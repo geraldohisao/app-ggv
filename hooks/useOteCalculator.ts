@@ -1,0 +1,201 @@
+
+import { useMemo } from 'react';
+import { OTEProfile } from '../types';
+import { SDR_REMUNERATION, CLOSER_REMUNERATION } from '../constants';
+
+// Define types for inputs to ensure type safety
+export type SdrInputs = {
+    perfil: OTEProfile.SDR;
+    nivel: string;
+    metaIndividualSQLs: string;
+    sqlsAceitosPeloCloser: string;
+    metaColetivaGlobal: string;
+    metaTrimestralSQLs: string;
+    realizadoTrimestralSQLs: string;
+    mqlsGerados: string;
+    metaAnualSQLs: string;
+    realizadoAnualSQLs: string;
+    mesesDeCasa: string;
+};
+
+export type CloserInputs = {
+    perfil: OTEProfile.Closer;
+    nivel: string;
+    metaMensalVendas: string;
+    vendasRealizadas: string;
+    metaColetivaGlobal: string;
+    sqlsDoTrimestre: string;
+    vendasDoTrimestre: string;
+    metaAnualAcumulada: string;
+    vendasRealizadasAno: string;
+    mesesDeCasa: string;
+};
+
+type CloserBonuses = {
+    campaign: { [key: string]: boolean };
+    product: { [key: string]: boolean };
+};
+
+type OTEInputs = SdrInputs | CloserInputs;
+
+// Helper function for tiered values
+const getTieredValue = (achievement: number, tiers: { threshold: number }[], values: number[]) => {
+    for (let i = 0; i < tiers.length; i++) {
+        if (achievement >= tiers[i].threshold) {
+            return values[i];
+        }
+    }
+    return 0;
+};
+
+// Hook implementation
+export const useOteCalculator = (
+    inputs: OTEInputs,
+    closerBonuses: CloserBonuses,
+    includeQuarterlyBonus: boolean,
+    includeAnnualBonus: boolean
+) => {
+    return useMemo(() => {
+        if (inputs.perfil === OTEProfile.Closer) {
+            const closerInputs = inputs as CloserInputs;
+            const nivelKey = CLOSER_REMUNERATION.levels[closerInputs.nivel as keyof typeof CLOSER_REMUNERATION.levels] || 'level1';
+            
+            const metaMensalVendas = parseFloat(closerInputs.metaMensalVendas || '0');
+            const vendasRealizadas = parseFloat(closerInputs.vendasRealizadas || '0');
+            const metaColetivaGlobalPerc = parseFloat(closerInputs.metaColetivaGlobal || '0') / 100;
+            const sqlsDoTrimestre = parseFloat(closerInputs.sqlsDoTrimestre || '0');
+            const vendasDoTrimestre = parseFloat(closerInputs.vendasDoTrimestre || '0');
+            const metaAnualAcumulada = parseFloat(closerInputs.metaAnualAcumulada || '0');
+            const vendasRealizadasAno = parseFloat(closerInputs.vendasRealizadasAno || '0');
+            const mesesDeCasa = Math.max(1, Math.min(12, parseInt(closerInputs.mesesDeCasa || '12', 10)));
+
+            const salarioFixo = CLOSER_REMUNERATION.fixedSalary[nivelKey as keyof typeof CLOSER_REMUNERATION.fixedSalary];
+            
+            const progressoMensal = metaMensalVendas > 0 ? (vendasRealizadas / metaMensalVendas) : 0;
+            
+            const getTieredRate = (achievement: number, tiers: {threshold: number, rate: number}[]) => {
+                for (let i = 0; i < tiers.length; i++) {
+                    if (achievement >= tiers[i].threshold) {
+                        return tiers[i].rate;
+                    }
+                }
+                return 0;
+            };
+
+            const comissaoRate = getTieredRate(progressoMensal, CLOSER_REMUNERATION.individualCommission.tiers);
+            const comissaoIndividualMeta = vendasRealizadas * comissaoRate;
+
+            const premiacaoColetiva = metaColetivaGlobalPerc >= CLOSER_REMUNERATION.teamBonus.threshold ? CLOSER_REMUNERATION.teamBonus.values[nivelKey as keyof typeof CLOSER_REMUNERATION.teamBonus.values] : 0;
+
+            const conversaoTrimestral = sqlsDoTrimestre > 0 ? (vendasDoTrimestre / sqlsDoTrimestre) : 0;
+            const quarterlyBonusRule = CLOSER_REMUNERATION.quarterlyBonus[nivelKey as keyof typeof CLOSER_REMUNERATION.quarterlyBonus];
+            const bonusTrimestralPotencial = (quarterlyBonusRule && conversaoTrimestral >= quarterlyBonusRule.threshold) 
+                ? quarterlyBonusRule.value 
+                : 0;
+
+            const metaTrimestralAtingida = bonusTrimestralPotencial > 0;
+            const premiacaoTrimestral = includeQuarterlyBonus ? bonusTrimestralPotencial : 0;
+
+            const progressoAnual = metaAnualAcumulada > 0 ? (vendasRealizadasAno / metaAnualAcumulada) : 0;
+            const fullAnnualBonus = CLOSER_REMUNERATION.annualBonus.values[nivelKey as keyof typeof CLOSER_REMUNERATION.annualBonus.values];
+            const bonusAnualPotencial = progressoAnual >= 1 ? (fullAnnualBonus / 12) * mesesDeCasa : 0;
+            const metaAnualAtingida = bonusAnualPotencial > 0;
+            const bonusAnual = includeAnnualBonus ? bonusAnualPotencial : 0;
+            
+            const bonusCampanha = Object.entries(closerBonuses.campaign).reduce((acc, [key, isChecked]) => {
+                if(isChecked) {
+                    acc += CLOSER_REMUNERATION.campaignBonus[key as keyof typeof CLOSER_REMUNERATION.campaignBonus][nivelKey as keyof typeof CLOSER_REMUNERATION.fixedSalary];
+                }
+                return acc;
+            }, 0);
+
+            const bonusProduto = Object.entries(closerBonuses.product).reduce((acc, [key, isChecked]) => {
+                if(isChecked) {
+                    acc += CLOSER_REMUNERATION.productBonus[key as keyof typeof CLOSER_REMUNERATION.productBonus][nivelKey as keyof typeof CLOSER_REMUNERATION.fixedSalary];
+                }
+                return acc;
+            }, 0);
+
+            const totalOte = salarioFixo + comissaoIndividualMeta + premiacaoColetiva + premiacaoTrimestral + bonusCampanha + bonusProduto + bonusAnual;
+
+            const calculateScenarioOTE = (achievement: number) => {
+                 const scenarioVendas = metaMensalVendas * achievement;
+                 const scenarioRate = getTieredRate(achievement, CLOSER_REMUNERATION.individualCommission.tiers);
+                 const scenarioCommission = scenarioVendas * scenarioRate;
+                 return salarioFixo + scenarioCommission;
+            };
+
+            return {
+                salarioFixo, comissaoIndividualMeta, premiacaoColetiva, premiacaoTrimestral, bonusCampanha, bonusProduto, bonusAnual, totalOte,
+                progressoMensal: progressoMensal * 100,
+                progressoTrimestral: conversaoTrimestral * 100,
+                progressoColetiva: metaColetivaGlobalPerc * 100,
+                progressoAnual: progressoAnual * 100,
+                oteBaixo: calculateScenarioOTE(0.75),
+                oteAlvo: calculateScenarioOTE(1.0),
+                oteAlto: calculateScenarioOTE(1.5),
+                metaTrimestralAtingida,
+                bonusTrimestralPotencial,
+                metaAnualAtingida,
+                bonusAnualPotencial,
+            };
+
+        } else { // SDR Profile
+            const sdrInputs = inputs as SdrInputs;
+            const nivelKey = SDR_REMUNERATION.levels[sdrInputs.nivel as keyof typeof SDR_REMUNERATION.levels] || 'level1';
+            
+            const metaIndividualSQLs = parseFloat(sdrInputs.metaIndividualSQLs || '0');
+            const sqlsAceitosPeloCloser = parseFloat(sdrInputs.sqlsAceitosPeloCloser || '0');
+            const metaColetivaGlobalPerc = parseFloat(sdrInputs.metaColetivaGlobal || '0') / 100;
+            const metaTrimestralSQLs = parseFloat(sdrInputs.metaTrimestralSQLs || '0');
+            const realizadoTrimestralSQLs = parseFloat(sdrInputs.realizadoTrimestralSQLs || '0');
+            const mqlsGerados = parseFloat(sdrInputs.mqlsGerados || '0');
+            const metaAnualSQLs = parseFloat(sdrInputs.metaAnualSQLs || '0');
+            const realizadoAnualSQLs = parseFloat(sdrInputs.realizadoAnualSQLs || '0');
+            const mesesDeCasa = Math.max(1, Math.min(12, parseInt(sdrInputs.mesesDeCasa || '12', 10)));
+            
+            const salarioFixo = SDR_REMUNERATION.fixedSalary[nivelKey as keyof typeof SDR_REMUNERATION.fixedSalary];
+            
+            const progressoMensal = metaIndividualSQLs > 0 ? (sqlsAceitosPeloCloser / metaIndividualSQLs) : 0;
+            const comissaoIndividual = getTieredValue(progressoMensal, SDR_REMUNERATION.individualCommission.tiers, SDR_REMUNERATION.individualCommission.values[nivelKey as keyof typeof SDR_REMUNERATION.individualCommission.values]);
+
+            const metaColetiva = getTieredValue(metaColetivaGlobalPerc, SDR_REMUNERATION.teamBonus.tiers, SDR_REMUNERATION.teamBonus.values[nivelKey as keyof typeof SDR_REMUNERATION.teamBonus.values]);
+            
+            const conversaoMQLSQL = mqlsGerados > 0 ? (sqlsAceitosPeloCloser / mqlsGerados) : 0;
+            const hasMetConversionForBonus = conversaoMQLSQL >= SDR_REMUNERATION.performanceBonus.threshold;
+            
+            const premioPerformance = hasMetConversionForBonus ? SDR_REMUNERATION.performanceBonus.values[nivelKey as keyof typeof SDR_REMUNERATION.performanceBonus.values] : 0;
+            
+            const progressoTrimestral = metaTrimestralSQLs > 0 ? (realizadoTrimestralSQLs / metaTrimestralSQLs) : 0;
+            const bonusTrimestralPotencial = getTieredValue(progressoTrimestral, SDR_REMUNERATION.quarterlyBonus.tiers, SDR_REMUNERATION.quarterlyBonus.values[nivelKey as keyof typeof SDR_REMUNERATION.quarterlyBonus.values]);
+            const metaTrimestralAtingida = bonusTrimestralPotencial > 0;
+            
+            const progressoAnual = metaAnualSQLs > 0 ? (realizadoAnualSQLs / metaAnualSQLs) : 0;
+            const fullAnnualBonus = SDR_REMUNERATION.annualBonus.values[nivelKey as keyof typeof SDR_REMUNERATION.annualBonus.values];
+            const bonusAnualPotencial = progressoAnual >= 1 ? (fullAnnualBonus / 12) * mesesDeCasa : 0;
+            const metaAnualAtingida = bonusAnualPotencial > 0;
+            
+            const metaTrimestral = includeQuarterlyBonus && metaTrimestralAtingida ? bonusTrimestralPotencial : 0;
+            const bonusAnual = includeAnnualBonus && metaAnualAtingida ? bonusAnualPotencial : 0;
+
+            const totalOte = salarioFixo + comissaoIndividual + metaColetiva + premioPerformance + metaTrimestral + bonusAnual;
+
+            const calculateScenarioOTE = (achievement: number) => {
+                const scenarioCommission = getTieredValue(achievement, SDR_REMUNERATION.individualCommission.tiers, SDR_REMUNERATION.individualCommission.values[nivelKey as keyof typeof SDR_REMUNERATION.individualCommission.values]);
+                return salarioFixo + scenarioCommission;
+            }
+            
+            return {
+                salarioFixo, comissaoIndividual, metaColetiva, premioPerformance, totalOte,
+                metaTrimestral, bonusAnual,
+                progressoMensal: progressoMensal * 100,
+                progressoTrimestral: progressoTrimestral * 100,
+                progressoColetiva: metaColetivaGlobalPerc * 100,
+                progressoConversao: SDR_REMUNERATION.performanceBonus.threshold > 0 ? Math.min(100, (conversaoMQLSQL / SDR_REMUNERATION.performanceBonus.threshold) * 100) : 0,
+                progressoAnual: progressoAnual * 100,
+                oteBaixo: calculateScenarioOTE(0.75), oteAlvo: calculateScenarioOTE(1.0), oteAlto: calculateScenarioOTE(1.5),
+                metaTrimestralAtingida, bonusTrimestralPotencial, metaAnualAtingida, bonusAnualPotencial,
+            };
+        }
+    }, [inputs, closerBonuses, includeQuarterlyBonus, includeAnnualBonus]);
+};

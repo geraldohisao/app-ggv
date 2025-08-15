@@ -1,0 +1,22 @@
+# TODO / Backlog
+
+- [ ] M1: Webhook + queue + download + transcrição + persistência
+  - [ ] Rota POST /webhooks/voip com HMAC e idempotência
+  - [ ] Job BullMQ process-call
+  - [ ] Storage: download → Disk → S3/MinIO
+  - [ ] Transcriber (stub + Deepgram/Whisper)
+  - [ ] Prisma migrations e persistência
+- [ ] M2: Extração LLM + scorecard + segments
+  - [ ] Prompts insights/scorecard/crm
+  - [ ] LLM.extract determinístico
+  - [ ] Segmentação básica por timestamps
+- [ ] M3: API de leitura + painel Next.js
+  - [ ] GET /calls e GET /calls/:id
+  - [ ] Web: listagem, detalhe com player, transcrição e artefatos
+- [ ] M4: Integração CRM + reprocessamento/manual push
+  - [ ] Feature-flag ENABLE_CRM_PUSH
+  - [ ] POST /calls/:id/push-crm
+- [ ] M5: Observabilidade, testes, hardening
+  - [ ] Pino logger, métricas
+  - [ ] Testes vitest (webhook parser, transcript normalize, CRM mapping)
+  - [ ] Retenção (RETENTION_DAYS), anonimização (HASH_PHONE_NUMBERS)

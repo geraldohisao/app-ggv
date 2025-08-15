@@ -1,0 +1,11 @@
+{
+  "templateKey": "diagnostico",
+  "items": [
+    { "key": "abertura", "weight": 1 },
+    { "key": "situacao", "weight": 1 },
+    { "key": "dor", "weight": 3 },
+    { "key": "impacto", "weight": 2 },
+    { "key": "solucao_fit", "weight": 2 },
+    { "key": "proximos_passos", "weight": 1 }
+  ]
+}

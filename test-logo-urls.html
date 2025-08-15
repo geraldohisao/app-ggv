@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste URLs dos Logos</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .logo-test { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .logo-test img { max-width: 200px; max-height: 100px; display: block; margin: 10px 0; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste das URLs dos Logos</h1>
+    
+    <div class="logo-test">
+        <h3>Logo Grupo GGV</h3>
+        <p><strong>URL:</strong> <code>https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png</code></p>
+        <img 
+            src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
+            alt="Logo Grupo GGV"
+            onload="document.getElementById('grupo-status').innerHTML = '✅ Carregou com sucesso'"
+            onerror="document.getElementById('grupo-status').innerHTML = '❌ Falhou ao carregar'"
+        />
+        <p id="grupo-status">🔄 Carregando...</p>
+    </div>
+    
+    <div class="logo-test">
+        <h3>Logo GGV Inteligência</h3>
+        <p><strong>URL:</strong> <code>https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image_1.svg</code></p>
+        <img 
+            src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image_1.svg" 
+            alt="Logo GGV Inteligência"
+            onload="document.getElementById('inteligencia-status').innerHTML = '✅ Carregou com sucesso'"
+            onerror="document.getElementById('inteligencia-status').innerHTML = '❌ Falhou ao carregar'"
+        />
+        <p id="inteligencia-status">🔄 Carregando...</p>
+    </div>
+    
+    <div class="logo-test">
+        <h3>Teste Alternativo - Logo GGV Inteligência</h3>
+        <p><strong>URL Alternativa:</strong> <code>https://ggvinteligencia.com.br/wp-content/uploads/2023/12/Logo-GGV-Inteligencia.svg</code></p>
+        <img 
+            src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/Logo-GGV-Inteligencia.svg" 
+            alt="Logo GGV Inteligência Alt"
+            onload="document.getElementById('inteligencia-alt-status').innerHTML = '✅ Carregou com sucesso'"
+            onerror="document.getElementById('inteligencia-alt-status').innerHTML = '❌ Falhou ao carregar'"
+        />
+        <p id="inteligencia-alt-status">🔄 Carregando...</p>
+    </div>
+
+    <script>
+        // Testar URLs via fetch
+        async function testUrl(url, statusElementId) {
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                const element = document.getElementById(statusElementId);
+                if (response.ok) {
+                    element.innerHTML += ' (Status: ' + response.status + ')';
+                    element.classList.add('success');
+                } else {
+                    element.innerHTML += ' (Status: ' + response.status + ')';
+                    element.classList.add('error');
+                }
+            } catch (error) {
+                const element = document.getElementById(statusElementId);
+                element.innerHTML += ' (Erro: ' + error.message + ')';
+                element.classList.add('error');
+            }
+        }
+
+        // Aguardar um pouco e testar via fetch
+        setTimeout(() => {
+            testUrl('https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png', 'grupo-status');
+            testUrl('https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image_1.svg', 'inteligencia-status');
+            testUrl('https://ggvinteligencia.com.br/wp-content/uploads/2023/12/Logo-GGV-Inteligencia.svg', 'inteligencia-alt-status');
+        }, 2000);
+    </script>
+</body>
+</html>

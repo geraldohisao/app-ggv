@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Pipedrive - GGV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold mb-6">🧪 Teste da Integração Pipedrive</h1>
+        
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Deal ID para teste:
+            </label>
+            <input
+                type="text"
+                id="dealId"
+                value="569934"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Digite o deal_id"
+            />
+        </div>
+
+        <button
+            onclick="testPipedrive()"
+            id="testBtn"
+            class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+            Testar Requisição GET
+        </button>
+
+        <div id="result" class="mt-6 hidden"></div>
+
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-medium text-gray-700 mb-2">Informações do Teste:</h4>
+            <ul class="text-sm text-gray-600 space-y-1">
+                <li><strong>Endpoint:</strong> <code class="bg-white px-1 rounded">https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register</code></li>
+                <li><strong>Método:</strong> GET</li>
+                <li><strong>Parâmetro:</strong> deal_id</li>
+                <li><strong>Headers:</strong> Content-Type: application/json</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const PIPEDRIVE_ENDPOINT = 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register';
+
+        async function testPipedrive() {
+            const dealId = document.getElementById('dealId').value;
+            const resultDiv = document.getElementById('result');
+            const testBtn = document.getElementById('testBtn');
+            
+            if (!dealId) {
+                alert('Digite um deal_id para testar');
+                return;
+            }
+
+            // Mostrar loading
+            testBtn.textContent = 'Testando...';
+            testBtn.disabled = true;
+            resultDiv.classList.add('hidden');
+
+            try {
+                console.log('🧪 TESTE - Iniciando teste do Pipedrive...');
+                console.log('🔗 TESTE - Endpoint:', PIPEDRIVE_ENDPOINT);
+                console.log('🆔 TESTE - Deal ID:', dealId);
+
+                const url = `${PIPEDRIVE_ENDPOINT}?deal_id=${encodeURIComponent(dealId)}`;
+                console.log('📍 TESTE - URL completa:', url);
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                });
+
+                console.log('📊 TESTE - Status da resposta:', response.status);
+                console.log('📋 TESTE - Headers da resposta:', Object.fromEntries(response.headers.entries()));
+
+                const responseText = await response.text();
+                console.log('📄 TESTE - Resposta raw:', responseText);
+
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('❌ TESTE - Erro ao fazer parse JSON:', parseError);
+                    responseData = { raw: responseText };
+                }
+
+                // Mostrar resultado
+                showResult(response.ok, responseData, response.status, response.ok ? null : `HTTP ${response.status}: ${response.statusText}`);
+
+                if (response.ok) {
+                    console.log('✅ TESTE - Sucesso:', responseData);
+                } else {
+                    console.error('❌ TESTE - Erro HTTP:', response.status, response.statusText);
+                }
+
+            } catch (error) {
+                console.error('❌ TESTE - Erro na requisição:', error);
+                showResult(false, null, null, error.message || 'Erro desconhecido');
+            } finally {
+                testBtn.textContent = 'Testar Requisição GET';
+                testBtn.disabled = false;
+            }
+        }
+
+        function showResult(success, data, status, error) {
+            const resultDiv = document.getElementById('result');
+            
+            const successClass = success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+            const iconClass = success ? 'text-green-600' : 'text-red-600';
+            const textClass = success ? 'text-green-800' : 'text-red-800';
+            const icon = success ? '✅' : '❌';
+            const statusText = success ? 'Sucesso!' : 'Erro na requisição';
+
+            let html = `
+                <div class="p-4 rounded-lg border ${successClass}">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg ${iconClass}">${icon}</span>
+                        <span class="font-medium ${textClass}">${statusText}</span>
+                        ${status ? `<span class="text-sm text-gray-600">(HTTP ${status})</span>` : ''}
+                    </div>
+            `;
+
+            if (error) {
+                html += `
+                    <p class="text-red-700 text-sm mb-2">
+                        <strong>Erro:</strong> ${error}
+                    </p>
+                `;
+            }
+
+            if (data) {
+                html += `
+                    <div>
+                        <h4 class="font-medium text-gray-700 mb-2">Dados recebidos:</h4>
+                        <pre class="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-60">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            
+            resultDiv.innerHTML = html;
+            resultDiv.classList.remove('hidden');
+        }
+
+        // Verificar se há deal_id na URL atual
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dealIdFromUrl = urlParams.get('deal_id');
+            if (dealIdFromUrl) {
+                document.getElementById('dealId').value = dealIdFromUrl;
+                console.log('🔍 Deal ID encontrado na URL:', dealIdFromUrl);
+            }
+        });
+    </script>
+</body>
+</html>
