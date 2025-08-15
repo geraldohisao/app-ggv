@@ -1,0 +1,5 @@
+# Redirects para SPA (Single Page Application)
+/*    /index.html   200
+
+# API redirects (se necessário)
+/api/*  https://your-api-domain.com/api/:splat  200
