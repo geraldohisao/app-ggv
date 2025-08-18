@@ -313,22 +313,30 @@ export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
 }
 
 // Nova função para enviar dados do diagnóstico para o webhook do Pipedrive
-export async function sendDiagnosticToPipedriveWebhook(
+export async function sendDiagnosticToPipedrive(
     companyData: CompanyData,
-    answers: Answers,
+    answers: Record<number, number>,
     totalScore: number,
     dealId?: string
 ): Promise<boolean> {
-    const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
+    const webhookUrl = 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
     
     try {
+        // Forçar uso do novo domínio em produção
+        const isProduction = window.location.hostname === 'app.grupoggv.com';
+        const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+        
         // Gerar link público do resultado
-        const resultUrl = `${window.location.origin}/resultado-diagnostico?deal_id=${dealId || 'unknown'}`;
+        const resultUrl = `${baseUrl}/resultado-diagnostico?deal_id=${dealId || 'unknown'}`;
+        
+        console.log('📤 WEBHOOK - URL do resultado:', resultUrl);
         
         // Função para converter pontuação em resposta textual
         const getAnswerText = (score: number): string => {
             if (score >= 8) return 'Sim';
-            if (score >= 5) return 'Parcialmente';
+            if (score >= 6) return 'Às vezes';
+            if (score >= 4) return 'N/A';
+            if (score >= 1) return '(Nenhum)';
             return 'Não';
         };
         

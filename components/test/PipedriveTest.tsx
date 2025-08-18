@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const PIPEDRIVE_ENDPOINT = 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register';
+const PIPEDRIVE_ENDPOINT = 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
 
 interface TestResult {
   success: boolean;

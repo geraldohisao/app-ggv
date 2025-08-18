@@ -49,15 +49,15 @@ const PublicResultPage: React.FC = () => {
                 maturityPercentage: '75%',
                 diagnosticAnswers: {
                     maturidade: 'Sim',
-                    mapeamento_processos: 'Parcialmente',
+                    mapeamento_processos: 'Às vezes',
                     crm: 'Sim',
-                    script_comercial: 'Parcialmente',
-                    teste_perfil_comportamental: 'Sim',
-                    plano_metas_comissionamento: 'Parcialmente',
+                    script_comercial: 'N/A',
+                    teste_perfil_comportamental: 'Às vezes',
+                    plano_metas_comissionamento: 'N/A',
                     indicadores_comerciais: 'Sim',
                     treinamentos_periodicos: 'Sim',
-                    acao_pos_venda: 'Parcialmente',
-                    prospeccao_ativa: 'Parcialmente',
+                    acao_pos_venda: 'Às vezes',
+                    prospeccao_ativa: '(Nenhum)',
                 },
                 resultUrl: window.location.href,
                 dealId: dealId,
@@ -111,7 +111,9 @@ const PublicResultPage: React.FC = () => {
     const getAnswerColor = (answer: string) => {
         switch (answer) {
             case 'Sim': return 'text-green-600';
-            case 'Parcialmente': return 'text-yellow-600';
+            case 'Às vezes': return 'text-yellow-600';
+            case 'N/A': return 'text-blue-600';
+            case '(Nenhum)': return 'text-gray-600';
             case 'Não': return 'text-red-600';
             default: return 'text-gray-600';
         }

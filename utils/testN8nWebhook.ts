@@ -16,11 +16,12 @@ interface WebhookTestResult {
 export async function testN8nWebhook(dealId: string = '569934'): Promise<WebhookTestResult> {
   // Usar proxy local em desenvolvimento
   const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const endpoint = isDevelopment
-    ? '/n8n-api/diag-ggv-register'
-    : 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register';
+
+  const ENDPOINT = isDevelopment 
+    ? 'http://localhost:8080/webhook-test/diag-ggv-register'
+    : 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
   
-  const url = `${endpoint}?deal_id=${encodeURIComponent(dealId)}`;
+  const url = `${ENDPOINT}?deal_id=${encodeURIComponent(dealId)}`;
   
   console.log('🧪 TESTE N8N - Verificando webhook...');
   console.log('📍 TESTE N8N - URL:', url);

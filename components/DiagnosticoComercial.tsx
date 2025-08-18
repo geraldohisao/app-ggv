@@ -3,7 +3,7 @@ import type { CompanyData, MarketSegment, Answers } from '../types';
 import { CompanyInfoForm } from './diagnostico/CompanyInfoForm';
 import { QuestionnaireView } from './diagnostico/QuestionnaireView';
 import { ResultsView } from './diagnostico/ResultsView';
-import { prefillFromN8n, sendDiagnosticToN8n, sendDiagnosticToPipedriveWebhook } from '../services/supabaseService';
+import { prefillFromN8n, sendDiagnosticToN8n, sendDiagnosticToPipedrive } from '../services/supabaseService';
 
 // Função de teste para simular dados do diagnóstico
 const testDiagnosticData = () => {
@@ -19,15 +19,15 @@ const testDiagnosticData = () => {
 
     const mockAnswers = {
         1: 8,  // Maturidade - Sim
-        2: 6,  // Mapeamento de processos - Parcialmente
+        2: 6,  // Mapeamento de processos - Às vezes
         3: 9,  // CRM - Sim
-        4: 5,  // Script comercial - Parcialmente
-        5: 7,  // Teste de perfil comportamental - Parcialmente
-        6: 4,  // Plano de metas/comissionamento - Não
+        4: 5,  // Script comercial - N/A
+        5: 7,  // Teste de perfil comportamental - Às vezes
+        6: 4,  // Plano de metas/comissionamento - N/A
         7: 8,  // Indicadores comerciais - Sim
         8: 9,  // Treinamentos periódicos - Sim
-        9: 6,  // Ação de pós-venda - Parcialmente
-        10: 3  // Prospecção ativa - Não
+        9: 6,  // Ação de pós-venda - Às vezes
+        10: 3  // Prospecção ativa - (Nenhum)
     };
 
     const mockTotalScore = 65; // 65%
@@ -109,7 +109,7 @@ export const DiagnosticoComercial: React.FC = () => {
             // Enviar para o webhook do Pipedrive (nova funcionalidade)
             if (dealId) {
                 console.log('📤 DIAGNÓSTICO - Enviando para webhook Pipedrive com deal_id:', dealId);
-                const success = await sendDiagnosticToPipedriveWebhook(
+                const success = await sendDiagnosticToPipedrive(
                     companyData,
                     answers,
                     totalScore,
@@ -150,7 +150,7 @@ export const DiagnosticoComercial: React.FC = () => {
         });
         
         try {
-            const success = await sendDiagnosticToPipedriveWebhook(
+            const success = await sendDiagnosticToPipedrive(
                 mockCompanyData,
                 mockAnswers,
                 mockTotalScore,

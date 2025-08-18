@@ -5,7 +5,7 @@ window.testN8nIntegration = async function(dealId = '569934') {
     console.log('🧪 TESTE N8N/PIPEDRIVE INTEGRATION');
     console.log('===================================');
     
-    const ENDPOINT = 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register';
+    const ENDPOINT = 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
     
     console.log('🔗 Endpoint:', ENDPOINT);
     console.log('🆔 Deal ID:', dealId);

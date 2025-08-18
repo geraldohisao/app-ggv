@@ -20,9 +20,10 @@ export interface UsePipedriveDataResult {
 
 // Usar proxy local em desenvolvimento para contornar CORS
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const PIPEDRIVE_ENDPOINT = isDevelopment
-  ? '/n8n-api/diag-ggv-register'  // Proxy local em desenvolvimento
-  : 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register'; // Direto em produção
+
+const PIPEDRIVE_WEBHOOK_URL = isDevelopment 
+    ? 'http://localhost:8080/webhook/diag-ggv-register' 
+    : 'https://app.grupoggv.com/api/webhook/diag-ggv-register'; // Direto em produção
 
 /**
  * Hook para capturar deal_id da URL e buscar dados do Pipedrive
@@ -83,7 +84,7 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
     
     try {
       // GARANTIR que deal_id seja sempre enviado como query parameter
-      const url = `${PIPEDRIVE_ENDPOINT}?deal_id=${encodeURIComponent(cleanDealId)}`;
+      const url = `${PIPEDRIVE_WEBHOOK_URL}?deal_id=${encodeURIComponent(cleanDealId)}`;
       console.log('📍 PIPEDRIVE - URL completa:', url);
       console.log('📋 PIPEDRIVE - Deal ID que será enviado:', cleanDealId);
       

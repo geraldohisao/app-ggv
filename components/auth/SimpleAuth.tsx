@@ -9,8 +9,15 @@ interface SimpleAuthProps {
 
 export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onAuthSuccess, onAuthError }) => {
   const [processing, setProcessing] = useState(false);
+  const [processed, setProcessed] = useState(false);
 
   useEffect(() => {
+    // Evitar processamento múltiplo
+    if (processed || processing) {
+      console.log('⏩ SIMPLE AUTH - Já processado ou processando, ignorando...');
+      return;
+    }
+
     // Detectar se estamos retornando do OAuth
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
@@ -23,9 +30,13 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onAuthSuccess, onAuthErr
     if (accessToken) {
       console.log('🔄 SIMPLE AUTH - Detectado tokens OAuth, processando...');
       setProcessing(true);
+      setProcessed(true);
       processOAuthTokens(accessToken, refreshToken, expiresIn, tokenType);
+    } else {
+      console.log('⚠️ SIMPLE AUTH - Nenhum token encontrado, encerrando...');
+      onAuthError('Nenhum token de autenticação encontrado');
     }
-  }, []);
+  }, [processed, processing]);
 
   const processOAuthTokens = async (
     accessToken: string, 

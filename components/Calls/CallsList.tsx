@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const API_BASE = (import.meta as any)?.env?.VITE_CALLS_API_BASE || 'http://localhost:8080';
+const API_BASE = (import.meta as any)?.env?.VITE_CALLS_API_BASE || 'https://app.grupoggv.com/api';
 
 export default function CallsList() {
   const [data, setData] = useState<{ items: any[]; total: number }>({ items: [], total: 0 });

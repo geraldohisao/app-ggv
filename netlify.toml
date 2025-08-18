@@ -6,6 +6,10 @@
   NODE_VERSION = "18.17.0"
   NPM_CONFIG_PRODUCTION = "false"
 
+# Configuração do domínio customizado
+[context.production]
+  domain = "app.grupoggv.com"
+
 # Redirects para SPA (Single Page Application)
 [[redirects]]
   from = "/*"
@@ -29,6 +33,7 @@
 # Configuração para arquivos de ambiente
 [context.production.environment]
   NODE_ENV = "production"
+  VITE_APP_DOMAIN = "app.grupoggv.com"
 
 [context.deploy-preview.environment]
   NODE_ENV = "production"

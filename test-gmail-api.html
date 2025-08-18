@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Gmail API - app.grupoggv.com</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Teste Gmail API - app.grupoggv.com</h1>
+        <p>Este teste verifica se o Gmail API está funcionando corretamente.</p>
+
+        <div class="test-section">
+            <h3>🔧 Configuração</h3>
+            <div class="status info" id="config-status">Verificando configuração...</div>
+            <button onclick="checkConfig()">Verificar Configuração</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🔐 Autenticação</h3>
+            <div class="status info" id="auth-status">Aguardando teste...</div>
+            <button onclick="testAuth()">Testar Autenticação</button>
+            <button onclick="forceReauth()">Forçar Reautenticação</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📧 Envio de E-mail</h3>
+            <div class="form-group">
+                <label for="test-email">E-mail de Destino:</label>
+                <input type="email" id="test-email" value="test@example.com" placeholder="Digite o e-mail de teste">
+            </div>
+            <div class="form-group">
+                <label for="test-subject">Assunto:</label>
+                <input type="text" id="test-subject" value="Teste Gmail API - app.grupoggv.com" placeholder="Assunto do e-mail">
+            </div>
+            <div class="form-group">
+                <label for="test-message">Mensagem:</label>
+                <textarea id="test-message" placeholder="Mensagem do e-mail">Este é um teste do Gmail API para verificar se está funcionando corretamente com o domínio app.grupoggv.com.
+
+URLs testadas:
+- Diagnóstico: https://app.grupoggv.com/diagnostico
+- Resultado: https://app.grupoggv.com/resultado-diagnostico
+
+Teste realizado em: ${new Date().toLocaleString()}</textarea>
+            </div>
+            <div class="status info" id="send-status">Aguardando teste...</div>
+            <button onclick="testSendEmail()">Enviar E-mail de Teste</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Logs de Debug</h3>
+            <button onclick="clearLog()">Limpar Log</button>
+            <div class="log" id="test-log"></div>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('test-log').innerHTML = '';
+        }
+
+        function updateStatus(elementId, status, message) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${status}`;
+            element.textContent = message;
+        }
+
+        async function checkConfig() {
+            log('🔧 Verificando configuração do Gmail...');
+            updateStatus('config-status', 'info', 'Verificando...');
+            
+            try {
+                // Verificar se as funções do Gmail estão disponíveis
+                if (typeof window.sendEmailViaGmail === 'undefined') {
+                    throw new Error('Funções do Gmail não estão disponíveis');
+                }
+                
+                updateStatus('config-status', 'success', '✅ Gmail API configurado');
+                log('✅ Configuração: OK');
+            } catch (error) {
+                updateStatus('config-status', 'error', '❌ Gmail API não configurado');
+                log('❌ Configuração: ' + error.message);
+            }
+        }
+
+        async function testAuth() {
+            log('🔐 Testando autenticação...');
+            updateStatus('auth-status', 'info', 'Testando...');
+            
+            try {
+                // Simular teste de autenticação
+                const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + (localStorage.getItem('gmail_access_token') || 'test')
+                    }
+                });
+                
+                if (response.status === 401) {
+                    updateStatus('auth-status', 'warning', '⚠️ Token expirado ou inválido');
+                    log('⚠️ Autenticação: Token expirado');
+                } else if (response.status === 403) {
+                    updateStatus('auth-status', 'error', '❌ Permissões insuficientes');
+                    log('❌ Autenticação: Permissões insuficientes');
+                } else if (response.ok) {
+                    updateStatus('auth-status', 'success', '✅ Autenticação OK');
+                    log('✅ Autenticação: OK');
+                } else {
+                    updateStatus('auth-status', 'error', '❌ Erro de autenticação');
+                    log('❌ Autenticação: Erro ' + response.status);
+                }
+            } catch (error) {
+                updateStatus('auth-status', 'error', '❌ Erro na autenticação');
+                log('❌ Autenticação: ' + error.message);
+            }
+        }
+
+        async function forceReauth() {
+            log('🔄 Forçando reautenticação...');
+            updateStatus('auth-status', 'info', 'Reautenticando...');
+            
+            try {
+                // Limpar tokens
+                localStorage.removeItem('gmail_access_token');
+                sessionStorage.removeItem('gmail_access_token');
+                
+                updateStatus('auth-status', 'success', '✅ Tokens limpos');
+                log('✅ Reautenticação: Tokens limpos');
+            } catch (error) {
+                updateStatus('auth-status', 'error', '❌ Erro na reautenticação');
+                log('❌ Reautenticação: ' + error.message);
+            }
+        }
+
+        async function testSendEmail() {
+            const email = document.getElementById('test-email').value;
+            const subject = document.getElementById('test-subject').value;
+            const message = document.getElementById('test-message').value;
+            
+            if (!email || !subject || !message) {
+                updateStatus('send-status', 'error', '❌ Preencha todos os campos');
+                return;
+            }
+            
+            log('📧 Enviando e-mail de teste...');
+            updateStatus('send-status', 'info', 'Enviando...');
+            
+            try {
+                // Simular envio de e-mail
+                const html = `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                        <h2>${subject}</h2>
+                        <p>${message.replace(/\n/g, '<br>')}</p>
+                        <hr>
+                        <p style="font-size: 12px; color: #666;">
+                            Enviado via Gmail API - app.grupoggv.com<br>
+                            Teste realizado em: ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+                `;
+                
+                // Aqui você chamaria a função real do Gmail
+                // await sendEmailViaGmail({ to: email, subject, html });
+                
+                // Simular sucesso
+                setTimeout(() => {
+                    updateStatus('send-status', 'success', '✅ E-mail enviado com sucesso (simulado)');
+                    log('✅ E-mail: Enviado com sucesso');
+                }, 2000);
+                
+            } catch (error) {
+                updateStatus('send-status', 'error', '❌ Erro ao enviar e-mail');
+                log('❌ E-mail: ' + error.message);
+            }
+        }
+
+        // Executar verificações iniciais
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkConfig();
+                testAuth();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

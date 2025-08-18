@@ -94,10 +94,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const processAuthState = async (session: any, source: string) => {
             if (!mounted) return;
             
-            // Se já está processando, aguardar um pouco e tentar novamente
+            // Se já está processando, ignorar esta tentativa para evitar loop
             if (authProcessing) {
-                console.log(`⏳ AUTH - Já processando, aguardando... (${source})`);
-                setTimeout(() => processAuthState(session, source), 1000);
+                console.log(`⏳ AUTH - Já processando, ignorando tentativa... (${source})`);
                 return;
             }
             
@@ -209,9 +208,15 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 2) Reagir a mudanças de auth com debounce
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (!mounted) return;
+            if (!mounted || authProcessing) return;
             
             console.log('🔄 AUTH - Evento:', event, session ? 'COM sessão' : 'SEM sessão');
+            
+            // Ignorar eventos redundantes para evitar loop
+            if (event === 'INITIAL_SESSION') {
+                console.log('⏩ AUTH - Ignorando INITIAL_SESSION (já processado)');
+                return;
+            }
             
             // Debounce para evitar múltiplas execuções
             if (authChangeTimeout) {
@@ -219,8 +224,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             
             authChangeTimeout = setTimeout(() => {
-                processAuthState(session, `evento-${event}`);
-            }, 300); // Reduzido de 500ms para 300ms para ser mais responsivo
+                if (!authProcessing && mounted) {
+                    processAuthState(session, `evento-${event}`);
+                }
+            }, 500);
         });
 
         // 3) Timeout de segurança - se ficar mais de 15 segundos carregando, forçar conclusão
@@ -264,7 +271,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(true);
         
         // Limpar URL de parâmetros de auth para evitar loops
-        const baseUrl = window.location.origin + window.location.pathname;
+        // Forçar uso do domínio correto em produção
+        const isProduction = window.location.hostname === 'app.grupoggv.com';
+        const baseOrigin = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+        const baseUrl = baseOrigin + window.location.pathname;
         const urlParams = new URLSearchParams(window.location.search);
         
         // Preservar apenas parâmetros importantes (não relacionados ao auth)
@@ -278,6 +288,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         const cleanUrl = baseUrl + (preservedParams.toString() ? '?' + preservedParams.toString() : '');
         
+        console.log('🔐 LOGIN - Domínio detectado:', {
+            hostname: window.location.hostname,
+            isProduction,
+            baseOrigin,
+            cleanUrl
+        });
+        
         console.log('🔐 LOGIN - Iniciando OAuth com redirect para:', cleanUrl);
         
         try {
@@ -288,7 +305,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     scopes: 'openid email profile https://www.googleapis.com/auth/gmail.send',
                     queryParams: {
                         include_granted_scopes: 'true',
-                        prompt: 'select_account' // Mudado de 'consent' para evitar loop
+                        prompt: isProduction ? 'select_account' : 'none' // Usar 'select_account' em produção
                     }
                 }
             });

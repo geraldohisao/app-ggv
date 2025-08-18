@@ -123,10 +123,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!supabase) return;
         
         try {
+            // Forçar uso do domínio correto em produção
+            const isProduction = window.location.hostname === 'app.grupoggv.com';
+            const redirectOrigin = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+            
+            console.log('🔐 SIMPLE LOGIN - Domínio detectado:', {
+                hostname: window.location.hostname,
+                isProduction,
+                redirectOrigin
+            });
+            
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: redirectOrigin
                 }
             });
             

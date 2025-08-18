@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { CompanyData } from '../../../types';
 import { XMarkIcon, CheckCircleIcon } from '../../ui/icons';
 import { FormInput } from '../../ui/Form';
-import { sendEmailViaGmail } from '../../../services/gmailService';
+import { sendEmailViaGmail, forceGmailReauth, checkGmailSetup } from '../../../services/gmailService';
 import { createPublicReport } from '../../../services/supabaseService';
 import { LOGO_URLS } from '../../../config/logos';
+import { CompanyData } from '../../../types';
 
 interface EmailModalProps {
     onClose: () => void;
@@ -17,6 +17,21 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
     const [isSent, setIsSent] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [gmailStatus, setGmailStatus] = useState<'checking' | 'configured' | 'not-configured'>('checking');
+
+    // Verificar status do Gmail ao carregar
+    React.useEffect(() => {
+        checkGmailStatus();
+    }, []);
+
+    const checkGmailStatus = async () => {
+        try {
+            const status = await checkGmailSetup();
+            setGmailStatus(status.configured ? 'configured' : 'not-configured');
+        } catch {
+            setGmailStatus('not-configured');
+        }
+    };
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,11 +42,19 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
         }
         try {
             setLoading(true);
-            let publicUrl = `${window.location.origin}`;
+            
+            // Forçar uso do novo domínio em produção
+            const isProduction = window.location.hostname === 'app.grupoggv.com';
+            const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+            
+            let publicUrl = baseUrl;
             if (reportData) {
                 const { token } = await createPublicReport(reportData, email);
-                publicUrl = `${window.location.origin}/r/${token}`;
+                publicUrl = `${baseUrl}/r/${token}`;
             }
+            
+            console.log('📧 EMAIL - URL do relatório:', publicUrl);
+            
             const intelLogo = LOGO_URLS.ggvInteligenciaLogoUrl;
             const subject = `Seu Diagnóstico Comercial – ${companyData.companyName}`;
             const html = `
@@ -55,11 +78,34 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                   <p style="font-size:12px;color:#64748b">Enviado por GGV Inteligência em Vendas.</p>
                 </div>
               </div>`;
+            
+            console.log('📧 EMAIL - Enviando e-mail para:', email);
             await sendEmailViaGmail({ to: email, subject, html });
             setIsSent(true);
             setTimeout(() => onClose(), 2000);
         } catch (err: any) {
-            setError(err?.message || 'Falha ao enviar e-mail pelo Gmail.');
+            console.error('❌ EMAIL - Erro ao enviar:', err);
+            
+            // Tratar erros específicos do Gmail
+            if (err?.message?.includes('insufficient authentication scopes') || err?.message?.includes('insufficient permissions')) {
+                setError('Gmail API: Permissões insuficientes. Clique em "Reautenticar" para resolver.');
+            } else {
+                setError(err?.message || 'Falha ao enviar e-mail pelo Gmail.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReauth = async () => {
+        try {
+            setLoading(true);
+            setError('');
+            await forceGmailReauth();
+            await checkGmailStatus();
+            setError('Reautenticação concluída. Tente enviar o e-mail novamente.');
+        } catch (err: any) {
+            setError('Erro na reautenticação: ' + (err?.message || 'Erro desconhecido'));
         } finally {
             setLoading(false);
         }
@@ -78,6 +124,26 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                 {!isSent ? (
                     <form onSubmit={handleSend}>
                         <p className="text-slate-600 mb-4">O relatório completo será enviado para o endereço de e-mail abaixo.</p>
+                        
+                        {/* Status do Gmail */}
+                        {gmailStatus === 'checking' && (
+                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-blue-700 text-sm">Verificando configuração do Gmail...</p>
+                            </div>
+                        )}
+                        
+                        {gmailStatus === 'not-configured' && (
+                            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-yellow-700 text-sm">⚠️ Gmail não configurado. Entre em contato com o suporte.</p>
+                            </div>
+                        )}
+                        
+                        {gmailStatus === 'configured' && (
+                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-green-700 text-sm">✅ Gmail configurado e pronto para uso.</p>
+                            </div>
+                        )}
+                        
                         <FormInput
                             id="send-email"
                             name="email"
@@ -88,9 +154,29 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                             error={error}
                             required
                         />
+                        
                         <div className="flex justify-end gap-4 mt-6">
                             <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-bold py-2 px-5 rounded-lg hover:bg-slate-300 transition-colors">Cancelar</button>
-                            <button type="submit" disabled={loading} className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-60">{loading ? 'Enviando...' : 'Enviar'}</button>
+                            
+                            {/* Botão de reautenticação se houver erro de permissão */}
+                            {error.includes('insufficient authentication scopes') || error.includes('insufficient permissions') ? (
+                                <button 
+                                    type="button" 
+                                    onClick={handleReauth} 
+                                    disabled={loading}
+                                    className="bg-orange-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-60"
+                                >
+                                    {loading ? 'Reautenticando...' : 'Reautenticar'}
+                                </button>
+                            ) : (
+                                <button 
+                                    type="submit" 
+                                    disabled={loading || gmailStatus === 'not-configured'} 
+                                    className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-60"
+                                >
+                                    {loading ? 'Enviando...' : 'Enviar'}
+                                </button>
+                            )}
                         </div>
                     </form>
                 ) : (

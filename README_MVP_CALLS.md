@@ -1,42 +1,31 @@
-# Calls MVP (MeetRox/Salesbud)
+# MVP Calls - Documentação da API
 
-## Como rodar (local)
-1) Copie `.env.example` para `.env` e ajuste as chaves.
-2) Suba serviços:
-```bash
-docker compose up --build
-```
-3) Rode migrações Prisma (em outro terminal):
-```bash
-# dentro do container api ou local com DATABASE_URL apontando para docker
-npx prisma migrate deploy --schema packages/shared/prisma/schema.prisma
-```
+## 📞 Endpoints da API
 
-## Endpoints
+### **Desenvolvimento**
 - POST `http://localhost:8080/webhooks/voip`
 - GET `http://localhost:8080/calls`
 - GET `http://localhost:8080/calls/:id`
 - POST `http://localhost:8080/calls/:id/push-crm`
 
-## Simular webhook
+### **Produção**
+- POST `https://app.grupoggv.com/api/webhooks/voip`
+- GET `https://app.grupoggv.com/api/calls`
+- GET `https://app.grupoggv.com/api/calls/:id`
+- POST `https://app.grupoggv.com/api/calls/:id/push-crm`
+
+## 🧪 Teste de Webhook
+
 ```bash
 curl -X POST http://localhost:8080/webhooks/voip \
- -H 'content-type: application/json' \
- -d '{
-  "event":"call.completed",
-  "call_id":"abc-123",
-  "from":"+551199999999",
-  "to":"+551188888888",
-  "agent_id":"agent-42",
-  "duration":300,
-  "recording_url":"https://example.com/audio.wav",
-  "timestamp":"2025-04-01T14:15:22Z",
-  "consent":true
- }'
+  -H "Content-Type: application/json" \
+  -d '{"call_id": "123", "status": "completed"}'
 ```
 
-## Guia de Teste Manual
-1) Disparar o webhook acima (ou com `x-signature` válido se `WEBHOOK_SECRET` setado).
-2) Ver no log do worker o job `process-call` sendo executado.
+## 📱 Interface Web
+
+### **Desenvolvimento**
 3) Abrir `http://localhost:3000` e visualizar a chamada listada.
-4) Entrar no detalhe e clicar em “Enviar para CRM” (se `ENABLE_CRM_PUSH=true`).
+
+### **Produção**
+3) Abrir `https://app.grupoggv.com/calls` e visualizar a chamada listada.
