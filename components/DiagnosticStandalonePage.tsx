@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProvider, useUser } from '../contexts/UserContext';
+import { UserProvider, useUser } from '../contexts/SimpleUserContext';
 import { DiagnosticoComercial } from './DiagnosticoComercial';
 import UserMenu from './UserMenu';
 import { Module } from '../types';

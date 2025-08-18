@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Roteamento - Diagnóstico</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-item { margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff; }
+        .url { background: #e9ecef; padding: 8px; border-radius: 4px; font-family: monospace; margin: 5px 0; }
+        .button { display: inline-block; background: #007bff; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; margin: 5px; }
+        .button:hover { background: #0056b3; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste de Roteamento - Diagnóstico</h1>
+        <p><strong>Verificar se a página de diagnóstico está funcionando corretamente</strong></p>
+        
+        <div class="status info">
+            <strong>ℹ️ Status Atual:</strong>
+            <div id="current-info"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>🏠 Página Principal</h3>
+            <div class="url">https://app.grupoggv.com/</div>
+            <p>Deve mostrar a aplicação principal com header e navegação completa</p>
+            <a href="https://app.grupoggv.com/" target="_blank" class="button">Testar</a>
+        </div>
+
+        <div class="test-item">
+            <h3>🎯 Página de Diagnóstico</h3>
+            <div class="url">https://app.grupoggv.com/diagnostico</div>
+            <p>Deve mostrar página específica do diagnóstico com header simplificado</p>
+            <a href="https://app.grupoggv.com/diagnostico" target="_blank" class="button">Testar</a>
+        </div>
+
+        <div class="test-item">
+            <h3>🎯 Diagnóstico com Deal ID</h3>
+            <div class="url">https://app.grupoggv.com/diagnostico?deal_id=569934</div>
+            <p>Deve mostrar diagnóstico com dados pré-carregados do deal</p>
+            <a href="https://app.grupoggv.com/diagnostico?deal_id=569934" target="_blank" class="button">Testar</a>
+        </div>
+
+        <div class="test-item">
+            <h3>📊 Resultado Público</h3>
+            <div class="url">https://app.grupoggv.com/resultado-diagnostico?deal_id=569934</div>
+            <p>Deve mostrar resultado público (sem login necessário)</p>
+            <a href="https://app.grupoggv.com/resultado-diagnostico?deal_id=569934" target="_blank" class="button">Testar</a>
+        </div>
+
+        <div class="test-item">
+            <h3>🔧 Debug OAuth</h3>
+            <div class="url">https://app.grupoggv.com/debug-oauth-production.html</div>
+            <p>Ferramenta de debug para problemas de autenticação</p>
+            <a href="https://app.grupoggv.com/debug-oauth-production.html" target="_blank" class="button">Testar</a>
+        </div>
+
+        <div class="test-item">
+            <h3>✅ Checklist de Verificação</h3>
+            <ul>
+                <li>✅ <strong>Roteamento implementado:</strong> App.tsx detecta /diagnostico</li>
+                <li>✅ <strong>Contexto unificado:</strong> Usa SimpleUserContext</li>
+                <li>✅ <strong>Sessão persistente:</strong> Configurada para 100+ horas</li>
+                <li>✅ <strong>OAuth corrigido:</strong> Domínio forçado em produção</li>
+                <li>⏳ <strong>Teste necessário:</strong> Verificar se carrega corretamente</li>
+            </ul>
+        </div>
+
+        <div class="test-item">
+            <h3>🚨 Se Ainda Não Funcionar</h3>
+            <ol>
+                <li><strong>Limpar cache:</strong> Ctrl+Shift+R (Windows) ou Cmd+Shift+R (Mac)</li>
+                <li><strong>Verificar console:</strong> F12 → Console → Procurar erros</li>
+                <li><strong>Verificar Network:</strong> F12 → Network → Ver se recursos carregam</li>
+                <li><strong>Testar incógnito:</strong> Para descartar problemas de cache</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar informações da página atual
+        document.getElementById('current-info').innerHTML = `
+            <strong>URL:</strong> ${window.location.href}<br>
+            <strong>Pathname:</strong> ${window.location.pathname}<br>
+            <strong>Search:</strong> ${window.location.search}<br>
+            <strong>Hostname:</strong> ${window.location.hostname}<br>
+            <strong>Produção:</strong> ${window.location.hostname === 'app.grupoggv.com' ? 'Sim' : 'Não'}
+        `;
+
+        // Verificar se estamos na página correta
+        if (window.location.pathname.includes('/diagnostico')) {
+            document.body.style.background = '#d4edda';
+            document.querySelector('h1').innerHTML += ' - 🎯 PÁGINA DE DIAGNÓSTICO DETECTADA!';
+        }
+    </script>
+</body>
+</html>
