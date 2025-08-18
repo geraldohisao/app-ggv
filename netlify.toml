@@ -1,9 +1,10 @@
 [build]
   publish = "dist"
-  command = "npm run build"
+  command = "npx tsc && npx vite build"
 
 [build.environment]
   NODE_VERSION = "18.17.0"
+  NPM_FLAGS = "--prefix=/opt/buildhome/nodejs/bin"
 
 # Redirects para SPA (Single Page Application)
 [[redirects]]
