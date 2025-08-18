@@ -31,9 +31,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
+        // Timeout de segurança para evitar loading infinito
+        const safetyTimeout = setTimeout(() => {
+            console.log('⚠️ SIMPLE AUTH - Timeout de segurança ativado, parando loading...');
+            setLoading(false);
+        }, 10000); // 10 segundos
+
         // Verificação simples de sessão
         const checkSession = async () => {
             try {
+                console.log('🔍 SIMPLE AUTH - Iniciando verificação de sessão...');
+                
                 // Primeiro verificar se há usuário de emergência
                 const emergencyUser = localStorage.getItem('ggv-emergency-user');
                 if (emergencyUser) {
@@ -42,6 +50,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         console.log('🚨 SIMPLE AUTH - Usuário de emergência encontrado:', user.email);
                         setUser(user);
                         setLoading(false);
+                        clearTimeout(safetyTimeout);
                         return;
                     } catch (e) {
                         console.warn('⚠️ SIMPLE AUTH - Erro ao carregar usuário de emergência:', e);
@@ -49,10 +58,21 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     }
                 }
 
-                const { data: { session } } = await supabase.auth.getSession();
+                console.log('🔍 SIMPLE AUTH - Verificando sessão do Supabase...');
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                    console.error('❌ SIMPLE AUTH - Erro ao obter sessão:', error);
+                    setUser(null);
+                    setLoading(false);
+                    clearTimeout(safetyTimeout);
+                    return;
+                }
+                
                 console.log('🔐 AUTH - Sessão:', session ? 'ENCONTRADA' : 'NÃO ENCONTRADA');
                 
                 if (session?.user) {
+                    console.log('👤 SIMPLE AUTH - Processando dados do usuário...');
                     // Criar usuário simples
                     const email = session.user.email || '';
                     const forcedRole = (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br')
@@ -70,17 +90,19 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         initials: (properName || 'U').split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase(),
                         role: forcedRole,
                     };
-                    console.log('🔐 SIMPLE AUTH - Usuário criado:', simpleUser.email, 'Role:', simpleUser.role);
+                    console.log('✅ SIMPLE AUTH - Usuário criado:', simpleUser.email, 'Role:', simpleUser.role);
                     setUser(simpleUser);
                 } else {
                     console.log('🔐 SIMPLE AUTH - Nenhuma sessão encontrada');
                     setUser(null);
                 }
             } catch (error) {
-                console.warn('⚠️ AUTH - Erro na verificação:', error);
+                console.error('❌ AUTH - Erro na verificação:', error);
                 setUser(null);
             } finally {
+                console.log('🏁 SIMPLE AUTH - Finalizando verificação, parando loading...');
                 setLoading(false);
+                clearTimeout(safetyTimeout);
             }
         };
 

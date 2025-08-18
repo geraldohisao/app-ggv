@@ -119,8 +119,9 @@ const LoginPage: React.FC = () => {
                             <div className="mt-2 text-center text-xs text-blue-600">
                                 {isProcessingOAuth ? 'Processando tokens do Google...' : 'Carregando dados do usuário...'}
                             </div>
-                            {/* Botão de emergência */}
-                            <div className="mt-3 text-center">
+                            
+                            {/* Botões de emergência */}
+                            <div className="mt-3 flex flex-col gap-2">
                                 <button
                                     onClick={() => {
                                         console.log('🚨 EMERGÊNCIA - Limpando e recarregando...');
@@ -132,6 +133,13 @@ const LoginPage: React.FC = () => {
                                     className="text-xs text-red-600 hover:text-red-800 underline"
                                 >
                                     Problema? Clique para limpar e tentar novamente
+                                </button>
+                                
+                                <button
+                                    onClick={handleEmergencyLogin}
+                                    className="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded border"
+                                >
+                                    🚨 Forçar Acesso de Emergência
                                 </button>
                             </div>
                         </div>
