@@ -1,9 +1,9 @@
 [build]
   publish = "dist"
-  command = "npm install && npm run build"
+  command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "18.17.0"
 
 # Redirects para SPA (Single Page Application)
 [[redirects]]
