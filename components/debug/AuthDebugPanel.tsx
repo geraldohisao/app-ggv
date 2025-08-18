@@ -93,7 +93,8 @@ export const AuthDebugPanel: React.FC<AuthDebugPanelProps> = ({ visible = false 
             if (supabase) {
               supabase.auth.getSession().then(({ data: { session } }) => {
                 console.log('🔍 DEBUG - Sessão atual:', session);
-                addEvent(`Sessão manual: ${session ? 'ATIVA' : 'INATIVA'}`);
+                const timestamp = new Date().toLocaleTimeString();
+                setAuthEvents(prev => [...prev.slice(-9), `${timestamp}: Sessão manual: ${session ? 'ATIVA' : 'INATIVA'}`]);
               });
             }
           }}
@@ -105,7 +106,8 @@ export const AuthDebugPanel: React.FC<AuthDebugPanelProps> = ({ visible = false 
           onClick={() => {
             const url = window.location.href;
             const hasAuth = url.includes('access_token') || url.includes('#access_token');
-            addEvent(`URL tem auth: ${hasAuth ? 'SIM' : 'NÃO'}`);
+            const timestamp = new Date().toLocaleTimeString();
+            setAuthEvents(prev => [...prev.slice(-9), `${timestamp}: URL tem auth: ${hasAuth ? 'SIM' : 'NÃO'}`]);
             console.log('🔍 DEBUG - URL completa:', url);
           }}
           className="px-2 py-1 bg-green-700 rounded text-xs"

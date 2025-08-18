@@ -52,8 +52,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const withTimeout = async <T,>(p: Promise<T>, ms: number): Promise<T> => {
             return await Promise.race([
                 p,
-                new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timeout(${ms}ms)`)), ms)) as any,
-            ]) as T;
+                new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timeout(${ms}ms)`)), ms)),
+            ]);
         };
 
         const cleanAuthParamsFromUrl = () => {
@@ -194,7 +194,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
                 
                 console.log('🔐 AUTH - Verificando sessão inicial...');
-                const { data: { session } } = await withTimeout(supabase.auth.getSession(), 8000);
+                const result = await withTimeout(supabase.auth.getSession(), 8000) as any;
+                const { data: { session } } = result;
                 await processAuthState(session, 'inicial');
             } catch (error) {
                 console.warn('⚠️ AUTH - Falha na verificação inicial:', (error as any)?.message);

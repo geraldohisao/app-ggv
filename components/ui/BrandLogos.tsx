@@ -1,12 +1,13 @@
 import React from 'react';
-import { LOGO_URLS } from '../../config/logos';
 
-// URLs fixas - não depende mais do Supabase
+// URLs fixas para o GrupoGGV (mantido para compatibilidade)
+const FIXED_LOGOS = {
+  grupoGGVLogoUrl: 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png',
+  ggvInteligenciaLogoUrl: 'https://ggvinteligencia.com.br/wp-content/uploads/2023/12/Logo-GGV-Inteligencia.svg',
+};
+
 const useBrandLogos = () => {
-  return {
-    grupoGGVLogoUrl: LOGO_URLS.grupoGGVLogoUrl,
-    ggvInteligenciaLogoUrl: LOGO_URLS.ggvInteligenciaLogoUrl,
-  };
+  return FIXED_LOGOS;
 };
 
 // Fallback simples em SVG para quando a URL do logo não estiver configurada
@@ -51,52 +52,17 @@ export const GrupoGGVBrand: React.FC<{ className?: string; alt?: string }>
   );
 };
 
-// Fallback SVG para GGV Inteligência
-const GGVInteligenciaFallbackLogo: React.FC<{ className?: string; alt?: string }> = ({ className, alt }) => (
-  <svg viewBox="0 0 200 60" className={className} role="img" aria-label={alt}>
-    <title>{alt}</title>
-    {/* Logo GGV */}
-    <circle cx="30" cy="30" r="25" fill="#1e40af" />
-    <text x="30" y="38" textAnchor="middle" fontFamily="Inter, system-ui, sans-serif" fontWeight="900" fontSize="20" fill="white">GGV</text>
-    {/* Texto Inteligência */}
-    <text x="70" y="25" fontFamily="Inter, system-ui, sans-serif" fontWeight="600" fontSize="16" fill="#1e40af">Inteligência</text>
-    <text x="70" y="42" fontFamily="Inter, system-ui, sans-serif" fontWeight="400" fontSize="12" fill="#64748b">em Vendas</text>
-  </svg>
-);
+
 
 export const GGVInteligenciaBrand: React.FC<{ className?: string; alt?: string }>
   = ({ className, alt = 'GGV Inteligência' }) => {
-  const urls = useBrandLogos();
-  
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.warn('Logo GGV Inteligência falhou, usando fallback SVG');
-    const target = e.target as HTMLImageElement;
-    target.style.display = 'none';
-    const parent = target.parentNode;
-    if (parent) {
-      const fallback = document.createElement('div');
-      fallback.innerHTML = `
-        <svg viewBox="0 0 200 60" class="${className}" role="img" aria-label="${alt}">
-          <title>${alt}</title>
-          <circle cx="30" cy="30" r="25" fill="#1e40af" />
-          <text x="30" y="38" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="20" fill="white">GGV</text>
-          <text x="70" y="25" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="16" fill="#1e40af">Inteligência</text>
-          <text x="70" y="42" font-family="Inter, system-ui, sans-serif" font-weight="400" font-size="12" fill="#64748b">em Vendas</text>
-        </svg>
-      `;
-      parent.appendChild(fallback);
-    }
-  };
-  
   return (
     <img 
-      src={urls.ggvInteligenciaLogoUrl} 
-      alt={alt} 
+      src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg"
+      alt={alt}
       className={className}
-      referrerPolicy="no-referrer" 
-      loading="eager" 
-      decoding="async"
-      onError={handleError}
+      loading="eager"
+      referrerPolicy="no-referrer"
     />
   );
 };

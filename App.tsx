@@ -10,20 +10,38 @@ import Header from './components/Header';
 import CallsList from './components/Calls/CallsList';
 import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
-import { UserProvider, useUser } from './contexts/UserContext';
+import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
+import PublicResultPage from './components/PublicResultPage';
+import { UserProvider, useUser } from './contexts/SimpleUserContext';
 import { LoadingSpinner } from './components/ui/Feedback';
 import { AuthDebugPanel, useAuthDebug } from './components/debug/AuthDebugPanel';
+import { RobustDebugPanel } from './components/debug/RobustDebugPanel';
 import { initializeLogos } from './utils/fetchLogosFromDatabase';
+
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useUser();
   const [activeModule, setActiveModule] = useState<Module>(Module.Diagnostico);
   const { debugVisible } = useAuthDebug();
 
-  // Inicializar sistema de logos
+  // Verificar se é uma página de resultado público
+  const isPublicResultPage = window.location.pathname === '/resultado-diagnostico';
+
+  // Inicializa o sistema de logos uma única vez no início do app
   useEffect(() => {
-    initializeLogos();
+    if (typeof window !== 'undefined') {
+      // pequena espera para garantir supabase pronto em ambientes locais
+      const timer = setTimeout(() => {
+        initializeLogos();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
   }, []);
+
+  // Se for página de resultado público, não precisa de autenticação
+  if (isPublicResultPage) {
+    return <PublicResultPage />;
+  }
 
   if (loading) {
     return (
@@ -38,6 +56,7 @@ const AppContent: React.FC = () => {
       <>
         <LoginPage />
         <AuthDebugPanel visible={debugVisible} />
+        <RobustDebugPanel />
       </>
     );
   }
@@ -60,6 +79,8 @@ const AppContent: React.FC = () => {
         return <OpportunityFeedbackPage />;
       case Module.Calls:
         return <CallsList />;
+      case Module.ReativacaoLeads:
+        return <ReativacaoLeadsPage />;
       default:
         return <DiagnosticoComercial />;
     }
@@ -76,6 +97,7 @@ const AppContent: React.FC = () => {
         {renderModule()}
       </main>
       <AuthDebugPanel visible={debugVisible} />
+      <RobustDebugPanel />
     </div>
   );
 };

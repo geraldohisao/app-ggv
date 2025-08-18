@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste GGV App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste da Aplicação GGV</h1>
+    
+    <div id="status" class="status info">
+        Iniciando testes...
+    </div>
+
+    <div>
+        <button onclick="testServer()">Testar Servidor</button>
+        <button onclick="loadApp()">Carregar App</button>
+        <button onclick="openInNewTab()">Abrir em Nova Aba</button>
+        <button onclick="checkConsole()">Verificar Console</button>
+    </div>
+
+    <div id="results"></div>
+
+    <iframe id="appFrame" src="about:blank"></iframe>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        const appFrame = document.getElementById('appFrame');
+
+        function updateStatus(message, type = 'info') {
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            resultsDiv.appendChild(div);
+        }
+
+        async function testServer() {
+            updateStatus('Testando servidor...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:5173');
+                if (response.ok) {
+                    updateStatus('✅ Servidor respondendo corretamente!', 'success');
+                    addResult('Servidor OK - Status: ' + response.status, 'success');
+                } else {
+                    updateStatus('⚠️ Servidor respondeu com erro: ' + response.status, 'warning');
+                    addResult('Erro do servidor: ' + response.status, 'error');
+                }
+            } catch (error) {
+                updateStatus('❌ Erro ao conectar com servidor: ' + error.message, 'error');
+                addResult('Erro de conexão: ' + error.message, 'error');
+            }
+        }
+
+        function loadApp() {
+            updateStatus('Carregando aplicação no iframe...', 'info');
+            appFrame.src = 'http://localhost:5173';
+            
+            appFrame.onload = function() {
+                updateStatus('✅ Aplicação carregada no iframe!', 'success');
+                addResult('App carregado no iframe', 'success');
+                
+                // Tentar acessar o documento do iframe
+                try {
+                    const iframeDoc = appFrame.contentDocument || appFrame.contentWindow.document;
+                    const title = iframeDoc.title;
+                    addResult('Título da página: ' + title, 'info');
+                    
+                    // Verificar se há erros visíveis
+                    const bodyText = iframeDoc.body.innerText;
+                    if (bodyText.includes('Error') || bodyText.includes('Erro')) {
+                        addResult('⚠️ Possível erro detectado na página', 'warning');
+                    } else {
+                        addResult('✅ Nenhum erro visível detectado', 'success');
+                    }
+                } catch (e) {
+                    addResult('⚠️ Não foi possível acessar conteúdo do iframe (CORS)', 'warning');
+                }
+            };
+            
+            appFrame.onerror = function() {
+                updateStatus('❌ Erro ao carregar aplicação no iframe', 'error');
+                addResult('Erro no carregamento do iframe', 'error');
+            };
+        }
+
+        function openInNewTab() {
+            updateStatus('Abrindo aplicação em nova aba...', 'info');
+            window.open('http://localhost:5173', '_blank');
+            addResult('Nova aba aberta', 'info');
+        }
+
+        function checkConsole() {
+            updateStatus('Verificando console...', 'info');
+            console.log('🔍 TESTE: Verificação do console');
+            console.warn('🔍 TESTE: Warning de teste');
+            console.error('🔍 TESTE: Error de teste');
+            addResult('Logs de teste enviados para o console', 'info');
+        }
+
+        // Iniciar teste automático
+        window.addEventListener('load', function() {
+            setTimeout(testServer, 1000);
+        });
+
+        // Monitorar erros globais
+        window.addEventListener('error', function(e) {
+            addResult('❌ Erro JavaScript: ' + e.message, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            addResult('❌ Promise rejeitada: ' + e.reason, 'error');
+        });
+    </script>
+</body>
+</html>

@@ -116,11 +116,3 @@ export async function initializeLogos(): Promise<void> {
     fetchAndSaveLogosFromDatabase();
   }, 60 * 60 * 1000);
 }
-
-// Executar automaticamente quando o módulo for importado
-if (typeof window !== 'undefined') {
-  // Aguardar um pouco para o Supabase inicializar
-  setTimeout(() => {
-    initializeLogos();
-  }, 1000);
-}

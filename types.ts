@@ -17,6 +17,8 @@ export enum Module {
   Calculadora = 'CALCULADORA',
   Settings = 'SETTINGS',
   OpportunityFeedback = 'OPPORTUNITY_FEEDBACK',
+  Calls = 'CALLS',
+  ReativacaoLeads = 'REATIVACAO_LEADS',
 }
 
 export enum UserRole {

@@ -52,10 +52,163 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
         }
     };
     
+    // Função para mapear valores do N8N para valores das constantes
+    const mapPipedriveValues = (data: Partial<CompanyData>) => {
+        const mapped = { ...data };
+        
+        // MAPEAMENTO DE FATURAMENTO - Converter valores N8N para formato das constantes
+        if (data.monthlyBilling) {
+            console.log('💰 FORM - Faturamento original:', data.monthlyBilling);
+            console.log('💰 FORM - Tipo:', typeof data.monthlyBilling);
+            
+            // MAPEAMENTO ESPECÍFICO DOS VALORES N8N
+            const faturamentoMap: Record<string, string> = {
+                // Valores que vem do N8N → Valores das constantes
+                '601 a 1 milhão/mês': 'R$ 601 mil a 1 milhão/mês',
+                '€01 a 1 milhão/mês': 'R$ 601 mil a 1 milhão/mês',
+                '21 a 50 mil/mês': 'R$ 21 a 50 mil/mês',
+                '51 a 100 mil/mês': 'R$ 51 a 100 mil/mês',
+                '101 a 300 mil/mês': 'R$ 101 a 300 mil/mês',
+                '301 a 600 mil/mês': 'R$ 301 a 600 mil/mês',
+                'Acima de 1 milhão/mês': 'Acima de R$ 1 milhão/mês',
+                'Nenhum faturamento': 'Nenhum faturamento'
+            };
+            
+            // Tentar mapeamento direto
+            if (faturamentoMap[data.monthlyBilling]) {
+                mapped.monthlyBilling = faturamentoMap[data.monthlyBilling];
+                console.log('💰 FORM - ✅ Mapeamento direto:', data.monthlyBilling, '→', mapped.monthlyBilling);
+            } else if (FATURAMENTO_MENSAL.includes(data.monthlyBilling)) {
+                // Se já estiver em formato válido, manter
+                mapped.monthlyBilling = data.monthlyBilling;
+                console.log('💰 FORM - ✅ Faturamento válido mantido:', data.monthlyBilling);
+            } else {
+                // Fallback baseado em números
+                if (data.monthlyBilling.includes('601') || data.monthlyBilling.includes('1 milhão')) {
+                    mapped.monthlyBilling = 'R$ 601 mil a 1 milhão/mês';
+                    console.log('💰 FORM - 🔄 Fallback baseado em conteúdo (601/1milhão):', mapped.monthlyBilling);
+                } else {
+                    mapped.monthlyBilling = 'Acima de R$ 1 milhão/mês';
+                    console.log('💰 FORM - 🔄 Fallback genérico:', mapped.monthlyBilling);
+                }
+            }
+        }
+        
+        // MAPEAMENTO DE SETOR - buscar em todos os campos possíveis
+        const setorCandidatos = [
+            data.activitySector,
+            (data as any)['setor_de_atuação'], // COM ACENTOS - PRINCIPAL!
+            (data as any).setor_de_atuacao,    // Sem acentos - fallback
+            (data as any).setor,
+            (data as any).activity_sector
+        ].filter(Boolean);
+        
+        console.log('🎯 FORM - Candidatos a setor encontrados:', setorCandidatos);
+        console.log('🎯 FORM - Array SETORES_DE_ATUACAO (primeiros 10):', SETORES_DE_ATUACAO.slice(0, 10));
+        console.log('🎯 FORM - Procurando por "Consultoria":', SETORES_DE_ATUACAO.filter(s => s.includes('Consultoria')));
+        
+        if (setorCandidatos.length > 0) {
+            const setorOriginal = setorCandidatos[0];
+            const setorLimpo = setorOriginal.trim(); // Remover espaços extras
+            
+            console.log('🎯 FORM - Setor original:', `"${setorOriginal}"`);
+            console.log('🎯 FORM - Setor limpo:', `"${setorLimpo}"`);
+            console.log('🎯 FORM - Tamanho do setor:', setorLimpo.length);
+            
+            // Verificar se existe exatamente
+            const existeExato = SETORES_DE_ATUACAO.includes(setorLimpo);
+            console.log('🎯 FORM - Existe exato?', existeExato);
+            
+            if (existeExato) {
+                mapped.activitySector = setorLimpo;
+                console.log('✅ FORM - Setor exato aplicado:', setorLimpo);
+            } else {
+                // Buscar por correspondência parcial (case insensitive)
+                console.log('🔍 FORM - Buscando setor por correspondência...');
+                
+                const setorEncontrado = SETORES_DE_ATUACAO.find(opcao => {
+                    const opcaoLimpa = opcao.trim().toLowerCase();
+                    const setorBusca = setorLimpo.toLowerCase();
+                    const match = opcaoLimpa === setorBusca || 
+                                  opcaoLimpa.includes('consultoria') && setorBusca.includes('consultoria');
+                    
+                    if (match) {
+                        console.log('🎯 FORM - Match encontrado:', opcao, '←→', setorLimpo);
+                    }
+                    return match;
+                });
+                
+                if (setorEncontrado) {
+                    mapped.activitySector = setorEncontrado;
+                    console.log('✅ FORM - Setor encontrado por busca:', setorEncontrado);
+                } else {
+                    console.log('❌ FORM - Setor não encontrado em nenhuma busca');
+                    console.log('📋 FORM - Setores com "Consultoria":', 
+                        SETORES_DE_ATUACAO.filter(s => s.toLowerCase().includes('consultoria'))
+                    );
+                }
+            }
+        } else {
+            console.log('❌ FORM - Nenhum setor encontrado nos dados');
+        }
+        
+        return mapped;
+    };
+
     // Atualiza com prefill quando chegar depois do primeiro render
     useEffect(() => {
+        console.log('🔄 FORM - useEffect executado');
+        console.log('📥 FORM - Prefill recebido:', prefill);
+        
         if (prefill) {
-            setFormData(prev => ({ ...prev, ...prefill } as CompanyData));
+            console.log('🎯 FORM - ANÁLISE DETALHADA DOS DADOS RECEBIDOS:');
+            console.log('  - prefill.activitySector:', `"${prefill.activitySector}"`);
+            console.log('  - prefill.setor_de_atuacao:', `"${(prefill as any).setor_de_atuacao}"`);
+            console.log('  - prefill["setor_de_atuação"]:', `"${(prefill as any)['setor_de_atuação']}"`);
+            console.log('  - Tipo activitySector:', typeof prefill.activitySector);
+            console.log('  - Todas as chaves do prefill:', Object.keys(prefill));
+            console.log('📝 FORM - Aplicando mapeamento...');
+            
+            const mappedPrefill = mapPipedriveValues(prefill);
+            
+            console.log('📝 FORM - Dados finais que serão aplicados:', mappedPrefill);
+            
+            // Verificar se os valores mapeados existem nas constantes
+            console.log('🔍 FORM - Verificando se valores existem nas opções:');
+            console.log('💰 FORM - Faturamento mapeado existe?', FATURAMENTO_MENSAL.includes(mappedPrefill.monthlyBilling || ''));
+            console.log('🎯 FORM - Setor mapeado existe?', SETORES_DE_ATUACAO.includes(mappedPrefill.activitySector as any || ''));
+            console.log('📋 FORM - Opções de faturamento:', FATURAMENTO_MENSAL);
+            
+            // Aplicar dados com delay para garantir que DOM esteja pronto
+            setTimeout(() => {
+                setFormData(prev => {
+                    const newData = { ...prev, ...mappedPrefill } as CompanyData;
+                    console.log('📝 FORM - FormData final aplicado:', newData);
+                    
+                    // Log específico dos campos que não estão preenchendo
+                    console.log('💰 FORM - Faturamento no formData:', newData.monthlyBilling);
+                    console.log('🎯 FORM - Setor no formData:', newData.activitySector);
+                    
+                    // Verificar se os valores estão nas opções disponíveis
+                    const faturamentoValido = FATURAMENTO_MENSAL.includes(newData.monthlyBilling || '');
+                    const setorValido = SETORES_DE_ATUACAO.includes(newData.activitySector as any || '');
+                    
+                    console.log('✅ FORM - Faturamento válido para select:', faturamentoValido);
+                    console.log('✅ FORM - Setor válido para select:', setorValido);
+                    
+                    if (!faturamentoValido) {
+                        console.log('❌ FORM - Faturamento não encontrado nas opções:', newData.monthlyBilling);
+                        console.log('📋 FORM - Opções disponíveis:', FATURAMENTO_MENSAL);
+                    }
+                    
+                    if (!setorValido) {
+                        console.log('❌ FORM - Setor não encontrado nas opções:', newData.activitySector);
+                        console.log('📋 FORM - Opções disponíveis:', SETORES_DE_ATUACAO.slice(0, 10), '...');
+                    }
+                    
+                    return newData;
+                });
+            }, 100); // Aguardar 100ms
         }
     }, [prefill]);
 

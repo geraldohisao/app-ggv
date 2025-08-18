@@ -3,9 +3,10 @@ import { Module, UserRole } from '../types';
 import { 
     ArrowLeftOnRectangleIcon,
     Cog6ToothIcon,
-    FlagIcon 
+    FlagIcon,
+    BoltIcon
 } from './ui/icons';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/SimpleUserContext';
 import { supabase } from '../services/supabaseClient';
 
 
@@ -94,12 +95,20 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                         />
                         {/* Sincronizar Função removido: agora usamos profiles.user_function diretamente */}
                         {canSeeSettings && (
-                            <MenuItem 
-                                icon={<Cog6ToothIcon className="w-5 h-5"/>} 
-                                text="Configurações" 
-                                isActive={activeModule === Module.Settings}
-                                onClick={() => handleSelectModule(Module.Settings)}
-                            />
+                            <>
+                                <MenuItem 
+                                    icon={<BoltIcon className="w-5 h-5"/>} 
+                                    text="Reativação de Leads (N8N)" 
+                                    isActive={activeModule === Module.ReativacaoLeads}
+                                    onClick={() => handleSelectModule(Module.ReativacaoLeads)}
+                                />
+                                <MenuItem 
+                                    icon={<Cog6ToothIcon className="w-5 h-5"/>} 
+                                    text="Configurações" 
+                                    isActive={activeModule === Module.Settings}
+                                    onClick={() => handleSelectModule(Module.Settings)}
+                                />
+                            </>
                         )}
                     </ul>
                     

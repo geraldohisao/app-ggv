@@ -1,5 +1,4 @@
 import React from 'react';
-import { GrupoGGVBrand } from '../ui/BrandLogos';
 
 type AppBrandProps = {
   className?: string;
@@ -14,7 +13,13 @@ const sizeToHeight: Record<NonNullable<AppBrandProps['size']>, string> = {
 
 const AppBrand: React.FC<AppBrandProps> = ({ className, size = 'md' }) => (
   <div className={`flex items-center gap-3 ${className || ''}`}>
-    <GrupoGGVBrand className={`${sizeToHeight[size]} w-auto object-contain`} />
+    <img 
+      src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png"
+      alt="Grupo GGV"
+      className={`${sizeToHeight[size]} w-auto object-contain`}
+      loading="eager"
+      referrerPolicy="no-referrer"
+    />
   </div>
 );
 

@@ -10,7 +10,7 @@ export const ResetCacheModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
     window.location.reload();
   };
   return (
-    <ModalBase title="Resetar Cache">
+    <ModalBase title="Resetar Cache" onClose={onClose}>
       <div className="space-y-3">
         <p className="text-sm text-slate-600">Isso limpará localStorage, sessionStorage, IndexedDB e service workers (se houver) e recarregará o app.</p>
         <div className="flex justify-end gap-3">

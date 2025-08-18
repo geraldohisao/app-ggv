@@ -3,7 +3,38 @@ import type { CompanyData, MarketSegment, Answers } from '../types';
 import { CompanyInfoForm } from './diagnostico/CompanyInfoForm';
 import { QuestionnaireView } from './diagnostico/QuestionnaireView';
 import { ResultsView } from './diagnostico/ResultsView';
-import { prefillFromN8n, sendDiagnosticToN8n } from '../services/supabaseService';
+import { prefillFromN8n, sendDiagnosticToN8n, sendDiagnosticToPipedriveWebhook } from '../services/supabaseService';
+
+// Função de teste para simular dados do diagnóstico
+const testDiagnosticData = () => {
+    const mockCompanyData = {
+        companyName: 'Empresa Teste Ltda',
+        email: 'contato@empresateste.com',
+        activityBranch: 'Tecnologia',
+        activitySector: 'Software',
+        monthlyBilling: 'R$ 100 a 500 mil/mês',
+        salesTeamSize: '5-10 pessoas',
+        salesChannels: ['Online', 'Presencial']
+    };
+
+    const mockAnswers = {
+        1: 8,  // Maturidade - Sim
+        2: 6,  // Mapeamento de processos - Parcialmente
+        3: 9,  // CRM - Sim
+        4: 5,  // Script comercial - Parcialmente
+        5: 7,  // Teste de perfil comportamental - Parcialmente
+        6: 4,  // Plano de metas/comissionamento - Não
+        7: 8,  // Indicadores comerciais - Sim
+        8: 9,  // Treinamentos periódicos - Sim
+        9: 6,  // Ação de pós-venda - Parcialmente
+        10: 3  // Prospecção ativa - Não
+    };
+
+    const mockTotalScore = 65; // 65%
+    const mockDealId = '56934';
+
+    return { mockCompanyData, mockAnswers, mockTotalScore, mockDealId };
+};
 import { GGVInteligenciaBrand } from './ui/BrandLogos';
 import { usePipedriveData } from '../hooks/usePipedriveData';
 
@@ -73,14 +104,70 @@ export const DiagnosticoComercial: React.FC = () => {
     const handleSubmit = async () => {
         if (!companyData) return; // Should not happen
         setStep('results');
+        
         try {
+            // Enviar para o webhook do Pipedrive (nova funcionalidade)
+            if (dealId) {
+                console.log('📤 DIAGNÓSTICO - Enviando para webhook Pipedrive com deal_id:', dealId);
+                const success = await sendDiagnosticToPipedriveWebhook(
+                    companyData,
+                    answers,
+                    totalScore,
+                    dealId
+                );
+                
+                if (success) {
+                    console.log('✅ DIAGNÓSTICO - Dados enviados com sucesso para Pipedrive');
+                } else {
+                    console.error('❌ DIAGNÓSTICO - Falha ao enviar dados para Pipedrive');
+                }
+            } else {
+                console.log('⚠️ DIAGNÓSTICO - Nenhum deal_id encontrado, enviando apenas para N8N');
+            }
+            
+            // Manter compatibilidade com N8N existente
             await sendDiagnosticToN8n({
                 companyData,
                 segment: selectedSegment,
                 answers,
                 totalScore,
             });
-        } catch {}
+        } catch (error) {
+            console.error('❌ DIAGNÓSTICO - Erro ao enviar dados:', error);
+        }
+    };
+
+    // Função para testar o webhook com dados simulados
+    const handleTestWebhook = async () => {
+        const { mockCompanyData, mockAnswers, mockTotalScore, mockDealId } = testDiagnosticData();
+        
+        console.log('🧪 TESTE - Iniciando simulação de dados para webhook...');
+        console.log('🧪 TESTE - Dados simulados:', {
+            companyData: mockCompanyData,
+            answers: mockAnswers,
+            totalScore: mockTotalScore,
+            dealId: mockDealId
+        });
+        
+        try {
+            const success = await sendDiagnosticToPipedriveWebhook(
+                mockCompanyData,
+                mockAnswers,
+                mockTotalScore,
+                mockDealId
+            );
+            
+            if (success) {
+                console.log('✅ TESTE - Dados simulados enviados com sucesso para webhook!');
+                alert('✅ Teste realizado com sucesso! Verifique os logs no console.');
+            } else {
+                console.error('❌ TESTE - Falha ao enviar dados simulados');
+                alert('❌ Falha no teste. Verifique os logs no console.');
+            }
+        } catch (error) {
+            console.error('❌ TESTE - Erro durante o teste:', error);
+            alert('❌ Erro durante o teste. Verifique os logs no console.');
+        }
     };
 
     const handleRetry = () => {
@@ -114,13 +201,29 @@ export const DiagnosticoComercial: React.FC = () => {
                             
                             {/* Erro do Pipedrive */}
                             {pipedriveError && (
-                                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <p className="text-sm text-yellow-700">
-                                        ⚠️ {pipedriveError.includes('404') || pipedriveError.includes('não encontrado') 
-                                            ? 'Webhook N8N não está ativo. Usando dados simulados para teste.' 
-                                            : 'Não foi possível carregar os dados da oportunidade.'} 
-                                        Você pode prosseguir preenchendo manualmente.
+                                <div className={`mt-4 p-3 rounded-lg ${
+                                    pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
+                                        ? 'bg-red-50 border border-red-200'
+                                        : 'bg-yellow-50 border border-yellow-200'
+                                }`}>
+                                    <p className={`text-sm ${
+                                        pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
+                                            ? 'text-red-700'
+                                            : 'text-yellow-700'
+                                    }`}>
+                                        {pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto') ? (
+                                            <>🚫 {pipedriveError}</>
+                                        ) : pipedriveError.includes('404') || pipedriveError.includes('não encontrado') ? (
+                                            <>⚠️ Webhook N8N não está ativo. Usando dados simulados para teste. Você pode prosseguir preenchendo manualmente.</>
+                                        ) : (
+                                            <>⚠️ Não foi possível carregar os dados da oportunidade. Você pode prosseguir preenchendo manualmente.</>
+                                        )}
                                     </p>
+                                    {pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto') && (
+                                        <p className="text-xs text-red-600 mt-1">
+                                            💡 Verifique se o deal_id na URL está correto ou contate o suporte.
+                                        </p>
+                                    )}
                                     {pipedriveError.includes('simulados') && (
                                         <p className="text-xs text-yellow-600 mt-1">
                                             💡 Para ativar a integração real, configure o webhook N8N no endpoint correto.
@@ -128,6 +231,26 @@ export const DiagnosticoComercial: React.FC = () => {
                                     )}
                                 </div>
                             )}
+
+                            {/* Botão de Teste do Webhook */}
+                            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-medium text-blue-800">
+                                            🧪 Teste do Webhook
+                                        </h3>
+                                        <p className="text-sm text-blue-700 mt-1">
+                                            Clique para enviar dados simulados para o webhook do Pipedrive
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleTestWebhook}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Testar Webhook
+                                    </button>
+                                </div>
+                            </div>
                             
                             {/* Sucesso do Pipedrive */}
                             {pipedriveData && !pipedriveLoading && (

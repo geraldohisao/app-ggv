@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/SimpleUserContext';
 import { GoogleIcon, ExclamationTriangleIcon } from './ui/icons';
 import { supabase } from '../services/supabaseClient';
 import { isValidKey, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/config';
-import { EmergencyAuth } from './auth/EmergencyAuth';
+// Removido EmergencyAuth para simplificar
 import { LOGO_URLS } from '../config/logos';
 
 const LoginPage: React.FC = () => {
@@ -47,28 +47,31 @@ const LoginPage: React.FC = () => {
         
         try {
             await login();
-            // O login redireciona para o Google, então não chegamos aqui normalmente
             console.log('🔐 LOGIN PAGE - Login iniciado com sucesso');
         } catch (err: any) {
             console.error('🚨 LOGIN PAGE - Erro no login:', err);
-            
-            let errorMessage = 'Erro no login. Tente novamente.';
-            
-            if (err.error_description) {
-                errorMessage = err.error_description;
-            } else if (err.message) {
-                if (err.message.includes('network') || err.message.includes('fetch')) {
-                    errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
-                } else if (err.message.includes('timeout')) {
-                    errorMessage = 'Tempo esgotado. Tente novamente.';
-                } else {
-                    errorMessage = err.message;
-                }
-            }
-            
-            setError(errorMessage);
+            setError('Erro no login. Tente novamente.');
             setLoading(false);
         }
+    };
+
+    const handleEmergencyLogin = () => {
+        console.log('🚨 EMERGENCY AUTH - Forçando login...');
+        
+        // Criar perfil de emergência
+        const emergencyUser = {
+            id: 'emergency-' + Date.now(),
+            email: 'geraldo@grupoggv.com',
+            name: 'Geraldo',
+            initials: 'GE',
+            role: 'SUPER_ADMIN',
+        };
+        
+        // Salvar no localStorage
+        localStorage.setItem('ggv-emergency-user', JSON.stringify(emergencyUser));
+        
+        // Recarregar página
+        window.location.reload();
     };
 
     return (
@@ -167,24 +170,24 @@ const LoginPage: React.FC = () => {
                         <p className="text-red-600 text-xs mt-4 text-center">{error}</p>
                     )}
 
-                    {/* Emergency Auth para casos onde o OAuth falha */}
-                    {(isProcessingOAuth || authLoading) && (
-                        <EmergencyAuth 
-                            onAuthSuccess={(user) => {
-                                // Simular o comportamento do UserContext
-                                console.log('🎉 EMERGENCY LOGIN - Usuário:', user);
-                                window.location.reload(); // Força reload para resetar estados
-                            }}
-                        />
-                    )}
-
+                    {/* Botão de emergência simplificado */}
                     <div className="mt-6 border-t border-slate-200 pt-4">
-                        <button
-                            onClick={loginAsTestUser}
-                            className="text-sm text-slate-500 hover:text-slate-700 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 rounded"
-                        >
-                            Acessar como Teste (Admin)
-                        </button>
+                        <div className="text-center">
+                            <button
+                                onClick={handleEmergencyLogin}
+                                className="text-sm text-red-600 hover:text-red-800 hover:underline focus:outline-none"
+                            >
+                                🚨 Forçar Login de Emergência
+                            </button>
+                        </div>
+                        <div className="mt-2 text-center">
+                            <button
+                                onClick={loginAsTestUser}
+                                className="text-sm text-slate-500 hover:text-slate-700 hover:underline focus:outline-none"
+                            >
+                                Acessar como Teste (Admin)
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

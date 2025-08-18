@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { MarketSegment, AIPersona, StoredKnowledgeDocument, ConversationHistories, AIMode, User, UserRole, OpportunityFeedback, KnowledgeFAQ, KnowledgeOverview } from '../types';
+import { MarketSegment, AIPersona, StoredKnowledgeDocument, ConversationHistories, AIMode, User, UserRole, OpportunityFeedback, KnowledgeFAQ, KnowledgeOverview, CompanyData, Answers } from '../types';
 import { DEFAULT_DIAGNOSTIC_SEGMENTS } from '../constants';
 
 // --- User Profile ---
@@ -308,6 +308,97 @@ export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
         });
         return res.ok;
     } catch {
+        return false;
+    }
+}
+
+// Nova função para enviar dados do diagnóstico para o webhook do Pipedrive
+export async function sendDiagnosticToPipedriveWebhook(
+    companyData: CompanyData,
+    answers: Answers,
+    totalScore: number,
+    dealId?: string
+): Promise<boolean> {
+    const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
+    
+    try {
+        // Gerar link público do resultado
+        const resultUrl = `${window.location.origin}/resultado-diagnostico?deal_id=${dealId || 'unknown'}`;
+        
+        // Função para converter pontuação em resposta textual
+        const getAnswerText = (score: number): string => {
+            if (score >= 8) return 'Sim';
+            if (score >= 5) return 'Parcialmente';
+            return 'Não';
+        };
+        
+        // Calcular porcentagem de maturidade
+        const maturityPercentage = Math.round((totalScore / 100) * 100);
+        
+        // Preparar payload com todos os dados do diagnóstico
+        const payload = {
+            // Dados da empresa (preenchidos automaticamente do Pipedrive)
+            companyData: {
+                companyName: companyData.companyName,
+                email: companyData.email,
+                activityBranch: companyData.activityBranch,
+                activitySector: companyData.activitySector,
+                monthlyBilling: companyData.monthlyBilling,
+                salesTeamSize: companyData.salesTeamSize,
+                salesChannels: companyData.salesChannels,
+            },
+            
+            // Respostas do diagnóstico (10 perguntas) - formato textual
+            diagnosticAnswers: {
+                maturidade: getAnswerText(answers[1] || 0),
+                mapeamento_processos: getAnswerText(answers[2] || 0),
+                crm: getAnswerText(answers[3] || 0),
+                script_comercial: getAnswerText(answers[4] || 0),
+                teste_perfil_comportamental: getAnswerText(answers[5] || 0),
+                plano_metas_comissionamento: getAnswerText(answers[6] || 0),
+                indicadores_comerciais: getAnswerText(answers[7] || 0),
+                treinamentos_periodicos: getAnswerText(answers[8] || 0),
+                acao_pos_venda: getAnswerText(answers[9] || 0),
+                prospeccao_ativa: getAnswerText(answers[10] || 0),
+            },
+            
+            // Resultados calculados
+            results: {
+                totalScore: totalScore,
+                maxPossibleScore: 100, // 10 perguntas * 10 pontos cada
+                maturityPercentage: `${maturityPercentage}%`, // Porcentagem como string
+                maturityLevel: maturityPercentage >= 70 ? 'Alta' : maturityPercentage >= 40 ? 'Média' : 'Baixa',
+            },
+            
+            // Link público do resultado
+            resultUrl: resultUrl,
+            
+            // Metadados
+            metadata: {
+                dealId: dealId,
+                timestamp: new Date().toISOString(),
+                source: 'GGV Diagnóstico Comercial',
+            }
+        };
+        
+        console.log('📤 PIPEDRIVE WEBHOOK - Enviando dados:', payload);
+        
+        const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        
+        if (res.ok) {
+            console.log('✅ PIPEDRIVE WEBHOOK - Dados enviados com sucesso');
+            return true;
+        } else {
+            console.error('❌ PIPEDRIVE WEBHOOK - Erro ao enviar:', res.status, res.statusText);
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ PIPEDRIVE WEBHOOK - Erro na requisição:', error);
         return false;
     }
 }
@@ -1003,7 +1094,7 @@ export const migratePlatformLogosToAppSettings = async (): Promise<boolean> => {
             grupoGGVLogoUrl: obj?.grupoGGVLogoUrl ?? null,
             ggvInteligenciaLogoUrl: obj?.ggvInteligenciaLogoUrl ?? null,
         };
-        await saveLogoUrls(legacy);
+        await saveLogoUrls(legacy.grupoGGVLogoUrl || '', legacy.ggvInteligenciaLogoUrl || '');
         return true;
     } catch {
         return false;
