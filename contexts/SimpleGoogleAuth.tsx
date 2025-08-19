@@ -12,7 +12,7 @@ interface UserContextType {
 
 export const UserContext = createContext<UserContextType>({
     user: null,
-    loading: false, // Começar com false para evitar loading infinito
+    loading: true,
     login: async () => {},
     logout: () => {},
     loginAsTestUser: () => {},
@@ -20,8 +20,7 @@ export const UserContext = createContext<UserContextType>({
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(false); // Começar com false
-    const [initialized, setInitialized] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     // Função para criar usuário a partir da sessão
     const createUserFromSession = (session: any): User => {
@@ -44,105 +43,80 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
     };
 
-    // Inicialização única e simples
     useEffect(() => {
-        if (initialized) return;
+        console.log('🔐 GOOGLE AUTH - Iniciando...');
         
-        console.log('🔐 ROBUST AUTH - Inicializando...');
-        setInitialized(true);
-
         if (!supabase) {
-            console.log('🔐 ROBUST AUTH - Supabase não configurado');
+            console.log('🔐 GOOGLE AUTH - Supabase não configurado');
+            setLoading(false);
             return;
         }
 
-        // Verificar usuário de emergência primeiro
-        const emergencyUser = localStorage.getItem('ggv-emergency-user');
-        if (emergencyUser) {
+        // Verificação inicial de sessão
+        const checkSession = async () => {
             try {
-                const user = JSON.parse(emergencyUser);
-                console.log('🚨 ROBUST AUTH - Usuário de emergência encontrado:', user.email);
-                setUser(user);
-                return;
-            } catch (e) {
-                console.warn('⚠️ ROBUST AUTH - Erro ao carregar usuário de emergência:', e);
-                localStorage.removeItem('ggv-emergency-user');
-            }
-        }
-
-        // Verificação simples de sessão
-        const checkAuth = async () => {
-            try {
-                setLoading(true);
-                console.log('🔍 ROBUST AUTH - Verificando sessão...');
+                console.log('🔍 GOOGLE AUTH - Verificando sessão existente...');
                 
                 const { data: { session }, error } = await supabase.auth.getSession();
                 
                 if (error) {
-                    console.error('❌ ROBUST AUTH - Erro ao obter sessão:', error);
+                    console.error('❌ GOOGLE AUTH - Erro ao obter sessão:', error);
                     setUser(null);
+                    setLoading(false);
                     return;
                 }
 
                 if (session?.user) {
                     const user = createUserFromSession(session);
-                    console.log('✅ ROBUST AUTH - Usuário autenticado:', user.email, 'Role:', user.role);
+                    console.log('✅ GOOGLE AUTH - Usuário encontrado:', user.email, 'Role:', user.role);
                     setUser(user);
                 } else {
-                    console.log('🔐 ROBUST AUTH - Nenhuma sessão encontrada');
+                    console.log('🔐 GOOGLE AUTH - Nenhuma sessão encontrada');
                     setUser(null);
                 }
-            } catch (error) {
-                console.error('❌ ROBUST AUTH - Erro na verificação:', error);
-                setUser(null);
-            } finally {
+                
                 setLoading(false);
-                console.log('🏁 ROBUST AUTH - Verificação concluída');
+            } catch (error) {
+                console.error('❌ GOOGLE AUTH - Erro na verificação:', error);
+                setUser(null);
+                setLoading(false);
             }
         };
 
-        // Timeout de segurança
-        const safetyTimeout = setTimeout(() => {
-            console.log('⚠️ ROBUST AUTH - Timeout de segurança ativado');
-            setLoading(false);
-        }, 5000); // 5 segundos
+        checkSession();
 
-        checkAuth().finally(() => {
-            clearTimeout(safetyTimeout);
-        });
-
-        // Listener simples para mudanças
+        // Listener para mudanças de autenticação
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log('🔄 ROBUST AUTH - Mudança de estado:', event);
+            console.log('🔄 GOOGLE AUTH - Evento:', event);
             
             if (event === 'SIGNED_IN' && session?.user) {
                 const user = createUserFromSession(session);
-                console.log('✅ ROBUST AUTH - Login realizado:', user.email);
+                console.log('✅ GOOGLE AUTH - Login realizado:', user.email);
                 setUser(user);
             } else if (event === 'SIGNED_OUT') {
-                console.log('🔐 ROBUST AUTH - Logout realizado');
+                console.log('🔐 GOOGLE AUTH - Logout realizado');
                 setUser(null);
-                localStorage.removeItem('ggv-emergency-user');
             }
         });
 
         return () => {
             subscription.unsubscribe();
         };
-    }, [initialized]);
+    }, []);
 
     const login = async () => {
-        if (!supabase) return;
+        if (!supabase) {
+            throw new Error('Supabase não configurado');
+        }
         
         try {
-            setLoading(true);
-            console.log('🔐 ROBUST AUTH - Iniciando login...');
+            console.log('🔐 GOOGLE AUTH - Iniciando login com Google...');
             
-            // Determinar URL de redirect
+            // Determinar URL de redirect correta
             const isProduction = window.location.hostname === 'app.grupoggv.com';
             const redirectUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
             
-            console.log('🔐 ROBUST AUTH - Redirect para:', redirectUrl);
+            console.log('🔐 GOOGLE AUTH - Redirect URL:', redirectUrl);
 
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -156,49 +130,35 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             });
 
             if (error) {
-                console.error('❌ ROBUST AUTH - Erro no OAuth:', error);
-                throw error;
+                console.error('❌ GOOGLE AUTH - Erro no OAuth:', error);
+                throw new Error(`Erro no login: ${error.message}`);
             }
+
+            console.log('🔄 GOOGLE AUTH - Redirecionando para Google...');
         } catch (error) {
-            console.error('❌ ROBUST AUTH - Erro no login:', error);
-            setLoading(false);
+            console.error('❌ GOOGLE AUTH - Erro no login:', error);
             throw error;
         }
     };
 
     const logout = async () => {
         try {
-            console.log('🔐 ROBUST AUTH - Fazendo logout...');
+            console.log('🔐 GOOGLE AUTH - Fazendo logout...');
             
-            // Limpar usuário de emergência
-            localStorage.removeItem('ggv-emergency-user');
-            
-            if (user?.id?.startsWith('emergency-') || user?.id === 'test-user-001') {
-                // Logout local apenas
-                setUser(null);
-                return;
-            }
-
             if (supabase) {
                 await supabase.auth.signOut();
             }
             setUser(null);
+            console.log('✅ GOOGLE AUTH - Logout realizado');
         } catch (error) {
-            console.error('❌ ROBUST AUTH - Erro no logout:', error);
+            console.error('❌ GOOGLE AUTH - Erro no logout:', error);
             setUser(null);
         }
     };
 
+    // Manter função vazia para compatibilidade, mas não usar
     const loginAsTestUser = () => {
-        console.log('🧪 ROBUST AUTH - Login como usuário de teste');
-        const testUser: User = {
-            id: 'test-user-001',
-            email: 'teste@ggv.com.br',
-            name: 'Usuário Teste (Admin)',
-            initials: 'TE',
-            role: UserRole.SuperAdmin,
-        };
-        setUser(testUser);
+        console.log('⚠️ GOOGLE AUTH - Login de teste desabilitado');
     };
 
     return (
