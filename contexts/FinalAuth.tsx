@@ -12,7 +12,7 @@ interface UserContextType {
 
 export const UserContext = createContext<UserContextType>({
     user: null,
-    loading: true,
+    loading: false, // Começar sem loading
     login: async () => {},
     logout: () => {},
     loginAsTestUser: () => {},
@@ -20,7 +20,8 @@ export const UserContext = createContext<UserContextType>({
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Começar sem loading
+    const [initialized, setInitialized] = useState(false);
 
     // Função para criar usuário a partir da sessão
     const createUserFromSession = (session: any): User => {
@@ -43,66 +44,73 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
     };
 
+    // Inicialização única e simples - SEM LOOPS
     useEffect(() => {
-        console.log('🔐 GOOGLE AUTH - Iniciando...');
+        if (initialized) return; // Evitar múltiplas inicializações
         
+        console.log('🔐 FINAL AUTH - Inicializando uma única vez...');
+        setInitialized(true);
+
         if (!supabase) {
-            console.log('🔐 GOOGLE AUTH - Supabase não configurado');
-            setLoading(false);
+            console.log('🔐 FINAL AUTH - Supabase não configurado');
             return;
         }
 
-        // Verificação inicial de sessão
-        const checkSession = async () => {
+        // Verificação inicial simples
+        const initAuth = async () => {
             try {
-                console.log('🔍 GOOGLE AUTH - Verificando sessão existente...');
+                setLoading(true);
+                console.log('🔍 FINAL AUTH - Verificando sessão...');
                 
                 const { data: { session }, error } = await supabase.auth.getSession();
                 
                 if (error) {
-                    console.error('❌ GOOGLE AUTH - Erro ao obter sessão:', error);
+                    console.error('❌ FINAL AUTH - Erro:', error);
                     setUser(null);
-                    setLoading(false);
                     return;
                 }
 
                 if (session?.user) {
                     const user = createUserFromSession(session);
-                    console.log('✅ GOOGLE AUTH - Usuário encontrado:', user.email, 'Role:', user.role);
+                    console.log('✅ FINAL AUTH - Usuário encontrado:', user.email);
                     setUser(user);
                 } else {
-                    console.log('🔐 GOOGLE AUTH - Nenhuma sessão encontrada');
+                    console.log('🔐 FINAL AUTH - Sem sessão');
                     setUser(null);
                 }
-                
-                setLoading(false);
             } catch (error) {
-                console.error('❌ GOOGLE AUTH - Erro na verificação:', error);
+                console.error('❌ FINAL AUTH - Erro na verificação:', error);
                 setUser(null);
+            } finally {
                 setLoading(false);
+                console.log('🏁 FINAL AUTH - Inicialização concluída');
             }
         };
 
-        checkSession();
+        initAuth();
 
-        // Listener para mudanças de autenticação
+        // Listener simples - SEM LOOPS
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log('🔄 GOOGLE AUTH - Evento:', event);
+            console.log('🔄 FINAL AUTH - Evento:', event);
             
+            // Apenas reagir a eventos importantes
             if (event === 'SIGNED_IN' && session?.user) {
                 const user = createUserFromSession(session);
-                console.log('✅ GOOGLE AUTH - Login realizado:', user.email);
+                console.log('✅ FINAL AUTH - Login:', user.email);
                 setUser(user);
+                setLoading(false);
             } else if (event === 'SIGNED_OUT') {
-                console.log('🔐 GOOGLE AUTH - Logout realizado');
+                console.log('🔐 FINAL AUTH - Logout');
                 setUser(null);
+                setLoading(false);
             }
         });
 
         return () => {
+            console.log('🔄 FINAL AUTH - Limpando subscription');
             subscription.unsubscribe();
         };
-    }, []);
+    }, [initialized]); // Dependência apenas de initialized
 
     const login = async () => {
         if (!supabase) {
@@ -110,55 +118,56 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
         try {
-            console.log('🔐 GOOGLE AUTH - Iniciando login com Google...');
+            setLoading(true);
+            console.log('🔐 FINAL AUTH - Iniciando login...');
             
-            // Determinar URL de redirect correta
+            // URL de redirect simples
             const isProduction = window.location.hostname === 'app.grupoggv.com';
             const redirectUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
             
-            console.log('🔐 GOOGLE AUTH - Redirect URL:', redirectUrl);
+            console.log('🔐 FINAL AUTH - Redirect:', redirectUrl);
 
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
-                    scopes: 'openid email profile',
-                    queryParams: {
-                        prompt: 'select_account'
-                    }
+                    scopes: 'openid email profile'
                 }
             });
 
             if (error) {
-                console.error('❌ GOOGLE AUTH - Erro no OAuth:', error);
+                console.error('❌ FINAL AUTH - Erro OAuth:', error);
+                setLoading(false);
                 throw new Error(`Erro no login: ${error.message}`);
             }
 
-            console.log('🔄 GOOGLE AUTH - Redirecionando para Google...');
+            console.log('🔄 FINAL AUTH - Redirecionando...');
         } catch (error) {
-            console.error('❌ GOOGLE AUTH - Erro no login:', error);
+            console.error('❌ FINAL AUTH - Erro no login:', error);
+            setLoading(false);
             throw error;
         }
     };
 
     const logout = async () => {
         try {
-            console.log('🔐 GOOGLE AUTH - Fazendo logout...');
+            console.log('🔐 FINAL AUTH - Logout...');
             
             if (supabase) {
                 await supabase.auth.signOut();
             }
             setUser(null);
-            console.log('✅ GOOGLE AUTH - Logout realizado');
+            setLoading(false);
         } catch (error) {
-            console.error('❌ GOOGLE AUTH - Erro no logout:', error);
+            console.error('❌ FINAL AUTH - Erro no logout:', error);
             setUser(null);
+            setLoading(false);
         }
     };
 
-    // Manter função vazia para compatibilidade, mas não usar
     const loginAsTestUser = () => {
-        console.log('⚠️ GOOGLE AUTH - Login de teste desabilitado');
+        // Função vazia - não implementar
+        console.log('⚠️ FINAL AUTH - Teste desabilitado');
     };
 
     return (

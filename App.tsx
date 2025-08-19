@@ -12,20 +12,18 @@ import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
-import { UserProvider, useUser } from './contexts/SimpleGoogleAuth';
+import { UserProvider, useUser } from './contexts/FinalAuth';
 import { LoadingSpinner } from './components/ui/Feedback';
-import { AuthDebugPanel, useAuthDebug } from './components/debug/AuthDebugPanel';
-import { RobustDebugPanel } from './components/debug/RobustDebugPanel';
+// Debug panels removidos para evitar conflitos
 import { initializeLogos } from './utils/fetchLogosFromDatabase';
 import UserMenu from './components/UserMenu';
 import AppBrand from './components/common/AppBrand';
-import GoogleLoginPage from './components/GoogleLoginPage';
+import FinalLoginPage from './components/FinalLoginPage';
 
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useUser();
   const [activeModule, setActiveModule] = useState<Module>(Module.Diagnostico);
-  const { debugVisible } = useAuthDebug();
 
   // Verificar se é uma página de resultado público
   const isPublicResultPage = window.location.pathname === '/resultado-diagnostico';
@@ -60,7 +58,7 @@ const AppContent: React.FC = () => {
     }
 
     if (!user) {
-      return <GoogleLoginPage />;
+      return <FinalLoginPage />;
     }
 
     return (
@@ -101,7 +99,7 @@ const AppContent: React.FC = () => {
   }
 
   if (!user) {
-    return <GoogleLoginPage />;
+    return <FinalLoginPage />;
   }
 
   const renderModule = () => {
