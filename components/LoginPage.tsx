@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '../contexts/SimpleUserContext';
+import { useUser } from '../contexts/RobustUserContext';
 import { GoogleIcon, ExclamationTriangleIcon } from './ui/icons';
 import { supabase } from '../services/supabaseClient';
 import { isValidKey, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/config';

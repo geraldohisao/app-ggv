@@ -12,13 +12,14 @@ import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
-import { UserProvider, useUser } from './contexts/SimpleUserContext';
+import { UserProvider, useUser } from './contexts/RobustUserContext';
 import { LoadingSpinner } from './components/ui/Feedback';
 import { AuthDebugPanel, useAuthDebug } from './components/debug/AuthDebugPanel';
 import { RobustDebugPanel } from './components/debug/RobustDebugPanel';
 import { initializeLogos } from './utils/fetchLogosFromDatabase';
 import UserMenu from './components/UserMenu';
 import AppBrand from './components/common/AppBrand';
+import DirectAccessPage from './components/DirectAccessPage';
 
 
 const AppContent: React.FC = () => {
@@ -48,46 +49,9 @@ const AppContent: React.FC = () => {
     return <PublicResultPage />;
   }
   
-  // Se for página de diagnóstico, usar componente específico (sem duplo UserProvider)
+  // Se for página de diagnóstico, usar página de acesso direto simplificada
   if (isDiagnosticPage) {
-    // Renderizar conteúdo do diagnóstico diretamente para evitar duplo UserProvider
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <LoadingSpinner />
-        </div>
-      );
-    }
-
-    if (!user) {
-      return (
-        <>
-          <LoginPage />
-          <AuthDebugPanel visible={debugVisible} />
-          <RobustDebugPanel />
-        </>
-      );
-    }
-
-    return (
-      <div className="flex flex-col h-full font-sans">
-        <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20">
-          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex-shrink-0">
-                <AppBrand className="h-12" />
-              </div>
-              <UserMenu activeModule={Module.Diagnostico} setActiveModule={() => {}} onLogout={logout} />
-            </div>
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto bg-slate-100">
-          <DiagnosticoComercial />
-        </main>
-        <AuthDebugPanel visible={debugVisible} />
-        <RobustDebugPanel />
-      </div>
-    );
+    return <DirectAccessPage />;
   }
 
   if (loading) {
