@@ -21,6 +21,7 @@ export const DiagnosticoComercial: React.FC = () => {
     const [manualDealId, setManualDealId] = useState<string>('');
     const [isSearchingDeal, setIsSearchingDeal] = useState<boolean>(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [manualSearchData, setManualSearchData] = useState<any>(null);
     
     // Hook para buscar dados do Pipedrive baseado no deal_id da URL
     const { data: pipedriveData, loading: pipedriveLoading, error: pipedriveError, dealId } = usePipedriveData();
@@ -94,6 +95,13 @@ export const DiagnosticoComercial: React.FC = () => {
                 monthlyBilling: data.faturamento_mensal || '',
                 salesTeamSize: data.tamanho_equipe_comercial || '',
                 salesChannels: data.salesChannels || [],
+            });
+
+            // Salvar dados da busca manual para exibir mensagem de sucesso
+            setManualSearchData({
+                ...data,
+                _searchedDealId: manualDealId.trim(),
+                _searchTimestamp: new Date().toISOString()
             });
 
             // Atualizar URL para incluir o deal_id
@@ -271,34 +279,65 @@ export const DiagnosticoComercial: React.FC = () => {
 
 
                             
-                            {/* Sucesso do Pipedrive */}
-                            {pipedriveData && !pipedriveLoading && (
+                            {/* Sucesso do Pipedrive ou busca manual */}
+                            {(pipedriveData && !pipedriveLoading) || manualSearchData ? (
                                 <div className={`mt-4 p-3 rounded-lg ${
-                                    (pipedriveData as any)._mockData 
+                                    // Determinar cor baseado no tipo de dados
+                                    (pipedriveData as any)?._mockData || (manualSearchData?._mockData) 
                                         ? 'bg-blue-50 border border-blue-200' 
                                         : 'bg-green-50 border border-green-200'
                                 }`}>
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <p className={`text-sm ${
-                                                (pipedriveData as any)._mockData 
+                                                (pipedriveData as any)?._mockData || (manualSearchData?._mockData)
                                                     ? 'text-blue-700' 
                                                     : 'text-green-700'
                                             }`}>
-                                                {(pipedriveData as any)._mockData 
-                                                    ? '🧪 Dados simulados carregados para teste! Os campos serão preenchidos automaticamente.' 
-                                                    : `✅ Dados da oportunidade ${(pipedriveData as any)._dealId ? `(Deal ID: ${(pipedriveData as any)._dealId})` : ''} carregados! Os campos serão preenchidos automaticamente.`}
+                                                {(() => {
+                                                    // Dados da busca manual
+                                                    if (manualSearchData) {
+                                                        const dealId = manualSearchData._searchedDealId || manualSearchData._dealId;
+                                                        return manualSearchData._mockData 
+                                                            ? `🧪 Dados simulados do Deal ID ${dealId} carregados para teste!`
+                                                            : `✅ Dados da oportunidade ${dealId} carregados com sucesso!`;
+                                                    }
+                                                    // Dados do hook automático
+                                                    if (pipedriveData) {
+                                                        return (pipedriveData as any)._mockData 
+                                                            ? '🧪 Dados simulados carregados para teste!'
+                                                            : `✅ Dados da oportunidade ${(pipedriveData as any)._dealId ? `(Deal ID: ${(pipedriveData as any)._dealId})` : ''} carregados!`;
+                                                    }
+                                                    return '';
+                                                })()}
+                                                {' Os campos serão preenchidos automaticamente.'}
                                             </p>
-                                            {(pipedriveData as any)._mockData && (
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                    💡 Estes são dados de exemplo. Configure o webhook N8N para usar dados reais do Pipedrive.
-                                                </p>
-                                            )}
-                                            {(pipedriveData as any)._realData && (
-                                                <p className="text-xs text-green-600 mt-1">
-                                                    📊 <strong>Empresa:</strong> {pipedriveData.companyName} | <strong>Email:</strong> {pipedriveData.email}
-                                                </p>
-                                            )}
+                                            
+                                            {/* Detalhes da empresa */}
+                                            {(() => {
+                                                const data = manualSearchData || pipedriveData;
+                                                const isReal = data?._realData && !data?._mockData;
+                                                const companyName = data?.companyName || data?.empresa;
+                                                const email = data?.email;
+                                                
+                                                if (isReal && companyName) {
+                                                    return (
+                                                        <p className="text-xs text-green-600 mt-1">
+                                                            📊 <strong>Empresa:</strong> {companyName} {email && `| `}<strong>Email:</strong> {email}
+                                                        </p>
+                                                    );
+                                                }
+                                                
+                                                if (data?._mockData) {
+                                                    return (
+                                                        <p className="text-xs text-blue-600 mt-1">
+                                                            💡 Estes são dados de exemplo para teste.
+                                                        </p>
+                                                    );
+                                                }
+                                                
+                                                return null;
+                                            })()}
                                         </div>
                                         
                                         {/* Botão para buscar outro deal */}
@@ -307,6 +346,7 @@ export const DiagnosticoComercial: React.FC = () => {
                                                 setPrefill(null);
                                                 setManualDealId('');
                                                 setSearchError(null);
+                                                setManualSearchData(null);
                                                 const url = new URL(window.location.href);
                                                 url.searchParams.delete('deal_id');
                                                 window.history.replaceState({}, '', url.toString());
