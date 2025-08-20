@@ -17,6 +17,11 @@ export const DiagnosticoComercial: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [prefill, setPrefill] = useState<Partial<CompanyData> | null>(null);
     
+    // Estados para busca manual de deal_id
+    const [manualDealId, setManualDealId] = useState<string>('');
+    const [isSearchingDeal, setIsSearchingDeal] = useState<boolean>(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    
     // Hook para buscar dados do Pipedrive baseado no deal_id da URL
     const { data: pipedriveData, loading: pipedriveLoading, error: pipedriveError, dealId } = usePipedriveData();
 
@@ -59,6 +64,52 @@ export const DiagnosticoComercial: React.FC = () => {
             }
         })();
     }, [dealId]);
+
+    // Função para buscar dados manualmente por deal_id
+    const handleSearchDeal = async () => {
+        if (!manualDealId.trim()) {
+            setSearchError('Por favor, insira um Deal ID válido');
+            return;
+        }
+
+        setIsSearchingDeal(true);
+        setSearchError(null);
+
+        try {
+            const response = await fetch(`https://app.grupoggv.com/.netlify/functions/diag-ggv-register?deal_id=${encodeURIComponent(manualDealId.trim())}`);
+            
+            if (!response.ok) {
+                throw new Error(`Erro ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log('🔍 BUSCA MANUAL - Dados recebidos:', data);
+
+            // Aplicar dados encontrados
+            setPrefill({
+                companyName: data.companyName || data.empresa || '',
+                email: data.email || '',
+                activityBranch: data.ramo_de_atividade || '',
+                activitySector: data['setor_de_atuação'] || data.setor_de_atuacao || '',
+                monthlyBilling: data.faturamento_mensal || '',
+                salesTeamSize: data.tamanho_equipe_comercial || '',
+                salesChannels: data.salesChannels || [],
+            });
+
+            // Atualizar URL para incluir o deal_id
+            const url = new URL(window.location.href);
+            url.searchParams.set('deal_id', manualDealId.trim());
+            window.history.replaceState({}, '', url.toString());
+
+            console.log('✅ BUSCA MANUAL - Dados aplicados com sucesso');
+
+        } catch (err: any) {
+            console.error('❌ BUSCA MANUAL - Erro:', err);
+            setSearchError(err.message || 'Erro ao buscar dados do deal');
+        } finally {
+            setIsSearchingDeal(false);
+        }
+    };
 
     const totalScore = useMemo(() => Object.values(answers).reduce((sum, score) => sum + score, 0), [answers]);
     
@@ -129,6 +180,52 @@ export const DiagnosticoComercial: React.FC = () => {
                             <p className="mt-4 text-slate-700 text-lg">Você quer ter uma equipe de vendas auto gerenciável, que bate metas todos os meses?</p>
                             <p className="mt-3 text-slate-500">Responda esse questionário em apenas <span className="inline-flex items-center font-bold bg-blue-100 text-blue-900 px-2 rounded-md">1 minuto</span> e receba gratuitamente um raio-x completo da realidade comercial da sua empresa.</p>
                             
+                            {/* Seção para buscar dados por Deal ID */}
+                            {!dealId && !pipedriveData && (
+                                <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                                        💼 Tem uma oportunidade no Pipedrive? Insira o Deal ID para carregar os dados automaticamente:
+                                    </h3>
+                                    <div className="flex gap-2 max-w-md mx-auto">
+                                        <input
+                                            type="text"
+                                            value={manualDealId}
+                                            onChange={(e) => setManualDealId(e.target.value)}
+                                            placeholder="Ex: 62719"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            disabled={isSearchingDeal}
+                                        />
+                                        <button
+                                            onClick={handleSearchDeal}
+                                            disabled={isSearchingDeal || !manualDealId.trim()}
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md flex items-center gap-1"
+                                        >
+                                            {isSearchingDeal ? (
+                                                <>
+                                                    <div className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full"></div>
+                                                    Buscando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    🔍 Buscar
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Erro de busca manual */}
+                                    {searchError && (
+                                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                                            ❌ {searchError}
+                                        </div>
+                                    )}
+                                    
+                                    <p className="mt-2 text-xs text-slate-500">
+                                        Ou continue sem Deal ID para preencher manualmente
+                                    </p>
+                                </div>
+                            )}
+                            
                             {/* Status do carregamento do Pipedrive */}
                             {pipedriveLoading && (
                                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -181,20 +278,45 @@ export const DiagnosticoComercial: React.FC = () => {
                                         ? 'bg-blue-50 border border-blue-200' 
                                         : 'bg-green-50 border border-green-200'
                                 }`}>
-                                    <p className={`text-sm ${
-                                        (pipedriveData as any)._mockData 
-                                            ? 'text-blue-700' 
-                                            : 'text-green-700'
-                                    }`}>
-                                        {(pipedriveData as any)._mockData 
-                                            ? '🧪 Dados simulados carregados para teste! Os campos serão preenchidos automaticamente.' 
-                                            : '✅ Dados da oportunidade carregados! Os campos serão preenchidos automaticamente.'}
-                                    </p>
-                                    {(pipedriveData as any)._mockData && (
-                                        <p className="text-xs text-blue-600 mt-1">
-                                            💡 Estes são dados de exemplo. Configure o webhook N8N para usar dados reais do Pipedrive.
-                                        </p>
-                                    )}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1">
+                                            <p className={`text-sm ${
+                                                (pipedriveData as any)._mockData 
+                                                    ? 'text-blue-700' 
+                                                    : 'text-green-700'
+                                            }`}>
+                                                {(pipedriveData as any)._mockData 
+                                                    ? '🧪 Dados simulados carregados para teste! Os campos serão preenchidos automaticamente.' 
+                                                    : `✅ Dados da oportunidade ${(pipedriveData as any)._dealId ? `(Deal ID: ${(pipedriveData as any)._dealId})` : ''} carregados! Os campos serão preenchidos automaticamente.`}
+                                            </p>
+                                            {(pipedriveData as any)._mockData && (
+                                                <p className="text-xs text-blue-600 mt-1">
+                                                    💡 Estes são dados de exemplo. Configure o webhook N8N para usar dados reais do Pipedrive.
+                                                </p>
+                                            )}
+                                            {(pipedriveData as any)._realData && (
+                                                <p className="text-xs text-green-600 mt-1">
+                                                    📊 <strong>Empresa:</strong> {pipedriveData.companyName} | <strong>Email:</strong> {pipedriveData.email}
+                                                </p>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Botão para buscar outro deal */}
+                                        <button
+                                            onClick={() => {
+                                                setPrefill(null);
+                                                setManualDealId('');
+                                                setSearchError(null);
+                                                const url = new URL(window.location.href);
+                                                url.searchParams.delete('deal_id');
+                                                window.history.replaceState({}, '', url.toString());
+                                            }}
+                                            className="text-xs px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded flex items-center gap-1"
+                                            title="Buscar outro Deal ID"
+                                        >
+                                            🔄 Outro Deal
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                             
