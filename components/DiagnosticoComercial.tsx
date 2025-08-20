@@ -155,13 +155,7 @@ export const DiagnosticoComercial: React.FC = () => {
                 console.log('⚠️ DIAGNÓSTICO - Nenhum deal_id encontrado, enviando apenas para N8N');
             }
             
-            // Manter compatibilidade com N8N existente
-            await sendDiagnosticToN8n({
-                companyData,
-                segment: selectedSegment,
-                answers,
-                totalScore,
-            });
+            // N8N será enviado após análise IA ser gerada (movido para ResultsView)
         } catch (error) {
             console.error('❌ DIAGNÓSTICO - Erro ao enviar dados:', error);
         }
@@ -401,11 +395,12 @@ export const DiagnosticoComercial: React.FC = () => {
             case 'results':
                 // Render results only if we have all the necessary data
                 return (companyData && selectedSegment) ? (
-                    <ResultsView 
+                                        <ResultsView
                         companyData={companyData}
                         segment={selectedSegment}
                         answers={answers}
                         totalScore={totalScore}
+                        dealId={dealId}
                         onRetry={handleRetry}
                     />
                 ) : (

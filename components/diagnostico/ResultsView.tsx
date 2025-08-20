@@ -6,7 +6,7 @@ import { ArrowLeftIcon, ArrowRightIcon, EnvelopeIcon, DocumentTextIcon, RefreshI
 import { EmailModal } from './modals/EmailModal';
 import { PdfModal } from './modals/PdfModal';
 import { CoverTab, DashboardTab, SegmentedAnalysisTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
-import { getCurrentUserDisplayName } from '../../services/supabaseService';
+import { getCurrentUserDisplayName, sendDiagnosticToN8n } from '../../services/supabaseService';
 
 const REPORT_TABS = ["Capa", "Dashboard Geral", "Análise Segmentada", "Diagnóstico Textual", "Análise IA"];
 const MAX_SCORE_PER_QUESTION = 10;
@@ -17,10 +17,11 @@ interface ResultsViewProps {
     segment: MarketSegment;
     answers: Answers;
     totalScore: number;
+    dealId?: string;
     onRetry: () => void;
 }
 
-export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, answers, totalScore, onRetry }) => {
+export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, answers, totalScore, dealId, onRetry }) => {
     const [activeTab, setActiveTab] = useState(REPORT_TABS[0]);
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [showPdfModal, setShowPdfModal] = useState(false);
@@ -28,6 +29,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     const [summaryInsights, setSummaryInsights] = useState<SummaryInsights | null>(null);
     const [detailedAnalysis, setDetailedAnalysis] = useState<DetailedAIAnalysis | null>(null);
     const [specialistName, setSpecialistName] = useState<string>('');
+    const [n8nSent, setN8nSent] = useState<boolean>(false);
 
     useEffect(() => {
         // Busca o nome do usuário logado para exibir como Especialista na capa
@@ -73,6 +75,43 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         };
         fetchInsights();
     }, [companyData, answers, totalScore, segment]);
+
+    // Enviar dados para N8N após análise IA ser concluída
+    useEffect(() => {
+        const sendToN8n = async () => {
+            // Só enviar se:
+            // 1. Ambas análises IA foram concluídas (ou houve erro)
+            // 2. Ainda não foi enviado
+            // 3. Não está mais carregando
+            if (!n8nSent && !isLoadingSummary && !isLoadingDetailed && (summaryInsights || detailedAnalysis || apiError)) {
+                console.log('📤 N8N - Enviando resultados após análise IA concluída');
+                
+                try {
+                    const success = await sendDiagnosticToN8n({
+                        companyData,
+                        segment,
+                        answers,
+                        totalScore,
+                        dealId,
+                        summaryInsights,
+                        detailedAnalysis,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    if (success) {
+                        console.log('✅ N8N - Resultados enviados com sucesso após análise IA');
+                        setN8nSent(true);
+                    } else {
+                        console.error('❌ N8N - Falha ao enviar resultados após análise IA');
+                    }
+                } catch (error) {
+                    console.error('❌ N8N - Erro ao enviar resultados:', error);
+                }
+            }
+        };
+        
+        sendToN8n();
+    }, [n8nSent, isLoadingSummary, isLoadingDetailed, summaryInsights, detailedAnalysis, apiError, companyData, segment, answers, totalScore, dealId]);
 
     const handleNextTab = () => {
         const currentIndex = REPORT_TABS.indexOf(activeTab);
