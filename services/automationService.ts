@@ -11,6 +11,7 @@ const N8N_CONFIG = {
 export async function triggerReativacao(input: ReativacaoPayload) {
   console.log('🚀 AUTOMATION - Iniciando reativação para SDR:', input.proprietario);
   console.log('📡 AUTOMATION - Enviando para N8N:', N8N_CONFIG.WEBHOOK_URL);
+  console.log('📊 AUTOMATION - Dados a serem enviados:', input);
   
   try {
     const payload = {
@@ -20,19 +21,49 @@ export async function triggerReativacao(input: ReativacaoPayload) {
       timestamp: new Date().toISOString()
     };
     
+    console.log('📤 AUTOMATION - Payload completo:', payload);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), N8N_CONFIG.TIMEOUT);
+    
     const res = await fetch(N8N_CONFIG.WEBHOOK_URL, {
-    method: "POST",
+      method: "POST",
       headers: { 
         "Content-Type": "application/json",
         "User-Agent": "GGV-Platform/1.0",
-        "X-Source": "ggv-reativacao"
+        "X-Source": "ggv-reativacao",
+        "Accept": "application/json, text/plain, */*"
       },
       body: JSON.stringify(payload),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
+    console.log('📡 AUTOMATION - Status da resposta N8N:', res.status, res.statusText);
     
     if (!res.ok) {
       const errorText = await res.text();
       console.error('❌ AUTOMATION - N8N retornou erro:', res.status, errorText);
+      
+      // Se for erro 500 com "Error in workflow", pode ser um problema temporário
+      if (res.status === 500 && errorText.includes('Error in workflow')) {
+        console.log('⚠️ AUTOMATION - Erro 500 detectado, pode ser processamento em andamento');
+        // Criar resposta simulada para indicar que foi iniciado mas com erro
+        const result = {
+          ok: false,
+          success: false,
+          message: `Workflow iniciado mas com erro interno no N8N: ${errorText}`,
+          status: 'error',
+          workflowId: `wf_error_${Date.now()}`,
+          executionId: `exec_error_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          error: errorText,
+          httpStatus: res.status
+        };
+        return await processN8nResponse(result, input);
+      }
+      
       throw new Error(`N8N Error ${res.status}: ${errorText}`);
     }
     
@@ -75,8 +106,8 @@ async function processN8nResponse(result: any, input: ReativacaoPayload) {
   console.log('📊 AUTOMATION - Processando resposta real do N8N:', result);
   
   // Extrair informações reais do N8N
-  const workflowId = result.workflowId || result.executionId || result.id;
-  const runId = result.runId || result.executionId || result.run_id;
+  const workflowId = result.workflowId || result.executionId || result.id || `fallback_${Date.now()}`;
+  const runId = result.runId || result.executionId || result.run_id || `run_${Date.now()}`;
   
   // Verificar se foi sucesso baseado na resposta real do N8N
   const isSuccess = result.ok === true || 

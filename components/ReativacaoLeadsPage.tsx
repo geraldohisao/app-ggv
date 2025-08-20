@@ -87,11 +87,20 @@ const ReativacaoLeadsPage: React.FC = () => {
       // Enviar para o backend
       const response = await triggerReativacao(validatedData);
       
-      setResult({
-        success: true,
-        message: "Automação solicitada com sucesso.",
-        data: response
-      });
+      // Verificar se houve erro no N8N
+      if (response.status === 'error' || response.httpStatus === 500) {
+        setResult({
+          success: false,
+          message: `⚠️ Automação iniciada mas com problema no N8N: ${response.message || 'Erro interno do workflow'}. O processamento pode estar em andamento mesmo assim.`,
+          data: response
+        });
+      } else {
+        setResult({
+          success: true,
+          message: "Automação solicitada com sucesso.",
+          data: response
+        });
+      }
 
       // Recarregar histórico se estiver visível
       if (showHistory) {
