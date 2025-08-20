@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient';
 // Configuração real do N8N
 const N8N_CONFIG = {
   WEBHOOK_URL: 'https://automation-test.ggvinteligencia.com.br/webhook/reativacao-leads',
-  TIMEOUT: 15000, // 15 segundos
+  TIMEOUT: 45000, // 45 segundos - aumentado para volumes maiores
   CALLBACK_URL: 'https://app.grupoggv.com/.netlify/functions/n8n-callback' // Netlify Function endpoint
 };
 
@@ -98,6 +98,25 @@ export async function triggerReativacao(input: ReativacaoPayload) {
     
   } catch (error: any) {
     console.error('❌ AUTOMATION - Erro ao conectar com N8N:', error);
+    
+    // Tratamento específico para timeout/abort
+    if (error.name === 'AbortError' || error.message.includes('aborted')) {
+      console.log('⏰ AUTOMATION - Timeout detectado, criando resposta de fallback');
+      // Criar resposta simulada indicando que pode estar processando
+      const result = {
+        ok: true,
+        success: true,
+        message: `Automação iniciada (timeout após ${N8N_CONFIG.TIMEOUT/1000}s). O N8N pode ainda estar processando em background.`,
+        status: 'timeout_started',
+        workflowId: `wf_timeout_${Date.now()}`,
+        executionId: `exec_timeout_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        timeout: true,
+        note: 'Aguarde o callback do N8N para confirmação final'
+      };
+      return await processN8nResponse(result, input);
+    }
+    
     throw new Error(`Falha ao conectar com N8N: ${error.message}`);
   }
 }

@@ -94,6 +94,12 @@ const ReativacaoLeadsPage: React.FC = () => {
           message: `⚠️ Automação iniciada mas com problema no N8N: ${response.message || 'Erro interno do workflow'}. O processamento pode estar em andamento mesmo assim.`,
           data: response
         });
+      } else if (response.status === 'timeout_started' || response.timeout) {
+        setResult({
+          success: true,
+          message: `⏰ Automação iniciada mas demorou para responder (${response.message}). Verifique o histórico em alguns minutos para ver o status final.`,
+          data: response
+        });
       } else {
         setResult({
           success: true,
