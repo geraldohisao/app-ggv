@@ -14,6 +14,15 @@ import { CheckCircleIcon, ExclamationTriangleIcon, BoltIcon, TrashIcon, ClockIco
 
 const ReativacaoLeadsPage: React.FC = () => {
   const { user } = useUser();
+  
+  // Helper function para verificar se um objeto existe e tem propriedades
+  const safeGet = (obj: any, path: string, defaultValue: any = null) => {
+    try {
+      return path.split('.').reduce((current, key) => current && current[key], obj) ?? defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
   const [formData, setFormData] = useState<FormData>({
@@ -87,12 +96,22 @@ const ReativacaoLeadsPage: React.FC = () => {
       // ✅ FEEDBACK IMEDIATO - Mostrar que foi iniciado
       setResult({
         success: true,
-        message: `🚀 Automação iniciada para ${validatedData.proprietario}! Processando ${validatedData.numero_negocio} leads...`,
-        data: { status: 'starting', immediate: true }
+        message: `🚀 Automação REAL iniciada para ${validatedData.proprietario}! N8N processando ${validatedData.numero_negocio} leads com dados reais do Pipedrive...`,
+        data: { status: 'starting', immediate: true, real: true }
       });
 
       // Enviar para o backend (em background)
       const response = await triggerReativacao(validatedData);
+      
+      // ✅ VERIFICAR SE RESPONSE EXISTE ANTES DE ACESSAR PROPRIEDADES
+      if (!response) {
+        setResult({
+          success: false,
+          message: `❌ Erro: Não foi possível obter resposta do sistema de automação.`,
+          data: null
+        });
+        return;
+      }
       
       // ✅ ATUALIZAR RESULTADO APENAS SE HOUVER PROBLEMA
       if (response.status === 'error' || response.httpStatus === 500) {
@@ -190,14 +209,16 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Auto-refresh do histórico com frequência muito reduzida para evitar flicker
   useEffect(() => {
-    if (!showHistory) return;
+    if (!showHistory || !history) return;
 
     const hasActive = history.some(h => (
-      h.status === 'processing' ||
-      h.status === 'starting' ||
-      h.status === 'finalizing' ||
-      h.status === 'connecting' ||
-      h.status === 'fetching'
+      h && h.status && (
+        h.status === 'processing' ||
+        h.status === 'starting' ||
+        h.status === 'finalizing' ||
+        h.status === 'connecting' ||
+        h.status === 'fetching'
+      )
     ));
 
     // Frequência muito reduzida: 10s para ativos, 30s para inativos
@@ -232,11 +253,14 @@ const ReativacaoLeadsPage: React.FC = () => {
       pending: { color: 'bg-yellow-100 text-yellow-800', text: 'Pendente' },
       connecting: { color: 'bg-yellow-100 text-yellow-800', text: 'Conectando' },
       starting: { color: 'bg-blue-100 text-blue-800', text: 'Iniciando' },
+      started: { color: 'bg-blue-100 text-blue-800', text: 'Iniciado' },
+      running: { color: 'bg-blue-100 text-blue-800', text: 'Executando' },
       fetching: { color: 'bg-purple-100 text-purple-800', text: 'Buscando' },
       processing: { color: 'bg-indigo-100 text-indigo-800', text: 'Processando' },
       finalizing: { color: 'bg-orange-100 text-orange-800', text: 'Finalizando' },
       completed: { color: 'bg-green-100 text-green-800', text: 'Concluído' },
       success: { color: 'bg-green-100 text-green-800', text: 'Sucesso' },
+      failed: { color: 'bg-red-100 text-red-800', text: 'Falhou' },
       error: { color: 'bg-red-100 text-red-800', text: 'Erro' }
     } as const;
     const config = (statusConfig as any)[status] || statusConfig.pending;
@@ -249,10 +273,11 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Função para renderizar progresso
   const renderProgress = (item: AutomationHistoryItem) => {
+    // Verificação de segurança para n8nResponse
     const n8nResponse = item.n8nResponse as any;
     
     // Verificar se deve mostrar progresso
-    const shouldShowProgress = n8nResponse?.progress || 
+    const shouldShowProgress = (n8nResponse && n8nResponse.progress) || 
       item.status === 'processing' || 
       item.status === 'starting' || 
       item.status === 'finalizing' ||
@@ -263,12 +288,12 @@ const ReativacaoLeadsPage: React.FC = () => {
       return null;
     }
 
-    const progress = n8nResponse?.progress || 0;
-    const message = n8nResponse?.message || 'Processando...';
-    const details = n8nResponse?.details || '';
-    const leadsProcessed = n8nResponse?.leadsProcessed || 0;
-    const totalLeads = n8nResponse?.totalLeads || item.numeroNegocio;
-    const status = n8nResponse?.status || item.status;
+    const progress = safeGet(n8nResponse, 'progress', 0);
+    const message = safeGet(n8nResponse, 'message', 'Processando...');
+    const details = safeGet(n8nResponse, 'details', '');
+    const leadsProcessed = safeGet(n8nResponse, 'leadsProcessed', 0);
+    const totalLeads = safeGet(n8nResponse, 'totalLeads', item.numeroNegocio);
+    const status = safeGet(n8nResponse, 'status', item.status);
 
     // Configuração de cores e ícones por status
     const statusConfig = {
@@ -393,7 +418,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     }
     
     try {
-      const workflowId = item.n8nResponse?.workflowId;
+      const workflowId = item.n8nResponse && item.n8nResponse.workflowId ? item.n8nResponse.workflowId : null;
       if (!workflowId) {
         alert('Workflow ID não encontrado');
         return;
@@ -690,18 +715,24 @@ const ReativacaoLeadsPage: React.FC = () => {
                     {renderProgress(item)}
 
                     {/* Botão para marcar como concluído manualmente */}
-                    {item.status !== 'completed' && item.status !== 'error' && (
+                    {item.status !== 'completed' && item.status !== 'error' && item.status !== 'success' && item.status !== 'failed' && (
                       <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-blue-800 font-medium">Workflow finalizado no N8N?</p>
-                            <p className="text-xs text-blue-600">Se o N8N já terminou, clique para marcar como concluído</p>
+                            <p className="text-sm text-blue-800 font-medium">🔄 Workflow em processamento real no N8N</p>
+                            <p className="text-xs text-blue-600">
+                              Aguardando callback automático. Se já terminou, marque como concluído.
+                            </p>
+                            <div className="mt-2 flex items-center gap-2 text-xs text-blue-700">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                              <span>Processamento em tempo real • Dados 100% reais</span>
+                            </div>
                           </div>
                           <button
                             onClick={() => handleManualComplete(item)}
                             className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                           >
-                            Marcar Concluído
+                            ✅ Marcar Concluído
                           </button>
                         </div>
                       </div>
@@ -717,10 +748,29 @@ const ReativacaoLeadsPage: React.FC = () => {
                           {item.status === 'success' || item.status === 'completed' ? (
                             <div className="text-green-600">
                               ✅ Workflow executado com sucesso
+                              {safeGet(item.n8nResponse, 'leadsProcessed') && (
+                                <div className="mt-1 text-slate-600">
+                                  📊 {safeGet(item.n8nResponse, 'leadsProcessed', 0)} leads processados
+                                </div>
+                              )}
                             </div>
-                          ) : item.status === 'processing' || item.status === 'starting' || item.status === 'finalizing' || item.status === 'connecting' || item.status === 'fetching' ? (
+                          ) : item.status === 'failed' ? (
+                            <div className="text-red-600">
+                              ❌ Workflow falhou no N8N
+                              {safeGet(item.n8nResponse, 'message') && (
+                                <div className="mt-1 text-slate-600">
+                                  📋 {safeGet(item.n8nResponse, 'message')}
+                                </div>
+                              )}
+                              {safeGet(item.n8nResponse, 'leadsProcessed') !== null && (
+                                <div className="mt-1 text-slate-600">
+                                  📊 {safeGet(item.n8nResponse, 'leadsProcessed', 0)} leads processados
+                                </div>
+                              )}
+                            </div>
+                          ) : item.status === 'processing' || item.status === 'starting' || item.status === 'started' || item.status === 'finalizing' || item.status === 'connecting' || item.status === 'fetching' ? (
                             <div className="text-blue-600">
-                              🔄 Workflow em execução...
+                              🔄 Workflow em execução no N8N...
                             </div>
                           ) : item.status === 'error' ? (
                             <div className="text-red-600">
@@ -733,10 +783,40 @@ const ReativacaoLeadsPage: React.FC = () => {
                           )}
                         </div>
                         
+                        {/* Mostrar resumo se disponível */}
+                        {safeGet(item.n8nResponse, 'summary') && (
+                          <div className="mt-2 text-xs text-slate-600">
+                            <strong>Resumo:</strong> {safeGet(item.n8nResponse, 'summary')}
+                          </div>
+                        )}
+                        
+                        {/* Mostrar dados do Pipedrive se disponível */}
+                        {safeGet(item.n8nResponse, 'pipedriveData') && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                            <div className="text-xs text-blue-800 font-medium">📊 Dados do Pipedrive:</div>
+                            <div className="text-xs text-blue-700 mt-1">
+                              {safeGet(item.n8nResponse, 'pipedriveData.person.name') && (
+                                <div>👤 Pessoa: {safeGet(item.n8nResponse, 'pipedriveData.person.name')}</div>
+                              )}
+                              {safeGet(item.n8nResponse, 'pipedriveData.organization.name') && (
+                                <div>🏢 Empresa: {safeGet(item.n8nResponse, 'pipedriveData.organization.name')}</div>
+                              )}
+                              {safeGet(item.n8nResponse, 'pipedriveData.deal.title') && (
+                                <div>💼 Deal: {safeGet(item.n8nResponse, 'pipedriveData.deal.title')}</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* Mensagem específica do N8N */}
-                        {item.n8nResponse.message && (
+                        {item.n8nResponse && item.n8nResponse.message && (
                           <div className="mt-2 text-xs text-slate-600">
                             <strong>Resposta:</strong> {item.n8nResponse.message}
+                            {item.n8nResponse.data?.dev_mode && (
+                              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                                DEV MODE
+                              </span>
+                            )}
                           </div>
                         )}
                         
