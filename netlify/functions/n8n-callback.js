@@ -39,7 +39,17 @@ exports.handler = async (event, context) => {
 
     // Parse do body
     const body = JSON.parse(event.body || '{}');
-    const { workflowId, executionId, status, message, data, timestamp } = body;
+    const { workflowId, executionId, status, message, data, timestamp, deals, leadsProcessed, summary } = body;
+    
+    // Se recebeu dados do Pipedrive diretamente (formato alternativo)
+    const isPipedriveData = body.person_id || body.org_id || body.deal;
+    if (isPipedriveData) {
+      console.log('📊 N8N CALLBACK - Dados do Pipedrive detectados:', {
+        person_id: body.person_id,
+        org_id: body.org_id,
+        deal_title: body.deal?.title
+      });
+    }
 
     // Validação básica
     if (!workflowId || !status) {
@@ -77,20 +87,42 @@ exports.handler = async (event, context) => {
 
     console.log('✅ N8N CALLBACK - Processando:', { workflowId, status, message });
 
+    // Preparar dados do N8N para salvar
+    const n8nResponseData = {
+      status: status,
+      message: message,
+      executionId: executionId,
+      webhookReceived: true,
+      webhookTime: timestamp || new Date().toISOString(),
+      // Dados estruturados do processamento
+      data: data,
+      deals: deals,
+      leadsProcessed: leadsProcessed || (deals ? deals.length : 0),
+      summary: summary,
+      // Se recebeu dados do Pipedrive diretamente
+      pipedriveData: isPipedriveData ? {
+        person_id: body.person_id,
+        org_id: body.org_id,
+        lead_id: body.lead_id,
+        project_id: body.project_id,
+        content: body.content,
+        add_time: body.add_time,
+        update_time: body.update_time,
+        organization: body.organization,
+        person: body.person,
+        deal: body.deal,
+        lead: body.lead,
+        user: body.user
+      } : null
+    };
+
     // Atualizar registro no banco
     const { data: updatedRecord, error } = await supabase
       .from('automation_history')
       .update({
         status: status,
         error_message: status === 'failed' ? message : null,
-        n8n_response: {
-          status: status,
-          message: message,
-          data: data,
-          executionId: executionId,
-          webhookReceived: true,
-          webhookTime: timestamp || new Date().toISOString()
-        },
+        n8n_response: n8nResponseData,
         updated_at: new Date().toISOString()
       })
       .or(`id.eq.${workflowId},n8n_response->>workflowId.eq.${workflowId},n8n_response->>runId.eq.${workflowId}`)

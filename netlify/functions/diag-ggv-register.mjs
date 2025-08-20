@@ -2,7 +2,7 @@
 // URL: https://app.grupoggv.com/.netlify/functions/diag-ggv-register
 // Alias: https://app.grupoggv.com/api/webhook/diag-ggv-register
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   // Headers CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
