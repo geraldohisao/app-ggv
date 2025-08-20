@@ -3,6 +3,19 @@ import { DIAGNOSTIC_AREAS, BENCHMARK_DATA } from '../../../constants';
 import { DiagnosticArea } from '../../../types';
 import Tooltip from '../../ui/Tooltip';
 
+// Mapeamento dos itens específicos avaliados por área
+const AREA_ITEMS: Record<DiagnosticArea, string> = {
+    'Processos': 'Mapeamento de processos',
+    'Tecnologia': 'CRM',
+    'Padronização': 'Script comercial',
+    'Pessoas': 'Teste de perfil comportamental',
+    'Gestão': 'Plano de metas e comissionamento',
+    'Monitoramento': 'Indicadores comerciais',
+    'Desenvolvimento': 'Treinamentos periódicos',
+    'Relacionamento': 'Pós-venda',
+    'Prospecção': 'Prospecção ativa',
+};
+
 interface BarChartProps {
     scoresByArea: Record<string, { score: number; count: number }>;
 }
@@ -16,7 +29,15 @@ export const BarChart: React.FC<BarChartProps> = ({ scoresByArea }) => {
         const marketAvg = BENCHMARK_DATA.marketAverage[area as DiagnosticArea] / 10 * 100;
         const topPerformers = BENCHMARK_DATA.topPerformers[area as DiagnosticArea] / 10 * 100;
         const gap = Math.max(0, topPerformers - percentage);
-        return { name: area, percentage, marketAvg, topPerformers, gap };
+        const itemName = AREA_ITEMS[area as DiagnosticArea] || area;
+        return { 
+            name: area, 
+            itemName, 
+            percentage, 
+            marketAvg, 
+            topPerformers, 
+            gap 
+        };
     })
         // Ordenação por maior gap (Top - Você)
         .sort((a, b) => b.gap - a.gap);
@@ -52,7 +73,10 @@ export const BarChart: React.FC<BarChartProps> = ({ scoresByArea }) => {
 				return (
 					<div key={data.name}>
 						<div className="grid grid-cols-12 items-center gap-3 mb-1">
-							<div className="col-span-3 truncate text-sm font-medium text-slate-800">{data.name}</div>
+							<div className="col-span-3 truncate">
+								<div className="text-sm font-medium text-slate-800">{data.itemName}</div>
+								<div className="text-xs text-slate-500">({data.name})</div>
+							</div>
 							<div className="col-span-9 text-right text-[11px] font-medium text-slate-600" aria-hidden>
 								{youPercent.toFixed(0)}%
 							</div>

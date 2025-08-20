@@ -7,9 +7,9 @@ interface RadarChartProps {
 }
 
 export const RadarChart: React.FC<RadarChartProps> = ({ scoresByArea }) => {
-    const size = 300;
+    const size = 400; // Aumentado de 300 para 400
     const center = size / 2;
-    const radius = center * 0.8;
+    const radius = center * 0.65; // Reduzido de 0.8 para 0.65 para dar mais espaço aos labels
     const numAxes = DIAGNOSTIC_AREAS.length;
     const angleSlice = (Math.PI * 2) / numAxes;
 
@@ -42,7 +42,19 @@ export const RadarChart: React.FC<RadarChartProps> = ({ scoresByArea }) => {
     const marketAvgPath = marketAvgPoints.map(p => `${p.x},${p.y}`).join(' ');
 
     return (
-        <div className="flex justify-center items-center">
+        <div className="flex flex-col items-center space-y-4">
+            {/* Legenda */}
+            <div className="flex justify-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-blue-900 bg-opacity-40 border-2 border-blue-900 rounded"></div>
+                    <span className="text-slate-700">Sua empresa</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-amber-300 bg-opacity-20 border-2 border-amber-600 border-dashed rounded"></div>
+                    <span className="text-slate-700">Média do mercado</span>
+                </div>
+            </div>
+            
             <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                 {/* Background circles */}
                 {[25, 50, 75, 100].map(val => (
@@ -53,7 +65,16 @@ export const RadarChart: React.FC<RadarChartProps> = ({ scoresByArea }) => {
                 {axes.map((axis, i) => (
                     <g key={axis.name}>
                         <line x1={center} y1={center} x2={axis.x} y2={axis.y} stroke="#cbd5e1" strokeWidth="1" />
-                        <text x={axis.x + (axis.x - center) * 0.1} y={axis.y + (axis.y - center) * 0.1} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="bold" fill="#475569">
+                        <text 
+                            x={axis.x + (axis.x - center) * 0.2} 
+                            y={axis.y + (axis.y - center) * 0.2} 
+                            textAnchor="middle" 
+                            dominantBaseline="central" 
+                            fontSize="11" 
+                            fontWeight="600" 
+                            fill="#374151"
+                            style={{ textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}
+                        >
                             {axis.name}
                         </text>
                     </g>
