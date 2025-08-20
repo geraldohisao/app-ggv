@@ -30,6 +30,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     const [detailedAnalysis, setDetailedAnalysis] = useState<DetailedAIAnalysis | null>(null);
     const [specialistName, setSpecialistName] = useState<string>('');
     const [n8nSent, setN8nSent] = useState<boolean>(false);
+    const [emergencyTimeout, setEmergencyTimeout] = useState<boolean>(false);
 
     useEffect(() => {
         // Busca o nome do usuário logado para exibir como Especialista na capa
@@ -76,6 +77,16 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         fetchInsights();
     }, [companyData, answers, totalScore, segment]);
 
+    // Timeout de emergência para enviar mesmo se IA não responder
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            console.log('⏰ N8N - Timeout de emergência ativado (15s)');
+            setEmergencyTimeout(true);
+        }, 15000); // 15 segundos
+
+        return () => clearTimeout(timer);
+    }, []);
+
     // Enviar dados para N8N após análise IA ser concluída
     useEffect(() => {
         const sendToN8n = async () => {
@@ -90,10 +101,18 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             });
             
             // Só enviar se:
-            // 1. Ambas análises IA foram concluídas (ou houve erro)
+            // 1. Ambas análises IA foram concluídas (ou houve erro) OU timeout de 15 segundos
             // 2. Ainda não foi enviado
             // 3. Não está mais carregando
-            if (!n8nSent && !isLoadingSummary && !isLoadingDetailed && (summaryInsights || detailedAnalysis || apiError)) {
+            const shouldSend = !n8nSent && (
+                (!isLoadingSummary && !isLoadingDetailed && (summaryInsights || detailedAnalysis || apiError)) ||
+                (!isLoadingSummary && !isLoadingDetailed) || // Enviar mesmo se IA falhar
+                emergencyTimeout // Enviar após timeout de emergência
+            );
+            
+            console.log('🔍 N8N SEND CHECK - Deve enviar?', shouldSend);
+            
+            if (shouldSend) {
                 console.log('📤 N8N - Enviando resultados após análise IA concluída');
                 console.log('📊 N8N - Dados a enviar:', { companyData, segment, answers, totalScore, dealId });
                 
@@ -122,7 +141,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         };
         
         sendToN8n();
-    }, [n8nSent, isLoadingSummary, isLoadingDetailed, summaryInsights, detailedAnalysis, apiError, companyData, segment, answers, totalScore, dealId]);
+    }, [n8nSent, isLoadingSummary, isLoadingDetailed, summaryInsights, detailedAnalysis, apiError, emergencyTimeout, companyData, segment, answers, totalScore, dealId]);
 
     const handleNextTab = () => {
         const currentIndex = REPORT_TABS.indexOf(activeTab);
