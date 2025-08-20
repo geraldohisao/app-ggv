@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient';
 const N8N_CONFIG = {
   WEBHOOK_URL: 'https://automation-test.ggvinteligencia.com.br/webhook/reativacao-leads',
   TIMEOUT: 15000, // 15 segundos
-  CALLBACK_URL: 'https://app.grupoggv.com/api/webhook/n8n-callback' // Edge Function do Supabase
+  CALLBACK_URL: 'https://app.grupoggv.com/.netlify/functions/n8n-callback' // Netlify Function endpoint
 };
 
 export async function triggerReativacao(input: ReativacaoPayload) {
