@@ -25,6 +25,13 @@ export const DiagnosticoComercial: React.FC = () => {
     
     // Hook para buscar dados do Pipedrive baseado no deal_id da URL
     const { data: pipedriveData, loading: pipedriveLoading, error: pipedriveError, dealId } = usePipedriveData();
+    
+    // Debug do deal_id
+    useEffect(() => {
+        console.log('🔍 DIAGNOSTICO - Deal ID atual:', dealId);
+        console.log('🔍 DIAGNOSTICO - Tipo do dealId:', typeof dealId);
+        console.log('🔍 DIAGNOSTICO - URL atual:', window.location.href);
+    }, [dealId]);
 
     // Atualizar prefill quando dados do Pipedrive estiverem disponíveis
     useEffect(() => {

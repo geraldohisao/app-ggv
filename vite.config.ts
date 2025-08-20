@@ -12,7 +12,7 @@ function cspProdOnly(): Plugin {
       if (process.env.NODE_ENV !== 'production') return html;
       // Relaxado para permitir scripts inline (window.APP_CONFIG) e evitar bloqueio de libs que usam eval em prod preview
       // Mantém restrições principais e adiciona domínios do Supabase explicitamente
-      const meta = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; connect-src 'self' https: wss: https://*.supabase.co https://*.supabase.in https://app.grupoggv.com https://api-test.ggvinteligencia.com.br https://automation-test.ggvinteligencia.com.br https://generativelanguage.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https://app.grupoggv.com; base-uri 'self'; object-src 'none';">`;
+      const meta = `<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; connect-src 'self' https: wss: https://*.supabase.co https://*.supabase.in https://app.grupoggv.com https://api-test.ggvinteligencia.com.br https://automation-test.ggvinteligencia.com.br https://generativelanguage.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; object-src 'none';">`;
       return html.replace('</head>', `${meta}\n</head>`);
     }
   };
