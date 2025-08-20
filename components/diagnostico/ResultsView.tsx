@@ -79,12 +79,23 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     // Enviar dados para N8N após análise IA ser concluída
     useEffect(() => {
         const sendToN8n = async () => {
+            console.log('🔍 N8N CHECK - Estado atual:', {
+                n8nSent,
+                isLoadingSummary,
+                isLoadingDetailed,
+                hasSummary: !!summaryInsights,
+                hasDetailed: !!detailedAnalysis,
+                hasError: !!apiError,
+                dealId
+            });
+            
             // Só enviar se:
             // 1. Ambas análises IA foram concluídas (ou houve erro)
             // 2. Ainda não foi enviado
             // 3. Não está mais carregando
             if (!n8nSent && !isLoadingSummary && !isLoadingDetailed && (summaryInsights || detailedAnalysis || apiError)) {
                 console.log('📤 N8N - Enviando resultados após análise IA concluída');
+                console.log('📊 N8N - Dados a enviar:', { companyData, segment, answers, totalScore, dealId });
                 
                 try {
                     const success = await sendDiagnosticToN8n({
