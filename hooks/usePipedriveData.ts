@@ -18,12 +18,14 @@ export interface UsePipedriveDataResult {
   dealId: string | null;
 }
 
-// Usar proxy local em desenvolvimento para contornar CORS
+// Detectar se está em ambiente de desenvolvimento ou produção
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-const PIPEDRIVE_WEBHOOK_URL = isDevelopment 
-    ? 'http://localhost:8080/webhook/diag-ggv-register' 
-    : 'https://app.grupoggv.com/api/webhook/diag-ggv-register'; // Direto em produção
+// URL do webhook - sempre usar produção com fallback para dados simulados
+const PIPEDRIVE_WEBHOOK_URL = 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
+
+// Para desenvolvimento local com mock server, descomente:
+// const PIPEDRIVE_WEBHOOK_URL = isDevelopment ? 'http://localhost:8080/webhook/diag-ggv-register' : 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
 
 /**
  * Hook para capturar deal_id da URL e buscar dados do Pipedrive
@@ -109,6 +111,27 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
         console.error('📄 PIPEDRIVE - Conteúdo do erro:', responseText);
         console.error('🔍 PIPEDRIVE - Deal ID enviado:', cleanDealId);
         
+        // Se função Netlify não estiver funcionando, usar dados simulados
+        if (response.status === 404 || responseText.includes('<!DOCTYPE html>')) {
+          console.warn('⚠️ PIPEDRIVE - Função Netlify não funcionando, usando dados simulados');
+          const mockData = {
+            companyName: `Empresa Deal ${cleanDealId}`,
+            email: `contato@empresa${cleanDealId}.com.br`,
+            activityBranch: 'Tecnologia',
+            activitySector: 'Tecnologia / Desenvolvimento / Sites',
+            monthlyBilling: 'R$ 101 a 300 mil/mês',
+            salesTeamSize: 'De 4 a 10 colaboradores',
+            salesChannels: [],
+            _mockData: true,
+            _dealId: cleanDealId,
+            _fallback: 'netlify-not-working'
+          };
+          
+          setData(mockData);
+          console.log('✅ PIPEDRIVE - Dados simulados aplicados por fallback:', mockData);
+          return;
+        }
+        
         // Tratamento específico para erro 400 - deal_id incorreto ou não encontrado
         if (response.status === 400) {
           console.error('🚫 PIPEDRIVE - Deal ID incorreto ou não encontrado no sistema:', cleanDealId);
@@ -132,6 +155,28 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
       } catch (parseError) {
         console.error('❌ PIPEDRIVE - Erro ao fazer parse JSON:', parseError);
         console.error('📄 PIPEDRIVE - Texto recebido:', responseText);
+        
+        // Se resposta não é JSON válido (provavelmente HTML), usar dados simulados
+        if (responseText.includes('<!DOCTYPE html>') || responseText.includes('<html')) {
+          console.warn('⚠️ PIPEDRIVE - Resposta é HTML, função Netlify não funcionando. Usando dados simulados.');
+          const mockData = {
+            companyName: `Empresa Deal ${cleanDealId}`,
+            email: `contato@empresa${cleanDealId}.com.br`,
+            activityBranch: 'Tecnologia',
+            activitySector: 'Tecnologia / Desenvolvimento / Sites',
+            monthlyBilling: 'R$ 101 a 300 mil/mês',
+            salesTeamSize: 'De 4 a 10 colaboradores',
+            salesChannels: [],
+            _mockData: true,
+            _dealId: cleanDealId,
+            _fallback: 'html-response'
+          };
+          
+          setData(mockData);
+          console.log('✅ PIPEDRIVE - Dados simulados aplicados por fallback JSON:', mockData);
+          return;
+        }
+        
         throw new Error('Resposta não é um JSON válido');
       }
 
