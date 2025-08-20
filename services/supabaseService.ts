@@ -298,16 +298,30 @@ export async function prefillFromN8n(dealId: string): Promise<AnyJson | null> {
 }
 
 export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
-    const { resultUrl } = await getN8nConfig();
-    if (!resultUrl) return false;
+    // Usar a mesma URL que funciona para buscar dados, mas para enviar resultados
+    const resultUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-results';
+    
+    console.log('📤 N8N - Enviando resultados do diagnóstico:', payload);
+    console.log('📤 N8N - URL de destino:', resultUrl);
+    
     try {
         const res = await fetch(resultUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
-        return res.ok;
-    } catch {
+        
+        if (res.ok) {
+            console.log('✅ N8N - Resultados enviados com sucesso');
+            return true;
+        } else {
+            console.error('❌ N8N - Erro ao enviar resultados:', res.status, res.statusText);
+            const responseText = await res.text();
+            console.error('❌ N8N - Resposta do erro:', responseText);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ N8N - Erro na requisição:', error);
         return false;
     }
 }
@@ -319,7 +333,7 @@ export async function sendDiagnosticToPipedrive(
     totalScore: number,
     dealId?: string
 ): Promise<boolean> {
-    const webhookUrl = 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
+    const webhookUrl = 'https://app.grupoggv.com/.netlify/functions/diag-ggv-register';
     
     try {
         // Forçar uso do novo domínio em produção
