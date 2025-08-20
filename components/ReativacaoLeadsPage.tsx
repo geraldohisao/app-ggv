@@ -84,29 +84,31 @@ const ReativacaoLeadsPage: React.FC = () => {
         (window as any).debugLog("reativacao:submit", "info", "AUTOMATION", validatedData);
       }
 
-      // Enviar para o backend
+      // ✅ FEEDBACK IMEDIATO - Mostrar que foi iniciado
+      setResult({
+        success: true,
+        message: `🚀 Automação iniciada para ${validatedData.proprietario}! Processando ${validatedData.numero_negocio} leads...`,
+        data: { status: 'starting', immediate: true }
+      });
+
+      // Enviar para o backend (em background)
       const response = await triggerReativacao(validatedData);
       
-      // Verificar se houve erro no N8N
+      // ✅ ATUALIZAR RESULTADO APENAS SE HOUVER PROBLEMA
       if (response.status === 'error' || response.httpStatus === 500) {
         setResult({
           success: false,
-          message: `⚠️ Automação iniciada mas com problema no N8N: ${response.message || 'Erro interno do workflow'}. O processamento pode estar em andamento mesmo assim.`,
+          message: `⚠️ Problema detectado no N8N: ${response.message || 'Erro interno do workflow'}. O processamento pode estar em andamento mesmo assim.`,
           data: response
         });
       } else if (response.status === 'timeout_started' || response.timeout) {
         setResult({
           success: true,
-          message: `⏰ Automação iniciada mas demorou para responder (${response.message}). Verifique o histórico em alguns minutos para ver o status final.`,
-          data: response
-        });
-      } else {
-        setResult({
-          success: true,
-          message: "Automação solicitada com sucesso.",
+          message: `⏰ Automação iniciada com sucesso! O N8N demorou para responder, mas está processando. Verifique o histórico em alguns minutos.`,
           data: response
         });
       }
+      // ✅ SE SUCESSO NORMAL, MANTER MENSAGEM IMEDIATA (não sobrescrever)
 
       // Recarregar histórico se estiver visível
       if (showHistory) {
