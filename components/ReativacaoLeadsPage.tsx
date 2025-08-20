@@ -89,9 +89,7 @@ const ReativacaoLeadsPage: React.FC = () => {
       
       setResult({
         success: true,
-        message: response.mock 
-          ? "Automação solicitada com sucesso (modo teste)" 
-          : "Automação solicitada com sucesso.",
+        message: "Automação solicitada com sucesso.",
         data: response
       });
 
