@@ -280,7 +280,7 @@ export const DiagnosticoComercial: React.FC = () => {
 
                             
                             {/* Sucesso do Pipedrive ou busca manual */}
-                            {(pipedriveData && !pipedriveLoading) || manualSearchData ? (
+                            {((pipedriveData && !pipedriveLoading) || manualSearchData || prefill) && !isSearchingDeal ? (
                                 <div className={`mt-4 p-3 rounded-lg ${
                                     // Determinar cor baseado no tipo de dados
                                     (pipedriveData as any)?._mockData || (manualSearchData?._mockData) 
@@ -308,6 +308,13 @@ export const DiagnosticoComercial: React.FC = () => {
                                                             ? '🧪 Dados simulados carregados para teste!'
                                                             : `✅ Dados da oportunidade ${(pipedriveData as any)._dealId ? `(Deal ID: ${(pipedriveData as any)._dealId})` : ''} carregados!`;
                                                     }
+                                                    // Fallback para quando só há prefill (dados carregados mas sem fonte específica)
+                                                    if (prefill && prefill.companyName) {
+                                                        const dealIdFromUrl = new URLSearchParams(window.location.search).get('deal_id');
+                                                        return dealIdFromUrl 
+                                                            ? `✅ Dados da oportunidade ${dealIdFromUrl} carregados com sucesso!`
+                                                            : '✅ Dados da empresa carregados com sucesso!';
+                                                    }
                                                     return '';
                                                 })()}
                                                 {' Os campos serão preenchidos automaticamente.'}
@@ -317,10 +324,19 @@ export const DiagnosticoComercial: React.FC = () => {
                                             {(() => {
                                                 const data = manualSearchData || pipedriveData;
                                                 const isReal = data?._realData && !data?._mockData;
-                                                const companyName = data?.companyName || data?.empresa;
-                                                const email = data?.email;
+                                                const companyName = data?.companyName || data?.empresa || prefill?.companyName;
+                                                const email = data?.email || prefill?.email;
                                                 
                                                 if (isReal && companyName) {
+                                                    return (
+                                                        <p className="text-xs text-green-600 mt-1">
+                                                            📊 <strong>Empresa:</strong> {companyName} {email && `| `}<strong>Email:</strong> {email}
+                                                        </p>
+                                                    );
+                                                }
+                                                
+                                                // Mostrar dados do prefill mesmo sem fonte específica
+                                                if (companyName && !data?._mockData) {
                                                     return (
                                                         <p className="text-xs text-green-600 mt-1">
                                                             📊 <strong>Empresa:</strong> {companyName} {email && `| `}<strong>Email:</strong> {email}
