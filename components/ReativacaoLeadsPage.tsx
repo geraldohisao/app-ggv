@@ -140,11 +140,7 @@ const ReativacaoLeadsPage: React.FC = () => {
   const loadHistory = async (page: number = 1) => {
     try {
       setIsLoadingHistory(true);
-      const response = await getAutomationHistory({
-        page,
-        limit: 10,
-        automationType: 'reativacao_leads'
-      });
+      const response = await getAutomationHistory(page, 10);
 
       setHistory(prev => {
         // Mantém a ordem vinda do servidor, mas reaproveita objetos já existentes quando possível
