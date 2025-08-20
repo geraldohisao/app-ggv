@@ -67,7 +67,7 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
       setError(null);
       setLoading(false);
     }
-  }, []); // Executar apenas uma vez
+  }, [window.location.search]); // Reagir a mudanças na URL
 
   const fetchPipedriveData = async (dealId: string) => {
     // Validação crítica: não fazer requisição sem deal_id
