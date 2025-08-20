@@ -21,8 +21,8 @@ export interface UsePipedriveDataResult {
 // Detectar se está em ambiente de desenvolvimento ou produção
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-// URL do webhook - sempre usar produção com fallback para dados simulados
-const PIPEDRIVE_WEBHOOK_URL = 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
+// URL do webhook - usar diretamente a função Netlify até o redirect funcionar
+const PIPEDRIVE_WEBHOOK_URL = 'https://app.grupoggv.com/.netlify/functions/diag-ggv-register';
 
 // Para desenvolvimento local com mock server, descomente:
 // const PIPEDRIVE_WEBHOOK_URL = isDevelopment ? 'http://localhost:8080/webhook/diag-ggv-register' : 'https://app.grupoggv.com/api/webhook/diag-ggv-register';

@@ -11,7 +11,20 @@
 [context.production]
   domain = "app.grupoggv.com"
 
-# Redirects para SPA (Single Page Application)
+# Redirects para APIs e webhooks - DEVEM FICAR ANTES DO SPA
+[[redirects]]
+  from = "/api/webhook/diag-ggv-register"
+  to = "/.netlify/functions/diag-ggv-register"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/webhook/n8n-callback"
+  to = "/.netlify/functions/n8n-callback"
+  status = 200
+  force = true
+
+# Redirects para SPA (Single Page Application) - deve ficar por último
 [[redirects]]
   from = "/*"
   to = "/index.html"
