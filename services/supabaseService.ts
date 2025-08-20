@@ -298,8 +298,8 @@ export async function prefillFromN8n(dealId: string): Promise<AnyJson | null> {
 }
 
 export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
-    // Usar a mesma URL que funciona para buscar dados, mas para enviar resultados
-    const resultUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-results';
+    // Usar a mesma URL que funciona para buscar dados, agora para enviar resultados
+    const resultUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
     
     console.log('📤 N8N - Enviando resultados do diagnóstico:', payload);
     console.log('📤 N8N - URL de destino:', resultUrl);
