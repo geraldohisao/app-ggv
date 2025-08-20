@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '../contexts/RobustUserContext';
+import { useUser } from '../contexts/SimpleUserContext';
 import { GoogleIcon, ExclamationTriangleIcon } from './ui/icons';
 import { supabase } from '../services/supabaseClient';
 import { isValidKey, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/config';
-// Removido EmergencyAuth para simplificar
-import { LOGO_URLS } from '../config/logos';
+import { GGVLogo } from './ui/GGVLogo';
 
 const LoginPage: React.FC = () => {
-    const { login, loginAsTestUser, loading: authLoading } = useUser();
+    const { login, loading: authLoading } = useUser();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isConfigIncomplete, setIsConfigIncomplete] = useState(false);
-    // Usar URL fixa do logo
-    const logoUrl = LOGO_URLS.grupoGGVLogoUrl;
     
     // Detectar se estamos processando retorno do OAuth
     const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
@@ -35,44 +32,22 @@ const LoginPage: React.FC = () => {
 
 
     const handleGoogleLogin = async () => {
-        if (isConfigIncomplete) {
-            setError("A configuração do Supabase está incompleta. Contate o administrador.");
-            return;
-        }
+        console.log('🔐 LOGIN PAGE - Iniciando login com Google...');
         
         setLoading(true);
         setError(null);
         
-        console.log('🔐 LOGIN PAGE - Iniciando processo de login...');
-        
         try {
             await login();
-            console.log('🔐 LOGIN PAGE - Login iniciado com sucesso');
+            console.log('🔐 LOGIN PAGE - Redirecionamento iniciado');
         } catch (err: any) {
             console.error('🚨 LOGIN PAGE - Erro no login:', err);
-            setError('Erro no login. Tente novamente.');
+            setError('Erro no login. Verifique sua conexão e tente novamente.');
             setLoading(false);
         }
     };
 
-    const handleEmergencyLogin = () => {
-        console.log('🚨 EMERGENCY AUTH - Forçando login...');
-        
-        // Criar perfil de emergência
-        const emergencyUser = {
-            id: 'emergency-' + Date.now(),
-            email: 'geraldo@grupoggv.com',
-            name: 'Geraldo',
-            initials: 'GE',
-            role: 'SUPER_ADMIN',
-        };
-        
-        // Salvar no localStorage
-        localStorage.setItem('ggv-emergency-user', JSON.stringify(emergencyUser));
-        
-        // Recarregar página
-        window.location.reload();
-    };
+
 
     return (
         <div className="flex flex-col items-center justify-center h-full bg-slate-100 p-4">
@@ -80,27 +55,15 @@ const LoginPage: React.FC = () => {
                 <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
                     <div className="mb-6 flex items-center justify-center">
                         <img
-                          src={logoUrl}
-                          alt="Grupo GGV"
-                          className="h-12 w-auto object-contain"
-                          loading="eager"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            console.warn('Logo falhou, usando fallback SVG');
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentNode;
-                            if (parent) {
-                              const fallback = document.createElement('div');
-                              fallback.innerHTML = `
-                                <div class="flex items-center gap-3">
-                                  <div class="h-7 w-12 rounded-xl bg-teal-600"></div>
-                                  <span class="text-2xl font-extrabold text-slate-900">Grupo GGV</span>
-                                </div>
-                              `;
-                              parent.appendChild(fallback);
-                            }
-                          }}
+                            src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png"
+                            alt="Grupo GGV"
+                            className="h-16 w-auto object-contain"
+                            loading="eager"
+                            onError={(e) => {
+                                console.warn('🖼️ Logo do Grupo GGV falhou, usando fallback');
+                                const target = e.target as HTMLImageElement;
+                                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iMTIiIGZpbGw9InVybCgjZ3JhZGllbnQwXzEpIi8+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNDAiIHI9IjE4IiBmaWxsPSJ3aGl0ZSIvPgo8dGV4dCB4PSI1MCIgeT0iNDciIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMwZDk0ODgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9ImJvbGQiPkc8L3RleHQ+Cjx0ZXh0IHg9IjUwIiB5PSI3NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPkdSVVBPIEdHVjwvdGV4dD4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZGllbnQwXzEiIHgxPSIwIiB5MT0iMCIgeDI9IjEwMCIgeTI9IjEwMCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgo8c3RvcCBzdG9wLWNvbG9yPSIjMGQ5NDg4Ii8+CjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBmNzY2ZSIvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+Cjwvc3ZnPgo=';
+                            }}
                         />
                     </div>
                     
@@ -120,26 +83,20 @@ const LoginPage: React.FC = () => {
                                 {isProcessingOAuth ? 'Processando tokens do Google...' : 'Carregando dados do usuário...'}
                             </div>
                             
-                            {/* Botões de emergência */}
-                            <div className="mt-3 flex flex-col gap-2">
+                            {/* Botão de limpeza apenas */}
+                            <div className="mt-3">
                                 <button
                                     onClick={() => {
-                                        console.log('🚨 EMERGÊNCIA - Limpando e recarregando...');
+                                        console.log('🧹 LIMPEZA - Limpando cache e recarregando...');
                                         localStorage.clear();
+                                        sessionStorage.clear();
                                         const dealId = new URLSearchParams(window.location.search).get('deal_id');
                                         window.location.href = window.location.origin + window.location.pathname + 
                                             (dealId ? `?deal_id=${dealId}` : '');
                                     }}
-                                    className="text-xs text-red-600 hover:text-red-800 underline"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
                                 >
-                                    Problema? Clique para limpar e tentar novamente
-                                </button>
-                                
-                                <button
-                                    onClick={handleEmergencyLogin}
-                                    className="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded border"
-                                >
-                                    🚨 Forçar Acesso de Emergência
+                                    Problema? Clique para limpar cache e tentar novamente
                                 </button>
                             </div>
                         </div>
@@ -163,7 +120,7 @@ const LoginPage: React.FC = () => {
                     <div className="flex justify-center my-6">
                          <button 
                             onClick={handleGoogleLogin} 
-                            disabled={loading || isConfigIncomplete || isProcessingOAuth || authLoading}
+                            disabled={loading || isProcessingOAuth || authLoading}
                             className="w-full max-w-xs inline-flex items-center justify-center px-4 py-2 border border-slate-300 rounded-full shadow-sm bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                          >
                             <GoogleIcon className="w-5 h-5 mr-3" />
@@ -178,25 +135,9 @@ const LoginPage: React.FC = () => {
                         <p className="text-red-600 text-xs mt-4 text-center">{error}</p>
                     )}
 
-                    {/* Botão de emergência simplificado */}
-                    <div className="mt-6 border-t border-slate-200 pt-4">
-                        <div className="text-center">
-                            <button
-                                onClick={handleEmergencyLogin}
-                                className="text-sm text-red-600 hover:text-red-800 hover:underline focus:outline-none"
-                            >
-                                🚨 Forçar Login de Emergência
-                            </button>
-                        </div>
-                        <div className="mt-2 text-center">
-                            <button
-                                onClick={loginAsTestUser}
-                                className="text-sm text-slate-500 hover:text-slate-700 hover:underline focus:outline-none"
-                            >
-                                Acessar como Teste (Admin)
-                            </button>
-                        </div>
-                    </div>
+
+
+
                 </div>
             </div>
         </div>

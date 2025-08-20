@@ -6,7 +6,7 @@ import {
     FlagIcon,
     BoltIcon
 } from './ui/icons';
-import { useUser } from '../contexts/SimpleUserContext';
+import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
 
 

@@ -92,3 +92,4 @@ npm run dev
 ---
 
 **✅ Correções aplicadas! Acesse: `http://localhost:5174`**
+

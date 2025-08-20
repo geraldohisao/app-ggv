@@ -326,10 +326,19 @@ export async function sendDiagnosticToPipedrive(
         const isProduction = window.location.hostname === 'app.grupoggv.com';
         const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
         
-        // Gerar link público do resultado
-        const resultUrl = `${baseUrl}/resultado-diagnostico?deal_id=${dealId || 'unknown'}`;
+        // Criar relatório público completo (mesmo formato do email)
+        const reportData = {
+            companyData,
+            answers,
+            totalScore,
+            dealId,
+            timestamp: new Date().toISOString()
+        };
         
-        console.log('📤 WEBHOOK - URL do resultado:', resultUrl);
+        const { token } = await createPublicReport(reportData, companyData.email);
+        const resultUrl = `${baseUrl}/r/${token}`;
+        
+        console.log('📤 WEBHOOK - URL do resultado público:', resultUrl);
         
         // Função para converter pontuação em resposta textual
         const getAnswerText = (score: number): string => {
@@ -378,14 +387,16 @@ export async function sendDiagnosticToPipedrive(
                 maturityLevel: maturityPercentage >= 70 ? 'Alta' : maturityPercentage >= 40 ? 'Média' : 'Baixa',
             },
             
-            // Link público do resultado
+            // Link público do resultado (mesmo formato do email)
             resultUrl: resultUrl,
             
             // Metadados
             metadata: {
                 dealId: dealId,
+                publicToken: token,
                 timestamp: new Date().toISOString(),
                 source: 'GGV Diagnóstico Comercial',
+                reportType: 'public_complete' // Indicar que é o relatório completo
             }
         };
         

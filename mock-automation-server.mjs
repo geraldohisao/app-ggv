@@ -42,6 +42,52 @@ let mockHistory = [
   }
 ];
 
+// Rota para ativar reativação (POST)
+app.post('/automation/reactivation', (req, res) => {
+  const { filtro, proprietario, cadencia, numero_negocio } = req.body;
+  
+  console.log('🚀 MOCK - Recebendo solicitação de reativação:', {
+    filtro,
+    proprietario,
+    cadencia,
+    numero_negocio
+  });
+  
+  // Simular diferentes cenários baseado no proprietário
+  if (proprietario === 'Teste Erro') {
+    console.log('❌ MOCK - Simulando erro para teste');
+    return res.status(500).json({
+      ok: false,
+      error: 'Erro simulado para teste',
+      message: 'Falha na conexão com N8N'
+    });
+  }
+  
+  // Simular sucesso
+  const runId = `run_${Date.now()}`;
+  const workflowId = `wf_${Date.now()}`;
+  
+  const response = {
+    ok: true,
+    forwarded: true,
+    message: 'Workflow was started successfully',
+    runId,
+    workflowId,
+    status: 'started',
+    timestamp: new Date().toISOString(),
+    parameters: {
+      filtro,
+      proprietario,
+      cadencia,
+      numero_negocio
+    }
+  };
+  
+  console.log('✅ MOCK - Reativação iniciada com sucesso:', runId);
+  
+  res.json(response);
+});
+
 // Rota para consultar histórico (GET)
 app.get('/automation/history', (req, res) => {
   const page = parseInt(req.query.page || '1');
@@ -195,47 +241,54 @@ app.get('/automation/status/:workflowId', (req, res) => {
   
   // Simular diferentes status baseado no tempo
   const now = Date.now();
-  const workflowStartTime = workflowStatuses.get(workflowId) || now;
+  let workflowStartTime = workflowStatuses.get(workflowId);
+  
+  if (!workflowStartTime) {
+    // Se não existe, criar agora
+    workflowStartTime = now;
+    workflowStatuses.set(workflowId, workflowStartTime);
+  }
+  
   const elapsed = now - workflowStartTime;
   
   let status, message, progress, details;
   
-  if (elapsed < 2000) {
-    // Primeiros 2 segundos: conectando
+  if (elapsed < 3000) {
+    // Primeiros 3 segundos: conectando
     status = 'connecting';
     message = 'Conectando ao N8N...';
-    progress = Math.min((elapsed / 2000) * 10, 10);
+    progress = Math.min((elapsed / 3000) * 15, 15);
     details = 'Estabelecendo conexão com o servidor de automação';
-  } else if (elapsed < 5000) {
-    // 2-5 segundos: iniciando
+  } else if (elapsed < 7000) {
+    // 3-7 segundos: iniciando
     status = 'starting';
     message = 'Iniciando workflow de reativação...';
-    progress = 10 + Math.min(((elapsed - 2000) / 3000) * 15, 15);
+    progress = 15 + Math.min(((elapsed - 3000) / 4000) * 20, 20);
     details = 'Configurando parâmetros e validando dados';
-  } else if (elapsed < 12000) {
-    // 5-12 segundos: buscando leads
+  } else if (elapsed < 15000) {
+    // 7-15 segundos: buscando leads
     status = 'fetching';
     message = 'Buscando leads para reativação...';
-    progress = 25 + Math.min(((elapsed - 5000) / 7000) * 25, 25);
+    progress = 35 + Math.min(((elapsed - 7000) / 8000) * 25, 25);
     details = 'Consultando base de dados e aplicando filtros';
-  } else if (elapsed < 20000) {
-    // 12-20 segundos: processando
+  } else if (elapsed < 25000) {
+    // 15-25 segundos: processando
     status = 'processing';
     message = 'Processando leads selecionados...';
-    progress = 50 + Math.min(((elapsed - 12000) / 8000) * 30, 30);
+    progress = 60 + Math.min(((elapsed - 15000) / 10000) * 25, 25);
     details = 'Aplicando cadência e preparando para envio';
-  } else if (elapsed < 25000) {
-    // 20-25 segundos: finalizando
+  } else if (elapsed < 30000) {
+    // 25-30 segundos: finalizando
     status = 'finalizing';
     message = 'Finalizando importação...';
-    progress = 80 + Math.min(((elapsed - 20000) / 5000) * 15, 15);
+    progress = 85 + Math.min(((elapsed - 25000) / 5000) * 10, 10);
     details = 'Salvando resultados e gerando relatório';
   } else {
-    // Após 25 segundos: concluído
+    // Após 30 segundos: concluído
     status = 'completed';
     message = 'Importação concluída com sucesso!';
     progress = 100;
-    details = 'Todos os leads foram processados e enviados';
+    details = 'Todos os leads foram processados e enviados para as SDRs';
   }
   
   // Calcular leads processados baseado no progresso
@@ -257,6 +310,30 @@ app.get('/automation/status/:workflowId', (req, res) => {
   
   console.log('📊 MOCK - Status do workflow:', workflowId, 'Status:', status, 'Progresso:', progress + '%');
   
+  // Se o status mudou para completed, atualizar o registro no histórico automaticamente
+  if (status === 'completed') {
+    const record = mockHistory.find(item => 
+      item.n8nResponse?.workflowId === workflowId
+    );
+    
+    if (record && record.status !== 'completed') {
+      record.status = 'completed';
+      record.updatedAt = new Date().toISOString();
+      record.n8nResponse = {
+        ...record.n8nResponse,
+        status: 'completed',
+        message: 'Importação concluída com sucesso!',
+        progress: 100,
+        leadsProcessed: totalLeads,
+        totalLeads,
+        autoCompleted: true,
+        completedAt: new Date().toISOString()
+      };
+      
+      console.log('✅ MOCK - Registro automaticamente marcado como concluído:', record.id);
+    }
+  }
+  
   res.json(response);
 });
 
@@ -272,7 +349,84 @@ app.post('/automation/start-workflow', (req, res) => {
   });
 });
 
+// Rota para marcar workflow como concluído manualmente
+app.post('/automation/complete/:workflowId', (req, res) => {
+  const { workflowId } = req.params;
+  const { message = 'Workflow concluído manualmente', leadsProcessed } = req.body;
+  
+  console.log('🎯 MOCK - Marcando workflow como concluído:', workflowId);
+  
+  // Encontrar o registro no histórico
+  const record = mockHistory.find(item => 
+    item.n8nResponse?.workflowId === workflowId
+  );
+  
+  if (record) {
+    record.status = 'completed';
+    record.updatedAt = new Date().toISOString();
+    record.n8nResponse = {
+      ...record.n8nResponse,
+      status: 'completed',
+      message,
+      progress: 100,
+      leadsProcessed: leadsProcessed || record.numeroNegocio,
+      totalLeads: record.numeroNegocio,
+      manuallyCompleted: true,
+      completedAt: new Date().toISOString()
+    };
+    
+    console.log('✅ MOCK - Workflow marcado como concluído:', record.id);
+    res.json({ success: true, message: 'Workflow marcado como concluído', record });
+  } else {
+    console.warn('⚠️ MOCK - Workflow não encontrado:', workflowId);
+    res.status(404).json({ error: 'Workflow não encontrado' });
+  }
+});
+
+// Rota para simular webhook de retorno do N8N
+app.post('/automation/webhook/n8n-callback', (req, res) => {
+  const { workflowId, status, message, data } = req.body;
+  
+  console.log('🔔 MOCK - Webhook N8N recebido:', {
+    workflowId,
+    status,
+    message,
+    dataKeys: data ? Object.keys(data) : []
+  });
+  
+  // Encontrar e atualizar o registro no histórico
+  const record = mockHistory.find(item => 
+    item.n8nResponse?.workflowId === workflowId
+  );
+  
+  if (record) {
+    record.status = status;
+    record.updatedAt = new Date().toISOString();
+    record.n8nResponse = {
+      ...record.n8nResponse,
+      status,
+      message,
+      data,
+      webhookReceived: true,
+      webhookTime: new Date().toISOString()
+    };
+    
+    console.log('✅ MOCK - Registro atualizado via webhook:', record.id);
+  } else {
+    console.warn('⚠️ MOCK - Workflow não encontrado para webhook:', workflowId);
+  }
+  
+  res.json({ success: true, message: 'Webhook processado' });
+});
+
 const PORT = 3001;
 app.listen(PORT, () => {
-  console.log(`Mock automation server running on port ${PORT}`);
+  console.log(`🚀 Mock automation server running on port ${PORT}`);
+  console.log(`📋 Endpoints disponíveis:`);
+  console.log(`   POST /automation/reactivation - Ativar reativação`);
+  console.log(`   GET  /automation/history - Consultar histórico`);
+  console.log(`   POST /automation/webhook/n8n-callback - Webhook N8N`);
+  console.log(`   GET  /automation/status/:workflowId - Status do workflow`);
+  console.log(`   POST /automation/complete/:workflowId - Marcar como concluído`);
+  console.log(`   POST /automation/history/reset - Reinicializar histórico`);
 });

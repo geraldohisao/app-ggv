@@ -12,7 +12,7 @@ import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
-import { UserProvider, useUser } from './contexts/FinalAuth';
+import { UserProvider, useUser } from './contexts/DirectUserContext';
 import { LoadingSpinner } from './components/ui/Feedback';
 // Debug panels removidos para evitar conflitos
 import { initializeLogos } from './utils/fetchLogosFromDatabase';
@@ -31,15 +31,9 @@ const AppContent: React.FC = () => {
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
 
-  // Inicializa o sistema de logos uma única vez no início do app
+  // Logos desabilitados temporariamente para evitar erros 404
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // pequena espera para garantir supabase pronto em ambientes locais
-      const timer = setTimeout(() => {
-        initializeLogos();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
+    console.log('📱 APP - Inicializado sem buscar logos (evitando erros 404)');
   }, []);
 
   // Se for página de resultado público, não precisa de autenticação
@@ -57,8 +51,13 @@ const AppContent: React.FC = () => {
       );
     }
 
+    // O login é gerenciado pelo DirectUserContext
     if (!user) {
-      return <FinalLoginPage />;
+      return (
+        <div className="flex items-center justify-center h-full">
+          <LoadingSpinner />
+        </div>
+      );
     }
 
     return (
@@ -90,16 +89,9 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <FinalLoginPage />;
+  // A tela de login é renderizada pelo DirectUserContext quando não há usuário
+  if (loading || !user) {
+    return null;
   }
 
   const renderModule = () => {
@@ -137,8 +129,7 @@ const AppContent: React.FC = () => {
       <main className={`flex-1 overflow-y-auto ${isFullScreen ? 'bg-white' : 'bg-slate-100'}`}>
         {renderModule()}
       </main>
-      <AuthDebugPanel visible={debugVisible} />
-      <RobustDebugPanel />
+
     </div>
   );
 };

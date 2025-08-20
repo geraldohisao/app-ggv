@@ -112,3 +112,4 @@ https://app.grupoggv.com/diagnostico?deal_id=569934
 ---
 
 **✅ Loading infinito corrigido! Sistema tem timeout de 10s e botões de emergência.**
+

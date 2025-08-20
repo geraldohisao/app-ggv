@@ -1,8 +1,0 @@
-FROM node:20-alpine
-WORKDIR /app
-COPY package.json package-lock.json* .npmrc* ./ 2>/dev/null || true
-COPY packages ./packages
-RUN npm i --workspaces --no-audit --no-fund
-RUN npm run -w @calls-mvp/web build || true
-EXPOSE 3000
-CMD ["npm","run","-w","@calls-mvp/web","dev"]

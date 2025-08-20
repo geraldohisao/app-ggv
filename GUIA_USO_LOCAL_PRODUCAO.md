@@ -186,3 +186,4 @@ https://app.grupoggv.com/diagnostico?deal_id=569934
 
 **Desenvolvimento: `http://localhost:5173`**
 **Produção: `https://app.grupoggv.com`**
+

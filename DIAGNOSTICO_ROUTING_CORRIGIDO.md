@@ -120,3 +120,4 @@ https://app.grupoggv.com/test-diagnostico-routing.html
 ---
 
 **✅ Diagnóstico corrigido! Teste: https://app.grupoggv.com/diagnostico?deal_id=569934**
+

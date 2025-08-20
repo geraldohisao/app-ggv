@@ -1,8 +1,0 @@
-FROM node:20-bullseye
-WORKDIR /app
-COPY package.json package-lock.json ./
-COPY packages ./packages
-RUN npm i --workspaces --no-audit --no-fund || npm ci --workspaces --no-audit --no-fund || true
-RUN npm run -w @calls-mvp/shared build && npm run -w @calls-mvp/worker build
-# Ensure Prisma client is generated at runtime with the correct env
-CMD ["sh","-lc","npx prisma generate --schema packages/shared/prisma/schema.prisma && node packages/worker/dist/index.js"]

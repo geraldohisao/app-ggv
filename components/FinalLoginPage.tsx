@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useUser } from '../contexts/FinalAuth';
 import { GoogleIcon } from './ui/icons';
-import { LOGO_URLS } from '../config/logos';
+import { GGVLogo } from './ui/GGVLogo';
 
 const FinalLoginPage: React.FC = () => {
     const { login, loading } = useUser();
@@ -24,11 +24,15 @@ const FinalLoginPage: React.FC = () => {
                     {/* Logo */}
                     <div className="mb-6 flex items-center justify-center">
                         <img
-                            src={LOGO_URLS.grupoGGVLogoUrl}
+                            src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png"
                             alt="Grupo GGV"
-                            className="h-12 w-auto object-contain"
+                            className="h-16 w-auto object-contain"
                             loading="eager"
-                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                                console.warn('🖼️ Logo do Grupo GGV falhou, usando fallback');
+                                const target = e.target as HTMLImageElement;
+                                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iMTIiIGZpbGw9InVybCgjZ3JhZGllbnQwXzEpIi8+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNDAiIHI9IjE4IiBmaWxsPSJ3aGl0ZSIvPgo8dGV4dCB4PSI1MCIgeT0iNDciIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMwZDk0ODgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9ImJvbGQiPkc8L3RleHQ+Cjx0ZXh0IHg9IjUwIiB5PSI3NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPkdSVVBPIEdHVjwvdGV4dD4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZGllbnQwXzEiIHgxPSIwIiB5MT0iMCIgeDI9IjEwMCIgeTI9IjEwMCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgo8c3RvcCBzdG9wLWNvbG9yPSIjMGQ5NDg4Ii8+CjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBmNzY2ZSIvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+Cjwvc3ZnPgo=';
+                            }}
                         />
                     </div>
                     

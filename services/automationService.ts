@@ -1,40 +1,117 @@
 import { ReativacaoPayload } from "../src/schemas/reativacao";
+import { supabase } from './supabaseClient';
+
+// Configuração real do N8N
+const N8N_CONFIG = {
+  WEBHOOK_URL: 'https://automation-test.ggvinteligencia.com.br/webhook/reativacao-leads',
+  TIMEOUT: 15000, // 15 segundos
+  CALLBACK_URL: 'https://app.grupoggv.com/api/webhook/n8n-callback' // Edge Function do Supabase
+};
 
 export async function triggerReativacao(input: ReativacaoPayload) {
   console.log('🚀 AUTOMATION - Iniciando reativação para SDR:', input.proprietario);
+  console.log('📡 AUTOMATION - Enviando para N8N:', N8N_CONFIG.WEBHOOK_URL);
   
-  const res = await fetch("/automation/reactivation", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const result = await res.json();
-  
-  console.log('📊 AUTOMATION - Resposta do N8N:', result);
-  
-  // Gerar workflowId e iniciar simulação
-  const workflowId = `wf_${Date.now()}`;
-  
-  // Salvar no histórico local (mock)
   try {
-    // Determinar se foi sucesso baseado na resposta do N8N
-    const isSuccess = result.ok && (
-      result.message?.includes('started') || 
-      result.message?.includes('Workflow was started') ||
-      result.message?.includes('success') ||
-      result.status === 'completed' ||
-      result.status === 'success' ||
-      result.runId ||
-      result.workflowId
-    );
+    const payload = {
+      ...input,
+      // Adicionar callback URL para N8N retornar status
+      callback_url: N8N_CONFIG.CALLBACK_URL,
+      timestamp: new Date().toISOString()
+    };
     
-    console.log('✅ AUTOMATION - Sucesso detectado:', isSuccess, 'Mensagem:', result.message);
+    const res = await fetch(N8N_CONFIG.WEBHOOK_URL, {
+    method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "User-Agent": "GGV-Platform/1.0",
+        "X-Source": "ggv-reativacao"
+      },
+      body: JSON.stringify(payload),
+    });
     
-    const historyResponse = await fetch("/automation/history", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('❌ AUTOMATION - N8N retornou erro:', res.status, errorText);
+      throw new Error(`N8N Error ${res.status}: ${errorText}`);
+    }
+    
+    // Tentar processar resposta - pode ser JSON ou texto
+    let result;
+    const responseText = await res.text();
+    console.log('📡 AUTOMATION - Resposta bruta do N8N:', responseText);
+    
+    try {
+      // Tentar parsear como JSON primeiro
+      result = JSON.parse(responseText);
+      console.log('✅ AUTOMATION - JSON parseado com sucesso:', result);
+    } catch (jsonError) {
+      console.log('⚠️ AUTOMATION - Resposta não é JSON válido, interpretando como texto');
+      
+      // Se não for JSON, criar objeto a partir da resposta de texto
+      result = {
+        ok: true,
+        success: true,
+        message: responseText.trim(),
+        status: 'started',
+        workflowId: `wf_${Date.now()}`,
+        executionId: `exec_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        rawResponse: responseText
+      };
+      
+      console.log('✅ AUTOMATION - Objeto criado a partir do texto:', result);
+    }
+    
+    return await processN8nResponse(result, input);
+    
+  } catch (error: any) {
+    console.error('❌ AUTOMATION - Erro ao conectar com N8N:', error);
+    throw new Error(`Falha ao conectar com N8N: ${error.message}`);
+  }
+}
+
+async function processN8nResponse(result: any, input: ReativacaoPayload) {
+  console.log('📊 AUTOMATION - Processando resposta real do N8N:', result);
+  
+  // Extrair informações reais do N8N
+  const workflowId = result.workflowId || result.executionId || result.id;
+  const runId = result.runId || result.executionId || result.run_id;
+  
+  // Verificar se foi sucesso baseado na resposta real do N8N
+  const isSuccess = result.ok === true || 
+                   result.success === true ||
+                   result.status === 'started' ||
+                   result.status === 'running' ||
+                   result.message?.toLowerCase().includes('started') || 
+                   result.message?.toLowerCase().includes('success') ||
+                   result.message?.toLowerCase().includes('workflow') ||
+                   result.message?.toLowerCase().includes('executed') ||
+                   result.message?.toLowerCase().includes('completed') ||
+                   workflowId || runId;
+
+  if (!isSuccess) {
+    console.error('❌ AUTOMATION - N8N retornou falha:', result);
+    throw new Error(result.message || result.error || 'N8N retornou erro');
+  }
+
+  console.log('✅ AUTOMATION - Workflow iniciado no N8N:', { workflowId, runId });
+  
+  // Salvar no histórico usando Supabase
+  const recordId = `real_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const n8nResponse = {
+    ...result,
+    workflowId,
+    runId,
+    status: 'started',
+    timestamp: new Date().toISOString(),
+    real: true // Marcar como execução real
+  };
+  
+  try {
+    // Tentar salvar no servidor local primeiro (desenvolvimento)
+    try {
+      const historyData = {
         userId: 'current-user',
         userEmail: 'geraldo@grupoggv.com',
         userRole: 'SUPER_ADMIN',
@@ -43,34 +120,107 @@ export async function triggerReativacao(input: ReativacaoPayload) {
         proprietario: input.proprietario,
         cadencia: input.cadencia,
         numeroNegocio: input.numero_negocio,
-        status: isSuccess ? 'processing' : 'error', // Sempre começar com 'processing' se sucesso
-        errorMessage: isSuccess ? null : (result.message || 'Erro desconhecido'),
-        n8nResponse: {
-          ...result,
-          workflowId,
-          startTime: new Date().toISOString(),
-          status: 'processing', // Status inicial para progresso
-          progress: 0, // Progresso inicial
-          message: 'Iniciando automação...'
+        status: 'started',
+        errorMessage: null,
+        n8nResponse
+      };
+      
+      const historyResponse = await fetch("/automation/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(historyData),
+      });
+      
+      if (historyResponse.ok) {
+        console.log('✅ AUTOMATION - Histórico salvo no servidor local');
+        return; // Sucesso, não precisa tentar Supabase
+      }
+    } catch (localError) {
+      console.log('⚠️ AUTOMATION - Servidor local não disponível, tentando Supabase');
+    }
+    
+    // Fallback: Tentar salvar no Supabase
+    try {
+      // Obter usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Tentar usar RPC primeiro
+      try {
+        const { error } = await supabase.rpc('save_automation_record', {
+          p_id: recordId,
+          p_user_id: user?.id || null,
+          p_user_email: user?.email || 'unknown@ggv.com',
+          p_user_role: 'USER',
+          p_automation_type: 'reativacao_leads',
+          p_filtro: input.filtro,
+          p_proprietario: input.proprietario,
+          p_cadencia: input.cadencia,
+          p_numero_negocio: input.numero_negocio,
+          p_status: 'started',
+          p_n8n_response: n8nResponse
+        });
+        
+        if (!error) {
+          console.log('✅ AUTOMATION - Histórico salvo no Supabase via RPC:', recordId);
+          return;
         }
-      }),
-    });
-    
-    const historyData = await historyResponse.json();
-    console.log('📝 AUTOMATION - Registro criado no histórico:', historyData.id);
-    
-    // Iniciar polling do status (se foi sucesso)
-    if (isSuccess && historyData.id) {
-      console.log('🔄 AUTOMATION - Iniciando polling para workflowId:', workflowId);
-      startWorkflowPolling(historyData.id, workflowId);
+      } catch (rpcError) {
+        console.log('⚠️ AUTOMATION - RPC não disponível, tentando inserção direta');
+      }
+      
+      // Fallback: Inserção direta na tabela
+      const { error: insertError } = await supabase
+        .from('automation_history')
+        .insert([{
+          id: recordId,
+          user_id: user?.id || null,
+          user_email: user?.email || 'unknown@ggv.com',
+          user_role: 'USER',
+          automation_type: 'reativacao_leads',
+          filtro: input.filtro,
+          proprietario: input.proprietario,
+          cadencia: input.cadencia,
+          numero_negocio: input.numero_negocio,
+          status: 'started',
+          n8n_response: n8nResponse,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }]);
+      
+      if (!insertError) {
+        console.log('✅ AUTOMATION - Histórico salvo no Supabase via inserção direta:', recordId);
+      } else {
+        console.error('❌ AUTOMATION - Erro ao salvar no Supabase:', insertError);
+      }
+      
+    } catch (supabaseError) {
+      console.error('❌ AUTOMATION - Erro ao conectar com Supabase:', supabaseError);
     }
   } catch (error) {
-    console.warn('❌ AUTOMATION - Erro ao salvar no histórico:', error);
+    console.error('❌ AUTOMATION - Erro geral ao salvar:', error);
   }
   
-  return result; // { ok: true, forwarded: true, runId?: string }
+  return {
+    success: true,
+    message: result.message || 'Automação iniciada no N8N',
+    workflowId,
+    runId,
+    mock: false, // Sempre false agora
+    n8nResponse: {
+      ...result,
+      workflowId,
+      runId,
+      status: 'started',
+      timestamp: new Date().toISOString(),
+      real: true
+    }
+  };
 }
 
+// Callback do N8N é agora tratado pela Edge Function do Supabase
+// URL: https://app.grupoggv.com/api/webhook/n8n-callback
+
+// Função para consultar histórico (apenas execuções reais)
 export interface AutomationHistoryItem {
   id: string;
   userId: string;
@@ -81,114 +231,159 @@ export interface AutomationHistoryItem {
   proprietario: string;
   cadencia: string;
   numeroNegocio: number;
-  status: 'pending' | 'success' | 'error' | 'processing' | 'starting' | 'finalizing' | 'connecting' | 'fetching' | 'completed';
+  status: string;
   errorMessage?: string;
   n8nResponse?: any;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface AutomationHistoryResponse {
+export async function getAutomationHistory(page: number = 1, limit: number = 10): Promise<{
   data: AutomationHistoryItem[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-export async function getAutomationHistory(params?: {
-  page?: number;
-  limit?: number;
-  automationType?: string;
-  status?: string;
-}): Promise<AutomationHistoryResponse> {
-  const searchParams = new URLSearchParams();
-  if (params?.page) searchParams.append('page', params.page.toString());
-  if (params?.limit) searchParams.append('limit', params.limit.toString());
-  if (params?.automationType) searchParams.append('automationType', params.automationType);
-  if (params?.status) searchParams.append('status', params.status);
-
-  const res = await fetch(`/automation/history?${searchParams.toString()}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// Função para verificar status do workflow no N8N
-export async function checkWorkflowStatus(workflowId?: string): Promise<any> {
-  if (!workflowId) {
-    // Se não temos workflowId, tentar buscar da última execução
-    const history = await getAutomationHistory({ limit: 1 });
-    const lastExecution = history.data[0];
-    if (lastExecution?.n8nResponse?.workflowId) {
-      workflowId = lastExecution.n8nResponse.workflowId;
-    } else {
-      throw new Error('Nenhum workflow ID encontrado');
-    }
-  }
-
-  // Tentar verificar status via N8N API (se disponível)
+  pagination: { page: number; limit: number; total: number; pages: number };
+}> {
   try {
-    const res = await fetch(`/automation/status/${workflowId}`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  } catch (error) {
-    console.warn('Erro ao verificar status do workflow:', error);
-    return { status: 'unknown', message: 'Status não disponível' };
-  }
-}
-
-// Função para atualizar status de um registro específico
-export async function updateAutomationStatus(historyId: string, status: string, details?: any): Promise<void> {
-  try {
-    await fetch(`/automation/history/${historyId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, n8nResponse: details }),
-    });
-  } catch (error) {
-    console.warn('Erro ao atualizar status:', error);
-  }
-}
-
-// Função para iniciar polling do status do workflow
-function startWorkflowPolling(historyId: string, workflowId: string) {
-  let pollCount = 0;
-  const maxPolls = 60; // Aumentado para 60 verificações (30 segundos com 500ms de intervalo)
-  
-  console.log('🔄 POLLING - Iniciando para historyId:', historyId, 'workflowId:', workflowId);
-  
-  const poll = async () => {
+    // Tentar primeiro o servidor local (desenvolvimento)
     try {
-      pollCount++;
-      console.log(`🔄 POLLING - Tentativa ${pollCount}/${maxPolls} para workflowId:`, workflowId);
-      
-      const status = await checkWorkflowStatus(workflowId);
-      console.log('📊 POLLING - Status recebido:', status);
-      
-      // Atualizar o histórico com o novo status
-      await updateAutomationStatus(historyId, status.status, status);
-      console.log('✅ POLLING - Status atualizado no histórico:', status.status);
-      
-      // Continuar polling se não estiver concluído
-      if (status.status !== 'completed' && pollCount < maxPolls) {
-        setTimeout(poll, 500); // Verificar a cada 500ms
-      } else if (status.status === 'completed') {
-        console.log('🎉 POLLING - Workflow concluído com sucesso:', status);
-      } else {
-        console.log('⏰ POLLING - Tempo limite atingido, parando polling');
+      const res = await fetch(`/automation/history?page=${page}&limit=${limit}`);
+      if (res.ok) {
+        const result = await res.json();
+        console.log('📊 AUTOMATION - Usando servidor local');
+        
+        // Filtrar apenas execuções reais (não simuladas)
+        const realExecutions = result.data.filter((item: AutomationHistoryItem) => 
+          item.n8nResponse?.real === true
+        );
+        
+        return {
+          data: realExecutions,
+  pagination: {
+            ...result.pagination,
+            total: realExecutions.length
+          }
+        };
       }
-    } catch (error) {
-      console.warn('❌ POLLING - Erro na tentativa', pollCount, ':', error);
-      
-      // Tentar mais algumas vezes mesmo com erro
-      if (pollCount < maxPolls) {
-        setTimeout(poll, 1000); // Esperar 1 segundo antes da próxima tentativa
-      }
+    } catch (localError) {
+      console.log('⚠️ AUTOMATION - Servidor local não disponível, tentando Supabase');
     }
-  };
+    
+    // Fallback: Tentar Supabase RPC (se disponível)
+    try {
+      const { data, error } = await supabase.rpc('get_automation_history', {
+        p_page: page,
+        p_limit: limit,
+        p_user_id: null
+      });
+      
+      if (!error && data) {
+        console.log('📊 AUTOMATION - Usando Supabase RPC');
+        const total = data[0]?.total_count || 0;
+        const pages = Math.ceil(total / limit);
+        
+        const formattedData: AutomationHistoryItem[] = data.map((item: any) => ({
+          id: item.id,
+          userId: item.user_id,
+          userEmail: item.user_email,
+          userRole: item.user_role,
+          automationType: item.automation_type,
+          filtro: item.filtro,
+          proprietario: item.proprietario,
+          cadencia: item.cadencia,
+          numeroNegocio: item.numero_negocio,
+          status: item.status,
+          errorMessage: item.error_message,
+          n8nResponse: item.n8n_response,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at
+        }));
+        
+        return {
+          data: formattedData,
+          pagination: { page, limit, total, pages }
+        };
+      }
+    } catch (supabaseError) {
+      console.log('⚠️ AUTOMATION - Supabase RPC não disponível:', supabaseError);
+    }
+    
+    // Fallback final: Tentar consulta direta na tabela (se existir)
+    try {
+      const { data, error } = await supabase
+        .from('automation_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
+      
+      if (!error && data) {
+        console.log('📊 AUTOMATION - Usando consulta direta Supabase');
+        const formattedData: AutomationHistoryItem[] = data.map((item: any) => ({
+          id: item.id,
+          userId: item.user_id,
+          userEmail: item.user_email,
+          userRole: item.user_role,
+          automationType: item.automation_type,
+          filtro: item.filtro,
+          proprietario: item.proprietario,
+          cadencia: item.cadencia,
+          numeroNegocio: item.numero_negocio,
+          status: item.status,
+          errorMessage: item.error_message,
+          n8nResponse: item.n8n_response,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at
+        }));
+        
+        return {
+          data: formattedData,
+          pagination: { page, limit, total: data.length, pages: Math.ceil(data.length / limit) }
+        };
+      }
+    } catch (directError) {
+      console.log('⚠️ AUTOMATION - Consulta direta falhou:', directError);
+    }
+    
+    // Se tudo falhar, retornar vazio
+    console.log('📊 AUTOMATION - Nenhuma fonte de dados disponível');
+    return {
+      data: [],
+      pagination: { page, limit, total: 0, pages: 0 }
+    };
+    
+  } catch (error) {
+    console.error('❌ AUTOMATION - Erro geral ao carregar histórico:', error);
+    return {
+      data: [],
+      pagination: { page, limit, total: 0, pages: 0 }
+    };
+  }
+}
+
+// Função para verificar status de workflow específico no N8N
+export async function checkWorkflowStatus(workflowId: string) {
+  console.log('🔍 AUTOMATION - Verificando status no N8N:', workflowId);
   
-  // Iniciar polling após 1 segundo
-  setTimeout(poll, 1000);
+  try {
+    // Esta URL deve ser configurada para consultar o status real no N8N
+    const statusUrl = `https://automation-test.ggvinteligencia.com.br/api/executions/${workflowId}/status`;
+    
+    const res = await fetch(statusUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "GGV-Platform/1.0"
+      }
+    });
+    
+    if (!res.ok) {
+      console.warn('⚠️ AUTOMATION - Não foi possível consultar status no N8N');
+      return null;
+    }
+    
+    const status = await res.json();
+    console.log('📊 AUTOMATION - Status do N8N:', status);
+    
+    return status;
+  } catch (error) {
+    console.warn('⚠️ AUTOMATION - Erro ao consultar N8N:', error);
+    return null;
+  }
 }

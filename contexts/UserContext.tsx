@@ -10,7 +10,6 @@ interface UserContextType {
     loading: boolean;
     login: () => Promise<void>;
     logout: () => void;
-    loginAsTestUser: () => void;
 }
 
 export const UserContext = createContext<UserContextType>({
@@ -18,7 +17,6 @@ export const UserContext = createContext<UserContextType>({
     loading: true,
     login: async () => {},
     logout: () => {},
-    loginAsTestUser: () => {},
 });
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -316,17 +314,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
     
-    const loginAsTestUser = () => {
-        const testUser: User = {
-            id: 'test-user-001',
-            email: 'teste@ggv.com.br',
-            name: 'Usuário Teste (Admin)',
-            initials: 'TE',
-            role: UserRole.SuperAdmin,
-        };
-        setUser(testUser);
-        setLoading(false);
-    };
+
 
     const logout = async () => {
         // Limpar usuário de emergência se existir
@@ -358,7 +346,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <UserContext.Provider value={{ user, loading, login, logout, loginAsTestUser }}>
+        <UserContext.Provider value={{ user, loading, login, logout }}>
             {useSimpleAuth && (
                 <SimpleAuth 
                     onAuthSuccess={(user) => {

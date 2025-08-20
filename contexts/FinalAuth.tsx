@@ -7,7 +7,6 @@ interface UserContextType {
     loading: boolean;
     login: () => Promise<void>;
     logout: () => void;
-    loginAsTestUser: () => void;
 }
 
 export const UserContext = createContext<UserContextType>({
@@ -15,7 +14,6 @@ export const UserContext = createContext<UserContextType>({
     loading: false, // Começar sem loading
     login: async () => {},
     logout: () => {},
-    loginAsTestUser: () => {},
 });
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -165,18 +163,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const loginAsTestUser = () => {
-        // Função vazia - não implementar
-        console.log('⚠️ FINAL AUTH - Teste desabilitado');
-    };
-
     return (
         <UserContext.Provider value={{
             user,
             loading,
             login,
-            logout,
-            loginAsTestUser
+            logout
         }}>
             {children}
         </UserContext.Provider>

@@ -133,3 +133,4 @@ https://app.grupoggv.com/diagnostico
 ---
 
 **🚀 Teste agora: `https://app.grupoggv.com/diagnostico?deal_id=569934`**
+

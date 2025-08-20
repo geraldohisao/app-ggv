@@ -39,6 +39,11 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
             secure: isProduction,
           },
+          '/automation': {
+            target: 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false,
+          },
         },
       },
       define: {

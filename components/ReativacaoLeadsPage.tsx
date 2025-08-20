@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '../contexts/SimpleUserContext';
+import { useUser } from '../contexts/DirectUserContext';
+import { UserRole } from '../types';
 import { reativacaoSchema, ReativacaoPayload } from '../src/schemas/reativacao';
 import { triggerReativacao, getAutomationHistory, AutomationHistoryItem } from '../services/automationService';
+
+// Tipo para o estado do formulário (permite valores temporários durante digitação)
+type FormData = Omit<ReativacaoPayload, 'numero_negocio'> & {
+  numero_negocio: number | string;
+};
 import { LoadingSpinner } from './ui/Feedback';
 import { FormSelect, FormInput } from './ui/Form';
 import { CheckCircleIcon, ExclamationTriangleIcon, BoltIcon, TrashIcon, ClockIcon, EyeIcon } from './ui/icons';
@@ -10,7 +16,7 @@ const ReativacaoLeadsPage: React.FC = () => {
   const { user } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
-  const [formData, setFormData] = useState<ReativacaoPayload>({
+  const [formData, setFormData] = useState<FormData>({
     filtro: "Lista de reativação - Topo de funil",
     proprietario: "Andressa",
     cadencia: "Reativação - Sem Retorno",
@@ -27,7 +33,7 @@ const ReativacaoLeadsPage: React.FC = () => {
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
 
   // Verificar se o usuário tem permissão
-  const isAdmin = user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN');
+  const isAdmin = user && (user.role === UserRole.Admin || user.role === UserRole.SuperAdmin);
   
   if (!isAdmin) {
     return (
@@ -62,8 +68,16 @@ const ReativacaoLeadsPage: React.FC = () => {
     setResult(null);
 
     try {
-      // Validar dados
-      const validatedData = reativacaoSchema.parse(formData);
+      // Preparar e validar dados
+      const dataToValidate = {
+        ...formData,
+        numero_negocio: formData.numero_negocio === '' || formData.numero_negocio === null || formData.numero_negocio === undefined 
+          ? 20 
+          : typeof formData.numero_negocio === 'string' 
+            ? parseInt(formData.numero_negocio) || 20
+            : formData.numero_negocio
+      };
+      const validatedData = reativacaoSchema.parse(dataToValidate);
       
       // Log no debug panel
       if ((window as any).debugLog) {
@@ -118,7 +132,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     setResult(null);
   };
 
-  const handleInputChange = (field: keyof ReativacaoPayload, value: any) => {
+  const handleInputChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -362,6 +376,41 @@ const ReativacaoLeadsPage: React.FC = () => {
     );
   };
 
+  const handleManualComplete = async (item: AutomationHistoryItem) => {
+    if (!window.confirm(`Tem certeza que o workflow para ${item.proprietario} foi finalizado no N8N?`)) {
+      return;
+    }
+    
+    try {
+      const workflowId = item.n8nResponse?.workflowId;
+      if (!workflowId) {
+        alert('Workflow ID não encontrado');
+        return;
+      }
+      
+      const response = await fetch(`/automation/complete/${workflowId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Workflow concluído manualmente para ${item.proprietario}`,
+          leadsProcessed: item.numeroNegocio
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Workflow marcado como concluído:', result);
+        loadHistory(); // Recarregar histórico
+        alert('Workflow marcado como concluído com sucesso!');
+      } else {
+        throw new Error('Falha ao marcar como concluído');
+      }
+    } catch (error) {
+      console.error('Erro ao marcar como concluído:', error);
+      alert('Erro ao marcar workflow como concluído.');
+    }
+  };
+
   const handleResetHistory = async () => {
     if (window.confirm('Tem certeza que deseja reinicializar o histórico? Isso removerá todos os registros de automação anteriores.')) {
       try {
@@ -452,7 +501,15 @@ const ReativacaoLeadsPage: React.FC = () => {
             max="1000"
             step="1"
             value={formData.numero_negocio}
-            onChange={(e) => handleInputChange('numero_negocio', parseInt(e.target.value) || 20)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '') {
+                handleInputChange('numero_negocio', '');
+              } else {
+                const numValue = parseInt(value);
+                handleInputChange('numero_negocio', isNaN(numValue) ? 1 : Math.max(1, numValue));
+              }
+            }}
             required
           />
             <p className="text-xs text-slate-500 mt-1">
@@ -620,6 +677,24 @@ const ReativacaoLeadsPage: React.FC = () => {
 
                     {/* Progresso em tempo real */}
                     {renderProgress(item)}
+
+                    {/* Botão para marcar como concluído manualmente */}
+                    {item.status !== 'completed' && item.status !== 'error' && (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-blue-800 font-medium">Workflow finalizado no N8N?</p>
+                            <p className="text-xs text-blue-600">Se o N8N já terminou, clique para marcar como concluído</p>
+                          </div>
+                          <button
+                            onClick={() => handleManualComplete(item)}
+                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                          >
+                            Marcar Concluído
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Status visual direto - similar ao print */}
                     {item.n8nResponse && (

@@ -133,3 +133,4 @@ https://app.grupoggv.com/diagnostico?deal_id=569934
 **✅ Fluxo direto e simples**
 
 **🚀 Teste: `https://app.grupoggv.com/diagnostico?deal_id=569934`**
+

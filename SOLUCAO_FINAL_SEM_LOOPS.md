@@ -144,3 +144,4 @@ Logs esperados:
 **🚀 Teste: `https://app.grupoggv.com/diagnostico?deal_id=569934`**
 
 **O login NUNCA MAIS deve entrar em loop!**
+
