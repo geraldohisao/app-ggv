@@ -134,7 +134,6 @@ const PublicDiagnosticReport: React.FC = () => {
           </div>
         </div>
       </div>
-      </div>
     );
   }
 
