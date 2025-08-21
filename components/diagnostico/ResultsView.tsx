@@ -158,6 +158,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             maturityPercentage: Math.round((totalScore / 90) * 100)  // $('registerGGVDiag').first().json.body.results.maturityPercentage
                         },
                         resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
+                        deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
                         
                         diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
                             const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
@@ -269,6 +270,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     
                     body: {
                         resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
+                        deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
                         aiAnalysis: {
                             summaryInsights: {
                                 specialistInsight: summaryInsights.specialistInsight || '',
