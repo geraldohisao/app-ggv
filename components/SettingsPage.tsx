@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
-import { UserRole } from '../types';
+import { UserRole, Module } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
 import { CpuChipIcon, ChartBarIcon, BookOpenIcon, ExclamationTriangleIcon, KeyIcon, CheckCircleIcon, PhotoIcon } from './ui/icons';
 import { DiagnosticSettingsModal } from './settings/DiagnosticSettingsModal';
@@ -10,6 +10,8 @@ import { ApiKeyManagerModal } from './settings/ApiKeyManagerModal';
 import { ServerKeyManagerModal } from './settings/ServerKeyManagerModal';
 import { ResetCacheModal } from './settings/ResetCacheModal';
 import { UserManagerModal } from './settings/UserManagerModal';
+import Breadcrumb from './common/Breadcrumb';
+import InternalLink from './common/InternalLink';
 const Preferences = React.lazy(() => import('./settings/Preferences'));
 
 const SettingsPage: React.FC = () => {
@@ -157,6 +159,15 @@ const SettingsPage: React.FC = () => {
     return (
         <div className="flex flex-col h-full">
             <header className="p-6 text-center">
+                <div className="mb-4">
+                    <Breadcrumb 
+                        items={[
+                            { module: Module.Diagnostico, label: 'Início' },
+                            { module: Module.Settings, label: 'Configurações' }
+                        ]} 
+                        className="justify-center"
+                    />
+                </div>
                 <h1 className="text-3xl font-bold text-slate-800">Configurações</h1>
                 <div className="mt-3 max-w-2xl mx-auto relative">
                     <input
@@ -184,9 +195,48 @@ const SettingsPage: React.FC = () => {
             </header>
             <div className="flex-1 overflow-y-auto p-6 pt-0">
                 <div className="max-w-5xl mx-auto space-y-8">
+                    {/* Navegação Rápida */}
+                    {!query && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Navegação Rápida</h3>
+                            <div className="flex flex-wrap gap-2">
+                                <InternalLink 
+                                    module={Module.Diagnostico} 
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+                                >
+                                    <ChartBarIcon className="w-4 h-4" />
+                                    Diagnóstico
+                                </InternalLink>
+                                <InternalLink 
+                                    module={Module.Assistente} 
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+                                >
+                                    <CpuChipIcon className="w-4 h-4" />
+                                    Assistente IA
+                                </InternalLink>
+                                <InternalLink 
+                                    module={Module.Calculadora} 
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+                                >
+                                    <KeyIcon className="w-4 h-4" />
+                                    Calculadora OTE
+                                </InternalLink>
+                                {(isSuperAdmin || isAdmin) && (
+                                    <InternalLink 
+                                        module={Module.ReativacaoLeads} 
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+                                    >
+                                        <BookOpenIcon className="w-4 h-4" />
+                                        Reativação de Leads
+                                    </InternalLink>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    
                     {cards.length === 0 && (
                         <div className="text-center text-slate-500 text-sm border border-dashed border-slate-200 rounded-xl p-6">
-                            Nenhuma configuração encontrada para “{query}”. Pressione Esc para limpar a busca.
+                            Nenhuma configuração encontrada para "{query}". Pressione Esc para limpar a busca.
                         </div>
                     )}
                     <SettingsSection title="Conteúdo e Inteligência Artificial">

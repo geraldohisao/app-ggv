@@ -19,21 +19,46 @@ import { initializeLogos } from './utils/fetchLogosFromDatabase';
 import UserMenu from './components/UserMenu';
 import AppBrand from './components/common/AppBrand';
 import FinalLoginPage from './components/FinalLoginPage';
+import { getModuleFromPath, isStandalonePage } from './utils/router';
 
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useUser();
-  const [activeModule, setActiveModule] = useState<Module>(Module.Diagnostico);
+  const [activeModule, setActiveModule] = useState<Module>(() => getModuleFromPath(window.location.pathname));
 
   // Verificar se é uma página de resultado público
   const isPublicResultPage = window.location.pathname === '/resultado-diagnostico';
   
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
+  
+  // Verificar se é uma página standalone (sem header)
+  const isStandalone = isStandalonePage(window.location.pathname);
 
   // Logos desabilitados temporariamente para evitar erros 404
   useEffect(() => {
     console.log('📱 APP - Inicializado sem buscar logos (evitando erros 404)');
+  }, []);
+
+  // Listener para mudanças de rota
+  useEffect(() => {
+    const handleRouteChange = (event: CustomEvent) => {
+      const { module } = event.detail;
+      setActiveModule(module);
+    };
+
+    const handlePopState = () => {
+      const newModule = getModuleFromPath(window.location.pathname);
+      setActiveModule(newModule);
+    };
+
+    window.addEventListener('routeChange', handleRouteChange as EventListener);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('routeChange', handleRouteChange as EventListener);
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   // Se for página de resultado público, não precisa de autenticação

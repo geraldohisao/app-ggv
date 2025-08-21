@@ -4,6 +4,7 @@ import UserMenu from './UserMenu';
 import { Module } from '../types';
 import ConnectionStatus from './ConnectionStatus';
 import { ChartBarIcon, CpuChipIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
+import { navigateToModule } from '../utils/router';
 
 interface HeaderProps {
     activeModule: Module;
@@ -33,7 +34,10 @@ const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule, onLogout
                         {navItems.map(item => (
                             <button
                                 key={item.module}
-                                onClick={() => setActiveModule(item.module)}
+                                onClick={() => {
+                                    navigateToModule(item.module);
+                                    setActiveModule(item.module);
+                                }}
                                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
                                     activeModule === item.module
                                         ? 'text-blue-900 bg-blue-50'

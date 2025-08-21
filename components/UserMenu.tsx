@@ -8,6 +8,7 @@ import {
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
+import { navigateToModule } from '../utils/router';
 
 
 interface UserMenuProps {
@@ -44,6 +45,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
     });
     
     const handleSelectModule = (module: Module) => {
+        navigateToModule(module);
         setActiveModule(module);
         setIsOpen(false);
     }

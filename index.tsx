@@ -18,6 +18,15 @@ root.render(
       <Routes>
         <Route path="/r/:token" element={<PublicDiagnosticReport />} />
         <Route path="/diagnostico" element={<DiagnosticStandalonePage />} />
+        <Route path="/diagnostico/*" element={<DiagnosticStandalonePage />} />
+        <Route path="/" element={<App />} />
+        <Route path="/assistente" element={<App />} />
+        <Route path="/calculadora" element={<App />} />
+        <Route path="/chamadas" element={<App />} />
+        <Route path="/configuracoes" element={<App />} />
+        <Route path="/feedback" element={<App />} />
+        <Route path="/reativacao" element={<App />} />
+        <Route path="/resultado-diagnostico" element={<App />} />
         <Route path="/*" element={<App />} />
       </Routes>
     </BrowserRouter>

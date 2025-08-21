@@ -1,7 +1,7 @@
 
 
 import React, { useMemo, useState } from 'react';
-import { OTEProfile } from '../types';
+import { OTEProfile, Module } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
 import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION } from '../constants';
@@ -10,6 +10,7 @@ import Tooltip from './ui/Tooltip';
 import ProgressBar from './ui/ProgressBar';
 import { QuestionMarkCircleIcon, CalculatorIcon, CheckCircleIcon, XCircleIcon } from './ui/icons';
 import { FormattedInputField, FormSelect as SelectField, FormCheckbox as BonusCheckbox, FormInput as InputField } from './ui/Form';
+import Breadcrumb from './common/Breadcrumb';
 
 const initialSdrInputs: SdrInputType = {
     perfil: OTEProfile.SDR,
@@ -77,6 +78,15 @@ const CalculadoraOTE: React.FC = () => {
     return (
         <div className="flex flex-col h-full">
             <header className="p-6 text-center">
+                <div className="mb-4">
+                    <Breadcrumb 
+                        items={[
+                            { module: Module.Diagnostico, label: 'Início' },
+                            { module: Module.Calculadora, label: 'Calculadora OTE' }
+                        ]} 
+                        className="justify-center"
+                    />
+                </div>
                 <h1 className="text-3xl font-bold text-slate-800">Calculadora OTE</h1>
                 <div className="inline-flex items-center gap-1">
                     <p className="text-slate-500 mt-1">Calcule seu On-Target Earnings</p>

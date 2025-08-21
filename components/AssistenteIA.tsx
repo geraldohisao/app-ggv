@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense } from 'react';
-import { AIMode, type AIMessage, type AIPersona, type ConversationHistories, type StoredKnowledgeDocument } from '../types';
+import { AIMode, type AIMessage, type AIPersona, type ConversationHistories, type StoredKnowledgeDocument, Module } from '../types';
 import { getAIAssistantResponseStream, getLastSourcesMeta } from '../services/aiRouterClient';
 import { findMostRelevantDocuments } from '../services/embeddingService';
 import { getLocalDocuments, syncQueuedDocuments } from '../services/localKnowledgeStore';
@@ -19,6 +19,7 @@ import { sanitizeOutput } from '../src/utils/sanitizeOutput';
 import { stripSourceTags, formatAIResponse } from '../src/utils/aiText';
 import { extractSourceMarkers } from '../src/utils/extractSources';
 import { copyToClipboard } from '../src/utils/clipboard';
+import Breadcrumb from './common/Breadcrumb';
 
 const SHOW_SOURCES = false;
 
@@ -508,15 +509,24 @@ const AssistenteIA: React.FC = () => {
     return (
         <div className="flex flex-col h-full bg-slate-50">
             <header className="p-4 border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto flex justify-between items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-xl font-bold text-slate-800 hidden sm:block">Assistente IA</h1>
-                        <div className="flex items-center gap-2">
-                            {personas.map(p => (
-                                <ModeButton key={p.id} targetMode={p.id} text={p.name.split(' ')[0]} />
-                            ))}
-                        </div>
+                <div className="max-w-5xl mx-auto">
+                    <div className="mb-3">
+                        <Breadcrumb 
+                            items={[
+                                { module: Module.Diagnostico, label: 'Início' },
+                                { module: Module.Assistente, label: 'Assistente IA' }
+                            ]} 
+                        />
                     </div>
+                    <div className="flex justify-between items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-xl font-bold text-slate-800 hidden sm:block">Assistente IA</h1>
+                            <div className="flex items-center gap-2">
+                                {personas.map(p => (
+                                    <ModeButton key={p.id} targetMode={p.id} text={p.name.split(' ')[0]} />
+                                ))}
+                            </div>
+                        </div>
                     <div className="flex items-center gap-1.5">
                         <Tooltip text="Atualizar dados da IA (documentos/personas)">
                           <button onClick={() => setLastRefreshed(Date.now())} className="p-2 text-slate-600 hover:text-blue-700 rounded-md hover:bg-slate-100" aria-label="Atualizar">
@@ -533,6 +543,7 @@ const AssistenteIA: React.FC = () => {
                             <TrashIcon className="w-5 h-5" />
                           </button>
                         </Tooltip>
+                    </div>
                     </div>
                 </div>
             </header>
