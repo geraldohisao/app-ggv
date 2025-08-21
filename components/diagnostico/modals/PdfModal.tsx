@@ -9,36 +9,98 @@ interface PdfModalProps {
 
 export const PdfModal: React.FC<PdfModalProps> = ({ onClose, reportData }) => {
     const handlePrint = () => {
-        // Criar uma nova janela para impressão com estilos otimizados
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
+        console.log('🖨️ PDF - Iniciando processo de impressão...');
         
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Diagnóstico Comercial - ${reportData?.companyData?.companyName || 'Relatório'}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-                    .page-break { page-break-before: always; }
-                    .no-print { display: none !important; }
-                    @media print {
-                        body { margin: 0; padding: 15px; }
-                        .page-break { page-break-before: always; }
-                    }
-                </style>
-            </head>
-            <body>
-                ${document.getElementById('pdf-content')?.innerHTML || '<p>Conteúdo não disponível</p>'}
-            </body>
-            </html>
-        `;
-        
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+        try {
+            // Método 1: Tentar window.print() diretamente
+            const printContent = document.getElementById('pdf-content');
+            if (!printContent) {
+                console.error('❌ PDF - Elemento pdf-content não encontrado');
+                alert('Erro: Conteúdo do PDF não disponível para impressão');
+                return;
+            }
+            
+            console.log('📄 PDF - Conteúdo encontrado, iniciando impressão...');
+            
+            // Criar uma nova janela para impressão com estilos otimizados
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            
+            if (!printWindow) {
+                console.error('❌ PDF - Popup bloqueado, tentando método alternativo...');
+                // Fallback: usar window.print() na janela atual
+                const originalContents = document.body.innerHTML;
+                document.body.innerHTML = printContent.innerHTML;
+                window.print();
+                document.body.innerHTML = originalContents;
+                return;
+            }
+            
+            const htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Diagnóstico Comercial - ${reportData?.companyData?.companyName || 'Relatório'}</title>
+                    <meta charset="UTF-8">
+                    <style>
+                        * { box-sizing: border-box; }
+                        body { 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+                            margin: 0; 
+                            padding: 20px; 
+                            line-height: 1.6;
+                            color: #333;
+                        }
+                        .page-break { 
+                            page-break-before: always; 
+                            margin-top: 40px;
+                        }
+                        .no-print { display: none !important; }
+                        h1, h2, h3 { color: #1e40af; margin-top: 0; }
+                        .bg-slate-50, .bg-slate-100 { background: #f8fafc !important; }
+                        .text-slate-600 { color: #475569 !important; }
+                        .rounded-lg, .rounded-xl { border-radius: 8px; }
+                        .shadow-sm { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+                        
+                        @media print {
+                            body { margin: 0; padding: 15px; }
+                            .page-break { page-break-before: always; margin-top: 0; }
+                            .no-print { display: none !important; }
+                            .shadow-sm { box-shadow: none !important; }
+                        }
+                        
+                        @page {
+                            margin: 1.5cm;
+                            size: A4;
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${printContent.innerHTML}
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            // Aguardar carregamento e então imprimir
+            printWindow.onload = () => {
+                console.log('✅ PDF - Janela carregada, iniciando impressão...');
+                setTimeout(() => {
+                    printWindow.focus();
+                    printWindow.print();
+                    
+                    // Fechar a janela após impressão (com delay para permitir cancelamento)
+                    setTimeout(() => {
+                        printWindow.close();
+                    }, 1000);
+                }, 500);
+            };
+            
+        } catch (error) {
+            console.error('❌ PDF - Erro durante impressão:', error);
+            alert('Erro ao gerar PDF. Tente novamente ou use Ctrl+P para imprimir a página.');
+        }
     };
 
     if (!reportData) {
