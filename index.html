@@ -35,7 +35,18 @@
           .catch(() => {});
       }
     </script>
-    <!-- Configurações locais removidas para produção -->
+    <!-- Configurações locais para desenvolvimento -->
+    <script>
+      // Configurações locais para desenvolvimento (Gmail, etc)
+      // Remover em produção
+      if (window.location.hostname === 'localhost') {
+        window.APP_CONFIG_LOCAL = {
+          GOOGLE_OAUTH_CLIENT_ID: '484863773901-8nkp8q8r3ifc0m5fqq8ej0k8m9vv4k5i.apps.googleusercontent.com',
+          // Adicione outras configurações de desenvolvimento aqui se necessário
+        };
+        console.log('🔧 DEV - Configurações locais carregadas para desenvolvimento');
+      }
+    </script>
     <script>
       // Sistema de logos simplificado - não usa mais cache localStorage
       console.log('Sistema de logos simplificado ativo');
@@ -43,32 +54,87 @@
     <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @media print {
+    /* Configuração da página A4 */
+    @page {
+      margin: 1.5cm;
+      size: A4;
+    }
+    
     body, html {
       background-color: white !important;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      color-adjust: exact;
+      margin: 0 !important;
+      padding: 0 !important;
     }
+    
+    /* Ocultar tudo exceto o conteúdo do PDF */
     body * {
       visibility: hidden;
     }
-    #pdf-root, #pdf-root * {
-      visibility: visible;
+    
+    #pdf-content, #pdf-content * {
+      visibility: visible !important;
     }
-    #pdf-root {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
+    
+    #pdf-content {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
     }
+    
+    /* Quebras de página */
     .page-break {
-      page-break-after: always;
+      page-break-before: always !important;
+      break-before: page !important;
+      margin-top: 0 !important;
     }
-    .no-break {
-      page-break-inside: avoid;
+    
+    /* Evitar quebras indesejadas */
+    .avoid-break, h1, h2, h3, h4, h5, h6 {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
-    ::-webkit-scrollbar {
-      display: none;
+    
+    /* Ocultar elementos desnecessários */
+    .no-print, button, .fixed, .sticky, nav, header:not(.print-header) {
+      display: none !important;
     }
+    
+    /* Remover estilos que interferem na impressão */
+    .shadow-sm, .shadow, .shadow-lg, .shadow-xl {
+      box-shadow: none !important;
+    }
+    
+    .overflow-hidden, .overflow-y-auto, .overflow-x-auto {
+      overflow: visible !important;
+    }
+    
+    /* Garantir que gráficos sejam impressos corretamente */
+    canvas, svg, img {
+      max-width: 100% !important;
+      height: auto !important;
+      page-break-inside: avoid !important;
+    }
+    
+    /* Cores para impressão */
+    .bg-blue-900, .bg-blue-800 {
+      background-color: #1e3a8a !important;
+      color: white !important;
+    }
+    
+    .text-blue-900 { color: #1e3a8a !important; }
+    .text-slate-600 { color: #475569 !important; }
+    .text-slate-800 { color: #1e293b !important; }
   }
 </style>
 <!-- Removido index.css (não existe no projeto) para evitar 404 em dev -->
