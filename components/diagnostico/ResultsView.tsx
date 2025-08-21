@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CompanyData, SummaryInsights, DetailedAIAnalysis, MaturityResult, MarketSegment, Answers } from '../../types';
 import { getSummaryInsights, getDetailedAIAnalysis } from '../../services/geminiService';
-import { diagnosticQuestions } from '../../data/diagnosticoQuestions.ts';
+import { diagnosticQuestions } from '../../data/diagnosticoQuestions';
 import { ArrowLeftIcon, ArrowRightIcon, EnvelopeIcon, DocumentTextIcon, RefreshIcon, ExclamationTriangleIcon } from '../ui/icons';
 import { EmailModal } from './modals/EmailModal';
 import { PdfModal } from './modals/PdfModal';
@@ -162,13 +162,20 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         
                         // Respostas exatas das perguntas do diagnóstico
                         diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
+                            console.log(`🔍 DEBUG - questionId: ${questionId}, score: ${score}`);
+                            console.log(`🔍 DEBUG - diagnosticQuestions length: ${diagnosticQuestions?.length}`);
+                            
                             const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
+                            console.log(`🔍 DEBUG - question found: ${!!question}, question.text: ${question?.text}`);
+                            
                             const option = question?.options.find(opt => opt.score === score);
+                            console.log(`🔍 DEBUG - option found: ${!!option}, option.text: ${option?.text}`);
                             
                             // Mapeamento direto das respostas baseado no score
                             let answerText = 'N/A';
                             if (option?.text) {
                                 answerText = option.text;
+                                console.log(`✅ Usando option.text: "${answerText}"`);
                             } else {
                                 // Fallback baseado no score - algumas perguntas têm "Às vezes" = 5
                                 if (score === 10) answerText = 'Sim';
@@ -178,9 +185,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                                     answerText = hasAsVezes ? 'Às vezes' : 'Parcialmente';
                                 }
                                 else if (score === 0) answerText = 'Não';
+                                console.log(`⚠️ Usando fallback: "${answerText}"`);
                             }
                             
-                            console.log(`📝 Pergunta ${questionId}: score=${score}, answerText="${answerText}"`);
+                            console.log(`📝 FINAL - Pergunta ${questionId}: score=${score}, answerText="${answerText}"`);
                             
                             return {
                                 questionId: parseInt(questionId),
