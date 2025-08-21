@@ -312,6 +312,7 @@ export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
     console.log('📤 N8N - Ambiente:', isLocal ? 'LOCAL' : 'PRODUÇÃO');
     console.log('📤 N8N - URL de destino:', resultUrl);
     console.log('📤 N8N - Deal ID:', dealId);
+    console.log('📤 N8N - Payload completo JSON:', JSON.stringify(payload, null, 2));
     
     try {
         // Tentar POST primeiro (caso seja configurado no futuro)
