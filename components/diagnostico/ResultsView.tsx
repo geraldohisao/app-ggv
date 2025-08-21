@@ -165,6 +165,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
                             const option = question?.options.find(opt => opt.score === score);
                             
+                            // Debug para verificar se está pegando o texto correto
+                            console.log(`📝 Pergunta ${questionId}: score=${score}, option.text="${option?.text}"`);
+                            
                             return {
                                 questionId: parseInt(questionId),
                                 question: question?.text || '',
