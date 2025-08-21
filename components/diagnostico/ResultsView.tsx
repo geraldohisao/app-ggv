@@ -146,11 +146,34 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     }
                 }
 
-                // Estrutura otimizada para o mapeamento N8N
+                // Estrutura EXATA que o N8N espera baseado nos mapeamentos
                 const diagnosticPayload = {
                     deal_id: dealId,
                     timestamp: new Date().toISOString(),
                     action: 'diagnostic_completed',
+                    
+                    // Estrutura que corresponde EXATAMENTE aos mapeamentos N8N
+                    body: {
+                        results: {
+                            maturityPercentage: Math.round((totalScore / 90) * 100)  // $('registerGGVDiag').first().json.body.results.maturityPercentage
+                        },
+                        resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
+                        
+                        diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
+                            const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
+                            const option = question?.options.find(opt => opt.score === score);
+                            
+                            return {
+                                questionId: parseInt(questionId),
+                                question: question?.text || '',
+                                answer: option?.text || 'N/A',  // $('registerGGVDiag').item.json.body.diagnosticAnswers[X].answer
+                                description: option?.description || '',
+                                score: score
+                            };
+                        })
+                    },
+                    
+                    // Dados adicionais para referência (fora do body que o N8N mapeia)
                     companyData: {
                         companyName: companyData.companyName,
                         email: companyData.email,
@@ -163,26 +186,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         name: segment?.name || 'Geral',
                         id: segment?.id || 'geral'
                     },
-                    // Estrutura que o N8N espera para mapeamento
-                    results: {
-                        totalScore: totalScore,
-                        maxScore: 90,
-                        maturityPercentage: Math.round((totalScore / 90) * 100),
-                        maturityLevel: totalScore >= 70 ? 'Avançado' : totalScore >= 40 ? 'Intermediário' : 'Inicial'
-                    },
-                    diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
-                        const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
-                        const option = question?.options.find(opt => opt.score === score);
-                        
-                        return {
-                            questionId: parseInt(questionId),
-                            question: question?.text || '',
-                            answer: option?.text || 'N/A',
-                            description: option?.description || '',
-                            score: score
-                        };
-                    }),
-                    publicReportUrl: publicReportUrl,
                     source: 'web-diagnostic'
                 };
 
@@ -258,22 +261,26 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
+                // Estrutura para análise IA também seguindo padrão N8N
                 const aiPayload = {
                     deal_id: dealId,
                     timestamp: new Date().toISOString(),
                     action: 'ai_analysis_completed',
-                    aiAnalysis: {
-                        summaryInsights: {
-                            specialistInsight: summaryInsights.specialistInsight || '',
-                            recommendations: summaryInsights.recommendations || []
-                        },
-                        detailedAnalysis: {
-                            strengths: detailedAnalysis.strengths || [],
-                            improvements: detailedAnalysis.improvements || [],
-                            nextSteps: detailedAnalysis.nextSteps || []
+                    
+                    body: {
+                        resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
+                        aiAnalysis: {
+                            summaryInsights: {
+                                specialistInsight: summaryInsights.specialistInsight || '',
+                                recommendations: summaryInsights.recommendations || []
+                            },
+                            detailedAnalysis: {
+                                strengths: detailedAnalysis.strengths || [],
+                                improvements: detailedAnalysis.improvements || [],
+                                nextSteps: detailedAnalysis.nextSteps || []
+                            }
                         }
-                    },
-                    publicReportUrl: publicReportUrl
+                    }
                 };
 
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
