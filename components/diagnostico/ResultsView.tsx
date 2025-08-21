@@ -66,6 +66,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
                 const detailed = await detailedPromise;
                 setDetailedAnalysis(detailed);
+                setIsLoadingDetailed(false);
             } catch (err: any) {
                 console.error("Failed to get AI analysis:", err);
                 setApiError(err.message || "Falha ao obter análise da IA.");
