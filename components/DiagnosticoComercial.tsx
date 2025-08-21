@@ -148,23 +148,10 @@ export const DiagnosticoComercial: React.FC = () => {
         
         try {
             // Enviar para o webhook do Pipedrive (nova funcionalidade)
-            if (dealId) {
-                console.log('📤 DIAGNÓSTICO - Enviando para webhook Pipedrive com deal_id:', dealId);
-                const success = await sendDiagnosticToPipedrive(
-                    companyData,
-                    answers,
-                    totalScore,
-                    dealId
-                );
-                
-                if (success) {
-                    console.log('✅ DIAGNÓSTICO - Dados enviados com sucesso para Pipedrive');
-                } else {
-                    console.error('❌ DIAGNÓSTICO - Falha ao enviar dados para Pipedrive');
-                }
-            } else {
-                console.log('⚠️ DIAGNÓSTICO - Nenhum deal_id encontrado, enviando apenas para N8N');
-            }
+            // Pipedrive webhook removido temporariamente para debug N8N
+            // TODO: Reativar após corrigir RLS
+            console.log('📤 DIAGNÓSTICO - Pipedrive webhook desabilitado temporariamente');
+            console.log('🔄 DIAGNÓSTICO - Prosseguindo para ResultsView onde N8N será enviado');
             
             // N8N será enviado após análise IA ser gerada (movido para ResultsView)
         } catch (error) {
