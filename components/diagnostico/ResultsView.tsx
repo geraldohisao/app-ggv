@@ -165,15 +165,29 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
                             const option = question?.options.find(opt => opt.score === score);
                             
-                            // Debug para verificar se está pegando o texto correto
-                            console.log(`📝 Pergunta ${questionId}: score=${score}, option.text="${option?.text}"`);
+                            // Mapeamento direto das respostas baseado no score
+                            let answerText = 'N/A';
+                            if (option?.text) {
+                                answerText = option.text;
+                            } else {
+                                // Fallback baseado no score - algumas perguntas têm "Às vezes" = 5
+                                if (score === 10) answerText = 'Sim';
+                                else if (score === 5) {
+                                    // Verificar se a pergunta tem "Às vezes" ou "Parcialmente"
+                                    const hasAsVezes = question?.options.some(opt => opt.text === 'Às vezes');
+                                    answerText = hasAsVezes ? 'Às vezes' : 'Parcialmente';
+                                }
+                                else if (score === 0) answerText = 'Não';
+                            }
+                            
+                            console.log(`📝 Pergunta ${questionId}: score=${score}, answerText="${answerText}"`);
                             
                             return {
                                 questionId: parseInt(questionId),
-                                question: question?.text || '',
-                                answer: option?.text || 'N/A',  // Resposta exata: "Sim", "Não", "Parcialmente", "Às vezes"
+                                question: question?.text || `Pergunta ${questionId}`,
+                                answer: answerText,  // GARANTIR que seja texto, nunca número
                                 description: option?.description || '',
-                                score: score  // Pontuação: 0, 5 ou 10
+                                score: score
                             };
                         })
                     },
