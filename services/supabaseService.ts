@@ -300,20 +300,35 @@ export async function prefillFromN8n(dealId: string): Promise<AnyJson | null> {
 export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
     // Detectar ambiente e usar endpoint apropriado
     const isLocal = window.location.hostname === 'localhost';
-    const resultUrl = isLocal 
+    const baseUrl = isLocal 
         ? '/automation/webhook/diag-ggv-register'  // Proxy local via Vite
         : 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register'; // N8N remoto
     
-    console.log('📤 N8N - Enviando resultados do diagnóstico:', payload);
+    // Como POST não está funcionando, vamos tentar GET com parâmetros de notificação
+    const dealId = payload.dealId || 'unknown';
+    const resultUrl = `${baseUrl}?deal_id=${dealId}&action=completed&timestamp=${Date.now()}`;
+    
+    console.log('📤 N8N - Enviando notificação de diagnóstico concluído:', payload);
     console.log('📤 N8N - Ambiente:', isLocal ? 'LOCAL' : 'PRODUÇÃO');
     console.log('📤 N8N - URL de destino:', resultUrl);
+    console.log('📤 N8N - Deal ID:', dealId);
     
     try {
-        const res = await fetch(resultUrl, {
+        // Tentar POST primeiro (caso seja configurado no futuro)
+        let res = await fetch(baseUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
+        
+        // Se POST falhar (400/404), usar GET como fallback
+        if (!res.ok && (res.status === 400 || res.status === 404)) {
+            console.log('📤 N8N - POST falhou, usando GET como fallback');
+            res = await fetch(resultUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+            });
+        }
         
         if (res.ok) {
             console.log('✅ N8N - Resultados enviados com sucesso');
