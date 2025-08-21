@@ -133,34 +133,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 console.log('📊 N8N - Dados a enviar:', { companyData, segment, answers, totalScore, dealId });
                 
                 try {
-                    // Criar relatório público para incluir no N8N
-                    let publicReportUrl = null;
+                    // Criar URL do relatório público sem dependência do banco (evitar RLS)
                     const isProduction = window.location.hostname === 'app.grupoggv.com';
                     const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+                    const publicReportUrl = `${baseUrl}/r/${dealId || 'diagnostic-' + Date.now()}`;
                     
-                    try {
-                        const reportData = {
-                            companyData,
-                            segment,
-                            answers,
-                            totalScore,
-                            maturity,
-                            scoresByArea: {}, // Será calculado automaticamente
-                            summaryInsights,
-                            detailedAnalysis,
-                            specialistName
-                        };
-                        
-                        console.log('📊 N8N - Tentando criar relatório público...');
-                        const { token } = await createPublicReport(reportData, companyData.email, undefined, dealId);
-                        publicReportUrl = `${baseUrl}/r/${token}`;
-                        console.log('✅ N8N - URL do relatório público criada:', publicReportUrl);
-                    } catch (error) {
-                        console.warn('⚠️ N8N - Erro RLS ao criar relatório público (usando fallback):', error);
-                        // Fallback: usar deal_id diretamente como URL
-                        publicReportUrl = `${baseUrl}/r/${dealId || 'fallback-' + Date.now()}`;
-                        console.log('🔄 N8N - URL de fallback:', publicReportUrl);
-                    }
+                    console.log('📊 N8N - URL do relatório público (sem RLS):', publicReportUrl);
 
                     const success = await sendDiagnosticToN8n({
                         companyData,
