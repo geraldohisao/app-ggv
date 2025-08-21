@@ -16,12 +16,25 @@ const AREA_ITEMS: Record<DiagnosticArea, string> = {
     'Prospecção': 'Prospecção ativa',
 };
 
+// Ordem correta baseada na sequência das perguntas do diagnóstico
+const QUESTION_ORDER: DiagnosticArea[] = [
+    'Processos',        // Pergunta 1: Mapeamento de processos
+    'Tecnologia',       // Pergunta 2: CRM
+    'Padronização',     // Pergunta 3: Script comercial
+    'Pessoas',          // Pergunta 4: Teste de perfil comportamental
+    'Gestão',           // Pergunta 5: Plano de metas e comissionamento
+    'Monitoramento',    // Pergunta 6: Indicadores comerciais
+    'Desenvolvimento',  // Pergunta 7: Treinamentos periódicos
+    'Relacionamento',   // Pergunta 8: Pós-venda
+    'Prospecção',       // Pergunta 9: Prospecção ativa
+];
+
 interface BarChartProps {
     scoresByArea: Record<string, { score: number; count: number }>;
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ scoresByArea }) => {
-    const chartData = DIAGNOSTIC_AREAS.map(area => {
+    const chartData = QUESTION_ORDER.map(area => {
         const areaData = scoresByArea[area];
         const score = areaData?.score ?? 0;
         const maxScore = (areaData?.count ?? 0) * 10;
@@ -38,9 +51,8 @@ export const BarChart: React.FC<BarChartProps> = ({ scoresByArea }) => {
             topPerformers, 
             gap 
         };
-    })
-        // Ordenação por maior gap (Top - Você)
-        .sort((a, b) => b.gap - a.gap);
+    });
+    // Agora mantém a ordem das perguntas (sem .sort)
 
 	return (
 		<div className="space-y-4">
