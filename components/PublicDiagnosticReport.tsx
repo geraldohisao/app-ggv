@@ -10,6 +10,18 @@ const PublicDiagnosticReport: React.FC = () => {
   const [data, setData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Todos os hooks devem estar no topo, antes de qualquer return condicional
+  const isFull = (params.get('full') === '1');
+  const topStrengths = useMemo(() => (data?.detailedAnalysis?.strengths || []).slice(0, 3), [data?.detailedAnalysis]);
+  const nextSteps = useMemo(() => (data?.detailedAnalysis?.nextSteps || []).slice(0, 3), [data?.detailedAnalysis]);
+
+  // Lazy imports - devem estar sempre no mesmo lugar
+  const CoverTab = React.lazy(() => import('./diagnostico/report/CoverTab').then(m => ({ default: m.CoverTab })));
+  const DashboardTab = React.lazy(() => import('./diagnostico/report/DashboardTab').then(m => ({ default: m.DashboardTab })));
+  const SegmentedAnalysisTab = React.lazy(() => import('./diagnostico/report/SegmentedAnalysisTab').then(m => ({ default: m.SegmentedAnalysisTab })));
+  const TextualDiagnosisTab = React.lazy(() => import('./diagnostico/report/TextualDiagnosisTab').then(m => ({ default: m.TextualDiagnosisTab })));
+  const AIAnalysisTab = React.lazy(() => import('./diagnostico/report/AIAnalysisTab').then(m => ({ default: m.AIAnalysisTab })));
+
   useEffect(() => {
     (async () => {
       try {
@@ -27,10 +39,6 @@ const PublicDiagnosticReport: React.FC = () => {
   if (!data) return <div className="p-8"><LoadingSpinner text="Carregando relatório..." /></div>;
 
   const { companyData, segment, totalScore, maturity, summaryInsights, detailedAnalysis } = data;
-  const isFull = (params.get('full') === '1');
-
-  const topStrengths = useMemo(() => (detailedAnalysis?.strengths || []).slice(0, 3), [detailedAnalysis]);
-  const nextSteps = useMemo(() => (detailedAnalysis?.nextSteps || []).slice(0, 3), [detailedAnalysis]);
 
   if (!isFull) {
     return (
@@ -137,11 +145,6 @@ const PublicDiagnosticReport: React.FC = () => {
     );
   }
 
-  const CoverTab = React.lazy(() => import('./diagnostico/report/CoverTab').then(m => ({ default: m.CoverTab })));
-  const DashboardTab = React.lazy(() => import('./diagnostico/report/DashboardTab').then(m => ({ default: m.DashboardTab })));
-  const SegmentedAnalysisTab = React.lazy(() => import('./diagnostico/report/SegmentedAnalysisTab').then(m => ({ default: m.SegmentedAnalysisTab })));
-  const TextualDiagnosisTab = React.lazy(() => import('./diagnostico/report/TextualDiagnosisTab').then(m => ({ default: m.TextualDiagnosisTab })));
-  const AIAnalysisTab = React.lazy(() => import('./diagnostico/report/AIAnalysisTab').then(m => ({ default: m.AIAnalysisTab })));
   const scoresByArea = data.scoresByArea;
 
   return (
