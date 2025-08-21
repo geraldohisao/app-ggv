@@ -6,11 +6,8 @@ import { GGVInteligenciaBrand } from './ui/BrandLogos';
 
 const PublicDiagnosticReport: React.FC = () => {
   const [params] = useSearchParams();
-  // Suporte para ambos os formatos: /r/{token} e /{deal_id}
-  const token = params.get('t') || 
-                window.location.pathname.split('/r/')[1] || 
-                window.location.pathname.slice(1) || // Remove '/' inicial para pegar deal_id
-                '';
+  // Apenas formato seguro: /r/{token}
+  const token = params.get('t') || window.location.pathname.split('/r/')[1] || '';
   const [data, setData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 

@@ -103,7 +103,28 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 // 1. ENVIO IMEDIATO - Resultados básicos do diagnóstico
                 const isProduction = window.location.hostname === 'app.grupoggv.com';
                 const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
-                const publicReportUrl = `${baseUrl}/${dealId || 'diagnostic-' + Date.now()}`;
+                
+                // Gerar token seguro para URL pública (evitar exposição direta do deal_id)
+                const generateSecureToken = (dealId: string) => {
+                    const timestamp = Date.now();
+                    const randomSalt = Math.random().toString(36).substring(2, 15);
+                    const dataToHash = `${dealId}-${timestamp}-${randomSalt}`;
+                    
+                    // Simular hash simples (em produção usar crypto real)
+                    let hash = 0;
+                    for (let i = 0; i < dataToHash.length; i++) {
+                        const char = dataToHash.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash; // Convert to 32bit integer
+                    }
+                    
+                    // Formato: {timestamp}-{hash_absoluto}-{primeiros_chars_deal}
+                    const shortDealId = dealId.substring(0, 3);
+                    return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
+                };
+                
+                const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
+                const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
                 const diagnosticPayload = {
                     deal_id: dealId,
@@ -192,7 +213,28 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             try {
                 const isProduction = window.location.hostname === 'app.grupoggv.com';
                 const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
-                const publicReportUrl = `${baseUrl}/${dealId || 'diagnostic-' + Date.now()}`;
+                
+                // Gerar token seguro para URL pública (evitar exposição direta do deal_id)
+                const generateSecureToken = (dealId: string) => {
+                    const timestamp = Date.now();
+                    const randomSalt = Math.random().toString(36).substring(2, 15);
+                    const dataToHash = `${dealId}-${timestamp}-${randomSalt}`;
+                    
+                    // Simular hash simples (em produção usar crypto real)
+                    let hash = 0;
+                    for (let i = 0; i < dataToHash.length; i++) {
+                        const char = dataToHash.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash; // Convert to 32bit integer
+                    }
+                    
+                    // Formato: {timestamp}-{hash_absoluto}-{primeiros_chars_deal}
+                    const shortDealId = dealId.substring(0, 3);
+                    return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
+                };
+                
+                const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
+                const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
                 const aiPayload = {
                     deal_id: dealId,

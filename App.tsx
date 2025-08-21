@@ -30,9 +30,9 @@ const AppContent: React.FC = () => {
   // Verificar se é uma página de resultado público
   const isPublicResultPage = window.location.pathname === '/resultado-diagnostico';
   
-  // Verificar se é uma página de relatório público com deal_id (formato: /{deal_id})
-  const dealIdMatch = window.location.pathname.match(/^\/(\d+)$/);
-  const isPublicDiagnosticReport = dealIdMatch !== null;
+  // Verificar se é uma página de relatório público com token seguro (formato: /r/{token})
+  const tokenMatch = window.location.pathname.match(/^\/r\/(.+)$/);
+  const isPublicDiagnosticReport = tokenMatch !== null;
   
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');

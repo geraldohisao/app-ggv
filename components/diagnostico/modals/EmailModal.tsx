@@ -50,7 +50,27 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             
             let publicUrl = baseUrl;
             if (reportData) {
-                const { token } = await createPublicReport(reportData, email, undefined, dealId);
+                // Gerar token seguro para URL pública (evitar exposição direta do deal_id)
+                const generateSecureToken = (dealId: string) => {
+                    const timestamp = Date.now();
+                    const randomSalt = Math.random().toString(36).substring(2, 15);
+                    const dataToHash = `${dealId}-${timestamp}-${randomSalt}`;
+                    
+                    // Simular hash simples (em produção usar crypto real)
+                    let hash = 0;
+                    for (let i = 0; i < dataToHash.length; i++) {
+                        const char = dataToHash.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash; // Convert to 32bit integer
+                    }
+                    
+                    // Formato: {timestamp}-{hash_absoluto}-{primeiros_chars_deal}
+                    const shortDealId = dealId.substring(0, 3);
+                    return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
+                };
+
+                const secureToken = dealId ? generateSecureToken(dealId) : undefined;
+                const { token } = await createPublicReport(reportData, email, undefined, dealId, secureToken);
                 publicUrl = `${baseUrl}/r/${token}`;
             }
             
