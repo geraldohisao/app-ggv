@@ -160,6 +160,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
                         deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
                         
+                        // Respostas exatas das perguntas do diagnóstico
                         diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
                             const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
                             const option = question?.options.find(opt => opt.score === score);
@@ -167,9 +168,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             return {
                                 questionId: parseInt(questionId),
                                 question: question?.text || '',
-                                answer: option?.text || 'N/A',  // $('registerGGVDiag').item.json.body.diagnosticAnswers[X].answer
+                                answer: option?.text || 'N/A',  // Resposta exata: "Sim", "Não", "Parcialmente", "Às vezes"
                                 description: option?.description || '',
-                                score: score
+                                score: score  // Pontuação: 0, 5 ou 10
                             };
                         })
                     },
