@@ -6,7 +6,7 @@ import { ArrowLeftIcon, ArrowRightIcon, EnvelopeIcon, DocumentTextIcon, RefreshI
 import { EmailModal } from './modals/EmailModal';
 import { PdfModal } from './modals/PdfModal';
 import { CoverTab, DashboardTab, SegmentedAnalysisTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
-import { getCurrentUserDisplayName, sendDiagnosticToN8n } from '../../services/supabaseService';
+import { getCurrentUserDisplayName, sendDiagnosticToN8n, createPublicReport } from '../../services/supabaseService';
 
 const REPORT_TABS = ["Capa", "Dashboard Geral", "Análise Segmentada", "Diagnóstico Textual", "Análise IA"];
 const MAX_SCORE_PER_QUESTION = 10;
@@ -117,6 +117,31 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 console.log('📊 N8N - Dados a enviar:', { companyData, segment, answers, totalScore, dealId });
                 
                 try {
+                    // Criar relatório público para incluir no N8N
+                    let publicReportUrl = null;
+                    try {
+                        const reportData = {
+                            companyData,
+                            segment,
+                            answers,
+                            totalScore,
+                            maturity,
+                            scoresByArea: {}, // Será calculado automaticamente
+                            summaryInsights,
+                            detailedAnalysis,
+                            specialistName
+                        };
+                        
+                        const { token } = await createPublicReport(reportData, companyData.email);
+                        const isProduction = window.location.hostname === 'app.grupoggv.com';
+                        const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+                        publicReportUrl = `${baseUrl}/r/${token}`;
+                        
+                        console.log('📊 N8N - URL do relatório público criada:', publicReportUrl);
+                    } catch (error) {
+                        console.error('⚠️ N8N - Erro ao criar relatório público:', error);
+                    }
+
                     const success = await sendDiagnosticToN8n({
                         companyData,
                         segment,
@@ -125,6 +150,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         dealId,
                         summaryInsights,
                         detailedAnalysis,
+                        publicReportUrl,
                         timestamp: new Date().toISOString()
                     });
                     
@@ -163,7 +189,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         return scores;
     }, [answers]);
 
-    const allDataForPdf = { companyData, segment, answers, totalScore, maturity, summaryInsights, detailedAnalysis, scoresByArea, specialistName };
+    const allDataForPdf = { companyData, segment, answers, totalScore, maturity, summaryInsights, detailedAnalysis, scoresByArea };
 
     return (
         <div className="w-full max-w-7xl mx-auto animate-fade-in space-y-6">

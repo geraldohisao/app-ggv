@@ -34,55 +34,106 @@ const PublicDiagnosticReport: React.FC = () => {
 
   if (!isFull) {
     return (
-      <div className="max-w-screen-sm mx-auto p-4 space-y-5">
-        <section className="rounded-2xl p-6 text-white bg-gradient-to-br from-blue-900 via-teal-700 to-teal-500 shadow-xl">
-          <div className="flex justify-center mb-4"><GGVInteligenciaBrand className="h-8" /></div>
-          <h1 className="text-2xl font-extrabold leading-tight">Diagnóstico Comercial</h1>
-          <p className="text-teal-100">{companyData?.companyName}</p>
-          <div className="mt-4 bg-white/15 rounded-xl p-4">
-            <p className="text-sm text-teal-100">Segmento</p>
-            <p className="font-semibold">{segment?.name || '-'}</p>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-center">
-              <div className="bg-white/10 rounded-lg p-3">
-                <p className="text-xs text-teal-100">Maturidade</p>
-                <p className="text-2xl font-black">{Math.round((totalScore/90)*100)}%</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50">
+        <div className="max-w-screen-sm mx-auto p-4 space-y-6">
+          {/* Header com logo */}
+          <div className="text-center pt-8 pb-4">
+            <img 
+              src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg" 
+              alt="GGV Inteligência" 
+              className="h-12 mx-auto mb-3"
+            />
+            <p className="text-slate-600 font-medium">Inteligência em Vendas</p>
+          </div>
+
+          {/* Card principal */}
+          <section className="rounded-3xl p-8 text-white bg-gradient-to-br from-blue-900 via-teal-700 to-teal-500 shadow-2xl border border-white/20">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl font-extrabold leading-tight mb-2">Diagnóstico Comercial</h1>
+              <p className="text-teal-100 text-lg font-medium">{companyData?.companyName}</p>
+            </div>
+            
+            <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+              <div className="text-center mb-4">
+                <p className="text-sm text-teal-100 uppercase tracking-wider">Segmento</p>
+                <p className="font-bold text-lg">{segment?.name || 'Geral'}</p>
               </div>
-              <div className="bg-white/10 rounded-lg p-3">
-                <p className="text-xs text-teal-100">Nível</p>
-                <p className="text-xl font-bold">{maturity?.level}</p>
+              
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <p className="text-xs text-teal-100 uppercase tracking-wider mb-1">Maturidade</p>
+                  <p className="text-3xl font-black text-white">{Math.round((totalScore/90)*100)}%</p>
+                </div>
+                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <p className="text-xs text-teal-100 uppercase tracking-wider mb-1">Nível</p>
+                  <p className="text-xl font-bold text-white">{maturity?.level}</p>
+                </div>
               </div>
             </div>
+          </section>
+
+          {summaryInsights && (
+            <section className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-slate-200/50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <span className="text-blue-600 font-bold">📋</span>
+                </div>
+                <h2 className="text-xl font-bold text-slate-800">Resumo Executivo</h2>
+              </div>
+              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{summaryInsights.specialistInsight}</p>
+            </section>
+          )}
+
+          {topStrengths.length > 0 && (
+            <section className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-slate-200/50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <span className="text-green-600 font-bold">✅</span>
+                </div>
+                <h2 className="text-xl font-bold text-slate-800">Pontos Fortes</h2>
+              </div>
+              <ul className="space-y-3">
+                {topStrengths.map((s: string, i: number) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p className="text-slate-700 leading-relaxed">{s}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {nextSteps.length > 0 && (
+            <section className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-slate-200/50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <span className="text-orange-600 font-bold">🎯</span>
+                </div>
+                <h2 className="text-xl font-bold text-slate-800">Próximos Passos</h2>
+              </div>
+              <ul className="space-y-3">
+                {nextSteps.map((s: string, i: number) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-orange-600 font-bold text-sm">{i + 1}</span>
+                    </div>
+                    <p className="text-slate-700 leading-relaxed">{s}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* CTA para relatório completo */}
+          <div className="text-center pt-4 pb-8">
+            <a href={`?full=1`} 
+               className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-900 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200">
+              <span>📊</span>
+              Ver relatório completo
+            </a>
           </div>
-        </section>
-
-        {summaryInsights && (
-          <section className="bg-white rounded-2xl p-4 shadow border border-slate-200/50">
-            <h2 className="text-base font-bold mb-2">Resumo</h2>
-            <p className="text-slate-700 text-sm whitespace-pre-wrap">{summaryInsights.specialistInsight}</p>
-          </section>
-        )}
-
-        {topStrengths.length > 0 && (
-          <section className="bg-white rounded-2xl p-4 shadow border border-slate-200/50">
-            <h2 className="text-base font-bold mb-2">Pontos fortes</h2>
-            <ul className="list-disc pl-5 text-sm space-y-1 text-slate-700">
-              {topStrengths.map((s: string, i: number) => (<li key={i}>{s}</li>))}
-            </ul>
-          </section>
-        )}
-
-        {nextSteps.length > 0 && (
-          <section className="bg-white rounded-2xl p-4 shadow border border-slate-200/50">
-            <h2 className="text-base font-bold mb-2">Próximos passos</h2>
-            <ul className="list-disc pl-5 text-sm space-y-1 text-slate-700">
-              {nextSteps.map((s: string, i: number) => (<li key={i}>{s}</li>))}
-            </ul>
-          </section>
-        )}
-
-        <div className="text-center">
-          <a href={`?full=1`} className="inline-block bg-blue-900 text-white px-4 py-2 rounded-lg font-semibold">Ver relatório completo</a>
         </div>
+      </div>
       </div>
     );
   }

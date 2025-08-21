@@ -55,29 +55,62 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             
             console.log('📧 EMAIL - URL do relatório:', publicUrl);
             
-            const intelLogo = LOGO_URLS.ggvInteligenciaLogoUrl;
+            const intelLogo = 'https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg';
             const subject = `Seu Diagnóstico Comercial – ${companyData.companyName}`;
             const html = `
-              <div style="font-family:Inter,Arial,sans-serif;line-height:1.6;color:#0f172a">
-                <div style="max-width:640px;margin:0 auto;padding:24px">
-                  <div style="text-align:center;margin-bottom:24px">
-                    ${intelLogo
-                      ? `<img src='${intelLogo}' alt='GGV Inteligência' style='height:34px;max-width:220px;object-fit:contain'/>`
-                      : `<div style='display:inline-block;background:#0f766e;padding:10px 14px;border-radius:10px;color:#fff;font-weight:800'>GGV Inteligência</div>`}
+              <!DOCTYPE html>
+              <html lang="pt-BR">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Diagnóstico Comercial - GGV Inteligência</title>
+              </head>
+              <body style="margin:0;padding:0;background-color:#f8fafc;font-family:Inter,Arial,sans-serif">
+                <div style="max-width:640px;margin:0 auto;background-color:#ffffff">
+                  <!-- Header -->
+                  <div style="background: linear-gradient(135deg, #1e40af 0%, #0f766e 100%);padding:32px 24px;text-align:center">
+                    <img src="${intelLogo}" alt="GGV Inteligência" style="height:48px;max-width:240px;object-fit:contain;margin-bottom:16px"/>
+                    <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;letter-spacing:-0.5px">Inteligência em Vendas</h1>
                   </div>
-                  <p>Olá,</p>
-                  <p>Preparamos o seu diagnóstico comercial com base nas respostas e benchmarks do mercado. Acesse pelo botão abaixo:</p>
-                  <p style="margin:24px 0; text-align:center">
-                    <a href="${publicUrl}"
-                       style="display:inline-block;background:#0b4f5f;color:#fff;padding:14px 22px;border-radius:12px;text-decoration:none;font-weight:700;letter-spacing:.2px">
-                      Abrir relatório
-                    </a>
-                  </p>
-                  <p>Se precisar de qualquer ajuda, basta responder este e‑mail.</p>
-                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />
-                  <p style="font-size:12px;color:#64748b">Enviado por GGV Inteligência em Vendas.</p>
+                  
+                  <!-- Content -->
+                  <div style="padding:32px 24px">
+                    <h2 style="color:#1e293b;font-size:20px;font-weight:600;margin:0 0 16px 0">Olá,</h2>
+                    
+                    <p style="color:#475569;line-height:1.6;margin:0 0 24px 0">
+                      Preparamos o seu diagnóstico comercial com base nas respostas e benchmarks do mercado. 
+                      Acesse pelo botão abaixo:
+                    </p>
+                    
+                    <!-- CTA Button -->
+                    <div style="text-align:center;margin:32px 0">
+                      <a href="${publicUrl}" 
+                         style="display:inline-block;background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%);color:#ffffff;padding:16px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(15, 118, 110, 0.3)">
+                        📊 Abrir relatório
+                      </a>
+                    </div>
+                    
+                    <div style="background:#f1f5f9;border-left:4px solid #0f766e;padding:16px;margin:24px 0;border-radius:0 8px 8px 0">
+                      <p style="color:#475569;margin:0;font-size:14px">
+                        💡 <strong>Dica:</strong> Salve este e-mail para acessar seu diagnóstico sempre que precisar.
+                      </p>
+                    </div>
+                    
+                    <p style="color:#475569;line-height:1.6;margin:24px 0 0 0">
+                      Se precisar de qualquer ajuda, basta responder este e-mail.
+                    </p>
+                  </div>
+                  
+                  <!-- Footer -->
+                  <div style="background:#f8fafc;padding:24px;text-align:center;border-top:1px solid #e2e8f0">
+                    <p style="color:#64748b;font-size:12px;margin:0">
+                      Enviado por <strong>GGV Inteligência em Vendas</strong><br>
+                      <a href="https://ggvinteligencia.com.br" style="color:#0f766e;text-decoration:none">ggvinteligencia.com.br</a>
+                    </p>
+                  </div>
                 </div>
-              </div>`;
+              </body>
+              </html>`;
             
             console.log('📧 EMAIL - Enviando e-mail para:', email);
             await sendEmailViaGmail({ to: email, subject, html });
