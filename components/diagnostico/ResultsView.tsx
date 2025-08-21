@@ -120,11 +120,18 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         name: segment?.name || 'Geral',
                         id: segment?.id || 'geral'
                     },
-                    diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => ({
-                        questionId: parseInt(questionId),
-                        score: score,
-                        answer: score >= 8 ? 'Sim' : score >= 6 ? 'Às vezes' : score >= 4 ? 'Parcialmente' : score >= 1 ? 'Pouco' : 'Não'
-                    })),
+                    diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
+                        const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
+                        const option = question?.options.find(opt => opt.score === score);
+                        
+                        return {
+                            questionId: parseInt(questionId),
+                            question: question?.text || '',
+                            answer: option?.text || 'N/A',
+                            description: option?.description || '',
+                            score: score
+                        };
+                    }),
                     results: {
                         totalScore: totalScore,
                         maxScore: 90,
