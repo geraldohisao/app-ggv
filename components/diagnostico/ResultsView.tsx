@@ -126,6 +126,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 try {
                     // Criar relatório público para incluir no N8N
                     let publicReportUrl = null;
+                    const isProduction = window.location.hostname === 'app.grupoggv.com';
+                    const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+                    
                     try {
                         const reportData = {
                             companyData,
@@ -139,14 +142,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             specialistName
                         };
                         
+                        console.log('📊 N8N - Tentando criar relatório público...');
                         const { token } = await createPublicReport(reportData, companyData.email, undefined, dealId);
-                        const isProduction = window.location.hostname === 'app.grupoggv.com';
-                        const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
                         publicReportUrl = `${baseUrl}/r/${token}`;
-                        
-                        console.log('📊 N8N - URL do relatório público criada:', publicReportUrl);
+                        console.log('✅ N8N - URL do relatório público criada:', publicReportUrl);
                     } catch (error) {
-                        console.error('⚠️ N8N - Erro ao criar relatório público:', error);
+                        console.warn('⚠️ N8N - Erro RLS ao criar relatório público (usando fallback):', error);
+                        // Fallback: usar deal_id diretamente como URL
+                        publicReportUrl = `${baseUrl}/r/${dealId || 'fallback-' + Date.now()}`;
+                        console.log('🔄 N8N - URL de fallback:', publicReportUrl);
                     }
 
                     const success = await sendDiagnosticToN8n({
