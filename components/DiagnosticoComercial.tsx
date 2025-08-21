@@ -22,6 +22,7 @@ export const DiagnosticoComercial: React.FC = () => {
     const [isSearchingDeal, setIsSearchingDeal] = useState<boolean>(false);
     const [searchError, setSearchError] = useState<string | null>(null);
     const [manualSearchData, setManualSearchData] = useState<any>(null);
+    const [showSearchField, setShowSearchField] = useState<boolean>(false);
     
     // Hook para buscar dados do Pipedrive baseado no deal_id da URL
     const { data: pipedriveData, loading: pipedriveLoading, error: pipedriveError, dealId } = usePipedriveData();
@@ -110,6 +111,9 @@ export const DiagnosticoComercial: React.FC = () => {
                 _searchedDealId: manualDealId.trim(),
                 _searchTimestamp: new Date().toISOString()
             });
+            
+            // Esconder o campo de busca após sucesso
+            setShowSearchField(false);
 
             // Atualizar URL para incluir o deal_id
             const url = new URL(window.location.href);
@@ -190,91 +194,109 @@ export const DiagnosticoComercial: React.FC = () => {
                             <p className="mt-3 text-slate-500">Responda esse questionário em apenas <span className="inline-flex items-center font-bold bg-blue-100 text-blue-900 px-2 rounded-md">1 minuto</span> e receba gratuitamente um raio-x completo da realidade comercial da sua empresa.</p>
                             
                             {/* Seção para buscar dados por Deal ID */}
-                            {!dealId && !pipedriveData && (
-                                <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                                    <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                                        💼 Tem uma oportunidade no Pipedrive? Insira o Deal ID para carregar os dados automaticamente:
-                                    </h3>
-                                    <div className="flex gap-2 max-w-md mx-auto">
+                            {((!dealId && !pipedriveData && !manualSearchData) || showSearchField) && (
+                                <div className="mt-6 p-3 bg-gradient-to-r from-blue-50 to-slate-50 border border-blue-200 rounded-xl">
+                                    <div className="flex items-center justify-center gap-2 mb-3">
+                                        <span className="text-blue-600">💼</span>
+                                        <span className="text-sm font-medium text-slate-700">Deal ID do Pipedrive?</span>
+                                    </div>
+                                    <div className="flex gap-2 max-w-sm mx-auto">
                                         <input
                                             type="text"
                                             value={manualDealId}
                                             onChange={(e) => setManualDealId(e.target.value)}
-                                            placeholder="Ex: 62719"
-                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="62719"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             disabled={isSearchingDeal}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter' && manualDealId.trim() && !isSearchingDeal) {
+                                                    handleSearchDeal();
+                                                }
+                                            }}
                                         />
                                         <button
                                             onClick={handleSearchDeal}
                                             disabled={isSearchingDeal || !manualDealId.trim()}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md flex items-center gap-1"
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg flex items-center gap-1 transition-colors"
                                         >
                                             {isSearchingDeal ? (
-                                                <>
-                                                    <div className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full"></div>
-                                                    Buscando...
-                                                </>
+                                                <div className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full"></div>
                                             ) : (
-                                                <>
-                                                    🔍 Buscar
-                                                </>
+                                                '🔍'
                                             )}
                                         </button>
+                                        {showSearchField && (
+                                            <button
+                                                onClick={() => {
+                                                    setShowSearchField(false);
+                                                    setManualDealId('');
+                                                    setSearchError(null);
+                                                }}
+                                                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm font-medium rounded-lg transition-colors"
+                                                disabled={isSearchingDeal}
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
                                     </div>
                                     
                                     {/* Erro de busca manual */}
                                     {searchError && (
-                                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
-                                            ❌ {searchError}
+                                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs text-center">
+                                            {searchError}
                                         </div>
                                     )}
-                                    
-                                    <p className="mt-2 text-xs text-slate-500">
-                                        Ou continue sem Deal ID para preencher manualmente
-                                    </p>
                                 </div>
                             )}
                             
                             {/* Status do carregamento do Pipedrive */}
                             {pipedriveLoading && (
-                                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
                                     <div className="flex items-center justify-center gap-2 text-blue-700">
                                         <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                                        <span className="text-sm">Carregando dados da oportunidade...</span>
+                                        <span className="text-sm font-medium">Carregando...</span>
                                     </div>
                                 </div>
                             )}
                             
                             {/* Erro do Pipedrive */}
                             {pipedriveError && (
-                                <div className={`mt-4 p-3 rounded-lg ${
+                                <div className={`mt-4 p-3 rounded-xl border ${
                                     pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
-                                        ? 'bg-red-50 border border-red-200'
-                                        : 'bg-yellow-50 border border-yellow-200'
+                                        ? 'bg-red-50 border-red-200'
+                                        : 'bg-amber-50 border-amber-200'
                                 }`}>
-                                    <p className={`text-sm ${
-                                        pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
-                                            ? 'text-red-700'
-                                            : 'text-yellow-700'
-                                    }`}>
-                                        {pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto') ? (
-                                            <>🚫 {pipedriveError}</>
-                                        ) : pipedriveError.includes('404') || pipedriveError.includes('não encontrado') ? (
-                                            <>⚠️ Webhook N8N não está ativo. Usando dados simulados para teste. Você pode prosseguir preenchendo manualmente.</>
-                                        ) : (
-                                            <>⚠️ Não foi possível carregar os dados da oportunidade. Você pode prosseguir preenchendo manualmente.</>
-                                        )}
-                                    </p>
-                                    {pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto') && (
-                                        <p className="text-xs text-red-600 mt-1">
-                                            💡 Verifique se o deal_id na URL está correto ou contate o suporte.
-                                        </p>
-                                    )}
-                                    {pipedriveError.includes('simulados') && (
-                                        <p className="text-xs text-yellow-600 mt-1">
-                                            💡 Para ativar a integração real, configure o webhook N8N no endpoint correto.
-                                        </p>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-lg ${
+                                            pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
+                                                ? 'text-red-600'
+                                                : 'text-amber-600'
+                                        }`}>
+                                            {pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto') ? '🚫' : '⚠️'}
+                                        </span>
+                                        <div>
+                                            <p className={`text-sm font-medium ${
+                                                pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
+                                                    ? 'text-red-700'
+                                                    : 'text-amber-700'
+                                            }`}>
+                                                {pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto') ? (
+                                                    'Deal ID incorreto'
+                                                ) : pipedriveError.includes('404') || pipedriveError.includes('não encontrado') ? (
+                                                    'Webhook indisponível'
+                                                ) : (
+                                                    'Não foi possível carregar os dados'
+                                                )}
+                                            </p>
+                                            <p className={`text-xs mt-1 ${
+                                                pipedriveError.includes('Deal ID') && pipedriveError.includes('incorreto')
+                                                    ? 'text-red-600'
+                                                    : 'text-amber-600'
+                                            }`}>
+                                                Você pode prosseguir preenchendo manualmente
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -282,96 +304,85 @@ export const DiagnosticoComercial: React.FC = () => {
                             
                             {/* Sucesso do Pipedrive ou busca manual */}
                             {((pipedriveData && !pipedriveLoading) || manualSearchData || prefill) && !isSearchingDeal ? (
-                                <div className={`mt-4 p-3 rounded-lg ${
+                                <div className={`mt-4 p-3 rounded-xl border-2 ${
                                     // Determinar cor baseado no tipo de dados
                                     (pipedriveData as any)?._mockData || (manualSearchData?._mockData) 
-                                        ? 'bg-blue-50 border border-blue-200' 
-                                        : 'bg-green-50 border border-green-200'
+                                        ? 'bg-blue-50 border-blue-200' 
+                                        : 'bg-green-50 border-green-200'
                                 }`}>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1">
-                                            <p className={`text-sm ${
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-lg ${
                                                 (pipedriveData as any)?._mockData || (manualSearchData?._mockData)
-                                                    ? 'text-blue-700' 
-                                                    : 'text-green-700'
+                                                    ? 'text-blue-600' 
+                                                    : 'text-green-600'
                                             }`}>
+                                                {(pipedriveData as any)?._mockData || (manualSearchData?._mockData) ? '🧪' : '✅'}
+                                            </span>
+                                            <div>
+                                                <p className={`text-sm font-medium ${
+                                                    (pipedriveData as any)?._mockData || (manualSearchData?._mockData)
+                                                        ? 'text-blue-700' 
+                                                        : 'text-green-700'
+                                                }`}>
+                                                    {(() => {
+                                                        // Dados da busca manual
+                                                        if (manualSearchData) {
+                                                            const dealId = manualSearchData._searchedDealId || manualSearchData._dealId;
+                                                            return manualSearchData._mockData 
+                                                                ? `Dados de teste carregados`
+                                                                : `Deal ${dealId} encontrado!`;
+                                                        }
+                                                        // Dados do hook automático
+                                                        if (pipedriveData) {
+                                                            return (pipedriveData as any)._mockData 
+                                                                ? 'Dados de teste carregados'
+                                                                : 'Dados carregados do Pipedrive';
+                                                        }
+                                                        // Fallback para quando só há prefill
+                                                        if (prefill && prefill.companyName) {
+                                                            return 'Dados da empresa carregados';
+                                                        }
+                                                        return '';
+                                                    })()}
+                                                </p>
+                                                
+                                                {/* Nome da empresa */}
                                                 {(() => {
-                                                    // Dados da busca manual
-                                                    if (manualSearchData) {
-                                                        const dealId = manualSearchData._searchedDealId || manualSearchData._dealId;
-                                                        return manualSearchData._mockData 
-                                                            ? `🧪 Dados simulados do Deal ID ${dealId} carregados para teste!`
-                                                            : `✅ Dados da oportunidade ${dealId} carregados com sucesso!`;
+                                                    const data = manualSearchData || pipedriveData;
+                                                    const companyName = data?.companyName || data?.empresa || prefill?.companyName;
+                                                    
+                                                    if (companyName) {
+                                                        return (
+                                                            <p className="text-xs text-slate-600 mt-1">
+                                                                {companyName}
+                                                            </p>
+                                                        );
                                                     }
-                                                    // Dados do hook automático
-                                                    if (pipedriveData) {
-                                                        return (pipedriveData as any)._mockData 
-                                                            ? '🧪 Dados simulados carregados para teste!'
-                                                            : `✅ Dados da oportunidade ${(pipedriveData as any)._dealId ? `(Deal ID: ${(pipedriveData as any)._dealId})` : ''} carregados!`;
-                                                    }
-                                                    // Fallback para quando só há prefill (dados carregados mas sem fonte específica)
-                                                    if (prefill && prefill.companyName) {
-                                                        const dealIdFromUrl = new URLSearchParams(window.location.search).get('deal_id');
-                                                        return dealIdFromUrl 
-                                                            ? `✅ Dados da oportunidade ${dealIdFromUrl} carregados com sucesso!`
-                                                            : '✅ Dados da empresa carregados com sucesso!';
-                                                    }
-                                                    return '';
+                                                    return null;
                                                 })()}
-                                                {' Os campos serão preenchidos automaticamente.'}
-                                            </p>
-                                            
-                                            {/* Detalhes da empresa */}
-                                            {(() => {
-                                                const data = manualSearchData || pipedriveData;
-                                                const isReal = data?._realData && !data?._mockData;
-                                                const companyName = data?.companyName || data?.empresa || prefill?.companyName;
-                                                const email = data?.email || prefill?.email;
-                                                
-                                                if (isReal && companyName) {
-                                                    return (
-                                                        <p className="text-xs text-green-600 mt-1">
-                                                            📊 <strong>Empresa:</strong> {companyName} {email && `| `}<strong>Email:</strong> {email}
-                                                        </p>
-                                                    );
-                                                }
-                                                
-                                                // Mostrar dados do prefill mesmo sem fonte específica
-                                                if (companyName && !data?._mockData) {
-                                                    return (
-                                                        <p className="text-xs text-green-600 mt-1">
-                                                            📊 <strong>Empresa:</strong> {companyName} {email && `| `}<strong>Email:</strong> {email}
-                                                        </p>
-                                                    );
-                                                }
-                                                
-                                                if (data?._mockData) {
-                                                    return (
-                                                        <p className="text-xs text-blue-600 mt-1">
-                                                            💡 Estes são dados de exemplo para teste.
-                                                        </p>
-                                                    );
-                                                }
-                                                
-                                                return null;
-                                            })()}
+                                            </div>
                                         </div>
                                         
                                         {/* Botão para buscar outro deal */}
                                         <button
                                             onClick={() => {
+                                                // Reset todos os estados relacionados ao Deal ID
                                                 setPrefill(null);
                                                 setManualDealId('');
                                                 setSearchError(null);
                                                 setManualSearchData(null);
+                                                setShowSearchField(true);
+                                                
+                                                // Limpar URL
                                                 const url = new URL(window.location.href);
                                                 url.searchParams.delete('deal_id');
                                                 window.history.replaceState({}, '', url.toString());
                                             }}
-                                            className="text-xs px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded flex items-center gap-1"
+                                            className="text-xs px-3 py-1 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-700 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
                                             title="Buscar outro Deal ID"
                                         >
-                                            🔄 Outro Deal
+                                            Alterar
                                         </button>
                                     </div>
                                 </div>

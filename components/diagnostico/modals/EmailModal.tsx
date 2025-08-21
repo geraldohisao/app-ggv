@@ -10,9 +10,10 @@ interface EmailModalProps {
     onClose: () => void;
     companyData: CompanyData;
     reportData?: any;
+    dealId?: string;
 }
 
-export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, reportData }) => {
+export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, reportData, dealId }) => {
     const [email, setEmail] = useState(companyData.email);
     const [isSent, setIsSent] = useState(false);
     const [error, setError] = useState('');
@@ -49,7 +50,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             
             let publicUrl = baseUrl;
             if (reportData) {
-                const { token } = await createPublicReport(reportData, email);
+                const { token } = await createPublicReport(reportData, email, undefined, dealId);
                 publicUrl = `${baseUrl}/r/${token}`;
             }
             

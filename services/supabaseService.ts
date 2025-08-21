@@ -369,9 +369,9 @@ export async function sendDiagnosticToPipedrive(
             timestamp: new Date().toISOString()
         };
         
-        let resultUrl = `${baseUrl}/r/fallback-${Date.now()}`;
+        let resultUrl = `${baseUrl}/r/${dealId || 'fallback-' + Date.now()}`;
         try {
-            const { token } = await createPublicReport(reportData, companyData.email);
+            const { token } = await createPublicReport(reportData, companyData.email, undefined, dealId);
             resultUrl = `${baseUrl}/r/${token}`;
             console.log('📤 WEBHOOK - URL do resultado público criada:', resultUrl);
         } catch (error) {
@@ -1293,11 +1293,12 @@ export type PublicReportRow = {
   expires_at?: string | null;
 };
 
-export async function createPublicReport(report: any, recipientEmail?: string, expiresAt?: string): Promise<{ token: string }> {
+export async function createPublicReport(report: any, recipientEmail?: string, expiresAt?: string, dealId?: string): Promise<{ token: string }> {
   if (!supabase) throw new Error('Supabase client is not initialized.');
   
   try {
-    const token = generatePublicToken(24);
+    // Usar deal_id como token se disponível, senão gerar token aleatório
+    const token = dealId || generatePublicToken(24);
     const { data: { user } } = await supabase.auth.getUser();
     
     const payload = {
@@ -1308,12 +1309,16 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
       expires_at: expiresAt || null,
     } as any;
     
-    console.log('📊 CREATE_PUBLIC_REPORT - Tentando criar relatório público:', { token, user_id: user?.id });
+    console.log('📊 CREATE_PUBLIC_REPORT - Criando relatório público:', { 
+      token, 
+      user_id: user?.id, 
+      using_deal_id: !!dealId 
+    });
     
     const { error } = await supabase.from('diagnostic_public_reports').insert(payload);
     if (error) {
       console.error('❌ CREATE_PUBLIC_REPORT - Erro RLS:', error);
-      // Se falhar por RLS, usar token simples sem inserir no banco
+      // Se falhar por RLS, usar token baseado em deal_id ou fallback
       console.log('🔄 CREATE_PUBLIC_REPORT - Usando fallback sem banco de dados');
       return { token };
     }
@@ -1322,8 +1327,8 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
     return { token };
   } catch (error) {
     console.error('❌ CREATE_PUBLIC_REPORT - Erro geral:', error);
-    // Fallback: gerar token sem salvar no banco
-    const fallbackToken = generatePublicToken(24);
+    // Fallback: usar deal_id ou gerar token
+    const fallbackToken = dealId || generatePublicToken(24);
     console.log('🔄 CREATE_PUBLIC_REPORT - Usando token de fallback:', fallbackToken);
     return { token: fallbackToken };
   }

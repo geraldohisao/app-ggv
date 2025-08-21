@@ -132,7 +132,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             specialistName
                         };
                         
-                        const { token } = await createPublicReport(reportData, companyData.email);
+                        const { token } = await createPublicReport(reportData, companyData.email, undefined, dealId);
                         const isProduction = window.location.hostname === 'app.grupoggv.com';
                         const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
                         publicReportUrl = `${baseUrl}/r/${token}`;
@@ -241,7 +241,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 </button>
             </div>
 
-            {showEmailModal && <EmailModal onClose={() => setShowEmailModal(false)} companyData={companyData} reportData={allDataForPdf} />}
+            {showEmailModal && <EmailModal onClose={() => setShowEmailModal(false)} companyData={companyData} reportData={allDataForPdf} dealId={dealId} />}
             {showPdfModal && <PdfModal onClose={() => setShowPdfModal(false)} reportData={allDataForPdf} />}
         </div>
     );
