@@ -100,17 +100,24 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 dealId
             });
             
-            // Só enviar se:
-            // 1. Ambas análises IA foram concluídas (ou houve erro) OU timeout de 15 segundos
-            // 2. Ainda não foi enviado
-            // 3. Não está mais carregando
-            const shouldSend = !n8nSent && (
-                (!isLoadingSummary && !isLoadingDetailed && (summaryInsights || detailedAnalysis || apiError)) ||
-                (!isLoadingSummary && !isLoadingDetailed) || // Enviar mesmo se IA falhar
-                emergencyTimeout // Enviar após timeout de emergência
-            );
+            // Debug detalhado das condições
+            console.log('🔍 N8N CONDITIONS DEBUG:', {
+                n8nSent,
+                isLoadingSummary,
+                isLoadingDetailed,
+                hasSummary: !!summaryInsights,
+                hasDetailed: !!detailedAnalysis,
+                hasError: !!apiError,
+                emergencyTimeout,
+                dealId
+            });
+
+            // Condição simplificada: enviar se não foi enviado ainda E (IA terminou OU timeout)
+            const aiFinished = !isLoadingSummary && !isLoadingDetailed;
+            const shouldSend = !n8nSent && (aiFinished || emergencyTimeout);
             
-            console.log('🔍 N8N SEND CHECK - Deve enviar?', shouldSend);
+            console.log('🔍 N8N SEND CHECK - AI finished?', aiFinished);
+            console.log('🔍 N8N SEND CHECK - Should send?', shouldSend);
             
             if (shouldSend) {
                 console.log('📤 N8N - Enviando resultados após análise IA concluída');
