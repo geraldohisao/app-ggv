@@ -80,9 +80,7 @@ export const AIAnalysisTab: React.FC<AIAnalysisTabProps> = ({ detailedAnalysis, 
                 </ReportCard>
             </div>
 
-            <div className="page-break"></div>
-
-            <div className="no-break">
+            <div className="no-break mt-8">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 flex items-center justify-center bg-blue-100 rounded-lg text-blue-800"><BoltIcon className="w-5 h-5" /></div>
                     <h2 className="text-xl font-bold text-slate-800">Recomendações Estratégicas</h2>
@@ -118,9 +116,7 @@ export const AIAnalysisTab: React.FC<AIAnalysisTabProps> = ({ detailedAnalysis, 
                 </ReportCard>
             </div>
 
-            <div className="page-break"></div>
-
-            <ReportCard title="Insights do Setor" icon={<LightBulbIcon className="w-5 h-5" />} className="no-break">
+            <ReportCard title="Insights do Setor" icon={<LightBulbIcon className="w-5 h-5" />} className="no-break mt-8">
                 <MarkdownRenderer text={detailedAnalysis.sectorInsights} />
             </ReportCard>
             <ReportCard title="Roadmap de Maturidade" icon={<FlagIcon className="w-5 h-5" />} className="no-break">

@@ -54,19 +54,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @media print {
-    /* Configuração da página A4 */
+    /* Configuração básica da página */
     @page {
-      margin: 1.5cm;
       size: A4;
+      margin: 1.5cm;
     }
     
     body, html {
       background-color: white !important;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      color-adjust: exact;
-      margin: 0 !important;
-      padding: 0 !important;
+      font-size: 12pt;
+      line-height: 1.4;
     }
     
     /* Ocultar tudo exceto o conteúdo do PDF */
@@ -74,67 +73,92 @@
       visibility: hidden;
     }
     
-    #pdf-content, #pdf-content * {
-      visibility: visible !important;
+    #pdf-root, #pdf-root * {
+      visibility: visible;
     }
     
-    #pdf-content {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
+    /* Configuração do container principal */
+    #pdf-root {
+      position: static !important;
+      left: auto !important;
+      top: auto !important;
       width: 100% !important;
       height: auto !important;
       overflow: visible !important;
-      background: white !important;
+      max-width: none !important;
+      max-height: none !important;
       margin: 0 !important;
       padding: 0 !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
     }
     
-    /* Quebras de página */
+    /* Seções PDF otimizadas */
+    .pdf-content {
+      width: 100%;
+      height: auto;
+    }
+    
+    .pdf-section {
+      width: 100%;
+      min-height: auto;
+      page-break-inside: avoid;
+      margin-bottom: 0;
+    }
+    
+    /* Quebras de página otimizadas */
+    .page-break-before {
+      page-break-before: always;
+      break-before: page;
+    }
+    
     .page-break {
-      page-break-before: always !important;
-      break-before: page !important;
-      margin-top: 0 !important;
+      page-break-after: always;
+      break-after: page;
+      height: 0;
+      margin: 0;
+      padding: 0;
     }
     
-    /* Evitar quebras indesejadas */
-    .avoid-break, h1, h2, h3, h4, h5, h6 {
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
+    .no-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     
-    /* Ocultar elementos desnecessários */
-    .no-print, button, .fixed, .sticky, nav, header:not(.print-header) {
-      display: none !important;
+    /* Remover elementos desnecessários */
+    .space-y-8 {
+      gap: 0 !important;
     }
     
-    /* Remover estilos que interferem na impressão */
-    .shadow-sm, .shadow, .shadow-lg, .shadow-xl {
-      box-shadow: none !important;
+    /* Otimizar espaçamento */
+    .mt-6, .mt-8, .mb-6, .mb-8 {
+      margin-top: 1rem !important;
+      margin-bottom: 1rem !important;
     }
     
-    .overflow-hidden, .overflow-y-auto, .overflow-x-auto {
+    /* Garantir que modais não interfiram */
+    .fixed, .absolute {
+      position: static !important;
+    }
+    
+    .overflow-hidden, .overflow-y-auto {
       overflow: visible !important;
     }
     
-    /* Garantir que gráficos sejam impressos corretamente */
-    canvas, svg, img {
+    /* Ocultar scrollbars */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Otimizar gráficos e imagens */
+    svg, canvas, img {
       max-width: 100% !important;
       height: auto !important;
-      page-break-inside: avoid !important;
+      page-break-inside: avoid;
     }
     
-    /* Cores para impressão */
-    .bg-blue-900, .bg-blue-800 {
-      background-color: #1e3a8a !important;
-      color: white !important;
+    /* Remover espaços vazios desnecessários */
+    .space-y-8 > * + * {
+      margin-top: 0 !important;
     }
-    
-    .text-blue-900 { color: #1e3a8a !important; }
-    .text-slate-600 { color: #475569 !important; }
-    .text-slate-800 { color: #1e293b !important; }
   }
 </style>
 <!-- Removido index.css (não existe no projeto) para evitar 404 em dev -->

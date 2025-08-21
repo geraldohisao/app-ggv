@@ -38,7 +38,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ maturity, totalScore
             <ReportCard title="Pontuação por Área vs. Benchmark" icon={<ChartBarIcon className="w-5 h-5" />}>
                 <BarChart scoresByArea={scoresByArea} />
             </ReportCard>
-            <div className="page-break"></div>
+            <div className="mt-8"></div>
             <ReportCard title="Radar de Maturidade Comercial" icon={<ChartPieIcon className="w-5 h-5" />} className="no-break">
                 <RadarChart scoresByArea={scoresByArea} />
             </ReportCard>
