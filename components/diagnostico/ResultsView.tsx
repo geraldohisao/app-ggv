@@ -114,12 +114,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
             // Condição simplificada: enviar se não foi enviado ainda E (IA terminou OU timeout)
             const aiFinished = !isLoadingSummary && !isLoadingDetailed;
-            const shouldSend = !n8nSent && (aiFinished || emergencyTimeout);
+            const notSentYet = !n8nSent;
+            const shouldSend = notSentYet && (aiFinished || emergencyTimeout);
             
             console.log('🔍 N8N SEND CHECK - AI finished?', aiFinished);
+            console.log('🔍 N8N SEND CHECK - Not sent yet?', notSentYet);
+            console.log('🔍 N8N SEND CHECK - Emergency timeout?', emergencyTimeout);
             console.log('🔍 N8N SEND CHECK - Should send?', shouldSend);
             
-            if (shouldSend) {
+            // Forçar envio uma vez para debug (remover depois)
+            if (!n8nSent && aiFinished) {
+                console.log('🚀 N8N FORCE SEND - Forçando envio para debug...');
+            }
+            
+            // Condição temporária para forçar envio (debug)
+            if (shouldSend || (!n8nSent && aiFinished)) {
                 console.log('📤 N8N - Enviando resultados após análise IA concluída');
                 console.log('📊 N8N - Dados a enviar:', { companyData, segment, answers, totalScore, dealId });
                 
