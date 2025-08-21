@@ -103,7 +103,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 // 1. ENVIO IMEDIATO - Resultados básicos do diagnóstico
                 const isProduction = window.location.hostname === 'app.grupoggv.com';
                 const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
-                const publicReportUrl = `${baseUrl}/r/${dealId || 'diagnostic-' + Date.now()}`;
+                const publicReportUrl = `${baseUrl}/${dealId || 'diagnostic-' + Date.now()}`;
 
                 const diagnosticPayload = {
                     deal_id: dealId,
@@ -192,7 +192,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             try {
                 const isProduction = window.location.hostname === 'app.grupoggv.com';
                 const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
-                const publicReportUrl = `${baseUrl}/r/${dealId || 'diagnostic-' + Date.now()}`;
+                const publicReportUrl = `${baseUrl}/${dealId || 'diagnostic-' + Date.now()}`;
 
                 const aiPayload = {
                     deal_id: dealId,

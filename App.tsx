@@ -12,6 +12,7 @@ import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
+import PublicDiagnosticReport from './components/PublicDiagnosticReport';
 import { UserProvider, useUser } from './contexts/DirectUserContext';
 import { LoadingSpinner } from './components/ui/Feedback';
 // Debug panels removidos para evitar conflitos
@@ -28,6 +29,10 @@ const AppContent: React.FC = () => {
 
   // Verificar se é uma página de resultado público
   const isPublicResultPage = window.location.pathname === '/resultado-diagnostico';
+  
+  // Verificar se é uma página de relatório público com deal_id (formato: /{deal_id})
+  const dealIdMatch = window.location.pathname.match(/^\/(\d+)$/);
+  const isPublicDiagnosticReport = dealIdMatch !== null;
   
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
@@ -64,6 +69,11 @@ const AppContent: React.FC = () => {
   // Se for página de resultado público, não precisa de autenticação
   if (isPublicResultPage) {
     return <PublicResultPage />;
+  }
+  
+  // Se for página de relatório público com deal_id, não precisa de autenticação
+  if (isPublicDiagnosticReport) {
+    return <PublicDiagnosticReport />;
   }
   
   // Se for página de diagnóstico, usar componente específico
