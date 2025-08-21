@@ -88,7 +88,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                   <!-- Header -->
                   <div style="background: linear-gradient(135deg, #1e40af 0%, #0f766e 100%);padding:32px 24px;text-align:center">
                     <div style="margin-bottom:16px">
-                      <img src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg" 
+                      <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png" 
                            alt="GGV Inteligência" 
                            style="max-width:200px;height:auto;display:block;margin:0 auto;border:0"/>
                     </div>
@@ -125,10 +125,17 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                   
                   <!-- Footer -->
                   <div style="background:#f8fafc;padding:24px;text-align:center;border-top:1px solid #e2e8f0">
-                    <p style="color:#64748b;font-size:12px;margin:0">
+                    <p style="color:#64748b;font-size:12px;margin:0 0 16px 0">
                       Enviado por <strong>GGV Inteligência em Vendas</strong><br>
                       <a href="https://ggvinteligencia.com.br" style="color:#0f766e;text-decoration:none">ggvinteligencia.com.br</a>
                     </p>
+                    
+                    <!-- Logo Grupo GGV -->
+                    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
+                      <img src="https://grupoggv.com/wp-content/uploads/2023/12/Logo-Grupo-GGV-Horizontal.png" 
+                           alt="Grupo GGV" 
+                           style="max-width:120px;height:auto;display:block;margin:0 auto;border:0;opacity:0.7"/>
+                    </div>
                   </div>
                 </div>
               </body>
