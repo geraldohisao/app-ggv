@@ -146,9 +146,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     }
                 }
 
+                // Estrutura otimizada para o mapeamento N8N
                 const diagnosticPayload = {
                     deal_id: dealId,
                     timestamp: new Date().toISOString(),
+                    action: 'diagnostic_completed',
                     companyData: {
                         companyName: companyData.companyName,
                         email: companyData.email,
@@ -160,6 +162,13 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     segment: {
                         name: segment?.name || 'Geral',
                         id: segment?.id || 'geral'
+                    },
+                    // Estrutura que o N8N espera para mapeamento
+                    results: {
+                        totalScore: totalScore,
+                        maxScore: 90,
+                        maturityPercentage: Math.round((totalScore / 90) * 100),
+                        maturityLevel: totalScore >= 70 ? 'Avançado' : totalScore >= 40 ? 'Intermediário' : 'Inicial'
                     },
                     diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
                         const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
@@ -173,14 +182,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             score: score
                         };
                     }),
-                    results: {
-                        totalScore: totalScore,
-                        maxScore: 90,
-                        maturityPercentage: Math.round((totalScore / 90) * 100),
-                        maturityLevel: totalScore >= 70 ? 'Avançado' : totalScore >= 40 ? 'Intermediário' : 'Inicial'
-                    },
                     publicReportUrl: publicReportUrl,
-                    status: 'diagnostic_completed',
                     source: 'web-diagnostic'
                 };
 
