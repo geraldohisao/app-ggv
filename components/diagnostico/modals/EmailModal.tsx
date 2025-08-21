@@ -55,7 +55,6 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             
             console.log('📧 EMAIL - URL do relatório:', publicUrl);
             
-            const intelLogo = 'https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg';
             const subject = `Seu Diagnóstico Comercial – ${companyData.companyName}`;
             const html = `
               <!DOCTYPE html>
@@ -65,11 +64,15 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Diagnóstico Comercial - GGV Inteligência</title>
               </head>
-              <body style="margin:0;padding:0;background-color:#f8fafc;font-family:Inter,Arial,sans-serif">
+              <body style="margin:0;padding:0;background-color:#f8fafc;font-family:Arial,sans-serif">
                 <div style="max-width:640px;margin:0 auto;background-color:#ffffff">
                   <!-- Header -->
                   <div style="background: linear-gradient(135deg, #1e40af 0%, #0f766e 100%);padding:32px 24px;text-align:center">
-                    <img src="${intelLogo}" alt="GGV Inteligência" style="height:48px;max-width:240px;object-fit:contain;margin-bottom:16px"/>
+                    <div style="margin-bottom:16px">
+                      <img src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg" 
+                           alt="GGV Inteligência" 
+                           style="height:48px;width:auto;display:inline-block;vertical-align:middle;border:0"/>
+                    </div>
                     <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;letter-spacing:-0.5px">Inteligência em Vendas</h1>
                   </div>
                   
