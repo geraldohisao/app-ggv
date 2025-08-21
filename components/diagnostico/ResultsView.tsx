@@ -126,6 +126,26 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
+                // Salvar token seguro no banco para mapeamento futuro
+                if (dealId && secureToken) {
+                    try {
+                        const reportData = {
+                            companyData,
+                            answers,
+                            totalScore,
+                            maturityLevel,
+                            dealId
+                        };
+                        
+                        // Importar createPublicReport dinamicamente para evitar dependência circular
+                        const { createPublicReport } = await import('../../services/supabaseService');
+                        await createPublicReport(reportData, undefined, undefined, dealId, secureToken);
+                        console.log('✅ N8N - Token seguro salvo:', secureToken);
+                    } catch (tokenError) {
+                        console.warn('⚠️ N8N - Erro ao salvar token (não crítico):', tokenError);
+                    }
+                }
+
                 const diagnosticPayload = {
                     deal_id: dealId,
                     timestamp: new Date().toISOString(),

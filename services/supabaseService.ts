@@ -1297,7 +1297,7 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
   if (!supabase) throw new Error('Supabase client is not initialized.');
   
   try {
-    // Usar token seguro se fornecido, senão gerar um
+    // Usar token seguro se fornecido, senão gerar um novo
     const token = secureToken || generatePublicToken(24);
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -1307,14 +1307,13 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
       recipient_email: recipientEmail || null,
       created_by: user?.id || null,
       expires_at: expiresAt || null,
-      deal_id: dealId || null, // Salvar deal_id para referência
+      deal_id: dealId || null, // Adicionar deal_id para mapeamento
     } as any;
     
     console.log('📊 CREATE_PUBLIC_REPORT - Criando relatório público:', { 
       token, 
-      deal_id: dealId,
       user_id: user?.id, 
-      using_secure_token: !!secureToken 
+      using_deal_id: !!dealId 
     });
     
     // Tentar inserir, mas sempre usar fallback para evitar erro RLS
@@ -1336,8 +1335,8 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
     return { token };
   } catch (error) {
     console.error('❌ CREATE_PUBLIC_REPORT - Erro geral:', error);
-    // Fallback: usar token seguro ou gerar um
-    const fallbackToken = secureToken || generatePublicToken(24);
+    // Fallback: usar deal_id ou gerar token
+    const fallbackToken = dealId || generatePublicToken(24);
     console.log('🔄 CREATE_PUBLIC_REPORT - Usando token de fallback:', fallbackToken);
     return { token: fallbackToken };
   }
