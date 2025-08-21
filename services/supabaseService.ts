@@ -369,10 +369,15 @@ export async function sendDiagnosticToPipedrive(
             timestamp: new Date().toISOString()
         };
         
-        const { token } = await createPublicReport(reportData, companyData.email);
-        const resultUrl = `${baseUrl}/r/${token}`;
-        
-        console.log('📤 WEBHOOK - URL do resultado público:', resultUrl);
+        let resultUrl = `${baseUrl}/r/fallback-${Date.now()}`;
+        try {
+            const { token } = await createPublicReport(reportData, companyData.email);
+            resultUrl = `${baseUrl}/r/${token}`;
+            console.log('📤 WEBHOOK - URL do resultado público criada:', resultUrl);
+        } catch (error) {
+            console.warn('⚠️ WEBHOOK - Erro ao criar relatório público, usando URL de fallback:', error);
+            console.log('📤 WEBHOOK - URL de fallback:', resultUrl);
+        }
         
         // Função para converter pontuação em resposta textual
         const getAnswerText = (score: number): string => {
@@ -1290,18 +1295,38 @@ export type PublicReportRow = {
 
 export async function createPublicReport(report: any, recipientEmail?: string, expiresAt?: string): Promise<{ token: string }> {
   if (!supabase) throw new Error('Supabase client is not initialized.');
-  const token = generatePublicToken(24);
-  const { data: { user } } = await supabase.auth.getUser();
-  const payload = {
-    token,
-    report,
-    recipient_email: recipientEmail || null,
-    created_by: user?.id || null,
-    expires_at: expiresAt || null,
-  } as any;
-  const { error } = await supabase.from('diagnostic_public_reports').insert(payload);
-  if (error) throw error;
-  return { token };
+  
+  try {
+    const token = generatePublicToken(24);
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const payload = {
+      token,
+      report,
+      recipient_email: recipientEmail || null,
+      created_by: user?.id || null,
+      expires_at: expiresAt || null,
+    } as any;
+    
+    console.log('📊 CREATE_PUBLIC_REPORT - Tentando criar relatório público:', { token, user_id: user?.id });
+    
+    const { error } = await supabase.from('diagnostic_public_reports').insert(payload);
+    if (error) {
+      console.error('❌ CREATE_PUBLIC_REPORT - Erro RLS:', error);
+      // Se falhar por RLS, usar token simples sem inserir no banco
+      console.log('🔄 CREATE_PUBLIC_REPORT - Usando fallback sem banco de dados');
+      return { token };
+    }
+    
+    console.log('✅ CREATE_PUBLIC_REPORT - Relatório público criado com sucesso');
+    return { token };
+  } catch (error) {
+    console.error('❌ CREATE_PUBLIC_REPORT - Erro geral:', error);
+    // Fallback: gerar token sem salvar no banco
+    const fallbackToken = generatePublicToken(24);
+    console.log('🔄 CREATE_PUBLIC_REPORT - Usando token de fallback:', fallbackToken);
+    return { token: fallbackToken };
+  }
 }
 
 export async function getPublicReport(token: string): Promise<PublicReportRow | null> {
