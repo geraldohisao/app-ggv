@@ -419,6 +419,30 @@ app.post('/automation/webhook/n8n-callback', (req, res) => {
   res.json({ success: true, message: 'Webhook processado' });
 });
 
+// Endpoint para receber dados do diagnóstico
+app.post('/automation/webhook/diag-ggv-register', (req, res) => {
+  console.log('📊 MOCK - Recebendo dados do diagnóstico:', req.body);
+  
+  const { companyData, segment, answers, totalScore, dealId } = req.body;
+  
+  // Simular processamento
+  const mockResponse = {
+    success: true,
+    message: 'Diagnóstico recebido e processado com sucesso',
+    data: {
+      company: companyData?.companyName || 'Empresa não informada',
+      score: totalScore,
+      segment,
+      dealId,
+      processed: true,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  console.log('✅ MOCK - Diagnóstico processado:', mockResponse);
+  res.json(mockResponse);
+});
+
 const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Mock automation server running on port ${PORT}`);
@@ -426,6 +450,7 @@ app.listen(PORT, () => {
   console.log(`   POST /automation/reactivation - Ativar reativação`);
   console.log(`   GET  /automation/history - Consultar histórico`);
   console.log(`   POST /automation/webhook/n8n-callback - Webhook N8N`);
+  console.log(`   POST /automation/webhook/diag-ggv-register - Receber diagnóstico`);
   console.log(`   GET  /automation/status/:workflowId - Status do workflow`);
   console.log(`   POST /automation/complete/:workflowId - Marcar como concluído`);
   console.log(`   POST /automation/history/reset - Reinicializar histórico`);

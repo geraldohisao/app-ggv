@@ -11,7 +11,7 @@ const AssistantSettingsModal = React.lazy<AssistantSettingsModalType>(
   () => import('./settings/AssistantSettingsModal').then((m: any) => ({ default: m.default || m.AssistantSettingsModal })) as any
 );
 import AIMarkdown from './common/AIMarkdown';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/DirectUserContext';
 import { LoadingSpinner, ErrorDisplay } from './ui/Feedback';
 import { getAutoApplySuggestions } from '../services/preferences';
 import { newRequestId, startStep } from '../src/utils/logger';

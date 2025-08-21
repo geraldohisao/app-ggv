@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Diagnóstico - Deal ID 62719</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            padding: 20px; 
+            background: #f8fafc;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .status { 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+        }
+        .success { 
+            background: #dcfce7; 
+            color: #166534; 
+            border: 1px solid #bbf7d0;
+        }
+        .error { 
+            background: #fef2f2; 
+            color: #dc2626; 
+            border: 1px solid #fecaca;
+        }
+        .info { 
+            background: #eff6ff; 
+            color: #1d4ed8; 
+            border: 1px solid #bfdbfe;
+        }
+        .warning { 
+            background: #fef3c7; 
+            color: #d97706; 
+            border: 1px solid #fed7aa;
+        }
+        .btn { 
+            background: #2563eb; 
+            color: white; 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover { 
+            background: #1d4ed8; 
+        }
+        .btn-success {
+            background: #16a34a;
+        }
+        .btn-success:hover {
+            background: #15803d;
+        }
+        pre { 
+            background: #f1f5f9; 
+            padding: 16px; 
+            border-radius: 8px; 
+            overflow-x: auto; 
+            font-size: 14px;
+        }
+        .test-results {
+            margin-top: 20px;
+        }
+        .deal-info {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste do Diagnóstico - Deal ID 62719</h1>
+        
+        <div class="deal-info">
+            <h3>📋 Informações do Deal</h3>
+            <strong>Deal ID:</strong> 62719<br>
+            <strong>Status:</strong> <span id="deal-status">Verificando...</span><br>
+            <strong>Servidor Mock:</strong> http://localhost:8080<br>
+            <strong>Aplicação:</strong> http://localhost:5174
+        </div>
+
+        <div class="test-results">
+            <h2>🔍 Testes Realizados</h2>
+            
+            <div id="webhook-test">
+                <h3>1. Teste do Webhook Mock</h3>
+                <button class="btn" onclick="testWebhook()">Testar Webhook</button>
+                <div id="webhook-result"></div>
+            </div>
+
+            <div id="diagnostic-test">
+                <h3>2. Teste do Diagnóstico</h3>
+                <button class="btn btn-success" onclick="openDiagnostic()">🚀 Abrir Diagnóstico com Deal ID 62719</button>
+                <div class="info">
+                    <strong>URL de teste:</strong> <a href="http://localhost:5174/diagnostico/?deal_id=62719" target="_blank">
+                        http://localhost:5174/diagnostico/?deal_id=62719
+                    </a>
+                </div>
+            </div>
+
+            <div id="validation-test">
+                <h3>3. Validação dos Dados</h3>
+                <button class="btn" onclick="validateData()">Validar Dados</button>
+                <div id="validation-result"></div>
+            </div>
+
+            <div id="random-test">
+                <h3>4. Teste com Deal ID Aleatório</h3>
+                <button class="btn" onclick="testRandomDeal()">Testar Deal Aleatório</button>
+                <div id="random-result"></div>
+            </div>
+        </div>
+
+        <div id="debug-info">
+            <h2>🐛 Informações de Debug</h2>
+            <div class="info">
+                <strong>Servidores necessários:</strong><br>
+                • ✅ Mock Server: http://localhost:8080 (rodando)<br>
+                • ✅ Vite Dev Server: http://localhost:5174 (rodando)<br><br>
+                <strong>Funcionalidades do Mock Server:</strong><br>
+                • Deal IDs fixos: 62718, 62719, 569934<br>
+                • Geração automática para outros IDs<br>
+                • Dados compatíveis com constantes do sistema
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testWebhook() {
+            const resultDiv = document.getElementById('webhook-result');
+            resultDiv.innerHTML = '<div class="info">🔄 Testando webhook...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8080/webhook/diag-ggv-register?deal_id=62719');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const isGenerated = data._generated || false;
+                    const statusClass = isGenerated ? 'warning' : 'success';
+                    const statusIcon = isGenerated ? '🎲' : '✅';
+                    const statusText = isGenerated ? 'Dados gerados automaticamente' : 'Dados pré-definidos encontrados';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="${statusClass}">
+                            ${statusIcon} <strong>${statusText}</strong><br>
+                            Empresa: ${data.companyName}<br>
+                            Setor: ${data['setor_de_atuação']}<br>
+                            Faturamento: ${data.faturamento_mensal}
+                        </div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    
+                    // Atualizar status do deal
+                    document.getElementById('deal-status').innerHTML = `<span style="color: #16a34a;">✅ Funcionando (${statusText})</span>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>Erro no webhook:</strong> ${response.status}<br>
+                            ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `;
+                    document.getElementById('deal-status').innerHTML = '<span style="color: #dc2626;">❌ Erro</span>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Erro de conexão:</strong> ${error.message}<br>
+                        Certifique-se que o mock server está rodando na porta 8080
+                    </div>
+                `;
+                document.getElementById('deal-status').innerHTML = '<span style="color: #dc2626;">❌ Servidor offline</span>';
+            }
+        }
+
+        function openDiagnostic() {
+            const url = 'http://localhost:5174/diagnostico/?deal_id=62719';
+            window.open(url, '_blank');
+        }
+
+        async function validateData() {
+            const resultDiv = document.getElementById('validation-result');
+            resultDiv.innerHTML = '<div class="info">🔄 Validando dados...</div>';
+            
+            try {
+                // Buscar dados do webhook
+                const response = await fetch('http://localhost:8080/webhook/diag-ggv-register?deal_id=62719');
+                const data = await response.json();
+                
+                // Constantes esperadas (simuladas)
+                const FATURAMENTO_MENSAL = [
+                    "Nenhum faturamento",
+                    "R$ 21 a 50 mil/mês",
+                    "R$ 51 a 100 mil/mês",
+                    "R$ 101 a 300 mil/mês",
+                    "R$ 301 a 600 mil/mês",
+                    "R$ 601 mil a 1 milhão/mês",
+                    "Acima de R$ 1 milhão/mês"
+                ];
+                
+                const SETORES_DE_ATUACAO = [
+                    'Comunicação / Agências / Gráficas',
+                    'Tecnologia / Desenvolvimento / Sites',
+                    'Consultoria / Assessoria / Administração',
+                    'E-commerce',
+                    'Educação',
+                    'Saúde / Medicina / Odontologia'
+                ];
+                
+                const TAMANHO_EQUIPE_VENDAS = [
+                    "Nenhum",
+                    "De 1 a 3 colaboradores", 
+                    "De 4 a 10 colaboradores",
+                    "De 11 a 25 colaboradores",
+                    "Acima de 25 colaboradores"
+                ];
+                
+                // Validações
+                const faturamentoValido = FATURAMENTO_MENSAL.includes(data.faturamento_mensal);
+                const setorValido = SETORES_DE_ATUACAO.includes(data['setor_de_atuação']);
+                const equipeValida = TAMANHO_EQUIPE_VENDAS.includes(data['tamanho_equipe_comercial']);
+                
+                let result = '<div class="success">✅ <strong>Validação concluída!</strong></div>';
+                result += `<div class="${faturamentoValido ? 'success' : 'error'}">
+                    ${faturamentoValido ? '✅' : '❌'} Faturamento: "${data.faturamento_mensal}" ${faturamentoValido ? '(válido)' : '(inválido)'}
+                </div>`;
+                result += `<div class="${setorValido ? 'success' : 'error'}">
+                    ${setorValido ? '✅' : '❌'} Setor: "${data['setor_de_atuação']}" ${setorValido ? '(válido)' : '(inválido)'}
+                </div>`;
+                result += `<div class="${equipeValida ? 'success' : 'error'}">
+                    ${equipeValida ? '✅' : '❌'} Equipe: "${data['tamanho_equipe_comercial']}" ${equipeValida ? '(válido)' : '(inválido)'}
+                </div>`;
+                
+                if (faturamentoValido && setorValido && equipeValida) {
+                    result += '<div class="success">🎉 <strong>Todos os dados estão compatíveis com as constantes!</strong></div>';
+                } else {
+                    result += '<div class="error">⚠️ <strong>Alguns dados precisam ser ajustados</strong></div>';
+                }
+                
+                resultDiv.innerHTML = result;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Erro na validação:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function testRandomDeal() {
+            const resultDiv = document.getElementById('random-result');
+            const randomId = Math.floor(Math.random() * 90000) + 10000; // ID entre 10000-99999
+            
+            resultDiv.innerHTML = `<div class="info">🔄 Testando com deal_id aleatório: ${randomId}...</div>`;
+            
+            try {
+                const response = await fetch(`http://localhost:8080/webhook/diag-ggv-register?deal_id=${randomId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="warning">
+                            🎲 <strong>Dados gerados automaticamente para deal_id ${randomId}</strong><br>
+                            Empresa: ${data.companyName}<br>
+                            Setor: ${data['setor_de_atuação']}<br>
+                            Faturamento: ${data.faturamento_mensal}<br><br>
+                            <a href="http://localhost:5174/diagnostico/?deal_id=${randomId}" target="_blank" class="btn">
+                                🚀 Testar este Deal ID
+                            </a>
+                        </div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>Erro:</strong> ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Erro:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Auto-executar teste do webhook ao carregar a página
+        window.addEventListener('load', () => {
+            setTimeout(testWebhook, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import React, { createContext, useState, ReactNode, useContext, useEffect } from 'react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 import { DirectAuth } from '../components/auth/DirectAuth';
+import { supabase } from '../services/supabaseClient';
 
 interface UserContextType {
     user: User | null;
@@ -23,20 +24,83 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         console.log('🚀 DIRECT CONTEXT - Iniciando...');
         
-        // Verificar se há usuário salvo no localStorage
-        const savedUser = localStorage.getItem('ggv-user');
-        if (savedUser) {
+        const checkAuthStatus = async () => {
+            // Primeiro, verificar se há uma sessão ativa no Supabase
             try {
-                const user = JSON.parse(savedUser);
-                console.log('✅ DIRECT CONTEXT - Usuário encontrado no localStorage:', user.email);
-                setUser(user);
-                setLoading(false);
-                return;
+                if (supabase) {
+                    const { data: { session }, error } = await supabase.auth.getSession();
+                    
+                    if (session?.user && !error) {
+                        console.log('✅ DIRECT CONTEXT - Sessão Supabase ativa encontrada');
+                        
+                        const email = session.user.email || '';
+                        const name = session.user.user_metadata?.full_name || 
+                                     session.user.user_metadata?.name || 
+                                     email.split('@')[0] || 
+                                     'Usuário';
+                        
+                        const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
+                        
+                        const user = {
+                            id: session.user.id,
+                            email,
+                            name: name.split(' ').map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(' '),
+                            initials: name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
+                            role: isAdmin ? UserRole.SuperAdmin : UserRole.User
+                        };
+                        
+                        // Salvar no storage local também
+                        const userJson = JSON.stringify(user);
+                        const timestamp = Date.now().toString();
+                        localStorage.setItem('ggv-user', userJson);
+                        localStorage.setItem('ggv-user-timestamp', timestamp);
+                        sessionStorage.setItem('ggv-user', userJson);
+                        sessionStorage.setItem('ggv-user-timestamp', timestamp);
+                        
+                        setUser(user);
+                        setLoading(false);
+                        return;
+                    }
+                }
             } catch (e) {
-                console.warn('⚠️ DIRECT CONTEXT - Erro ao carregar usuário salvo:', e);
-                localStorage.removeItem('ggv-user');
+                console.warn('⚠️ DIRECT CONTEXT - Erro ao verificar sessão Supabase:', e);
             }
-        }
+            
+            // Fallback: verificar localStorage/sessionStorage
+            const savedUser = localStorage.getItem('ggv-user') || sessionStorage.getItem('ggv-user');
+            const savedTimestamp = localStorage.getItem('ggv-user-timestamp') || sessionStorage.getItem('ggv-user-timestamp');
+            
+            if (savedUser && savedTimestamp) {
+                try {
+                    const user = JSON.parse(savedUser);
+                    const timestamp = parseInt(savedTimestamp);
+                    const now = Date.now();
+                    const oneHour = 60 * 60 * 1000; // 1 hora em milliseconds
+                    
+                    // Verificar se o usuário ainda é válido (menos de 1 hora)
+                    if (now - timestamp < oneHour) {
+                        console.log('✅ DIRECT CONTEXT - Usuário encontrado no localStorage:', user.email);
+                        setUser(user);
+                        setLoading(false);
+                        return;
+                    } else {
+                        console.log('⏰ DIRECT CONTEXT - Sessão expirada, removendo usuário salvo');
+                        localStorage.removeItem('ggv-user');
+                        localStorage.removeItem('ggv-user-timestamp');
+                        sessionStorage.removeItem('ggv-user');
+                        sessionStorage.removeItem('ggv-user-timestamp');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ DIRECT CONTEXT - Erro ao carregar usuário salvo:', e);
+                    localStorage.removeItem('ggv-user');
+                    localStorage.removeItem('ggv-user-timestamp');
+                    sessionStorage.removeItem('ggv-user');
+                    sessionStorage.removeItem('ggv-user-timestamp');
+                }
+            }
+        };
+        
+        checkAuthStatus();
 
         // Verificar se estamos retornando do OAuth
         const urlParams = new URLSearchParams(window.location.search);
@@ -60,8 +124,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleAuthSuccess = (authenticatedUser: User) => {
         console.log('✅ DIRECT CONTEXT - Login bem-sucedido:', authenticatedUser.email);
         
-        // Salvar usuário no localStorage
-        localStorage.setItem('ggv-user', JSON.stringify(authenticatedUser));
+        // Salvar usuário e timestamp no localStorage e sessionStorage para maior persistência
+        const userJson = JSON.stringify(authenticatedUser);
+        const timestamp = Date.now().toString();
+        
+        localStorage.setItem('ggv-user', userJson);
+        localStorage.setItem('ggv-user-timestamp', timestamp);
+        sessionStorage.setItem('ggv-user', userJson);
+        sessionStorage.setItem('ggv-user-timestamp', timestamp);
         
         setUser(authenticatedUser);
         setShowAuth(false);
@@ -74,9 +144,25 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setShowAuth(true);
     };
 
-    const logout = () => {
+    const logout = async () => {
         console.log('🚪 DIRECT CONTEXT - Logout');
+        
+        // Limpar sessão Supabase se existir
+        try {
+            if (supabase) {
+                await supabase.auth.signOut();
+                console.log('✅ DIRECT CONTEXT - Sessão Supabase limpa');
+            }
+        } catch (e) {
+            console.warn('⚠️ DIRECT CONTEXT - Erro ao limpar sessão Supabase:', e);
+        }
+        
+        // Limpar storage local
         localStorage.removeItem('ggv-user');
+        localStorage.removeItem('ggv-user-timestamp');
+        sessionStorage.removeItem('ggv-user');
+        sessionStorage.removeItem('ggv-user-timestamp');
+        
         setUser(null);
         setShowAuth(true);
         setAuthError(null);

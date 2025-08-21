@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AIPersona, UserRole, AIMode } from '../../types';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { getAIPersonas, saveAIPersona, getLLMGenerationConfig, saveLLMGenerationConfig, getRAGConfig, saveRAGConfig } from '../../services/supabaseService';
 import { ModalBase } from './ModalBase';
 import { LoadingSpinner, ErrorDisplay } from '../ui/Feedback';

@@ -98,7 +98,37 @@ export const DirectAuth: React.FC<DirectAuthProps> = ({ onAuthSuccess, onAuthErr
     try {
       console.log('🔐 DIRECT AUTH - Processando retorno OAuth...');
       
-      // Decodificar o JWT para obter informações do usuário
+      // Verificar se temos uma sessão válida no Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        console.log('✅ DIRECT AUTH - Sessão Supabase encontrada');
+        
+        const email = session.user.email || '';
+        const name = session.user.user_metadata?.full_name || 
+                     session.user.user_metadata?.name || 
+                     email.split('@')[0] || 
+                     'Usuário';
+
+        const user: User = {
+          id: session.user.id,
+          email,
+          name: formatName(name),
+          initials: getInitials(name),
+          role: isAdminEmail(email) ? UserRole.SuperAdmin : UserRole.User
+        };
+
+        console.log('✅ DIRECT AUTH - Usuário criado com sessão Supabase:', user);
+        
+        // Limpar URL
+        cleanUrl();
+        
+        onAuthSuccess(user);
+        return;
+      }
+      
+      // Fallback: decodificar JWT se não tiver sessão Supabase
+      console.log('⚠️ DIRECT AUTH - Sem sessão Supabase, usando fallback JWT');
       const payload = JSON.parse(atob(accessToken.split('.')[1]));
       
       const email = payload.email || '';
@@ -115,7 +145,7 @@ export const DirectAuth: React.FC<DirectAuthProps> = ({ onAuthSuccess, onAuthErr
         role: isAdminEmail(email) ? UserRole.SuperAdmin : UserRole.User
       };
 
-      console.log('✅ DIRECT AUTH - Usuário criado:', user);
+      console.log('✅ DIRECT AUTH - Usuário criado (fallback):', user);
       
       // Limpar URL
       cleanUrl();

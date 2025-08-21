@@ -298,10 +298,14 @@ export async function prefillFromN8n(dealId: string): Promise<AnyJson | null> {
 }
 
 export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
-    // Usar a URL correta do webhook N8N para enviar resultados
-    const resultUrl = 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register';
+    // Detectar ambiente e usar endpoint apropriado
+    const isLocal = window.location.hostname === 'localhost';
+    const resultUrl = isLocal 
+        ? '/automation/webhook/diag-ggv-register'  // Proxy local via Vite
+        : 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register'; // N8N remoto
     
     console.log('📤 N8N - Enviando resultados do diagnóstico:', payload);
+    console.log('📤 N8N - Ambiente:', isLocal ? 'LOCAL' : 'PRODUÇÃO');
     console.log('📤 N8N - URL de destino:', resultUrl);
     
     try {

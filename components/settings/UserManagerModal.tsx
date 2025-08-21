@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ModalBase } from './ModalBase';
 import { UserRole } from '../../types';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { LoadingSpinner, ErrorDisplay } from '../ui/Feedback';
 import { useUsersData } from '../../hooks/useUsersData';
 import UserToolbar from './UserToolbar';

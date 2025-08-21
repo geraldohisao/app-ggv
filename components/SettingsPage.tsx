@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { UserRole } from '../types';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/DirectUserContext';
 import { CpuChipIcon, ChartBarIcon, BookOpenIcon, ExclamationTriangleIcon, KeyIcon, CheckCircleIcon, PhotoIcon } from './ui/icons';
 import { DiagnosticSettingsModal } from './settings/DiagnosticSettingsModal';
 import { AssistantSettingsModal } from './settings/AssistantSettingsModal';

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Webhook Real - Pipedrive</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            padding: 20px; 
+            background: #f8fafc;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .status { 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+        }
+        .success { 
+            background: #dcfce7; 
+            color: #166534; 
+            border: 1px solid #bbf7d0;
+        }
+        .error { 
+            background: #fef2f2; 
+            color: #dc2626; 
+            border: 1px solid #fecaca;
+        }
+        .warning { 
+            background: #fef3c7; 
+            color: #d97706; 
+            border: 1px solid #fed7aa;
+        }
+        .info { 
+            background: #eff6ff; 
+            color: #1d4ed8; 
+            border: 1px solid #bfdbfe;
+        }
+        .btn { 
+            background: #2563eb; 
+            color: white; 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover { 
+            background: #1d4ed8; 
+        }
+        .btn-success {
+            background: #16a34a;
+        }
+        .btn-success:hover {
+            background: #15803d;
+        }
+        .btn-warning {
+            background: #d97706;
+        }
+        .btn-warning:hover {
+            background: #b45309;
+        }
+        pre { 
+            background: #f1f5f9; 
+            padding: 16px; 
+            border-radius: 8px; 
+            overflow-x: auto; 
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Teste de Webhook Real - Pipedrive</h1>
+        
+        <div class="info">
+            <strong>📋 Objetivo:</strong> Testar a integração real com Pipedrive via N8N para buscar dados de deals reais.
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Teste com Deal ID Específico</h2>
+            
+            <div class="input-group">
+                <label for="dealId">Deal ID do Pipedrive:</label>
+                <input type="text" id="dealId" placeholder="Ex: 62719" value="62719">
+            </div>
+            
+            <button class="btn btn-success" onclick="testRealWebhook()">🚀 Testar Webhook Real</button>
+            <button class="btn btn-warning" onclick="testDiagnostic()">📋 Abrir Diagnóstico</button>
+            
+            <div id="webhook-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Status da Integração</h2>
+            
+            <div id="integration-status">
+                <div class="info">🔄 Verificando status...</div>
+            </div>
+            
+            <button class="btn" onclick="checkIntegrationStatus()">🔄 Verificar Status</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Informações Técnicas</h2>
+            
+            <div class="info">
+                <strong>🔗 Endpoints:</strong><br>
+                • Webhook Real: <code>https://app.grupoggv.com/api/webhook/diag-ggv-register</code><br>
+                • Função Netlify: <code>/.netlify/functions/diag-ggv-register</code><br>
+                • Diagnóstico: <code>https://app.grupoggv.com/diagnostico/</code><br><br>
+                
+                <strong>🔧 Configuração Necessária:</strong><br>
+                • Variável <code>N8N_PIPEDRIVE_WEBHOOK_URL</code> na Netlify<br>
+                • Workflow N8N ativo e configurado<br>
+                • API do Pipedrive com acesso aos deals
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Logs de Debug</h2>
+            <pre id="debug-logs">Logs aparecerão aqui...</pre>
+            <button class="btn" onclick="clearLogs()">🗑️ Limpar Logs</button>
+        </div>
+    </div>
+
+    <script>
+        let debugLogs = [];
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            debugLogs.push(logMessage);
+            document.getElementById('debug-logs').textContent = debugLogs.join('\n');
+            console.log(logMessage);
+        }
+        
+        function clearLogs() {
+            debugLogs = [];
+            document.getElementById('debug-logs').textContent = 'Logs limpos...';
+        }
+
+        async function testRealWebhook() {
+            const dealId = document.getElementById('dealId').value.trim();
+            const resultDiv = document.getElementById('webhook-result');
+            
+            if (!dealId) {
+                resultDiv.innerHTML = '<div class="error">❌ Por favor, insira um Deal ID</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="info">🔄 Testando webhook real...</div>';
+            addLog(`Iniciando teste com deal_id: ${dealId}`);
+            
+            try {
+                const url = `https://app.grupoggv.com/api/webhook/diag-ggv-register?deal_id=${encodeURIComponent(dealId)}`;
+                addLog(`Fazendo requisição para: ${url}`);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addLog(`Status da resposta: ${response.status} ${response.statusText}`);
+                
+                const responseText = await response.text();
+                addLog(`Resposta raw: ${responseText.substring(0, 500)}...`);
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    addLog(`Erro ao fazer parse JSON: ${parseError.message}`);
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>Resposta não é JSON válido</strong><br>
+                            Status: ${response.status}<br>
+                            Possível causa: Função Netlify não está ativa ou há erro de roteamento
+                        </div>
+                        <pre>${responseText.substring(0, 1000)}</pre>
+                    `;
+                    return;
+                }
+                
+                if (response.ok) {
+                    addLog('✅ Resposta recebida com sucesso');
+                    
+                    // Verificar se são dados reais ou erro
+                    if (data.error) {
+                        const errorClass = data.error.includes('indisponível') ? 'warning' : 'error';
+                        const errorIcon = data.error.includes('indisponível') ? '⚠️' : '❌';
+                        
+                        resultDiv.innerHTML = `
+                            <div class="${errorClass}">
+                                ${errorIcon} <strong>${data.error}</strong><br>
+                                ${data.message}<br>
+                                ${data.suggestion ? `<br><em>💡 ${data.suggestion}</em>` : ''}
+                            </div>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                    } else {
+                        // Dados recebidos com sucesso
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                ✅ <strong>Dados reais recebidos do Pipedrive!</strong><br>
+                                Empresa: ${data.companyName || 'N/A'}<br>
+                                Email: ${data.email || 'N/A'}<br>
+                                Setor: ${data['setor_de_atuação'] || 'N/A'}
+                            </div>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                    }
+                } else {
+                    addLog(`❌ Erro HTTP: ${response.status}`);
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>Erro na requisição:</strong> ${response.status}<br>
+                            ${data.message || data.error || 'Erro desconhecido'}
+                        </div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+                
+            } catch (error) {
+                addLog(`❌ Erro de conexão: ${error.message}`);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Erro de conexão:</strong> ${error.message}<br>
+                        Verifique sua conexão de internet ou se o servidor está online.
+                    </div>
+                `;
+            }
+        }
+
+        function testDiagnostic() {
+            const dealId = document.getElementById('dealId').value.trim();
+            if (!dealId) {
+                alert('Por favor, insira um Deal ID primeiro');
+                return;
+            }
+            
+            const url = `https://app.grupoggv.com/diagnostico/?deal_id=${dealId}`;
+            addLog(`Abrindo diagnóstico: ${url}`);
+            window.open(url, '_blank');
+        }
+
+        async function checkIntegrationStatus() {
+            const statusDiv = document.getElementById('integration-status');
+            statusDiv.innerHTML = '<div class="info">🔄 Verificando integração...</div>';
+            addLog('Verificando status da integração');
+            
+            try {
+                // Teste básico da função Netlify
+                const response = await fetch('https://app.grupoggv.com/api/webhook/diag-ggv-register', {
+                    method: 'GET'
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.status === 400 && responseText.includes('Deal ID não fornecido')) {
+                    statusDiv.innerHTML = `
+                        <div class="success">
+                            ✅ <strong>Função Netlify está funcionando</strong><br>
+                            A função está respondendo corretamente e validando parâmetros.
+                        </div>
+                    `;
+                    addLog('✅ Função Netlify operacional');
+                } else if (responseText.includes('<!DOCTYPE html>')) {
+                    statusDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>Roteamento incorreto</strong><br>
+                            A URL está retornando HTML em vez da função. Verifique o netlify.toml.
+                        </div>
+                    `;
+                    addLog('❌ Problema de roteamento detectado');
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="warning">
+                            ⚠️ <strong>Status indeterminado</strong><br>
+                            Resposta inesperada: ${response.status}
+                        </div>
+                        <pre>${responseText.substring(0, 300)}</pre>
+                    `;
+                    addLog(`⚠️ Status indeterminado: ${response.status}`);
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Erro na verificação:</strong> ${error.message}
+                    </div>
+                `;
+                addLog(`❌ Erro na verificação: ${error.message}`);
+            }
+        }
+
+        // Verificar status automaticamente ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(checkIntegrationStatus, 1000);
+            addLog('Página carregada, iniciando verificações...');
+        });
+    </script>
+</body>
+</html>

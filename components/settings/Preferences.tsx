@@ -3,7 +3,7 @@ import { ModalBase } from './ModalBase';
 import { listAppSettingsMasked, getAppSetting, upsertAppSetting, saveGeminiApiKey } from '../../services/supabaseService';
 import { vectorHealth } from '../../utils/vectorHealth';
 import { setUseRemoteEmbeddings } from '../../services/embeddingService';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
 
 const maskValue = (full?: string | null) => {

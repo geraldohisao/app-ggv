@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { formInputClass, formLabelClass, formTextareaClass } from './ui/Form';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/DirectUserContext';
 import { OpportunityFeedback } from '../types';
 import { saveOpportunityFeedback } from '../services/supabaseService';
 import OpportunityFeedbackSuccess from './OpportunityFeedbackSuccess';

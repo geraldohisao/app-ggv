@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { OTEProfile } from '../types';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
 import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION } from '../constants';
 import { useOteCalculator, SdrInputs as SdrInputType, CloserInputs as CloserInputType } from '../hooks/useOteCalculator';

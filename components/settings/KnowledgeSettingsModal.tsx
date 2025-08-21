@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StoredKnowledgeDocument, UserRole } from '../../types';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { getKnowledgeDocuments, addKnowledgeDocument, deleteKnowledgeDocument, getKnowledgeOverview, upsertKnowledgeOverview } from '../../services/supabaseService';
 import { generateEmbedding } from '../../services/embeddingService';
 // Removido: fluxo antigo de armazenamento local e sincronização

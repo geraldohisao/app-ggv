@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MarketSegment, UserRole } from '../../types';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { getDiagnosticSegments, saveDiagnosticSegment, deleteDiagnosticSegment, seedDefaultSegments } from '../../services/supabaseService';
 import { DEFAULT_DIAGNOSTIC_SEGMENTS, AI_FOCUS_AREAS } from '../../constants';
 import { ModalBase } from './ModalBase';

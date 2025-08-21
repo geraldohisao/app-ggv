@@ -31,7 +31,8 @@ export default defineConfig(({ mode }) => {
       plugins: [react(), cspProdOnly()],
       server: {
         headers: {
-          'Cache-Control': 'no-store',
+          // Permitir cache para melhor persistência durante desenvolvimento
+          'Cache-Control': 'max-age=0',
         },
         proxy: {
           '/api': {

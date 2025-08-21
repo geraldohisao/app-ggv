@@ -375,7 +375,7 @@ export const DiagnosticoComercial: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
-                            )}
+                            ) : null}
                             
                             <button
                                 onClick={() => setStep('companyInfo')}
