@@ -302,7 +302,7 @@ export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
     const isLocal = window.location.hostname === 'localhost';
     const resultUrl = isLocal 
         ? '/automation/webhook/diag-ggv-register'  // Proxy local via Vite
-        : 'https://automation-test.ggvinteligencia.com.br/webhook-test/diag-ggv-register'; // N8N remoto
+        : 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register'; // N8N remoto
     
     console.log('📤 N8N - Enviando resultados do diagnóstico:', payload);
     console.log('📤 N8N - Ambiente:', isLocal ? 'LOCAL' : 'PRODUÇÃO');
