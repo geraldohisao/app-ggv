@@ -87,85 +87,148 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         return () => clearTimeout(timer);
     }, []);
 
-    // Enviar dados para N8N após análise IA ser concluída
+    // Envio direto para N8N - refatorado para ser mais simples e confiável
     useEffect(() => {
-        const sendToN8n = async () => {
-            console.log('🔍 N8N CHECK - Estado atual:', {
-                n8nSent,
-                isLoadingSummary,
-                isLoadingDetailed,
-                hasSummary: !!summaryInsights,
-                hasDetailed: !!detailedAnalysis,
-                hasError: !!apiError,
-                dealId
-            });
-            
-            // Debug detalhado das condições
-            console.log('🔍 N8N CONDITIONS DEBUG:', {
-                n8nSent,
-                isLoadingSummary,
-                isLoadingDetailed,
-                hasSummary: !!summaryInsights,
-                hasDetailed: !!detailedAnalysis,
-                hasError: !!apiError,
-                emergencyTimeout,
-                dealId
-            });
-
-            // Condição simplificada: enviar se não foi enviado ainda E (IA terminou OU timeout)
-            const aiFinished = !isLoadingSummary && !isLoadingDetailed;
-            const notSentYet = !n8nSent;
-            const shouldSend = notSentYet && (aiFinished || emergencyTimeout);
-            
-            console.log('🔍 N8N SEND CHECK - AI finished?', aiFinished);
-            console.log('🔍 N8N SEND CHECK - Not sent yet?', notSentYet);
-            console.log('🔍 N8N SEND CHECK - Emergency timeout?', emergencyTimeout);
-            console.log('🔍 N8N SEND CHECK - Should send?', shouldSend);
-            
-            // Forçar envio uma vez para debug (remover depois)
-            if (!n8nSent && aiFinished) {
-                console.log('🚀 N8N FORCE SEND - Forçando envio para debug...');
+        const sendDiagnosticResults = async () => {
+            // Só executar uma vez e quando tiver dados básicos
+            if (n8nSent || !companyData || !answers || Object.keys(answers).length === 0) {
+                return;
             }
-            
-            // Condição temporária para forçar envio (debug)
-            if (shouldSend || (!n8nSent && aiFinished)) {
-                console.log('📤 N8N - Enviando resultados após análise IA concluída');
-                console.log('📊 N8N - Dados a enviar:', { companyData, segment, answers, totalScore, dealId });
-                
-                try {
-                    // Criar URL do relatório público sem dependência do banco (evitar RLS)
-                    const isProduction = window.location.hostname === 'app.grupoggv.com';
-                    const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
-                    const publicReportUrl = `${baseUrl}/r/${dealId || 'diagnostic-' + Date.now()}`;
-                    
-                    console.log('📊 N8N - URL do relatório público (sem RLS):', publicReportUrl);
 
-                    const success = await sendDiagnosticToN8n({
-                        companyData,
-                        segment,
-                        answers,
-                        totalScore,
-                        dealId,
-                        summaryInsights,
-                        detailedAnalysis,
-                        publicReportUrl,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    if (success) {
-                        console.log('✅ N8N - Resultados enviados com sucesso após análise IA');
-                        setN8nSent(true);
-                    } else {
-                        console.error('❌ N8N - Falha ao enviar resultados após análise IA');
-                    }
-                } catch (error) {
-                    console.error('❌ N8N - Erro ao enviar resultados:', error);
+            console.log('🚀 N8N - Iniciando envio dos resultados do diagnóstico');
+            console.log('📊 N8N - Deal ID:', dealId);
+            console.log('📊 N8N - Total Score:', totalScore);
+
+            try {
+                // 1. ENVIO IMEDIATO - Resultados básicos do diagnóstico
+                const isProduction = window.location.hostname === 'app.grupoggv.com';
+                const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+                const publicReportUrl = `${baseUrl}/r/${dealId || 'diagnostic-' + Date.now()}`;
+
+                const diagnosticPayload = {
+                    deal_id: dealId,
+                    timestamp: new Date().toISOString(),
+                    companyData: {
+                        companyName: companyData.companyName,
+                        email: companyData.email,
+                        activityBranch: companyData.activityBranch,
+                        monthlyBilling: companyData.monthlyBilling,
+                        salesTeamSize: companyData.salesTeamSize,
+                        salesChannels: companyData.salesChannels || []
+                    },
+                    segment: {
+                        name: segment?.name || 'Geral',
+                        id: segment?.id || 'geral'
+                    },
+                    diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => ({
+                        questionId: parseInt(questionId),
+                        score: score,
+                        answer: score >= 8 ? 'Sim' : score >= 6 ? 'Às vezes' : score >= 4 ? 'Parcialmente' : score >= 1 ? 'Pouco' : 'Não'
+                    })),
+                    results: {
+                        totalScore: totalScore,
+                        maxScore: 90,
+                        maturityPercentage: Math.round((totalScore / 90) * 100),
+                        maturityLevel: totalScore >= 70 ? 'Avançado' : totalScore >= 40 ? 'Intermediário' : 'Inicial'
+                    },
+                    publicReportUrl: publicReportUrl,
+                    status: 'diagnostic_completed',
+                    source: 'web-diagnostic'
+                };
+
+                console.log('📤 N8N - Enviando payload completo:', diagnosticPayload);
+
+                // Envio direto via fetch para o webhook
+                const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
+                
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'GGV-Diagnostic/1.0'
+                    },
+                    body: JSON.stringify(diagnosticPayload)
+                });
+
+                console.log('📊 N8N - Status da resposta:', response.status);
+                
+                if (response.ok) {
+                    console.log('✅ N8N - Resultados básicos enviados com sucesso');
+                    setN8nSent(true);
+                } else {
+                    console.warn('⚠️ N8N - POST falhou, tentando GET fallback');
+                    // Fallback com GET
+                    const getUrl = `${webhookUrl}?deal_id=${dealId}&action=diagnostic_completed&total_score=${totalScore}&timestamp=${Date.now()}`;
+                    const getResponse = await fetch(getUrl, { method: 'GET' });
+                    console.log('📊 N8N - GET fallback status:', getResponse.status);
+                    setN8nSent(true);
                 }
+
+            } catch (error) {
+                console.error('❌ N8N - Erro ao enviar resultados:', error);
+                setN8nSent(true); // Marcar como enviado para não ficar tentando
             }
         };
-        
-        sendToN8n();
-    }, [n8nSent, isLoadingSummary, isLoadingDetailed, summaryInsights, detailedAnalysis, apiError, emergencyTimeout, companyData, segment, answers, totalScore, dealId]);
+
+        sendDiagnosticResults();
+    }, [companyData, answers, totalScore, dealId, n8nSent]);
+
+    // Envio adicional com análise IA (quando disponível)
+    useEffect(() => {
+        const sendAIAnalysis = async () => {
+            if (!n8nSent || !summaryInsights || !detailedAnalysis) {
+                return;
+            }
+
+            console.log('🤖 N8N - Enviando análise IA adicional');
+            
+            try {
+                const isProduction = window.location.hostname === 'app.grupoggv.com';
+                const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+                const publicReportUrl = `${baseUrl}/r/${dealId || 'diagnostic-' + Date.now()}`;
+
+                const aiPayload = {
+                    deal_id: dealId,
+                    timestamp: new Date().toISOString(),
+                    action: 'ai_analysis_completed',
+                    aiAnalysis: {
+                        summaryInsights: {
+                            specialistInsight: summaryInsights.specialistInsight || '',
+                            recommendations: summaryInsights.recommendations || []
+                        },
+                        detailedAnalysis: {
+                            strengths: detailedAnalysis.strengths || [],
+                            improvements: detailedAnalysis.improvements || [],
+                            nextSteps: detailedAnalysis.nextSteps || []
+                        }
+                    },
+                    publicReportUrl: publicReportUrl
+                };
+
+                const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'GGV-Diagnostic-AI/1.0'
+                    },
+                    body: JSON.stringify(aiPayload)
+                });
+
+                console.log('🤖 N8N - Status análise IA:', response.status);
+                if (response.ok) {
+                    console.log('✅ N8N - Análise IA enviada com sucesso');
+                } else {
+                    console.warn('⚠️ N8N - Falha ao enviar análise IA');
+                }
+
+            } catch (error) {
+                console.error('❌ N8N - Erro ao enviar análise IA:', error);
+            }
+        };
+
+        sendAIAnalysis();
+    }, [summaryInsights, detailedAnalysis, dealId, n8nSent]);
 
     const handleNextTab = () => {
         const currentIndex = REPORT_TABS.indexOf(activeTab);
