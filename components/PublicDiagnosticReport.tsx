@@ -35,6 +35,43 @@ const PublicDiagnosticReport: React.FC = () => {
     })();
   }, [token]);
 
+  // Meta Pixel Code - Adicionar ao head quando componente montar
+  useEffect(() => {
+    // Verificar se o Meta Pixel já foi carregado para evitar duplicação
+    if ((window as any).fbq) return;
+
+    // Criar e adicionar o script do Meta Pixel
+    const script = document.createElement('script');
+    script.innerHTML = `
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '1728364274068645');
+      fbq('track', 'PageView');
+    `;
+    
+    // Adicionar o script ao head
+    document.head.appendChild(script);
+
+    // Adicionar noscript fallback
+    const noscript = document.createElement('noscript');
+    noscript.innerHTML = '<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1728364274068645&ev=PageView&noscript=1" />';
+    document.head.appendChild(noscript);
+
+    console.log('📊 Meta Pixel - Carregado na página de resultado público');
+
+    // Cleanup quando componente desmontar
+    return () => {
+      // Remover scripts adicionados (opcional, pois geralmente queremos manter o pixel)
+      console.log('📊 Meta Pixel - Componente desmontado');
+    };
+  }, []);
+
   if (!token) return <ErrorDisplay message="Token inválido." />;
   if (error) return <ErrorDisplay message={error} />;
   if (!data) return <div className="p-8"><LoadingSpinner text="Carregando relatório..." /></div>;
