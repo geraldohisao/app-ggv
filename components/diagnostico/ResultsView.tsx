@@ -66,7 +66,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
                 const detailed = await detailedPromise;
                 setDetailedAnalysis(detailed);
-                setIsLoadingDetailed(false);
             } catch (err: any) {
                 console.error("Failed to get AI analysis:", err);
                 setApiError(err.message || "Falha ao obter análise da IA.");
@@ -164,7 +163,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         return scores;
     }, [answers]);
 
-    const allDataForPdf = { companyData, segment, answers, totalScore, maturity, summaryInsights, detailedAnalysis, scoresByArea };
+    const allDataForPdf = { companyData, segment, answers, totalScore, maturity, summaryInsights, detailedAnalysis, scoresByArea, specialistName };
 
     return (
         <div className="w-full max-w-7xl mx-auto animate-fade-in space-y-6">
