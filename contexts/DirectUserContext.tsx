@@ -8,12 +8,14 @@ interface UserContextType {
     user: User | null;
     loading: boolean;
     logout: () => void;
+    refreshUser: () => Promise<void>;
 }
 
 export const UserContext = createContext<UserContextType>({
     user: null,
     loading: true,
     logout: () => {},
+    refreshUser: async () => {},
 });
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -43,14 +45,36 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                      email.split('@')[0] || 
                                      'Usuário';
                         
-                        const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
+                        // Consultar role real da tabela profiles
+                        let userRole = UserRole.User;
+                        try {
+                            const { data: profile } = await supabase
+                                .from('profiles')
+                                .select('role')
+                                .eq('id', session.user.id)
+                                .single();
+                            
+                            if (profile?.role) {
+                                userRole = profile.role as UserRole;
+                                console.log('✅ DIRECT CONTEXT - Role carregado do banco:', userRole);
+                            } else {
+                                // Fallback para emails específicos
+                                const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
+                                userRole = isAdmin ? UserRole.SuperAdmin : UserRole.User;
+                                console.log('⚠️ DIRECT CONTEXT - Usando role fallback:', userRole);
+                            }
+                        } catch (profileError) {
+                            console.warn('⚠️ DIRECT CONTEXT - Erro ao buscar profile, usando fallback:', profileError);
+                            const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
+                            userRole = isAdmin ? UserRole.SuperAdmin : UserRole.User;
+                        }
                         
                         const user = {
                             id: session.user.id,
                             email,
                             name: name.split(' ').map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(' '),
                             initials: name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
-                            role: isAdmin ? UserRole.SuperAdmin : UserRole.User
+                            role: userRole
                         };
                         
                         // Salvar no storage local também
@@ -135,11 +159,33 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false);
     }, []);
 
-    const handleAuthSuccess = (authenticatedUser: User) => {
+    const handleAuthSuccess = async (authenticatedUser: User) => {
         console.log('✅ DIRECT CONTEXT - Login bem-sucedido:', authenticatedUser.email);
         
+        // Atualizar role do usuário consultando a tabela profiles
+        let finalUser = authenticatedUser;
+        try {
+            if (supabase) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', authenticatedUser.id)
+                    .single();
+                
+                if (profile?.role) {
+                    finalUser = {
+                        ...authenticatedUser,
+                        role: profile.role as UserRole
+                    };
+                    console.log('✅ DIRECT CONTEXT - Role atualizado do banco:', profile.role);
+                }
+            }
+        } catch (profileError) {
+            console.warn('⚠️ DIRECT CONTEXT - Erro ao atualizar role:', profileError);
+        }
+        
         // Salvar usuário e timestamp no localStorage e sessionStorage para maior persistência
-        const userJson = JSON.stringify(authenticatedUser);
+        const userJson = JSON.stringify(finalUser);
         const timestamp = Date.now().toString();
         
         localStorage.setItem('ggv-user', userJson);
@@ -147,7 +193,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         sessionStorage.setItem('ggv-user', userJson);
         sessionStorage.setItem('ggv-user-timestamp', timestamp);
         
-        setUser(authenticatedUser);
+        setUser(finalUser);
         setShowAuth(false);
         setAuthError(null);
     };
@@ -182,10 +228,52 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setAuthError(null);
     };
 
+    const refreshUser = async () => {
+        console.log('🔄 DIRECT CONTEXT - Atualizando dados do usuário...');
+        
+        if (!supabase || !user) {
+            console.warn('⚠️ DIRECT CONTEXT - Não é possível atualizar: sem Supabase ou usuário');
+            return;
+        }
+
+        try {
+            // Buscar role atualizado do banco
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+            
+            if (profile?.role && profile.role !== user.role) {
+                const updatedUser = {
+                    ...user,
+                    role: profile.role as UserRole
+                };
+                
+                console.log('✅ DIRECT CONTEXT - Role atualizado:', user.role, '→', profile.role);
+                
+                // Atualizar estado
+                setUser(updatedUser);
+                
+                // Atualizar storage
+                const userJson = JSON.stringify(updatedUser);
+                const timestamp = Date.now().toString();
+                localStorage.setItem('ggv-user', userJson);
+                localStorage.setItem('ggv-user-timestamp', timestamp);
+                sessionStorage.setItem('ggv-user', userJson);
+                sessionStorage.setItem('ggv-user-timestamp', timestamp);
+            } else {
+                console.log('ℹ️ DIRECT CONTEXT - Role não mudou:', user.role);
+            }
+        } catch (error) {
+            console.error('❌ DIRECT CONTEXT - Erro ao atualizar usuário:', error);
+        }
+    };
+
     // Se deve mostrar autenticação
     if (showAuth) {
         return (
-            <UserContext.Provider value={{ user, loading, logout }}>
+            <UserContext.Provider value={{ user, loading, logout, refreshUser }}>
                 <DirectAuth 
                     onAuthSuccess={handleAuthSuccess}
                     onAuthError={handleAuthError}
@@ -200,7 +288,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     return (
-        <UserContext.Provider value={{ user, loading, logout }}>
+        <UserContext.Provider value={{ user, loading, logout, refreshUser }}>
             {children}
         </UserContext.Provider>
     );
