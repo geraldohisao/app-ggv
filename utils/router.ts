@@ -26,7 +26,13 @@ export const routeModules: Record<Module, string> = {
 
 // Função para obter o módulo baseado na URL atual
 export const getModuleFromPath = (pathname: string): Module => {
-    return moduleRoutes[pathname] || Module.Diagnostico;
+    console.log('🔍 ROUTER - Resolvendo pathname:', pathname);
+    console.log('🔍 ROUTER - Módulos disponíveis:', Object.keys(moduleRoutes));
+    
+    const module = moduleRoutes[pathname] || Module.Diagnostico;
+    console.log('🔍 ROUTER - Módulo resolvido:', module);
+    
+    return module;
 };
 
 // Função para navegar para um módulo específico

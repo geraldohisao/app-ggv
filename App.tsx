@@ -139,26 +139,37 @@ const AppContent: React.FC = () => {
   }
 
   const renderModule = () => {
+    console.log('🎯 APP - Renderizando módulo:', activeModule);
+    console.log('🎯 APP - Pathname atual:', window.location.pathname);
+    
     switch (activeModule) {
       case Module.Diagnostico:
+        console.log('📊 APP - Renderizando Diagnóstico');
         return <DiagnosticoComercial />;
       case Module.Assistente:
+        console.log('🤖 APP - Renderizando Assistente');
         return (
           <AppErrorBoundary>
             <AssistenteIA />
           </AppErrorBoundary>
         );
       case Module.Calculadora:
+        console.log('🧮 APP - Renderizando Calculadora');
         return <CalculadoraOTE />;
       case Module.Settings:
+        console.log('⚙️ APP - Renderizando Settings');
         return <SettingsPage />;
       case Module.OpportunityFeedback:
+        console.log('📝 APP - Renderizando Opportunity Feedback');
         return <OpportunityFeedbackPage />;
       case Module.Calls:
+        console.log('📞 APP - Renderizando Calls');
         return <CallsList />;
       case Module.ReativacaoLeads:
+        console.log('🔄 APP - Renderizando Reativação');
         return <ReativacaoLeadsPage />;
       default:
+        console.log('🏠 APP - Renderizando Default (Diagnóstico)');
         return <DiagnosticoComercial />;
     }
   };
