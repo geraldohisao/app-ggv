@@ -27,6 +27,15 @@ const AppContent: React.FC = () => {
   const { user, loading, logout } = useUser();
   const [activeModule, setActiveModule] = useState<Module>(() => getModuleFromPath(window.location.pathname));
 
+  // Garantir que ao carregar a página, o módulo correto seja selecionado
+  useEffect(() => {
+    const currentModule = getModuleFromPath(window.location.pathname);
+    if (currentModule !== activeModule) {
+      console.log(`🔄 APP - Atualizando módulo: ${activeModule} → ${currentModule}`);
+      setActiveModule(currentModule);
+    }
+  }, [user, activeModule]); // Reexecutar quando o usuário for carregado ou módulo mudar
+
   // Verificar se é uma página de resultado público
   const isPublicResultPage = window.location.pathname === '/resultado-diagnostico';
   

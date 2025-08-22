@@ -76,15 +76,30 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     const timestamp = parseInt(savedTimestamp);
                     const now = Date.now();
                     const oneHour = 60 * 60 * 1000; // 1 hora em milliseconds
+                    const oneDay = 24 * 60 * 60 * 1000; // 24 horas em milliseconds
                     
-                    // Verificar se o usuário ainda é válido (menos de 1 hora)
-                    if (now - timestamp < oneHour) {
+                    // Para página de feedback, permitir sessão mais longa (24h)
+                    const isFeedbackPage = window.location.pathname === '/feedback';
+                    const sessionDuration = isFeedbackPage ? oneDay : oneHour;
+                    
+                    // Verificar se o usuário ainda é válido
+                    if (now - timestamp < sessionDuration) {
                         console.log('✅ DIRECT CONTEXT - Usuário encontrado no localStorage:', user.email);
+                        
+                        // Se está na página de feedback, renovar timestamp para evitar expiração
+                        if (isFeedbackPage) {
+                            const newTimestamp = Date.now().toString();
+                            localStorage.setItem('ggv-user-timestamp', newTimestamp);
+                            sessionStorage.setItem('ggv-user-timestamp', newTimestamp);
+                            console.log('🔄 DIRECT CONTEXT - Timestamp renovado para página de feedback');
+                        }
+                        
                         setUser(user);
                         setLoading(false);
                         return;
                     } else {
-                        console.log('⏰ DIRECT CONTEXT - Sessão expirada, removendo usuário salvo');
+                        const sessionExpiredMsg = isFeedbackPage ? 'Sessão de feedback expirada (24h)' : 'Sessão expirada (1h)';
+                        console.log(`⏰ DIRECT CONTEXT - ${sessionExpiredMsg}, removendo usuário salvo`);
                         localStorage.removeItem('ggv-user');
                         localStorage.removeItem('ggv-user-timestamp');
                         sessionStorage.removeItem('ggv-user');
