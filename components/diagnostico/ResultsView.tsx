@@ -40,7 +40,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     const [summaryInsights, setSummaryInsights] = useState<SummaryInsights | null>(null);
     const [detailedAnalysis, setDetailedAnalysis] = useState<DetailedAIAnalysis | null>(null);
     const [specialistName, setSpecialistName] = useState<string>('');
-    const [n8nSent, setN8nSent] = useState<boolean>(false);
+    // Controla se o webhook já foi enviado
+    const [aiSent, setAiSent] = useState<boolean>(false);
     const [emergencyTimeout, setEmergencyTimeout] = useState<boolean>(false);
 
     useEffect(() => {
@@ -88,48 +89,54 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         fetchInsights();
     }, [companyData, answers, totalScore, segment]);
 
-    // Timeout de emergência para enviar mesmo se IA não responder
+    // Timeout removido: o envio ocorrerá quando a IA concluir ou após 30s como fallback
     useEffect(() => {
         const timer = setTimeout(() => {
-            console.log('⏰ N8N - Timeout de emergência ativado (15s)');
+            if (!aiSent && summaryInsights && detailedAnalysis) return; // IA ok
+            if (aiSent) return;
+            console.warn('⏰ Fallback: enviando diagnóstico mesmo sem IA');
             setEmergencyTimeout(true);
-        }, 15000); // 15 segundos
-
+        }, 30000); // 30 segundos
         return () => clearTimeout(timer);
-    }, []);
+    }, [aiSent, summaryInsights, detailedAnalysis]);
 
-    // Envio direto para N8N - refatorado para ser mais simples e confiável
+    // OBS: Envio será feito **apenas** após a análise IA estar pronta.
+    // O bloco de envio imediato foi removido para evitar dois webhooks.
+
+    // Envio ÚNICO para N8N após análise IA estar pronta (ou timeout de emergência)
     useEffect(() => {
-        const sendDiagnosticResults = async () => {
-            // Só executar uma vez e quando tiver dados básicos
-            if (n8nSent || !companyData || !answers || Object.keys(answers).length === 0) {
+        const sendCompleteAnalysis = async () => {
+            // Só enviar se ainda não foi enviado E se temos dados básicos
+            if (aiSent || !companyData || !answers || Object.keys(answers).length === 0) {
                 return;
             }
 
-            console.log('🚀 N8N - Iniciando envio dos resultados do diagnóstico');
-            console.log('📊 N8N - Deal ID:', dealId);
-            console.log('📊 N8N - Total Score:', totalScore);
+            // Aguardar análise IA estar pronta OU timeout de emergência
+            const hasAI = summaryInsights && detailedAnalysis;
+            if (!hasAI && !emergencyTimeout) {
+                console.log('⏳ Aguardando análise IA ou timeout de emergência...');
+                return;
+            }
 
+            console.log('🚀 N8N - Enviando diagnóstico completo', hasAI ? 'com análise IA' : 'por timeout');
+            
             try {
-                // 1. ENVIO IMEDIATO - Resultados básicos do diagnóstico
                 const isProduction = window.location.hostname === 'app.grupoggv.com';
                 const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
                 
-                // Gerar token seguro para URL pública (evitar exposição direta do deal_id)
+                // Gerar token seguro para URL pública
                 const generateSecureToken = (dealId: string) => {
                     const timestamp = Date.now();
                     const randomSalt = Math.random().toString(36).substring(2, 15);
                     const dataToHash = `${dealId}-${timestamp}-${randomSalt}`;
                     
-                    // Simular hash simples (em produção usar crypto real)
                     let hash = 0;
                     for (let i = 0; i < dataToHash.length; i++) {
                         const char = dataToHash.charCodeAt(i);
                         hash = ((hash << 5) - hash) + char;
-                        hash = hash & hash; // Convert to 32bit integer
+                        hash = hash & hash;
                     }
                     
-                    // Formato: {timestamp}-{hash_absoluto}-{primeiros_chars_deal}
                     const shortDealId = dealId.substring(0, 3);
                     return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
                 };
@@ -137,8 +144,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
-                // Salvar token seguro no banco para mapeamento futuro
-                // CRÍTICO: Salvar SEMPRE, mesmo sem dealId para garantir que links funcionem
+                // Salvar relatório público
                 try {
                     const reportData = {
                         companyData,
@@ -154,106 +160,70 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     
                     console.log('💾 N8N - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
                     
-                    // Importar createPublicReport dinamicamente para evitar dependência circular
                     const { createPublicReport } = await import('../../services/supabaseService');
                     await createPublicReport(reportData, undefined, undefined, dealId, secureToken);
                     console.log('✅ N8N - Relatório salvo com sucesso:', secureToken);
                 } catch (tokenError) {
                     console.error('❌ N8N - ERRO CRÍTICO ao salvar relatório:', tokenError);
-                    // Este erro é crítico pois sem salvar, o link não funcionará
                 }
 
-                // Estrutura EXATA que o N8N espera baseado nos mapeamentos
-                const diagnosticPayload = {
+                // Payload completo para N8N (inclui score + análise IA se disponível)
+                const payload = {
                     deal_id: dealId,
                     timestamp: new Date().toISOString(),
-                    action: 'diagnostic_completed',
+                    action: 'ai_analysis_completed',
                     
-                    // Estrutura que corresponde EXATAMENTE aos mapeamentos N8N
                     body: {
                         results: {
-                            maturityPercentage: Math.round((totalScore / 90) * 100)  // $('registerGGVDiag').first().json.body.results.maturityPercentage
+                            maturityPercentage: Math.round((totalScore / 90) * 100)
                         },
-                        resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
-                        deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
+                        resultUrl: publicReportUrl,
+                        deal_id: dealId,
                         
-                        // ============================================================================
-                        // SOLUÇÃO DEFINITIVA: MAPEAMENTO DE RESPOSTAS TEXTUAIS PARA N8N
-                        // ============================================================================
-                        // NUNCA ALTERE ESTA SEÇÃO SEM TESTAR COMPLETAMENTE O ENVIO PARA N8N
-                        // O N8N REQUER RESPOSTAS COMO TEXTO, NÃO NÚMEROS
-                        diagnosticAnswers: (() => {
-                            console.log('🔄 INICIANDO MAPEAMENTO DEFINITIVO DAS RESPOSTAS');
-                console.log('🚀 VERSÃO DA CORREÇÃO ATIVA:', DIAGNOSTIC_FIX_VERSION);
-                            console.log('📊 Answers recebidos:', answers);
-                            console.log('📋 Total de perguntas:', diagnosticQuestions.length);
+                        // Incluir análise IA se disponível
+                        ...(hasAI && {
+                            aiAnalysis: {
+                                summaryInsights: {
+                                    specialistInsight: summaryInsights.specialistInsight || '',
+                                    recommendations: (summaryInsights as any).recommendations || []
+                                },
+                                detailedAnalysis: {
+                                    strengths: detailedAnalysis.strengths || [],
+                                    improvements: (detailedAnalysis as any).improvements || [],
+                                    nextSteps: detailedAnalysis.nextSteps || []
+                                }
+                            }
+                        }),
+
+                        // Respostas do diagnóstico
+                        diagnosticAnswers: diagnosticQuestions.map((question) => {
+                            const score = answers[question.id];
+                            const option = question.options.find(opt => opt.score === score);
                             
-                            const mappedAnswers = diagnosticQuestions.map((question) => {
-                                const score = answers[question.id];
-                                console.log(`\n🔍 PROCESSANDO Pergunta ${question.id}:`);
-                                console.log(`   Texto: "${question.text}"`);
-                                console.log(`   Score recebido: ${score} (tipo: ${typeof score})`);
-                                console.log(`   Opções disponíveis:`, question.options.map(o => `"${o.text}" (${o.score})`));
-                                
-                                // Validação rigorosa do score
-                                if (score === undefined || score === null || typeof score !== 'number') {
-                                    console.error(`❌ ERRO CRÍTICO - Score inválido para pergunta ${question.id}: ${score}`);
-                                    return {
-                                        questionId: question.id,
-                                        question: question.text,
-                                        answer: "ERRO: Não respondida",
-                                        description: "Esta pergunta não foi respondida corretamente",
-                                        score: 0
-                                    };
-                                }
-                                
-                                // Busca EXATA da opção pelo score
-                                const option = question.options.find(opt => opt.score === score);
-                                
-                                if (!option) {
-                                    console.error(`❌ ERRO CRÍTICO - Opção não encontrada para pergunta ${question.id} com score ${score}`);
-                                    console.error(`❌ Opções válidas:`, question.options);
-                                    
-                                    // Sistema de fallback robusto
-                                    const fallbackMap = {
-                                        10: 'Sim',
-                                        5: question.options.find(opt => opt.text.includes('vezes') || opt.text.includes('Às vezes'))?.text || 
-                                           question.options.find(opt => opt.text.includes('Parcialmente'))?.text || 'Parcialmente',
-                                        0: 'Não'
-                                    };
-                                    
-                                    const fallbackAnswer = fallbackMap[score as keyof typeof fallbackMap] || 'Resposta inválida';
-                                    
-                                    console.warn(`⚠️ Usando fallback: "${fallbackAnswer}"`);
-                                    
-                                    return {
-                                        questionId: question.id,
-                                        question: question.text,
-                                        answer: fallbackAnswer,
-                                        description: `FALLBACK: Score ${score} mapeado automaticamente`,
-                                        score: score
-                                    };
-                                }
-                                
-                                console.log(`✅ MAPEADO com sucesso: "${option.text}"`);
+                            if (!option) {
+                                const fallbackMap = { 10: 'Sim', 5: 'Parcialmente', 0: 'Não' };
+                                const fallbackAnswer = fallbackMap[score as keyof typeof fallbackMap] || 'Resposta inválida';
                                 
                                 return {
                                     questionId: question.id,
                                     question: question.text,
-                                    answer: option.text,  // TEXTO DA RESPOSTA - NUNCA SCORE
-                                    description: option.description,
+                                    answer: fallbackAnswer,
+                                    description: `FALLBACK: Score ${score}`,
                                     score: score
                                 };
-                            });
+                            }
                             
-                            console.log('✅ MAPEAMENTO CONCLUÍDO');
-                            console.log('📤 Respostas finais:', mappedAnswers.map(a => `${a.questionId}: "${a.answer}"`));
-                            
-                            return mappedAnswers;
-                        })()
+                            return {
+                                questionId: question.id,
+                                question: question.text,
+                                answer: option.text,
+                                description: option.description,
+                                score: score
+                            };
+                        })
                     },
                     
-                    // Dados adicionais para referência (fora do body que o N8N mapeia)
+                    // Dados adicionais
                     companyData: {
                         companyName: companyData.companyName,
                         email: companyData.email,
@@ -270,241 +240,36 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     version: DIAGNOSTIC_FIX_VERSION
                 };
 
-                console.log('📤 N8N - Enviando payload completo:', diagnosticPayload);
-                console.log('📤 N8N - Verificação das respostas:');
-                diagnosticPayload.body.diagnosticAnswers.forEach((answer, index) => {
-                    console.log(`  ${index + 1}. Pergunta: "${answer.question}"`);
-                    console.log(`     Resposta: "${answer.answer}" (Score: ${answer.score})`);
-                    console.log(`     Descrição: "${answer.description}"`);
-                });
-                
-                // ============================================================================
-                // VALIDAÇÃO FINAL ANTI-ALUCINAÇÃO: VERIFICAR FORMATO ANTES DO ENVIO
-                // ============================================================================
-                console.log('🔒 INICIANDO VALIDAÇÃO FINAL DO PAYLOAD');
-                
-                // Verificar se todas as respostas são texto válido
-                const invalidAnswers = diagnosticPayload.body.diagnosticAnswers.filter(a => 
-                    typeof a.answer !== 'string' || 
-                    a.answer === '' || 
-                    a.answer === 'N/A' || 
-                    a.answer.includes('ERRO') ||
-                    !isNaN(Number(a.answer))  // Detectar se a resposta é um número
-                );
-                
-                if (invalidAnswers.length > 0) {
-                    console.error('🚨 FALHA CRÍTICA NA VALIDAÇÃO - Respostas inválidas detectadas:');
-                    invalidAnswers.forEach((invalid, idx) => {
-                        console.error(`   ${idx + 1}. Pergunta ${invalid.questionId}: "${invalid.answer}" (INVÁLIDO)`);
-                    });
-                    console.error('🚨 INTERROMPENDO ENVIO - Payload não será enviado para evitar problemas no N8N');
-                    throw new Error(`Validação falhou: ${invalidAnswers.length} respostas inválidas detectadas`);
-                }
-                
-                // Verificar se temos exatamente o número correto de respostas
-                if (diagnosticPayload.body.diagnosticAnswers.length !== DIAGNOSTIC_VALIDATION.EXPECTED_QUESTION_COUNT) {
-                    console.error('🚨 ERRO - Número incorreto de respostas:', diagnosticPayload.body.diagnosticAnswers.length);
-                    throw new Error(`Esperado ${DIAGNOSTIC_VALIDATION.EXPECTED_QUESTION_COUNT} respostas, encontrado ${diagnosticPayload.body.diagnosticAnswers.length}`);
-                }
-                
-                // Verificar estrutura de cada resposta
-                diagnosticPayload.body.diagnosticAnswers.forEach((answer, idx) => {
-                    DIAGNOSTIC_VALIDATION.REQUIRED_PAYLOAD_FIELDS.forEach(field => {
-                        if (!(field in answer)) {
-                            throw new Error(`Campo obrigatório '${field}' ausente na resposta ${idx + 1}`);
-                        }
-                    });
-                    
-                    // Verificar se score é válido
-                    if (!DIAGNOSTIC_VALIDATION.VALID_SCORES.includes(answer.score as any)) {
-                        console.error(`🚨 Score inválido na pergunta ${answer.questionId}: ${answer.score}`);
-                        throw new Error(`Score inválido: ${answer.score}. Válidos: ${DIAGNOSTIC_VALIDATION.VALID_SCORES.join(', ')}`);
-                    }
-                });
-                
-                // Verificar se todas as respostas são de tipos válidos (com flexibilidade)
-                const answersWithInvalidTypes = diagnosticPayload.body.diagnosticAnswers.filter(a => 
-                    !DIAGNOSTIC_VALIDATION.VALID_ANSWER_TYPES.includes(a.answer as any) && 
-                    typeof a.answer !== 'string'
-                );
-                
-                if (answersWithInvalidTypes.length > 0) {
-                    console.warn('⚠️ Respostas com tipos não padrão (mas válidas):');
-                    answersWithInvalidTypes.forEach(a => {
-                        console.warn(`   Pergunta ${a.questionId}: "${a.answer}"`);
-                    });
-                }
-                
-                // Gerar checksum do payload para detectar alterações
-                const payloadChecksum = diagnosticPayload.body.diagnosticAnswers
-                    .map(a => `${a.questionId}:${a.answer}:${a.score}`)
-                    .join('|');
-                console.log('🔐 Checksum do payload:', payloadChecksum);
-                
-                // Verificação final de integridade
-                const integrityCheck = diagnosticPayload.body.diagnosticAnswers.every(a => 
-                    typeof a.questionId === 'number' &&
-                    typeof a.question === 'string' &&
-                    typeof a.answer === 'string' &&
-                    typeof a.description === 'string' &&
-                    typeof a.score === 'number' &&
-                    a.questionId > 0 && a.questionId <= 9 &&
-                    a.question.length > 0 &&
-                    a.answer.length > 0 &&
-                    a.description.length > 0
-                );
-                
-                if (!integrityCheck) {
-                    throw new Error('Falha na verificação de integridade do payload');
-                }
-                
-                console.log('✅ VALIDAÇÃO FINAL APROVADA - PAYLOAD ÍNTEGRO');
-                console.log('📊 Resumo das respostas validadas:');
-                diagnosticPayload.body.diagnosticAnswers.forEach((a, idx) => {
-                    console.log(`   ${idx + 1}. "${a.answer}" (Q${a.questionId}, Score: ${a.score})`);
-                });
-                console.log('🚀 INICIANDO ENVIO PARA N8N...');
+                console.log('📤 N8N - Enviando payload completo:', payload);
 
-                // Envio direto via fetch para o webhook
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
-                
                 const response = await fetch(webhookUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'User-Agent': 'GGV-Diagnostic/1.0'
                     },
-                    body: JSON.stringify(diagnosticPayload)
+                    body: JSON.stringify(payload)
                 });
 
                 console.log('📊 N8N - Status da resposta:', response.status);
                 
                 if (response.ok) {
-                    console.log('✅ N8N - Resultados básicos enviados com sucesso');
-                    setN8nSent(true);
+                    console.log('✅ N8N - Diagnóstico enviado com sucesso');
                 } else {
-                    console.warn('⚠️ N8N - POST falhou, tentando GET fallback');
-                    // Fallback com GET
-                    const getUrl = `${webhookUrl}?deal_id=${dealId}&action=diagnostic_completed&total_score=${totalScore}&timestamp=${Date.now()}`;
-                    const getResponse = await fetch(getUrl, { method: 'GET' });
-                    console.log('📊 N8N - GET fallback status:', getResponse.status);
-                    setN8nSent(true);
+                    console.warn('⚠️ N8N - Falha ao enviar, status:', response.status);
                 }
+                
+                setAiSent(true);
 
             } catch (error) {
-                console.error('❌ N8N - Erro ao enviar resultados:', error);
-                setN8nSent(true); // Marcar como enviado para não ficar tentando
+                console.error('❌ N8N - Erro ao enviar:', error);
+                setAiSent(true); // Marcar como enviado para não ficar tentando
             }
         };
 
-        sendDiagnosticResults();
-    }, [companyData, answers, totalScore, dealId, n8nSent]);
-
-    // Envio adicional com análise IA (quando disponível)
-    useEffect(() => {
-        const sendAIAnalysis = async () => {
-            if (!n8nSent || !summaryInsights || !detailedAnalysis) {
-                return;
-            }
-
-            console.log('🤖 N8N - Enviando análise IA adicional');
-            
-            try {
-                const isProduction = window.location.hostname === 'app.grupoggv.com';
-                const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
-                
-                // Gerar token seguro para URL pública (evitar exposição direta do deal_id)
-                const generateSecureToken = (dealId: string) => {
-                    const timestamp = Date.now();
-                    const randomSalt = Math.random().toString(36).substring(2, 15);
-                    const dataToHash = `${dealId}-${timestamp}-${randomSalt}`;
-                    
-                    // Simular hash simples (em produção usar crypto real)
-                    let hash = 0;
-                    for (let i = 0; i < dataToHash.length; i++) {
-                        const char = dataToHash.charCodeAt(i);
-                        hash = ((hash << 5) - hash) + char;
-                        hash = hash & hash; // Convert to 32bit integer
-                    }
-                    
-                    // Formato: {timestamp}-{hash_absoluto}-{primeiros_chars_deal}
-                    const shortDealId = dealId.substring(0, 3);
-                    return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
-                };
-                
-                const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
-                const publicReportUrl = `${baseUrl}/r/${secureToken}`;
-
-                // Salvar relatório também na segunda chamada (análise IA)
-                try {
-                    const reportData = {
-                        companyData,
-                        segment,
-                        answers,
-                        totalScore,
-                        maturity,
-                        summaryInsights,
-                        detailedAnalysis,
-                        scoresByArea: scoresByArea,
-                        dealId: dealId || null
-                    };
-                    
-                    console.log('💾 AI_ANALYSIS - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
-                    
-                    const { createPublicReport } = await import('../../services/supabaseService');
-                    await createPublicReport(reportData, undefined, undefined, dealId, secureToken);
-                    console.log('✅ AI_ANALYSIS - Relatório salvo com sucesso:', secureToken);
-                } catch (tokenError) {
-                    console.error('❌ AI_ANALYSIS - ERRO CRÍTICO ao salvar relatório:', tokenError);
-                }
-
-                // Estrutura para análise IA também seguindo padrão N8N
-                const aiPayload = {
-                    deal_id: dealId,
-                    timestamp: new Date().toISOString(),
-                    action: 'ai_analysis_completed',
-                    
-                    body: {
-                        resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
-                        deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
-                        aiAnalysis: {
-                            summaryInsights: {
-                                specialistInsight: summaryInsights.specialistInsight || '',
-                                recommendations: (summaryInsights as any).recommendations || []
-                            },
-                            detailedAnalysis: {
-                                strengths: detailedAnalysis.strengths || [],
-                                improvements: (detailedAnalysis as any).improvements || [],
-                                nextSteps: detailedAnalysis.nextSteps || []
-                            }
-                        }
-                    }
-                };
-
-                const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
-                const response = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'GGV-Diagnostic-AI/1.0'
-                    },
-                    body: JSON.stringify(aiPayload)
-                });
-
-                console.log('🤖 N8N - Status análise IA:', response.status);
-                if (response.ok) {
-                    console.log('✅ N8N - Análise IA enviada com sucesso');
-                } else {
-                    console.warn('⚠️ N8N - Falha ao enviar análise IA');
-                }
-
-            } catch (error) {
-                console.error('❌ N8N - Erro ao enviar análise IA:', error);
-            }
-        };
-
-        sendAIAnalysis();
-    }, [summaryInsights, detailedAnalysis, dealId, n8nSent]);
+        sendCompleteAnalysis();
+    }, [summaryInsights, detailedAnalysis, emergencyTimeout, aiSent, companyData, answers, totalScore, dealId]);
 
     const handleNextTab = () => {
         const currentIndex = REPORT_TABS.indexOf(activeTab);
