@@ -160,41 +160,54 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
                         deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
                         
-                        // Respostas exatas das perguntas do diagnóstico
-                        diagnosticAnswers: Object.entries(answers).map(([questionId, score]) => {
-                            console.log(`🔍 DEBUG - questionId: ${questionId}, score: ${score}`);
-                            console.log(`🔍 DEBUG - diagnosticQuestions length: ${diagnosticQuestions?.length}`);
+                        // CRÍTICO: Respostas exatas das perguntas do diagnóstico com TEXTO das opções
+                        // NÃO ALTERAR: O N8N precisa receber as respostas como TEXTO, não apenas scores
+                        // Mapear todas as perguntas para garantir ordem e completude
+                        diagnosticAnswers: diagnosticQuestions.map((question) => {
+                            const score = answers[question.id];
+                            console.log(`🔍 DEBUG - Pergunta ${question.id}: "${question.text}", score: ${score}`);
                             
-                            const question = diagnosticQuestions.find(q => q.id === parseInt(questionId));
-                            console.log(`🔍 DEBUG - question found: ${!!question}, question.text: ${question?.text}`);
-                            
-                            const option = question?.options.find(opt => opt.score === score);
-                            console.log(`🔍 DEBUG - option found: ${!!option}, option.text: ${option?.text}`);
-                            
-                            // Mapeamento direto das respostas baseado no score
-                            let answerText = 'N/A';
-                            if (option?.text) {
-                                answerText = option.text;
-                                console.log(`✅ Usando option.text: "${answerText}"`);
-                            } else {
-                                // Fallback baseado no score - algumas perguntas têm "Às vezes" = 5
-                                if (score === 10) answerText = 'Sim';
-                                else if (score === 5) {
-                                    // Verificar se a pergunta tem "Às vezes" ou "Parcialmente"
-                                    const hasAsVezes = question?.options.some(opt => opt.text === 'Às vezes');
-                                    answerText = hasAsVezes ? 'Às vezes' : 'Parcialmente';
-                                }
-                                else if (score === 0) answerText = 'Não';
-                                console.log(`⚠️ Usando fallback: "${answerText}"`);
+                            // Verificar se a pergunta foi respondida
+                            if (score === undefined || score === null) {
+                                console.warn(`⚠️ Pergunta ${question.id} não foi respondida`);
+                                return {
+                                    questionId: question.id,
+                                    question: question.text,
+                                    answer: "Não respondida",
+                                    description: "Esta pergunta não foi respondida",
+                                    score: 0
+                                };
                             }
                             
-                            console.log(`📝 FINAL - Pergunta ${questionId}: score=${score}, answerText="${answerText}"`);
+                            // Encontrar a opção correspondente ao score
+                            const option = question.options.find(opt => opt.score === score);
+                            
+                            if (!option) {
+                                console.error(`❌ ERRO - Opção não encontrada para pergunta ${question.id} com score ${score}`);
+                                console.error(`❌ Opções disponíveis:`, question.options.map(o => `${o.text} (${o.score})`));
+                                
+                                // Fallback baseado no score
+                                let fallbackText = 'Resposta inválida';
+                                if (score === 10) fallbackText = 'Sim';
+                                else if (score === 5) fallbackText = question.options.some(opt => opt.text === 'Às vezes') ? 'Às vezes' : 'Parcialmente';
+                                else if (score === 0) fallbackText = 'Não';
+                                
+                                return {
+                                    questionId: question.id,
+                                    question: question.text,
+                                    answer: fallbackText,
+                                    description: `Resposta baseada no score ${score} (opção não encontrada)`,
+                                    score: score
+                                };
+                            }
+                            
+                            console.log(`✅ Pergunta ${question.id}: "${option.text}" (Score: ${score})`);
                             
                             return {
-                                questionId: parseInt(questionId),
-                                question: question?.text || `Pergunta ${questionId}`,
-                                answer: answerText,  // GARANTIR que seja texto, nunca número
-                                description: option?.description || '',
+                                questionId: question.id,
+                                question: question.text,
+                                answer: option.text,  // SEMPRE o texto da opção encontrada
+                                description: option.description,
                                 score: score
                             };
                         })
@@ -217,6 +230,23 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 };
 
                 console.log('📤 N8N - Enviando payload completo:', diagnosticPayload);
+                console.log('📤 N8N - Verificação das respostas:');
+                diagnosticPayload.body.diagnosticAnswers.forEach((answer, index) => {
+                    console.log(`  ${index + 1}. Pergunta: "${answer.question}"`);
+                    console.log(`     Resposta: "${answer.answer}" (Score: ${answer.score})`);
+                    console.log(`     Descrição: "${answer.description}"`);
+                });
+                
+                // Validação crítica: garantir que todas as respostas são texto
+                const invalidAnswers = diagnosticPayload.body.diagnosticAnswers.filter(a => 
+                    typeof a.answer !== 'string' || a.answer === '' || a.answer === 'N/A'
+                );
+                if (invalidAnswers.length > 0) {
+                    console.error('❌ ERRO CRÍTICO - Respostas inválidas detectadas:', invalidAnswers);
+                    console.error('❌ Isso causará problemas no N8N. Verifique o mapeamento das opções.');
+                } else {
+                    console.log('✅ Todas as respostas são texto válido');
+                }
 
                 // Envio direto via fetch para o webhook
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
