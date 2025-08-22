@@ -29,7 +29,11 @@ export const getModuleFromPath = (pathname: string): Module => {
     console.log('🔍 ROUTER - Resolvendo pathname:', pathname);
     console.log('🔍 ROUTER - Módulos disponíveis:', Object.keys(moduleRoutes));
     
-    const module = moduleRoutes[pathname] || Module.Diagnostico;
+    // Normalizar pathname removendo barra final se existir
+    const normalizedPathname = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname;
+    console.log('🔍 ROUTER - Pathname normalizado:', normalizedPathname);
+    
+    const module = moduleRoutes[normalizedPathname] || Module.Diagnostico;
     console.log('🔍 ROUTER - Módulo resolvido:', module);
     
     return module;
