@@ -106,19 +106,30 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     // Envio ÚNICO para N8N após análise IA estar pronta (ou timeout de emergência)
     useEffect(() => {
         const sendCompleteAnalysis = async () => {
-            // Só enviar se ainda não foi enviado E se temos dados básicos
-            if (aiSent || !companyData || !answers || Object.keys(answers).length === 0) {
+            // PROTEÇÃO CRÍTICA: Evitar envio duplo
+            if (aiSent) {
+                console.log('🚫 N8N - Já enviado, pulando...');
+                return;
+            }
+            
+            // Validar dados básicos
+            if (!companyData || !answers || Object.keys(answers).length === 0) {
+                console.log('⚠️ N8N - Dados incompletos, aguardando...');
                 return;
             }
 
             // Aguardar análise IA estar pronta OU timeout de emergência
             const hasAI = summaryInsights && detailedAnalysis;
             if (!hasAI && !emergencyTimeout) {
-                console.log('⏳ Aguardando análise IA ou timeout de emergência...');
+                console.log('⏳ N8N - Aguardando análise IA ou timeout de emergência...');
                 return;
             }
 
-            console.log('🚀 N8N - Enviando diagnóstico completo', hasAI ? 'com análise IA' : 'por timeout');
+            // MARCAR COMO ENVIADO IMEDIATAMENTE para evitar race conditions
+            setAiSent(true);
+            
+            console.log('🚀 N8N - ENVIANDO DIAGNÓSTICO ÚNICO', hasAI ? 'com análise IA' : 'por timeout');
+            console.log('🔒 N8N - aiSent marcado como true para evitar duplicação');
             
             try {
                 const isProduction = window.location.hostname === 'app.grupoggv.com';

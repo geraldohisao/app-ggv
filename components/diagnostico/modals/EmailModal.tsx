@@ -151,6 +151,10 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             // Tratar erros específicos do Gmail
             if (err?.message?.includes('insufficient authentication scopes') || err?.message?.includes('insufficient permissions')) {
                 setError('Gmail API: Permissões insuficientes. Clique em "Reautenticar" para resolver.');
+            } else if (err?.message?.includes('Google Identity Services')) {
+                setError('Erro ao carregar Google Services. Tente recarregar a página e tentar novamente.');
+            } else if (err?.message?.includes('Timeout')) {
+                setError('Timeout na conexão com Google. Verifique sua internet e tente novamente.');
             } else {
                 setError(err?.message || 'Falha ao enviar e-mail pelo Gmail.');
             }

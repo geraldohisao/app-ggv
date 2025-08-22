@@ -18,14 +18,45 @@ async function getGoogleClientId(): Promise<string> {
 
 async function ensureGis(): Promise<void> {
   if (gisLoaded) return;
+  
+  // Verificar se já existe o script
+  const existingScript = document.querySelector('script[src*="gsi/client"]');
+  if (existingScript && (window as any).google?.accounts?.oauth2) {
+    gisLoaded = true;
+    return;
+  }
+  
   await new Promise<void>((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true; s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Falha ao carregar Google Identity Services'));
+    s.async = true; 
+    s.defer = true;
+    
+    // Timeout para evitar travamento
+    const timeout = setTimeout(() => {
+      reject(new Error('Timeout ao carregar Google Identity Services'));
+    }, 10000);
+    
+    s.onload = () => {
+      clearTimeout(timeout);
+      // Aguardar um pouco para garantir que a API está disponível
+      setTimeout(() => {
+        if ((window as any).google?.accounts?.oauth2) {
+          resolve();
+        } else {
+          reject(new Error('Google Identity Services não inicializou corretamente'));
+        }
+      }, 100);
+    };
+    
+    s.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('Falha ao carregar Google Identity Services'));
+    };
+    
     document.head.appendChild(s);
   });
+  
   gisLoaded = true;
 }
 

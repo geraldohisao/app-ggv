@@ -6,7 +6,7 @@ export const BUILD_ID: string = (typeof __APP_BUILD_ID__ !== 'undefined')
   ? String(__APP_BUILD_ID__)
   : 'build-' + Date.now();
 
-// ID único para a correção do diagnóstico N8N
-export const DIAGNOSTIC_FIX_VERSION = 'v2.0.0-n8n-text-fix-' + Date.now();
+// ID único para a correção do diagnóstico N8N - ATUALIZADO PARA FORÇAR CACHE BUST
+export const DIAGNOSTIC_FIX_VERSION = 'v3.0.0-single-webhook-' + Date.now();
 
 
