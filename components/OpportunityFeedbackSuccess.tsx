@@ -15,9 +15,7 @@ const OpportunityFeedbackSuccess: React.FC<{ onClose?: () => void } > = ({ onClo
         </div>
         <h2 className="text-2xl font-extrabold text-slate-900">Feedback enviado com sucesso</h2>
         <p className="text-slate-500 mt-2">Seu feedback foi registrado e será sincronizado com o Pipedrive.</p>
-        <div className="mt-8">
-          <button onClick={onClose} className="px-6 py-2 rounded-md bg-blue-900 text-white font-semibold shadow-sm">Concluir</button>
-        </div>
+        <p className="text-xs text-slate-400 mt-4">Você pode fechar esta janela.</p>
       </div>
     </div>
   );
