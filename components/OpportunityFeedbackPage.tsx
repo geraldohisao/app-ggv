@@ -61,8 +61,10 @@ const OpportunityFeedbackPage: React.FC = () => {
 
   // Função para enviar dados para o webhook no formato SurveyMonkey
   const sendToWebhook = async (feedbackData: OpportunityFeedback) => {
-    console.log('🔗 WEBHOOK - Preparando envio...');
-    
+        console.log('🔗 WEBHOOK - Preparando envio...');
+    console.log('📝 OBSERVAÇÕES - Valor capturado:', `"${feedbackData.notes}"`);
+    console.log('📝 OBSERVAÇÕES - Comprimento:', (feedbackData.notes || '').length);
+
     const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/feedback-ggv-register';
     
     // Formato simplificado que sabemos que funciona

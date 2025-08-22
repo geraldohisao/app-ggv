@@ -26,11 +26,35 @@ const PublicDiagnosticReport: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
+        console.log('🔍 PUBLIC_REPORT - Carregando relatório com token:', token);
         const row = await getPublicReport(token);
-        if (!row) { setError('Relatório não encontrado ou expirado.'); return; }
+        if (!row) { 
+          setError('Relatório não encontrado ou expirado.'); 
+          return; 
+        }
+        console.log('✅ PUBLIC_REPORT - Relatório carregado com sucesso');
         setData(row.report);
       } catch (e: any) {
-        setError(e?.message || 'Falha ao carregar relatório público.');
+        console.error('❌ PUBLIC_REPORT - Erro ao carregar:', e);
+        
+        // Mensagem de erro mais específica
+        let errorMessage = e?.message || 'Falha ao carregar relatório público.';
+        
+        // Se é um token antigo, dar instruções específicas
+        if (errorMessage.includes('antes da implementação do novo sistema')) {
+          errorMessage = `
+            Este diagnóstico foi criado antes da atualização do sistema de armazenamento.
+            
+            Para recuperar seus resultados:
+            1. Entre em contato com o suporte
+            2. Refaça o diagnóstico se necessário
+            3. Verifique se você tem o link correto
+            
+            Detalhes técnicos: ${errorMessage}
+          `.trim();
+        }
+        
+        setError(errorMessage);
       }
     })();
   }, [token]);
@@ -73,7 +97,39 @@ const PublicDiagnosticReport: React.FC = () => {
   }, []);
 
   if (!token) return <ErrorDisplay message="Token inválido." />;
-  if (error) return <ErrorDisplay message={error} />;
+  if (error) return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full">
+        <div className="bg-white rounded-3xl p-8 shadow-2xl border border-red-200">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-600 text-2xl">⚠️</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">Ocorreu um Erro</h1>
+            <p className="text-slate-600">Não foi possível carregar o relatório</p>
+          </div>
+          
+          <div className="bg-red-50 rounded-2xl p-6 border border-red-200 mb-6">
+            <h2 className="font-semibold text-red-800 mb-2">Detalhes do erro:</h2>
+            <pre className="text-sm text-red-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border">{error}</pre>
+          </div>
+          
+          <div className="text-center space-y-4">
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Tentar Novamente
+            </button>
+            
+            <div className="text-sm text-slate-500">
+              <p>Se o problema persistir, entre em contato com o suporte.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
   if (!data) return <div className="p-8"><LoadingSpinner text="Carregando relatório..." /></div>;
 
   const { companyData, segment, totalScore, maturity, summaryInsights, detailedAnalysis } = data;

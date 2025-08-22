@@ -1352,10 +1352,89 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
   }
 }
 
+// Função para decodificar tokens antigos gerados no ResultsView
+function decodeOldSecureToken(token: string): { timestamp: number; dealIdPrefix?: string } | null {
+  const tokenParts = token.split('-');
+  if (tokenParts.length >= 3 && tokenParts[0].length === 13) {
+    const timestamp = parseInt(tokenParts[0]);
+    const dealIdPrefix = tokenParts[2]; // Últimos 3 chars do deal_id original
+    return { timestamp, dealIdPrefix };
+  }
+  return null;
+}
+
 export async function getPublicReport(token: string): Promise<PublicReportRow | null> {
   if (!supabase) throw new Error('Supabase client is not initialized.');
-  const { data, error } = await supabase.rpc('get_public_report', { p_token: token });
-  if (error) throw error;
-  const row = (data && (data as any[])[0]) || null;
-  return row as any;
+  
+  try {
+    // Tentar buscar no novo sistema de relatórios públicos
+    const { data, error } = await supabase.rpc('get_public_report', { p_token: token });
+    if (error) {
+      console.warn('⚠️ GET_PUBLIC_REPORT - Erro RPC (pode ser que a função não exista ainda):', error.message);
+      throw error;
+    }
+    const row = (data && (data as any[])[0]) || null;
+    
+    if (row) {
+      console.log('✅ GET_PUBLIC_REPORT - Relatório encontrado no banco');
+      return row as any;
+    }
+    
+    console.log('📭 GET_PUBLIC_REPORT - Relatório não encontrado no banco');
+    return null;
+    
+  } catch (error: any) {
+    console.error('❌ GET_PUBLIC_REPORT - Erro ao buscar relatório:', error.message);
+    
+    // FALLBACK: Para tokens antigos que não estão no banco
+    if (token && token.includes('-')) {
+      console.log('🔄 GET_PUBLIC_REPORT - Tentando fallback para token antigo:', token);
+      
+      const decodedToken = decodeOldSecureToken(token);
+      if (decodedToken) {
+        const { timestamp, dealIdPrefix } = decodedToken;
+        const date = new Date(timestamp);
+        const ageDays = (Date.now() - timestamp) / (1000 * 60 * 60 * 24);
+        
+        console.log('📅 GET_PUBLIC_REPORT - Token criado em:', date.toLocaleString('pt-BR'));
+        console.log('📈 GET_PUBLIC_REPORT - Idade:', Math.floor(ageDays), 'dias');
+        console.log('🔍 GET_PUBLIC_REPORT - Prefixo do deal_id:', dealIdPrefix);
+        
+        if (ageDays > 90) {
+          console.warn('⚠️ GET_PUBLIC_REPORT - Token muito antigo (>90 dias), pode ter expirado');
+        }
+        
+        // Para tokens recentes (< 7 dias), tentar buscar por deal_id parcial
+        if (ageDays < 7 && dealIdPrefix) {
+          console.log('🔍 GET_PUBLIC_REPORT - Tentando buscar por deal_id que termina com:', dealIdPrefix);
+          
+          // Aqui poderíamos implementar uma busca por deal_id que termine com o prefixo
+          // Por enquanto, vamos apenas informar que é um token antigo mas recente
+          throw new Error(`
+            Este diagnóstico foi criado recentemente (${Math.floor(ageDays)} dias atrás) mas antes da implementação do novo sistema.
+            
+            Token: ${token}
+            Data: ${date.toLocaleString('pt-BR')}
+            
+            Para recuperar este relatório:
+            1. Execute o script SQL fornecido no Supabase
+            2. Refaça o diagnóstico se necessário
+            3. Entre em contato com o suporte técnico
+          `.trim());
+        }
+        
+        // Retornar erro específico para tokens antigos
+        throw new Error(`
+          Relatório não encontrado. Este diagnóstico foi criado em ${date.toLocaleString('pt-BR')} antes da implementação do novo sistema de armazenamento.
+          
+          Para recuperar seus resultados:
+          1. Execute o script SQL fornecido para criar a tabela no banco
+          2. Refaça o diagnóstico se necessário
+          3. Entre em contato com o suporte se precisar dos dados originais
+        `.trim());
+      }
+    }
+    
+    throw error;
+  }
 }
