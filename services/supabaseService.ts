@@ -370,8 +370,10 @@ export async function sendDiagnosticToPipedrive(
         };
         
         let resultUrl = `${baseUrl}/r/${dealId || 'fallback-' + Date.now()}`;
+        let publicToken = dealId || 'fallback-' + Date.now();
         try {
             const { token } = await createPublicReport(reportData, companyData.email, undefined, dealId);
+            publicToken = token;
             resultUrl = `${baseUrl}/r/${token}`;
             console.log('📤 WEBHOOK - URL do resultado público criada:', resultUrl);
         } catch (error) {
@@ -432,7 +434,7 @@ export async function sendDiagnosticToPipedrive(
             // Metadados
             metadata: {
                 dealId: dealId,
-                publicToken: token,
+                publicToken: publicToken,
                 timestamp: new Date().toISOString(),
                 source: 'GGV Diagnóstico Comercial',
                 reportType: 'public_complete' // Indicar que é o relatório completo

@@ -7,6 +7,7 @@ import { EmailModal } from './modals/EmailModal';
 import { PdfModal } from './modals/PdfModal';
 import { CoverTab, DashboardTab, SegmentedAnalysisTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
 import { getCurrentUserDisplayName, sendDiagnosticToN8n, createPublicReport } from '../../services/supabaseService';
+import { DIAGNOSTIC_FIX_VERSION } from '../../src/buildId';
 
 // ============================================================================
 // SISTEMA ANTI-ALUCINAÇÃO: CONSTANTES IMUTÁVEIS PARA VALIDAÇÃO
@@ -143,7 +144,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             companyData,
                             answers,
                             totalScore,
-                            maturityLevel,
+                            maturityLevel: maturity.level,
                             dealId
                         };
                         
@@ -177,6 +178,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         // O N8N REQUER RESPOSTAS COMO TEXTO, NÃO NÚMEROS
                         diagnosticAnswers: (() => {
                             console.log('🔄 INICIANDO MAPEAMENTO DEFINITIVO DAS RESPOSTAS');
+                console.log('🚀 VERSÃO DA CORREÇÃO ATIVA:', DIAGNOSTIC_FIX_VERSION);
                             console.log('📊 Answers recebidos:', answers);
                             console.log('📋 Total de perguntas:', diagnosticQuestions.length);
                             
@@ -258,7 +260,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         name: segment?.name || 'Geral',
                         id: segment?.id || 'geral'
                     },
-                    source: 'web-diagnostic'
+                    source: 'web-diagnostic',
+                    version: DIAGNOSTIC_FIX_VERSION
                 };
 
                 console.log('📤 N8N - Enviando payload completo:', diagnosticPayload);
@@ -438,11 +441,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         aiAnalysis: {
                             summaryInsights: {
                                 specialistInsight: summaryInsights.specialistInsight || '',
-                                recommendations: summaryInsights.recommendations || []
+                                recommendations: (summaryInsights as any).recommendations || []
                             },
                             detailedAnalysis: {
                                 strengths: detailedAnalysis.strengths || [],
-                                improvements: detailedAnalysis.improvements || [],
+                                improvements: (detailedAnalysis as any).improvements || [],
                                 nextSteps: detailedAnalysis.nextSteps || []
                             }
                         }
