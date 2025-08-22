@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug - Informações do Usuário Samuel</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .info-box { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #007bff; }
+        .error { border-left-color: #dc3545; }
+        .success { border-left-color: #28a745; }
+        .warning { border-left-color: #ffc107; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Samuel Bueno User Info</h1>
+    
+    <div class="info-box">
+        <h3>📋 Instruções</h3>
+        <p>1. Faça login como Samuel Bueno em: <strong>https://app.grupoggv.com</strong></p>
+        <p>2. Abra o Console do navegador (F12)</p>
+        <p>3. Cole e execute o código JavaScript abaixo:</p>
+    </div>
+
+    <div class="info-box">
+        <h3>🔧 Código para Debug</h3>
+        <pre>
+// Debug do usuário atual
+console.log('=== DEBUG SAMUEL BUENO ===');
+
+// 1. Verificar localStorage
+const savedUser = localStorage.getItem('ggv-user');
+if (savedUser) {
+    const user = JSON.parse(savedUser);
+    console.log('👤 Usuário no localStorage:', user);
+    console.log('📧 Email:', user.email);
+    console.log('🎭 Role:', user.role);
+    console.log('⚡ Function:', user.user_function);
+} else {
+    console.log('❌ Nenhum usuário no localStorage');
+}
+
+// 2. Verificar sessionStorage
+const sessionUser = sessionStorage.getItem('ggv-user');
+if (sessionUser) {
+    const user = JSON.parse(sessionUser);
+    console.log('💾 Usuário no sessionStorage:', user);
+} else {
+    console.log('❌ Nenhum usuário no sessionStorage');
+}
+
+// 3. Verificar contexto React (se disponível)
+if (window.React && window.React.version) {
+    console.log('⚛️ React detectado, versão:', window.React.version);
+}
+
+// 4. Forçar atualização do perfil via Supabase (se disponível)
+if (window.supabase) {
+    console.log('🗄️ Supabase detectado, consultando perfil...');
+    
+    window.supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+            console.log('👤 Usuário Supabase:', user.email);
+            
+            // Consultar perfil na tabela profiles
+            window.supabase
+                .from('profiles')
+                .select('role, user_function, name, email')
+                .eq('id', user.id)
+                .single()
+                .then(({ data: profile, error }) => {
+                    if (error) {
+                        console.error('❌ Erro ao consultar profile:', error);
+                    } else {
+                        console.log('📊 Profile do banco:', profile);
+                        console.log('🎭 Role no banco:', profile.role);
+                        console.log('⚡ Function no banco:', profile.user_function);
+                        
+                        // Verificar se está correto
+                        if (profile.role === 'ADMIN' && profile.user_function === 'Gestor') {
+                            console.log('✅ CONFIGURAÇÃO CORRETA - Samuel deveria ter acesso completo');
+                        } else {
+                            console.log('❌ CONFIGURAÇÃO INCORRETA:');
+                            console.log('   Role esperado: ADMIN, atual:', profile.role);
+                            console.log('   Function esperada: Gestor, atual:', profile.user_function);
+                        }
+                    }
+                });
+        } else {
+            console.log('❌ Usuário não logado no Supabase');
+        }
+    });
+} else {
+    console.log('❌ Supabase não detectado na janela');
+}
+
+console.log('=== FIM DEBUG ===');
+        </pre>
+    </div>
+
+    <div class="info-box warning">
+        <h3>⚠️ Resultados Esperados</h3>
+        <p><strong>Se estiver funcionando corretamente:</strong></p>
+        <ul>
+            <li>Role: "ADMIN"</li>
+            <li>Function: "Gestor"</li>
+            <li>Mensagem: "CONFIGURAÇÃO CORRETA"</li>
+        </ul>
+    </div>
+
+    <div class="info-box error">
+        <h3>❌ Se não estiver funcionando</h3>
+        <p><strong>Possíveis problemas:</strong></p>
+        <ul>
+            <li>Role diferente de "ADMIN"</li>
+            <li>Function null, undefined ou "SDR"</li>
+            <li>Usuário não encontrado no banco</li>
+        </ul>
+        <p><strong>Solução:</strong> Execute o script SQL <code>corrigir-samuel-definitivo.sql</code></p>
+    </div>
+
+    <div class="info-box success">
+        <h3>✅ Após Correção</h3>
+        <p>Samuel deveria ver no menu:</p>
+        <ul>
+            <li>✅ Feedback de Oportunidade</li>
+            <li>✅ Reativação de Leads (N8N)</li>
+            <li>✅ Configurações</li>
+        </ul>
+        <p>E ter <strong>visão de Gestor</strong> ao invés de SDR</p>
+    </div>
+</body>
+</html>
