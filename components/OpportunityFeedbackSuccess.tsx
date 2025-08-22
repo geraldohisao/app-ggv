@@ -1,11 +1,12 @@
 import React from 'react';
+import { GGVLogo } from './ui/GGVLogo';
 
 const OpportunityFeedbackSuccess: React.FC<{ onClose?: () => void } > = ({ onClose }) => {
   return (
     <div className="min-h-full flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-3xl bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center">
-        <div className="flex items-center justify-between mb-8">
-          <span className="text-xl font-extrabold tracking-tight text-slate-800">GGV</span>
+        <div className="flex items-center justify-center mb-8">
+          <GGVLogo size="small" variant="horizontal" />
         </div>
         <div className="mx-auto mb-6 w-24 h-24 rounded-full bg-green-50 flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

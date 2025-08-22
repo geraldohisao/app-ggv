@@ -4,6 +4,7 @@ import { useUser } from '../contexts/DirectUserContext';
 import { OpportunityFeedback } from '../types';
 import { saveOpportunityFeedback } from '../services/supabaseService';
 import OpportunityFeedbackSuccess from './OpportunityFeedbackSuccess';
+import { GGVLogo } from './ui/GGVLogo';
 
 const ToggleYesNo: React.FC<{ value: boolean | null; onChange: (v: boolean) => void }>
   = ({ value, onChange }) => (
@@ -19,9 +20,13 @@ const OpportunityFeedbackPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  // Extrair deal_id da URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const dealId = urlParams.get('deal_id') || urlParams.get('dealId');
+
   const [data, setData] = useState<OpportunityFeedback>({
     user_id: user?.id || '',
-    pipedrive_deal_id: new URLSearchParams(window.location.search).get('dealId') || undefined,
+    pipedrive_deal_id: dealId || undefined,
     meeting_happened: undefined,
     notes: '',
     accept_as_potential_client: undefined,
@@ -42,14 +47,155 @@ const OpportunityFeedbackPage: React.FC = () => {
 
   const canGoNext = () => step === 1 ? data.meeting_happened !== null : true;
 
+  // Função para enviar dados para o webhook no formato SurveyMonkey
+  const sendToWebhook = async (feedbackData: OpportunityFeedback) => {
+    const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/feedback-ggv-register';
+    
+    // Converter dados para o formato SurveyMonkey
+    const surveyMonkeyFormat = [{
+      id: `${Date.now()}${Math.random().toString(36).substr(2, 9)}`, // ID único
+      recipient_id: "",
+      collection_mode: "default",
+      response_status: "completed",
+      custom_value: "",
+      first_name: "",
+      last_name: "",
+      email_address: user?.email || "",
+      ip_address: "127.0.0.1", // IP placeholder
+      logic_path: {},
+      metadata: {
+        respondent: {
+          user_agent: {
+            type: "string",
+            value: navigator.userAgent
+          },
+          language: {
+            type: "string",
+            value: "pt-br"
+          }
+        },
+        contact: {}
+      },
+      page_path: [],
+      collector_id: "ggv-feedback",
+      survey_id: "ggv-opportunity-feedback",
+      custom_variables: {
+        deal: feedbackData.pipedrive_deal_id || ""
+      },
+      edit_url: "",
+      analyze_url: "",
+      total_time: 60, // Tempo estimado em segundos
+      date_modified: new Date().toISOString(),
+      date_created: new Date().toISOString(),
+      href: "",
+      pages: [
+        {
+          id: "page1",
+          questions: [
+            {
+              id: "meeting_question",
+              answers: [{
+                choice_id: feedbackData.meeting_happened ? "yes" : "no",
+                simple_text: feedbackData.meeting_happened ? "Sim" : "Não"
+              }],
+              family: "single_choice",
+              subtype: "vertical",
+              heading: "A reunião aconteceu?"
+            }
+          ]
+        }
+      ]
+    }];
+
+    // Se a reunião aconteceu, adicionar as perguntas do step 2
+    if (feedbackData.meeting_happened) {
+      surveyMonkeyFormat[0].pages.push({
+        id: "page2",
+        questions: [
+          {
+            id: "accept_client",
+            answers: [{
+              choice_id: feedbackData.accept_as_potential_client ? "yes" : "no",
+              simple_text: feedbackData.accept_as_potential_client ? "Sim" : "Não"
+            }],
+            family: "single_choice",
+            subtype: "vertical",
+            heading: "Você aceita essa oportunidade como um potencial cliente?"
+          },
+          {
+            id: "priority_now",
+            answers: [{
+              choice_id: feedbackData.priority_now ? "yes" : "no",
+              simple_text: feedbackData.priority_now ? "Sim" : "Não"
+            }],
+            family: "single_choice",
+            subtype: "vertical",
+            heading: "É uma prioridade no momento contratar a solução?"
+          },
+          {
+            id: "has_pain",
+            answers: [{
+              choice_id: feedbackData.has_pain ? "yes" : "no",
+              simple_text: feedbackData.has_pain ? "Sim" : "Não"
+            }],
+            family: "single_choice",
+            subtype: "vertical",
+            heading: "Possui dores que a sua solução resolve?"
+          },
+          {
+            id: "has_budget",
+            answers: [{
+              choice_id: feedbackData.has_budget ? "yes" : "no",
+              simple_text: feedbackData.has_budget ? "Sim" : "Não"
+            }],
+            family: "single_choice",
+            subtype: "vertical",
+            heading: "Possui orçamento para contratar a solução?"
+          },
+          {
+            id: "decision_maker",
+            answers: [{
+              choice_id: feedbackData.talked_to_decision_maker ? "yes" : "no",
+              simple_text: feedbackData.talked_to_decision_maker ? "Sim" : "Não"
+            }],
+            family: "single_choice",
+            subtype: "vertical",
+            heading: "Você falou com o responsável pela compra?"
+          }
+        ]
+      });
+    }
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(surveyMonkeyFormat)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro no webhook: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
     setIsSubmitting(true);
     try {
       const payload: OpportunityFeedback = { ...data, user_id: user.id };
+      
+      // Salvar no Supabase
       await saveOpportunityFeedback(payload);
+      
+      // Enviar para o webhook
+      await sendToWebhook(payload);
+      
       setDone(true);
     } catch (err: any) {
+      console.error('Erro ao enviar feedback:', err);
       alert(`Falha ao salvar feedback: ${err.message}`);
     } finally {
       setIsSubmitting(false);
@@ -69,10 +215,17 @@ const OpportunityFeedbackPage: React.FC = () => {
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <span className="text-xl font-extrabold tracking-tight text-slate-800">GGV</span>
+          <GGVLogo size="small" variant="horizontal" />
           <h1 className="text-2xl font-extrabold text-slate-900">Feedback de Oportunidade</h1>
         </div>
-        <p className="text-sm text-slate-500 mt-1">Preencha em menos de 1 minuto. Usaremos estes dados para ICP e Pipedrive.</p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-sm text-slate-500">Preencha em menos de 1 minuto. Usaremos estes dados para ICP e Pipedrive.</p>
+          {dealId && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+              Deal ID: {dealId}
+            </span>
+          )}
+        </div>
         <div className="mt-4 w-full bg-slate-200/70 h-2 rounded-full overflow-hidden">
           <div className="h-2 bg-blue-800 transition-all" style={{ width: `${progress}%` }}></div>
         </div>
