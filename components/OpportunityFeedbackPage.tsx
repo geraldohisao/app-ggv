@@ -75,6 +75,15 @@ const OpportunityFeedbackPage: React.FC = () => {
               family: "single_choice",
               subtype: "vertical",
               heading: "A reunião aconteceu?"
+            },
+            {
+              id: "notes_question",
+              answers: [{
+                text: feedbackData.notes || ""
+              }],
+              family: "open_ended",
+              subtype: "essay",
+              heading: "Observações"
             }
           ]
         }
