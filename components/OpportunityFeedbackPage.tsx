@@ -5,6 +5,7 @@ import { OpportunityFeedback } from '../types';
 import OpportunityFeedbackSuccess from './OpportunityFeedbackSuccess';
 import { GGVLogo } from './ui/GGVLogo';
 import { renewSessionTimestamp } from '../utils/sessionUtils';
+import AccessDenied from './AccessDenied';
 
 const ToggleYesNo: React.FC<{ value: boolean | null; onChange: (v: boolean) => void }>
   = ({ value, onChange }) => (
@@ -19,6 +20,17 @@ const OpportunityFeedbackPage: React.FC = () => {
   const [step, setStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  // Verificar se o usuário tem acesso (apenas Closer e Gestor)
+  const hasAccess = useMemo(() => {
+    if (!user) return false;
+    
+    // SuperAdmin sempre tem acesso
+    if (user.role === 'SUPER_ADMIN') return true;
+    
+    // Verificar função comercial - apenas Closer e Gestor
+    return user.user_function === 'Closer' || user.user_function === 'Gestor';
+  }, [user]);
 
   // Extrair deal_id da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -149,7 +161,8 @@ const OpportunityFeedbackPage: React.FC = () => {
       });
     }
 
-    console.log('📤 WEBHOOK - Enviando payload...');
+    console.log('📤 WEBHOOK - Payload final que será enviado:');
+    console.log(JSON.stringify(surveyMonkeyFormat, null, 2));
     
     try {
       const response = await fetch(webhookUrl, {
@@ -177,15 +190,19 @@ const OpportunityFeedbackPage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!user) {
+      console.error('❌ Usuário não encontrado');
       alert('Usuário não encontrado');
       return;
     }
     
     console.log('🚀 WEBHOOK - Iniciando envio...');
+    console.log('👤 Usuário:', user.email);
+    console.log('📋 Dados do formulário:', data);
     
     setIsSubmitting(true);
     try {
       const payload: OpportunityFeedback = { ...data, user_id: user.id };
+      console.log('📦 Payload completo:', payload);
       
       // Renovar sessão
       renewSessionTimestamp();
@@ -193,11 +210,13 @@ const OpportunityFeedbackPage: React.FC = () => {
       // Enviar para webhook
       console.log('📤 WEBHOOK - Enviando dados...');
       const response = await sendToWebhook(payload);
-      console.log('✅ WEBHOOK - Sucesso:', response);
+      console.log('✅ WEBHOOK - Resposta recebida:', response);
       
+      console.log('🎉 Definindo done=true para mostrar página de sucesso');
       setDone(true);
     } catch (err: any) {
-      console.error('❌ WEBHOOK - Erro:', err);
+      console.error('❌ WEBHOOK - Erro completo:', err);
+      console.error('❌ Stack trace:', err.stack);
       alert(`Erro ao enviar: ${err.message || 'Falha na comunicação'}`);
     } finally {
       setIsSubmitting(false);
@@ -208,6 +227,19 @@ const OpportunityFeedbackPage: React.FC = () => {
     if (step === 1) return data.meeting_happened ? 50 : 15;
     return 50 + Math.round((answeredStep2 / totalQuestionsStep2) * 50);
   }, [step, data.meeting_happened, answeredStep2]);
+
+  // Verificar acesso antes de renderizar
+  if (!hasAccess) {
+    const userFunctionDisplay = user?.user_function || 'Não definida';
+    return (
+      <AccessDenied
+        title="Feedback de Oportunidade"
+        message="Esta funcionalidade está disponível apenas para usuários com função Closer ou Gestor."
+        requiredRoles={['Closer', 'Gestor']}
+        userRole={userFunctionDisplay}
+      />
+    );
+  }
 
   if (done) {
     return <OpportunityFeedbackSuccess onClose={() => window.close()} />;

@@ -75,28 +75,33 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                      email.split('@')[0] || 
                                      'Usuário';
                         
-                        // Consultar role real da tabela profiles
+                        // Consultar role e função comercial da tabela profiles
                         let userRole = UserRole.User;
+                        let userFunction: 'SDR' | 'Closer' | 'Gestor' | undefined = undefined;
+                        
                         try {
                             const { data: profile } = await supabase
                                 .from('profiles')
-                                .select('role')
+                                .select('role, user_function')
                                 .eq('id', session.user.id)
                                 .single();
                             
                             if (profile?.role) {
                                 userRole = profile.role as UserRole;
-                                console.log('✅ DIRECT CONTEXT - Role carregado do banco:', userRole);
+                                userFunction = profile.user_function as 'SDR' | 'Closer' | 'Gestor' | undefined;
+                                console.log('✅ DIRECT CONTEXT - Role e função carregados do banco:', { role: userRole, function: userFunction });
                             } else {
                                 // Fallback para emails específicos
                                 const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
                                 userRole = isAdmin ? UserRole.SuperAdmin : UserRole.User;
-                                console.log('⚠️ DIRECT CONTEXT - Usando role fallback:', userRole);
+                                userFunction = isAdmin ? 'Gestor' : undefined; // Admin assume função de Gestor
+                                console.log('⚠️ DIRECT CONTEXT - Usando role/função fallback:', { role: userRole, function: userFunction });
                             }
                         } catch (profileError) {
                             console.warn('⚠️ DIRECT CONTEXT - Erro ao buscar profile, usando fallback:', profileError);
                             const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
                             userRole = isAdmin ? UserRole.SuperAdmin : UserRole.User;
+                            userFunction = isAdmin ? 'Gestor' : undefined;
                         }
                         
                         const user = {
@@ -104,7 +109,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             email,
                             name: name.split(' ').map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(' '),
                             initials: name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
-                            role: userRole
+                            role: userRole,
+                            user_function: userFunction
                         };
                         
                         // Salvar no storage local para próximas sessões usando utilitário
@@ -172,26 +178,27 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleAuthSuccess = async (authenticatedUser: User) => {
         console.log('✅ DIRECT CONTEXT - Login bem-sucedido:', authenticatedUser.email);
         
-        // Atualizar role do usuário consultando a tabela profiles
+        // Atualizar role e função do usuário consultando a tabela profiles
         let finalUser = authenticatedUser;
         try {
             if (supabase) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('role')
+                    .select('role, user_function')
                     .eq('id', authenticatedUser.id)
                     .single();
                 
-                if (profile?.role) {
+                if (profile) {
                     finalUser = {
                         ...authenticatedUser,
-                        role: profile.role as UserRole
+                        role: profile.role as UserRole,
+                        user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | undefined
                     };
-                    console.log('✅ DIRECT CONTEXT - Role atualizado do banco:', profile.role);
+                    console.log('✅ DIRECT CONTEXT - Role e função atualizados do banco:', { role: profile.role, function: profile.user_function });
                 }
             }
         } catch (profileError) {
-            console.warn('⚠️ DIRECT CONTEXT - Erro ao atualizar role:', profileError);
+            console.warn('⚠️ DIRECT CONTEXT - Erro ao atualizar role/função:', profileError);
         }
         
         // Salvar usuário usando utilitário de sessão
@@ -238,20 +245,25 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            // Buscar role atualizado do banco
+            // Buscar role e função atualizados do banco
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, user_function')
                 .eq('id', user.id)
                 .single();
             
-            if (profile?.role && profile.role !== user.role) {
+            if (profile && (profile.role !== user.role || profile.user_function !== user.user_function)) {
                 const updatedUser = {
                     ...user,
-                    role: profile.role as UserRole
+                    role: profile.role as UserRole,
+                    user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | undefined
                 };
                 
-                console.log('✅ DIRECT CONTEXT - Role atualizado:', user.role, '→', profile.role);
+                console.log('✅ DIRECT CONTEXT - Role/função atualizados:', 
+                    { role: user.role, function: user.user_function }, 
+                    '→', 
+                    { role: profile.role, function: profile.user_function }
+                );
                 
                 // Atualizar estado
                 setUser(updatedUser);
@@ -259,7 +271,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // Atualizar storage usando utilitário
                 saveSession(updatedUser);
             } else {
-                console.log('ℹ️ DIRECT CONTEXT - Role não mudou:', user.role);
+                console.log('ℹ️ DIRECT CONTEXT - Role/função não mudaram:', { role: user.role, function: user.user_function });
             }
         } catch (error) {
             console.error('❌ DIRECT CONTEXT - Erro ao atualizar usuário:', error);

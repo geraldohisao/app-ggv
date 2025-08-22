@@ -22,6 +22,7 @@ import AppBrand from './components/common/AppBrand';
 import FinalLoginPage from './components/FinalLoginPage';
 import { getModuleFromPath, isStandalonePage } from './utils/router';
 import SessionDebugPanel from './components/debug/SessionDebugPanel';
+import RoleTestPanel from './components/debug/RoleTestPanel';
 
 
 const AppContent: React.FC = () => {
@@ -186,8 +187,13 @@ const AppContent: React.FC = () => {
         {renderModule()}
       </main>
       
-      {/* Painel de debug da sessão - apenas em desenvolvimento */}
-      {process.env.NODE_ENV === 'development' && <SessionDebugPanel />}
+      {/* Painéis de debug - apenas em desenvolvimento */}
+      {process.env.NODE_ENV === 'development' && (
+        <>
+          <SessionDebugPanel />
+          <RoleTestPanel />
+        </>
+      )}
     </div>
   );
 };

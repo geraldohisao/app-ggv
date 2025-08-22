@@ -33,6 +33,7 @@ export interface User {
   name: string;
   initials: string;
   role: UserRole;
+  user_function?: 'SDR' | 'Closer' | 'Gestor'; // Função comercial do usuário
 }
 
 export interface CompanyData {
