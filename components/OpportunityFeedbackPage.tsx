@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { formInputClass, formLabelClass, formTextareaClass } from './ui/Form';
 import { useUser } from '../contexts/DirectUserContext';
 import { OpportunityFeedback } from '../types';
-import { saveOpportunityFeedback } from '../services/supabaseService';
 import OpportunityFeedbackSuccess from './OpportunityFeedbackSuccess';
 import { GGVLogo } from './ui/GGVLogo';
 import { renewSessionTimestamp } from '../utils/sessionUtils';
@@ -50,11 +49,9 @@ const OpportunityFeedbackPage: React.FC = () => {
 
   // Função para enviar dados para o webhook no formato SurveyMonkey
   const sendToWebhook = async (feedbackData: OpportunityFeedback) => {
-    console.log('🔗 WEBHOOK - Iniciando envio...');
-    console.log('📋 WEBHOOK - Dados de entrada:', feedbackData);
+    console.log('🔗 WEBHOOK - Preparando envio...');
     
     const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/feedback-ggv-register';
-    console.log('📍 WEBHOOK - URL:', webhookUrl);
     
     // Formato simplificado que sabemos que funciona
     const surveyMonkeyFormat = [{
@@ -143,27 +140,30 @@ const OpportunityFeedbackPage: React.FC = () => {
       });
     }
 
-    console.log('📤 WEBHOOK - Payload SurveyMonkey:', JSON.stringify(surveyMonkeyFormat, null, 2));
+    console.log('📤 WEBHOOK - Enviando payload...');
     
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(surveyMonkeyFormat)
-    });
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(surveyMonkeyFormat)
+      });
 
-    console.log('📊 WEBHOOK - Status da resposta:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ WEBHOOK - Erro da resposta:', errorText);
-      throw new Error(`Erro no webhook: ${response.status} ${response.statusText} - ${errorText}`);
+      console.log('📊 WEBHOOK - Status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ WEBHOOK - Enviado com sucesso');
+      return result;
+    } catch (error) {
+      console.error('❌ WEBHOOK - Falha na requisição:', error);
+      throw error;
     }
-
-    const result = await response.json();
-    console.log('✅ WEBHOOK - Resposta JSON:', result);
-    return result;
   };
 
   const handleSubmit = async () => {
@@ -172,7 +172,7 @@ const OpportunityFeedbackPage: React.FC = () => {
       return;
     }
     
-    console.log('🚀 FEEDBACK - Enviando apenas para webhook...');
+    console.log('🚀 WEBHOOK - Iniciando envio...');
     
     setIsSubmitting(true);
     try {
@@ -181,14 +181,15 @@ const OpportunityFeedbackPage: React.FC = () => {
       // Renovar sessão
       renewSessionTimestamp();
       
-      // Enviar APENAS para o webhook (sem Supabase)
-      console.log('🔗 FEEDBACK - Enviando para webhook...');
-      await sendToWebhook(payload);
+      // Enviar para webhook
+      console.log('📤 WEBHOOK - Enviando dados...');
+      const response = await sendToWebhook(payload);
+      console.log('✅ WEBHOOK - Sucesso:', response);
       
       setDone(true);
     } catch (err: any) {
-      console.error('❌ FEEDBACK - Erro:', err);
-      alert(`Falha ao enviar feedback: ${err.message || 'Erro desconhecido'}`);
+      console.error('❌ WEBHOOK - Erro:', err);
+      alert(`Erro ao enviar: ${err.message || 'Falha na comunicação'}`);
     } finally {
       setIsSubmitting(false);
     }
