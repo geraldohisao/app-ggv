@@ -56,43 +56,15 @@ const OpportunityFeedbackPage: React.FC = () => {
     const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/feedback-ggv-register';
     console.log('📍 WEBHOOK - URL:', webhookUrl);
     
-    // Converter dados para o formato SurveyMonkey
+    // Formato simplificado que sabemos que funciona
     const surveyMonkeyFormat = [{
-      id: `${Date.now()}${Math.random().toString(36).substr(2, 9)}`, // ID único
-      recipient_id: "",
-      collection_mode: "default",
-      response_status: "completed",
-      custom_value: "",
-      first_name: "",
-      last_name: "",
-      email_address: user?.email || "",
-      ip_address: "127.0.0.1", // IP placeholder
-      logic_path: {},
-      metadata: {
-        respondent: {
-          user_agent: {
-            type: "string",
-            value: navigator.userAgent
-          },
-          language: {
-            type: "string",
-            value: "pt-br"
-          }
-        },
-        contact: {}
-      },
-      page_path: [],
-      collector_id: "ggv-feedback",
-      survey_id: "ggv-opportunity-feedback",
+      id: `${Date.now()}`,
       custom_variables: {
         deal: feedbackData.pipedrive_deal_id || ""
       },
-      edit_url: "",
-      analyze_url: "",
-      total_time: 60, // Tempo estimado em segundos
-      date_modified: new Date().toISOString(),
+      email_address: user?.email || "",
+      response_status: "completed",
       date_created: new Date().toISOString(),
-      href: "",
       pages: [
         {
           id: "page1",
@@ -100,7 +72,7 @@ const OpportunityFeedbackPage: React.FC = () => {
             {
               id: "meeting_question",
               answers: [{
-                choice_id: feedbackData.meeting_happened ? "yes" : "no",
+                choice_id: feedbackData.meeting_happened ? "1193480653" : "1193480654",
                 simple_text: feedbackData.meeting_happened ? "Sim" : "Não"
               }],
               family: "single_choice",
@@ -120,7 +92,7 @@ const OpportunityFeedbackPage: React.FC = () => {
           {
             id: "accept_client",
             answers: [{
-              choice_id: feedbackData.accept_as_potential_client ? "yes" : "no",
+              choice_id: feedbackData.accept_as_potential_client ? "1193540950" : "1193540951",
               simple_text: feedbackData.accept_as_potential_client ? "Sim" : "Não"
             }],
             family: "single_choice",
@@ -130,7 +102,7 @@ const OpportunityFeedbackPage: React.FC = () => {
           {
             id: "priority_now",
             answers: [{
-              choice_id: feedbackData.priority_now ? "yes" : "no",
+              choice_id: feedbackData.priority_now ? "1193541109" : "1193541110",
               simple_text: feedbackData.priority_now ? "Sim" : "Não"
             }],
             family: "single_choice",
@@ -140,7 +112,7 @@ const OpportunityFeedbackPage: React.FC = () => {
           {
             id: "has_pain",
             answers: [{
-              choice_id: feedbackData.has_pain ? "yes" : "no",
+              choice_id: feedbackData.has_pain ? "1193541386" : "1193541387",
               simple_text: feedbackData.has_pain ? "Sim" : "Não"
             }],
             family: "single_choice",
@@ -150,7 +122,7 @@ const OpportunityFeedbackPage: React.FC = () => {
           {
             id: "has_budget",
             answers: [{
-              choice_id: feedbackData.has_budget ? "yes" : "no",
+              choice_id: feedbackData.has_budget ? "1193541451" : "1193541452",
               simple_text: feedbackData.has_budget ? "Sim" : "Não"
             }],
             family: "single_choice",
@@ -160,7 +132,7 @@ const OpportunityFeedbackPage: React.FC = () => {
           {
             id: "decision_maker",
             answers: [{
-              choice_id: feedbackData.talked_to_decision_maker ? "yes" : "no",
+              choice_id: feedbackData.talked_to_decision_maker ? "1193541464" : "1193541465",
               simple_text: feedbackData.talked_to_decision_maker ? "Sim" : "Não"
             }],
             family: "single_choice",
@@ -196,37 +168,27 @@ const OpportunityFeedbackPage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!user) {
-      console.error('❌ FEEDBACK - Usuário não encontrado');
+      alert('Usuário não encontrado');
       return;
     }
     
-    console.log('🚀 FEEDBACK - Iniciando envio...');
-    console.log('👤 FEEDBACK - Usuário:', user.email);
-    console.log('📋 FEEDBACK - Dados:', data);
+    console.log('🚀 FEEDBACK - Enviando apenas para webhook...');
     
     setIsSubmitting(true);
     try {
       const payload: OpportunityFeedback = { ...data, user_id: user.id };
-      console.log('📦 FEEDBACK - Payload final:', payload);
       
-      // Renovar sessão antes de salvar (atividade importante)
+      // Renovar sessão
       renewSessionTimestamp();
       
-      // Salvar no Supabase
-      console.log('💾 FEEDBACK - Salvando no Supabase...');
-      const savedData = await saveOpportunityFeedback(payload);
-      console.log('✅ FEEDBACK - Salvo no Supabase:', savedData);
-      
-      // Enviar para o webhook
+      // Enviar APENAS para o webhook (sem Supabase)
       console.log('🔗 FEEDBACK - Enviando para webhook...');
-      const webhookResponse = await sendToWebhook(payload);
-      console.log('✅ FEEDBACK - Resposta do webhook:', webhookResponse);
+      await sendToWebhook(payload);
       
       setDone(true);
     } catch (err: any) {
-      console.error('❌ FEEDBACK - Erro completo:', err);
-      console.error('❌ FEEDBACK - Stack trace:', err.stack);
-      alert(`Falha ao salvar feedback: ${err.message}`);
+      console.error('❌ FEEDBACK - Erro:', err);
+      alert(`Falha ao enviar feedback: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setIsSubmitting(false);
     }
