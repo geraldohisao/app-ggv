@@ -5,6 +5,7 @@ import { OpportunityFeedback } from '../types';
 import { saveOpportunityFeedback } from '../services/supabaseService';
 import OpportunityFeedbackSuccess from './OpportunityFeedbackSuccess';
 import { GGVLogo } from './ui/GGVLogo';
+import { renewSessionTimestamp } from '../utils/sessionUtils';
 
 const ToggleYesNo: React.FC<{ value: boolean | null; onChange: (v: boolean) => void }>
   = ({ value, onChange }) => (
@@ -186,6 +187,9 @@ const OpportunityFeedbackPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       const payload: OpportunityFeedback = { ...data, user_id: user.id };
+      
+      // Renovar sessão antes de salvar (atividade importante)
+      renewSessionTimestamp();
       
       // Salvar no Supabase
       await saveOpportunityFeedback(payload);

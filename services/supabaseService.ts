@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { MarketSegment, AIPersona, StoredKnowledgeDocument, ConversationHistories, AIMode, User, UserRole, OpportunityFeedback, KnowledgeFAQ, KnowledgeOverview, CompanyData, Answers } from '../types';
+import { renewSessionTimestamp } from '../utils/sessionUtils';
 import { DEFAULT_DIAGNOSTIC_SEGMENTS } from '../constants';
 
 // --- User Profile ---
@@ -654,6 +655,9 @@ export const getKnowledgeDocuments = async (): Promise<StoredKnowledgeDocument[]
 export const addKnowledgeDocument = async (newDoc: Omit<StoredKnowledgeDocument, 'id' | 'created_at'>): Promise<StoredKnowledgeDocument> => {
     if (!supabase) throw new Error("Supabase client is not initialized.");
     
+    // Renovar sessão (atividade importante)
+    renewSessionTimestamp();
+    
     console.log('💾 SUPABASE - Tentando salvar documento:', {
         name: newDoc.name,
         user_id: newDoc.user_id,
@@ -941,6 +945,10 @@ export const getChatHistories = async (userId: string): Promise<ConversationHist
 // --- Opportunity Feedback ---
 export const saveOpportunityFeedback = async (payload: OpportunityFeedback): Promise<OpportunityFeedback> => {
     if (!supabase) throw new Error('Supabase client is not initialized.');
+    
+    // Renovar sessão (atividade importante)
+    renewSessionTimestamp();
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
 

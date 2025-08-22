@@ -2,6 +2,7 @@ import React, { createContext, useState, ReactNode, useContext, useEffect } from
 import { User, UserRole } from '../types';
 import { DirectAuth } from '../components/auth/DirectAuth';
 import { supabase } from '../services/supabaseClient';
+import { useSessionKeepAlive } from '../hooks/useSessionKeepAlive';
 
 interface UserContextType {
     user: User | null;
@@ -20,6 +21,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
     const [showAuth, setShowAuth] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
+    
+    // Ativar keep-alive da sessão apenas quando usuário estiver logado
+    useSessionKeepAlive();
 
     useEffect(() => {
         console.log('🚀 DIRECT CONTEXT - Iniciando...');
@@ -75,31 +79,26 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     const user = JSON.parse(savedUser);
                     const timestamp = parseInt(savedTimestamp);
                     const now = Date.now();
-                    const oneHour = 60 * 60 * 1000; // 1 hora em milliseconds
-                    const oneDay = 24 * 60 * 60 * 1000; // 24 horas em milliseconds
+                    const oneHundredHours = 100 * 60 * 60 * 1000; // 100 horas em milliseconds
                     
-                    // Para página de feedback, permitir sessão mais longa (24h)
-                    const isFeedbackPage = window.location.pathname === '/feedback';
-                    const sessionDuration = isFeedbackPage ? oneDay : oneHour;
+                    // Todas as sessões agora duram 100 horas desde o último acesso
+                    const sessionDuration = oneHundredHours;
                     
                     // Verificar se o usuário ainda é válido
                     if (now - timestamp < sessionDuration) {
                         console.log('✅ DIRECT CONTEXT - Usuário encontrado no localStorage:', user.email);
                         
-                        // Se está na página de feedback, renovar timestamp para evitar expiração
-                        if (isFeedbackPage) {
-                            const newTimestamp = Date.now().toString();
-                            localStorage.setItem('ggv-user-timestamp', newTimestamp);
-                            sessionStorage.setItem('ggv-user-timestamp', newTimestamp);
-                            console.log('🔄 DIRECT CONTEXT - Timestamp renovado para página de feedback');
-                        }
+                        // Renovar timestamp em qualquer acesso para manter sessão ativa
+                        const newTimestamp = Date.now().toString();
+                        localStorage.setItem('ggv-user-timestamp', newTimestamp);
+                        sessionStorage.setItem('ggv-user-timestamp', newTimestamp);
+                        console.log('🔄 DIRECT CONTEXT - Timestamp renovado automaticamente (sessão de 100h)');
                         
                         setUser(user);
                         setLoading(false);
                         return;
                     } else {
-                        const sessionExpiredMsg = isFeedbackPage ? 'Sessão de feedback expirada (24h)' : 'Sessão expirada (1h)';
-                        console.log(`⏰ DIRECT CONTEXT - ${sessionExpiredMsg}, removendo usuário salvo`);
+                        console.log('⏰ DIRECT CONTEXT - Sessão expirada (100h), removendo usuário salvo');
                         localStorage.removeItem('ggv-user');
                         localStorage.removeItem('ggv-user-timestamp');
                         sessionStorage.removeItem('ggv-user');
