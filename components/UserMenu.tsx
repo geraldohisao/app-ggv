@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Module, UserRole } from '../types';
 import { 
     ArrowLeftOnRectangleIcon,
-    ArrowPathIcon,
     Cog6ToothIcon,
     FlagIcon,
     BoltIcon
@@ -19,7 +18,7 @@ interface UserMenuProps {
 }
 
 const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLogout }) => {
-    const { user, refreshUser } = useUser();
+    const { user } = useUser();
     const [isOpen, setIsOpen] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const dropdown = useRef<HTMLDivElement>(null);
@@ -95,17 +94,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                             text="Feedback de Oportunidade" 
                             isActive={activeModule === Module.OpportunityFeedback}
                             onClick={() => handleSelectModule(Module.OpportunityFeedback)}
-                        />
-                        {/* Botão temporário para atualizar permissões */}
-                        <MenuItem 
-                            icon={<ArrowPathIcon className="w-5 h-5"/>} 
-                            text="🔄 Atualizar Permissões" 
-                            isActive={false}
-                            onClick={async () => {
-                                setIsOpen(false);
-                                await refreshUser();
-                                alert('Permissões atualizadas! Verifique se agora consegue acessar a Reativação de Leads.');
-                            }}
                         />
                         {canSeeSettings && (
                             <>

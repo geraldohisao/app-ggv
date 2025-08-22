@@ -1,16 +1,49 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
+import { supabase } from '../services/supabaseClient';
 
 /**
  * Hook para manter a sessão ativa renovando o timestamp em qualquer atividade
+ * Agora integrado com o Supabase para sincronizar ambas as sessões
  */
 export const useSessionKeepAlive = () => {
-  const renewSession = useCallback(() => {
+  const lastRenewalRef = useRef(0);
+  const isRenewingRef = useRef(false);
+
+  const renewSession = useCallback(async () => {
+    // Evitar renovações simultâneas
+    if (isRenewingRef.current) return;
+    
     const savedUser = localStorage.getItem('ggv-user');
-    if (savedUser) {
+    if (!savedUser) return;
+
+    try {
+      isRenewingRef.current = true;
       const newTimestamp = Date.now().toString();
+      
+      // Atualizar timestamps locais
       localStorage.setItem('ggv-user-timestamp', newTimestamp);
       sessionStorage.setItem('ggv-user-timestamp', newTimestamp);
-      console.log('🔄 SESSION - Timestamp renovado por atividade do usuário');
+      
+      // Também renovar a sessão do Supabase se existir
+      if (supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            // Forçar renovação do token do Supabase
+            await supabase.auth.refreshSession();
+            console.log('🔄 SESSION - Sessão Supabase renovada junto com timestamp local');
+          }
+        } catch (supabaseError) {
+          // Se der erro no Supabase, não é crítico - continuamos com o sistema local
+          console.warn('⚠️ SESSION - Erro ao renovar sessão Supabase (não crítico):', supabaseError);
+        }
+      }
+      
+      console.log('🔄 SESSION - Timestamp renovado por atividade do usuário (100h válidas)');
+    } catch (error) {
+      console.error('❌ SESSION - Erro ao renovar sessão:', error);
+    } finally {
+      isRenewingRef.current = false;
     }
   }, []);
 
@@ -23,18 +56,18 @@ export const useSessionKeepAlive = () => {
       'mousemove',
       'touchstart',
       'focus',
-      'blur'
+      'blur',
+      'visibilitychange'  // Detectar quando o usuário volta para a aba
     ];
 
-    // Throttle para evitar muitas renovações
-    let lastRenewal = 0;
-    const throttleTime = 5 * 60 * 1000; // 5 minutos
+    // Throttle para evitar muitas renovações - reduzido para 3 minutos
+    const throttleTime = 3 * 60 * 1000; // 3 minutos
 
     const handleActivity = () => {
       const now = Date.now();
-      if (now - lastRenewal > throttleTime) {
+      if (now - lastRenewalRef.current > throttleTime) {
         renewSession();
-        lastRenewal = now;
+        lastRenewalRef.current = now;
       }
     };
 
@@ -43,8 +76,11 @@ export const useSessionKeepAlive = () => {
       document.addEventListener(event, handleActivity, { passive: true });
     });
 
-    // Renovar a cada 30 minutos automaticamente
-    const interval = setInterval(renewSession, 30 * 60 * 1000);
+    // Renovar automaticamente a cada 15 minutos (mais frequente para garantir)
+    const interval = setInterval(renewSession, 15 * 60 * 1000);
+
+    // Renovar imediatamente quando o hook for inicializado
+    renewSession();
 
     // Cleanup
     return () => {

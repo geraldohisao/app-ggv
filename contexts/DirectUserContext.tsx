@@ -3,6 +3,7 @@ import { User, UserRole } from '../types';
 import { DirectAuth } from '../components/auth/DirectAuth';
 import { supabase } from '../services/supabaseClient';
 import { useSessionKeepAlive } from '../hooks/useSessionKeepAlive';
+import { isSessionValid, clearSession, saveSession, getSessionInfo } from '../utils/sessionUtils';
 
 interface UserContextType {
     user: User | null;
@@ -31,13 +32,42 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('🚀 DIRECT CONTEXT - Iniciando...');
         
         const checkAuthStatus = async () => {
-            // Primeiro, verificar se há uma sessão ativa no Supabase
+            // Primeiro, verificar se há uma sessão válida usando os utilitários
+            const sessionInfo = getSessionInfo();
+            
+            if (sessionInfo.isLoggedIn && sessionInfo.isValid) {
+                console.log('✅ DIRECT CONTEXT - Usuário válido encontrado no localStorage:', sessionInfo.user.email);
+                console.log(`🕐 DIRECT CONTEXT - Sessão válida por mais ${sessionInfo.remainingHours} horas`);
+                
+                // Salvar novamente para renovar timestamp automaticamente
+                saveSession(sessionInfo.user);
+                
+                setUser(sessionInfo.user);
+                setLoading(false);
+                setShowAuth(false);
+                return;
+            } else if (sessionInfo.isLoggedIn && !sessionInfo.isValid) {
+                console.log('⏰ DIRECT CONTEXT - Sessão expirada (>100h), limpando dados');
+                clearSession();
+                
+                // Limpar também a sessão do Supabase se existir
+                if (supabase) {
+                    try {
+                        await supabase.auth.signOut();
+                        console.log('🧹 DIRECT CONTEXT - Sessão Supabase também limpa');
+                    } catch (e) {
+                        console.warn('⚠️ DIRECT CONTEXT - Erro ao limpar sessão Supabase:', e);
+                    }
+                }
+            }
+
+            // Segundo, verificar se há uma sessão ativa no Supabase (como backup)
             try {
                 if (supabase) {
                     const { data: { session }, error } = await supabase.auth.getSession();
                     
                     if (session?.user && !error) {
-                        console.log('✅ DIRECT CONTEXT - Sessão Supabase ativa encontrada');
+                        console.log('✅ DIRECT CONTEXT - Sessão Supabase encontrada como backup');
                         
                         const email = session.user.email || '';
                         const name = session.user.user_metadata?.full_name || 
@@ -77,64 +107,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             role: userRole
                         };
                         
-                        // Salvar no storage local também
-                        const userJson = JSON.stringify(user);
-                        const timestamp = Date.now().toString();
-                        localStorage.setItem('ggv-user', userJson);
-                        localStorage.setItem('ggv-user-timestamp', timestamp);
-                        sessionStorage.setItem('ggv-user', userJson);
-                        sessionStorage.setItem('ggv-user-timestamp', timestamp);
+                        // Salvar no storage local para próximas sessões usando utilitário
+                        saveSession(user);
                         
                         setUser(user);
                         setLoading(false);
+                        setShowAuth(false);
                         return;
                     }
                 }
             } catch (e) {
                 console.warn('⚠️ DIRECT CONTEXT - Erro ao verificar sessão Supabase:', e);
-            }
-            
-            // Fallback: verificar localStorage/sessionStorage
-            const savedUser = localStorage.getItem('ggv-user') || sessionStorage.getItem('ggv-user');
-            const savedTimestamp = localStorage.getItem('ggv-user-timestamp') || sessionStorage.getItem('ggv-user-timestamp');
-            
-            if (savedUser && savedTimestamp) {
-                try {
-                    const user = JSON.parse(savedUser);
-                    const timestamp = parseInt(savedTimestamp);
-                    const now = Date.now();
-                    const oneHundredHours = 100 * 60 * 60 * 1000; // 100 horas em milliseconds
-                    
-                    // Todas as sessões agora duram 100 horas desde o último acesso
-                    const sessionDuration = oneHundredHours;
-                    
-                    // Verificar se o usuário ainda é válido
-                    if (now - timestamp < sessionDuration) {
-                        console.log('✅ DIRECT CONTEXT - Usuário encontrado no localStorage:', user.email);
-                        
-                        // Renovar timestamp em qualquer acesso para manter sessão ativa
-                        const newTimestamp = Date.now().toString();
-                        localStorage.setItem('ggv-user-timestamp', newTimestamp);
-                        sessionStorage.setItem('ggv-user-timestamp', newTimestamp);
-                        console.log('🔄 DIRECT CONTEXT - Timestamp renovado automaticamente (sessão de 100h)');
-                        
-                        setUser(user);
-                        setLoading(false);
-                        return;
-                    } else {
-                        console.log('⏰ DIRECT CONTEXT - Sessão expirada (100h), removendo usuário salvo');
-                        localStorage.removeItem('ggv-user');
-                        localStorage.removeItem('ggv-user-timestamp');
-                        sessionStorage.removeItem('ggv-user');
-                        sessionStorage.removeItem('ggv-user-timestamp');
-                    }
-                } catch (e) {
-                    console.warn('⚠️ DIRECT CONTEXT - Erro ao carregar usuário salvo:', e);
-                    localStorage.removeItem('ggv-user');
-                    localStorage.removeItem('ggv-user-timestamp');
-                    sessionStorage.removeItem('ggv-user');
-                    sessionStorage.removeItem('ggv-user-timestamp');
-                }
             }
         };
         
@@ -153,10 +136,37 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
+        // Listener para quando a página fica visível novamente
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                console.log('👁️ DIRECT CONTEXT - Página visível novamente, verificando sessão...');
+                
+                const sessionInfo = getSessionInfo();
+                if (sessionInfo.isLoggedIn) {
+                    if (sessionInfo.isValid) {
+                        // Sessão ainda válida, renovar timestamp
+                        saveSession(sessionInfo.user);
+                        console.log('🔄 DIRECT CONTEXT - Timestamp renovado ao voltar para a página');
+                    } else {
+                        // Sessão expirou, fazer logout
+                        console.log('⏰ DIRECT CONTEXT - Sessão expirou enquanto página estava oculta');
+                        logout();
+                    }
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         // Nenhum usuário encontrado, mostrar tela de login
         console.log('🔐 DIRECT CONTEXT - Nenhum usuário encontrado, mostrar login');
         setShowAuth(true);
         setLoading(false);
+
+        // Cleanup do listener
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     const handleAuthSuccess = async (authenticatedUser: User) => {
@@ -184,14 +194,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.warn('⚠️ DIRECT CONTEXT - Erro ao atualizar role:', profileError);
         }
         
-        // Salvar usuário e timestamp no localStorage e sessionStorage para maior persistência
-        const userJson = JSON.stringify(finalUser);
-        const timestamp = Date.now().toString();
-        
-        localStorage.setItem('ggv-user', userJson);
-        localStorage.setItem('ggv-user-timestamp', timestamp);
-        sessionStorage.setItem('ggv-user', userJson);
-        sessionStorage.setItem('ggv-user-timestamp', timestamp);
+        // Salvar usuário usando utilitário de sessão
+        saveSession(finalUser);
         
         setUser(finalUser);
         setShowAuth(false);
@@ -217,11 +221,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.warn('⚠️ DIRECT CONTEXT - Erro ao limpar sessão Supabase:', e);
         }
         
-        // Limpar storage local
-        localStorage.removeItem('ggv-user');
-        localStorage.removeItem('ggv-user-timestamp');
-        sessionStorage.removeItem('ggv-user');
-        sessionStorage.removeItem('ggv-user-timestamp');
+        // Limpar storage local usando utilitário
+        clearSession();
         
         setUser(null);
         setShowAuth(true);
@@ -255,13 +256,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // Atualizar estado
                 setUser(updatedUser);
                 
-                // Atualizar storage
-                const userJson = JSON.stringify(updatedUser);
-                const timestamp = Date.now().toString();
-                localStorage.setItem('ggv-user', userJson);
-                localStorage.setItem('ggv-user-timestamp', timestamp);
-                sessionStorage.setItem('ggv-user', userJson);
-                sessionStorage.setItem('ggv-user-timestamp', timestamp);
+                // Atualizar storage usando utilitário
+                saveSession(updatedUser);
             } else {
                 console.log('ℹ️ DIRECT CONTEXT - Role não mudou:', user.role);
             }

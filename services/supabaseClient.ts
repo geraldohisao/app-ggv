@@ -12,6 +12,10 @@ try {
                 detectSessionInUrl: true,
                 // Usa localStorage para manter a sessão ativa entre reinícios do app
                 storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+                // Configurar sessão para durar 100 horas (360000 segundos)
+                storageKey: 'ggv-supabase-auth-token',
+                // Não expirar automaticamente - deixar nosso sistema gerenciar
+                sessionExpiry: 360000, // 100 horas em segundos
             },
         });
     } else {

@@ -21,6 +21,7 @@ import UserMenu from './components/UserMenu';
 import AppBrand from './components/common/AppBrand';
 import FinalLoginPage from './components/FinalLoginPage';
 import { getModuleFromPath, isStandalonePage } from './utils/router';
+import SessionDebugPanel from './components/debug/SessionDebugPanel';
 
 
 const AppContent: React.FC = () => {
@@ -184,7 +185,9 @@ const AppContent: React.FC = () => {
       <main className={`flex-1 overflow-y-auto ${isFullScreen ? 'bg-white' : 'bg-slate-100'}`}>
         {renderModule()}
       </main>
-
+      
+      {/* Painel de debug da sessão - apenas em desenvolvimento */}
+      {process.env.NODE_ENV === 'development' && <SessionDebugPanel />}
     </div>
   );
 };
