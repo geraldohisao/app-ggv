@@ -50,7 +50,11 @@ const OpportunityFeedbackPage: React.FC = () => {
 
   // Função para enviar dados para o webhook no formato SurveyMonkey
   const sendToWebhook = async (feedbackData: OpportunityFeedback) => {
+    console.log('🔗 WEBHOOK - Iniciando envio...');
+    console.log('📋 WEBHOOK - Dados de entrada:', feedbackData);
+    
     const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/feedback-ggv-register';
+    console.log('📍 WEBHOOK - URL:', webhookUrl);
     
     // Converter dados para o formato SurveyMonkey
     const surveyMonkeyFormat = [{
@@ -167,6 +171,8 @@ const OpportunityFeedbackPage: React.FC = () => {
       });
     }
 
+    console.log('📤 WEBHOOK - Payload SurveyMonkey:', JSON.stringify(surveyMonkeyFormat, null, 2));
+    
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
@@ -175,31 +181,51 @@ const OpportunityFeedbackPage: React.FC = () => {
       body: JSON.stringify(surveyMonkeyFormat)
     });
 
+    console.log('📊 WEBHOOK - Status da resposta:', response.status, response.statusText);
+    
     if (!response.ok) {
-      throw new Error(`Erro no webhook: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ WEBHOOK - Erro da resposta:', errorText);
+      throw new Error(`Erro no webhook: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('✅ WEBHOOK - Resposta JSON:', result);
+    return result;
   };
 
   const handleSubmit = async () => {
-    if (!user) return;
+    if (!user) {
+      console.error('❌ FEEDBACK - Usuário não encontrado');
+      return;
+    }
+    
+    console.log('🚀 FEEDBACK - Iniciando envio...');
+    console.log('👤 FEEDBACK - Usuário:', user.email);
+    console.log('📋 FEEDBACK - Dados:', data);
+    
     setIsSubmitting(true);
     try {
       const payload: OpportunityFeedback = { ...data, user_id: user.id };
+      console.log('📦 FEEDBACK - Payload final:', payload);
       
       // Renovar sessão antes de salvar (atividade importante)
       renewSessionTimestamp();
       
       // Salvar no Supabase
-      await saveOpportunityFeedback(payload);
+      console.log('💾 FEEDBACK - Salvando no Supabase...');
+      const savedData = await saveOpportunityFeedback(payload);
+      console.log('✅ FEEDBACK - Salvo no Supabase:', savedData);
       
       // Enviar para o webhook
-      await sendToWebhook(payload);
+      console.log('🔗 FEEDBACK - Enviando para webhook...');
+      const webhookResponse = await sendToWebhook(payload);
+      console.log('✅ FEEDBACK - Resposta do webhook:', webhookResponse);
       
       setDone(true);
     } catch (err: any) {
-      console.error('Erro ao enviar feedback:', err);
+      console.error('❌ FEEDBACK - Erro completo:', err);
+      console.error('❌ FEEDBACK - Stack trace:', err.stack);
       alert(`Falha ao salvar feedback: ${err.message}`);
     } finally {
       setIsSubmitting(false);
