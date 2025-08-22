@@ -138,23 +138,29 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
                 // Salvar token seguro no banco para mapeamento futuro
-                if (dealId && secureToken) {
-                    try {
-                        const reportData = {
-                            companyData,
-                            answers,
-                            totalScore,
-                            maturityLevel: maturity.level,
-                            dealId
-                        };
-                        
-                        // Importar createPublicReport dinamicamente para evitar dependência circular
-                        const { createPublicReport } = await import('../../services/supabaseService');
-                        await createPublicReport(reportData, undefined, undefined, dealId, secureToken);
-                        console.log('✅ N8N - Token seguro salvo:', secureToken);
-                    } catch (tokenError) {
-                        console.warn('⚠️ N8N - Erro ao salvar token (não crítico):', tokenError);
-                    }
+                // CRÍTICO: Salvar SEMPRE, mesmo sem dealId para garantir que links funcionem
+                try {
+                    const reportData = {
+                        companyData,
+                        segment,
+                        answers,
+                        totalScore,
+                        maturity,
+                        summaryInsights,
+                        detailedAnalysis,
+                        scoresByArea: scoresByArea,
+                        dealId: dealId || null
+                    };
+                    
+                    console.log('💾 N8N - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
+                    
+                    // Importar createPublicReport dinamicamente para evitar dependência circular
+                    const { createPublicReport } = await import('../../services/supabaseService');
+                    await createPublicReport(reportData, undefined, undefined, dealId, secureToken);
+                    console.log('✅ N8N - Relatório salvo com sucesso:', secureToken);
+                } catch (tokenError) {
+                    console.error('❌ N8N - ERRO CRÍTICO ao salvar relatório:', tokenError);
+                    // Este erro é crítico pois sem salvar, o link não funcionará
                 }
 
                 // Estrutura EXATA que o N8N espera baseado nos mapeamentos
@@ -428,6 +434,29 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 
                 const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
+
+                // Salvar relatório também na segunda chamada (análise IA)
+                try {
+                    const reportData = {
+                        companyData,
+                        segment,
+                        answers,
+                        totalScore,
+                        maturity,
+                        summaryInsights,
+                        detailedAnalysis,
+                        scoresByArea: scoresByArea,
+                        dealId: dealId || null
+                    };
+                    
+                    console.log('💾 AI_ANALYSIS - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
+                    
+                    const { createPublicReport } = await import('../../services/supabaseService');
+                    await createPublicReport(reportData, undefined, undefined, dealId, secureToken);
+                    console.log('✅ AI_ANALYSIS - Relatório salvo com sucesso:', secureToken);
+                } catch (tokenError) {
+                    console.error('❌ AI_ANALYSIS - ERRO CRÍTICO ao salvar relatório:', tokenError);
+                }
 
                 // Estrutura para análise IA também seguindo padrão N8N
                 const aiPayload = {

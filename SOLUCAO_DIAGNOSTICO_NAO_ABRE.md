@@ -8,19 +8,24 @@
 
 ## 🔍 ANÁLISE TÉCNICA
 
-### Causa Raiz
-O sistema de relatórios públicos de diagnóstico não tinha a infraestrutura de banco de dados necessária implementada:
+### Causa Raiz ATUALIZADA
+Identificamos DOIS problemas principais:
 
-1. **Tabela ausente**: `diagnostic_public_reports` não existia no Supabase
-2. **Função RPC ausente**: `get_public_report` não estava implementada
-3. **Token antigo**: O diagnóstico foi criado antes do sistema de persistência
+1. **Infraestrutura ausente**: `diagnostic_public_reports` não existia no Supabase
+2. **Função RPC ausente**: `get_public_report` não estava implementada  
+3. **BUG CRÍTICO**: `createPublicReport` só era chamado quando havia `dealId`
+4. **Token sem dealId**: Diagnósticos sem deal_id não eram salvos no banco
 
-### Decodificação do Token
-- **Token**: `1755883453343-afqopb-569`
+### Análise dos Tokens
+
+**Token Original:** `1755883453343-afqopb-569`
 - **Timestamp**: `1755883453343` (22/08/2025, 14:24:13)
-- **Hash**: `afqopb` 
-- **Deal ID Suffix**: `569` (últimos 3 dígitos do deal_id original)
-- **Idade**: Recém-criado (0 dias)
+- **Formato**: `{timestamp}-{hash}-{dealId_suffix}` (COM deal_id)
+
+**Token Novo:** `diagnostic-1755874448033`  
+- **Timestamp**: `1755874448033` (22/08/2025, 11:54:08)
+- **Formato**: `diagnostic-{timestamp}` (SEM deal_id)
+- **Problema**: Não era salvo no banco!
 
 ## ✅ SOLUÇÃO IMPLEMENTADA
 
@@ -44,7 +49,15 @@ CREATE TABLE diagnostic_public_reports (
 CREATE OR REPLACE FUNCTION get_public_report(p_token TEXT) ...
 ```
 
-### 2. Sistema de Fallback Inteligente
+### 2. CORREÇÃO DO BUG CRÍTICO
+**Arquivo:** `components/diagnostico/ResultsView.tsx`
+
+- ✅ **ANTES**: `createPublicReport` só chamado com `dealId`
+- ✅ **DEPOIS**: `createPublicReport` chamado SEMPRE
+- ✅ Salvamento garantido para todos os diagnósticos
+- ✅ Logs detalhados para monitoramento
+
+### 3. Sistema de Fallback Inteligente
 **Arquivo:** `services/supabaseService.ts`
 
 - ✅ Decodificação de tokens antigos
@@ -52,7 +65,7 @@ CREATE OR REPLACE FUNCTION get_public_report(p_token TEXT) ...
 - ✅ Mensagens de erro específicas
 - ✅ Logs detalhados para debug
 
-### 3. Interface de Erro Melhorada
+### 4. Interface de Erro Melhorada
 **Arquivo:** `components/PublicDiagnosticReport.tsx`
 
 - ✅ Página de erro personalizada
@@ -78,9 +91,14 @@ O sistema já foi atualizado com:
 - ✅ Logs detalhados
 - ✅ Interface melhorada
 
-### PASSO 3: Recuperar Diagnóstico Específico
+### PASSO 3: Recuperar Diagnósticos Específicos
 
-Para o token `1755883453343-afqopb-569`:
+**Para o token `diagnostic-1755874448033` (NOVO PROBLEMA):**
+1. Execute o script `insert-diagnostic-manually.sql` 
+2. Substitua os dados pelos dados reais do N8N
+3. Teste o link novamente
+
+**Para o token `1755883453343-afqopb-569` (PROBLEMA ORIGINAL):**
 
 1. **Buscar deal_id original** (termina com "569")
 2. **Verificar logs N8N/Pipedrive** da data 22/08/2025
