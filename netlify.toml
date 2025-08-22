@@ -1,11 +1,17 @@
 [build]
   publish = "dist"
-  command = "npx tsc && npx vite build"
+  command = "npm run build"
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18.17.0"
+  NODE_VERSION = "20.18.0"
   NPM_CONFIG_PRODUCTION = "false"
+  # Otimizações de build
+  CI = "true"
+  NODE_OPTIONS = "--max-old-space-size=4096"
+  # Cache para acelerar builds
+  NPM_CONFIG_CACHE = ".npm-cache"
+  NPM_CONFIG_PREFER_OFFLINE = "true"
 
 # Configuração do domínio customizado
 [context.production]
