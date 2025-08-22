@@ -132,7 +132,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                     
                     <!-- Logo Grupo GGV -->
                     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
-                      <img src="https://grupoggv.com/wp-content/uploads/2023/12/Logo-Grupo-GGV-Horizontal.png" 
+                      <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
                            alt="Grupo GGV" 
                            style="max-width:120px;height:auto;display:block;margin:0 auto;border:0;opacity:0.7"/>
                     </div>
