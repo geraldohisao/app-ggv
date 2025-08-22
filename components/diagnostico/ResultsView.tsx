@@ -8,6 +8,16 @@ import { PdfModal } from './modals/PdfModal';
 import { CoverTab, DashboardTab, SegmentedAnalysisTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
 import { getCurrentUserDisplayName, sendDiagnosticToN8n, createPublicReport } from '../../services/supabaseService';
 
+// ============================================================================
+// SISTEMA ANTI-ALUCINAÇÃO: CONSTANTES IMUTÁVEIS PARA VALIDAÇÃO
+// ============================================================================
+const DIAGNOSTIC_VALIDATION = {
+    EXPECTED_QUESTION_COUNT: 9,
+    VALID_ANSWER_TYPES: ['Sim', 'Não', 'Parcialmente', 'Às vezes'] as const,
+    VALID_SCORES: [0, 5, 10] as const,
+    REQUIRED_PAYLOAD_FIELDS: ['questionId', 'question', 'answer', 'description', 'score'] as const
+} as const;
+
 const REPORT_TABS = ["Capa", "Dashboard Geral", "Análise Segmentada", "Diagnóstico Textual", "Análise IA"];
 const MAX_SCORE_PER_QUESTION = 10;
 const MAX_SCORE = diagnosticQuestions.length * MAX_SCORE_PER_QUESTION;
@@ -160,57 +170,79 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         resultUrl: publicReportUrl,  // $('registerGGVDiag').first().json.body.resultUrl
                         deal_id: dealId,  // Para relacionar com o negócio no Pipedrive
                         
-                        // CRÍTICO: Respostas exatas das perguntas do diagnóstico com TEXTO das opções
-                        // NÃO ALTERAR: O N8N precisa receber as respostas como TEXTO, não apenas scores
-                        // Mapear todas as perguntas para garantir ordem e completude
-                        diagnosticAnswers: diagnosticQuestions.map((question) => {
-                            const score = answers[question.id];
-                            console.log(`🔍 DEBUG - Pergunta ${question.id}: "${question.text}", score: ${score}`);
+                        // ============================================================================
+                        // SOLUÇÃO DEFINITIVA: MAPEAMENTO DE RESPOSTAS TEXTUAIS PARA N8N
+                        // ============================================================================
+                        // NUNCA ALTERE ESTA SEÇÃO SEM TESTAR COMPLETAMENTE O ENVIO PARA N8N
+                        // O N8N REQUER RESPOSTAS COMO TEXTO, NÃO NÚMEROS
+                        diagnosticAnswers: (() => {
+                            console.log('🔄 INICIANDO MAPEAMENTO DEFINITIVO DAS RESPOSTAS');
+                            console.log('📊 Answers recebidos:', answers);
+                            console.log('📋 Total de perguntas:', diagnosticQuestions.length);
                             
-                            // Verificar se a pergunta foi respondida
-                            if (score === undefined || score === null) {
-                                console.warn(`⚠️ Pergunta ${question.id} não foi respondida`);
+                            const mappedAnswers = diagnosticQuestions.map((question) => {
+                                const score = answers[question.id];
+                                console.log(`\n🔍 PROCESSANDO Pergunta ${question.id}:`);
+                                console.log(`   Texto: "${question.text}"`);
+                                console.log(`   Score recebido: ${score} (tipo: ${typeof score})`);
+                                console.log(`   Opções disponíveis:`, question.options.map(o => `"${o.text}" (${o.score})`));
+                                
+                                // Validação rigorosa do score
+                                if (score === undefined || score === null || typeof score !== 'number') {
+                                    console.error(`❌ ERRO CRÍTICO - Score inválido para pergunta ${question.id}: ${score}`);
+                                    return {
+                                        questionId: question.id,
+                                        question: question.text,
+                                        answer: "ERRO: Não respondida",
+                                        description: "Esta pergunta não foi respondida corretamente",
+                                        score: 0
+                                    };
+                                }
+                                
+                                // Busca EXATA da opção pelo score
+                                const option = question.options.find(opt => opt.score === score);
+                                
+                                if (!option) {
+                                    console.error(`❌ ERRO CRÍTICO - Opção não encontrada para pergunta ${question.id} com score ${score}`);
+                                    console.error(`❌ Opções válidas:`, question.options);
+                                    
+                                    // Sistema de fallback robusto
+                                    const fallbackMap = {
+                                        10: 'Sim',
+                                        5: question.options.find(opt => opt.text.includes('vezes') || opt.text.includes('Às vezes'))?.text || 
+                                           question.options.find(opt => opt.text.includes('Parcialmente'))?.text || 'Parcialmente',
+                                        0: 'Não'
+                                    };
+                                    
+                                    const fallbackAnswer = fallbackMap[score as keyof typeof fallbackMap] || 'Resposta inválida';
+                                    
+                                    console.warn(`⚠️ Usando fallback: "${fallbackAnswer}"`);
+                                    
+                                    return {
+                                        questionId: question.id,
+                                        question: question.text,
+                                        answer: fallbackAnswer,
+                                        description: `FALLBACK: Score ${score} mapeado automaticamente`,
+                                        score: score
+                                    };
+                                }
+                                
+                                console.log(`✅ MAPEADO com sucesso: "${option.text}"`);
+                                
                                 return {
                                     questionId: question.id,
                                     question: question.text,
-                                    answer: "Não respondida",
-                                    description: "Esta pergunta não foi respondida",
-                                    score: 0
-                                };
-                            }
-                            
-                            // Encontrar a opção correspondente ao score
-                            const option = question.options.find(opt => opt.score === score);
-                            
-                            if (!option) {
-                                console.error(`❌ ERRO - Opção não encontrada para pergunta ${question.id} com score ${score}`);
-                                console.error(`❌ Opções disponíveis:`, question.options.map(o => `${o.text} (${o.score})`));
-                                
-                                // Fallback baseado no score
-                                let fallbackText = 'Resposta inválida';
-                                if (score === 10) fallbackText = 'Sim';
-                                else if (score === 5) fallbackText = question.options.some(opt => opt.text === 'Às vezes') ? 'Às vezes' : 'Parcialmente';
-                                else if (score === 0) fallbackText = 'Não';
-                                
-                                return {
-                                    questionId: question.id,
-                                    question: question.text,
-                                    answer: fallbackText,
-                                    description: `Resposta baseada no score ${score} (opção não encontrada)`,
+                                    answer: option.text,  // TEXTO DA RESPOSTA - NUNCA SCORE
+                                    description: option.description,
                                     score: score
                                 };
-                            }
+                            });
                             
-                            console.log(`✅ Pergunta ${question.id}: "${option.text}" (Score: ${score})`);
+                            console.log('✅ MAPEAMENTO CONCLUÍDO');
+                            console.log('📤 Respostas finais:', mappedAnswers.map(a => `${a.questionId}: "${a.answer}"`));
                             
-                            return {
-                                questionId: question.id,
-                                question: question.text,
-                                answer: option.text,  // SEMPRE o texto da opção encontrada
-                                description: option.description,
-                                score: score
-                            };
-                        })
+                            return mappedAnswers;
+                        })()
                     },
                     
                     // Dados adicionais para referência (fora do body que o N8N mapeia)
@@ -237,16 +269,92 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     console.log(`     Descrição: "${answer.description}"`);
                 });
                 
-                // Validação crítica: garantir que todas as respostas são texto
+                // ============================================================================
+                // VALIDAÇÃO FINAL ANTI-ALUCINAÇÃO: VERIFICAR FORMATO ANTES DO ENVIO
+                // ============================================================================
+                console.log('🔒 INICIANDO VALIDAÇÃO FINAL DO PAYLOAD');
+                
+                // Verificar se todas as respostas são texto válido
                 const invalidAnswers = diagnosticPayload.body.diagnosticAnswers.filter(a => 
-                    typeof a.answer !== 'string' || a.answer === '' || a.answer === 'N/A'
+                    typeof a.answer !== 'string' || 
+                    a.answer === '' || 
+                    a.answer === 'N/A' || 
+                    a.answer.includes('ERRO') ||
+                    !isNaN(Number(a.answer))  // Detectar se a resposta é um número
                 );
+                
                 if (invalidAnswers.length > 0) {
-                    console.error('❌ ERRO CRÍTICO - Respostas inválidas detectadas:', invalidAnswers);
-                    console.error('❌ Isso causará problemas no N8N. Verifique o mapeamento das opções.');
-                } else {
-                    console.log('✅ Todas as respostas são texto válido');
+                    console.error('🚨 FALHA CRÍTICA NA VALIDAÇÃO - Respostas inválidas detectadas:');
+                    invalidAnswers.forEach((invalid, idx) => {
+                        console.error(`   ${idx + 1}. Pergunta ${invalid.questionId}: "${invalid.answer}" (INVÁLIDO)`);
+                    });
+                    console.error('🚨 INTERROMPENDO ENVIO - Payload não será enviado para evitar problemas no N8N');
+                    throw new Error(`Validação falhou: ${invalidAnswers.length} respostas inválidas detectadas`);
                 }
+                
+                // Verificar se temos exatamente o número correto de respostas
+                if (diagnosticPayload.body.diagnosticAnswers.length !== DIAGNOSTIC_VALIDATION.EXPECTED_QUESTION_COUNT) {
+                    console.error('🚨 ERRO - Número incorreto de respostas:', diagnosticPayload.body.diagnosticAnswers.length);
+                    throw new Error(`Esperado ${DIAGNOSTIC_VALIDATION.EXPECTED_QUESTION_COUNT} respostas, encontrado ${diagnosticPayload.body.diagnosticAnswers.length}`);
+                }
+                
+                // Verificar estrutura de cada resposta
+                diagnosticPayload.body.diagnosticAnswers.forEach((answer, idx) => {
+                    DIAGNOSTIC_VALIDATION.REQUIRED_PAYLOAD_FIELDS.forEach(field => {
+                        if (!(field in answer)) {
+                            throw new Error(`Campo obrigatório '${field}' ausente na resposta ${idx + 1}`);
+                        }
+                    });
+                    
+                    // Verificar se score é válido
+                    if (!DIAGNOSTIC_VALIDATION.VALID_SCORES.includes(answer.score as any)) {
+                        console.error(`🚨 Score inválido na pergunta ${answer.questionId}: ${answer.score}`);
+                        throw new Error(`Score inválido: ${answer.score}. Válidos: ${DIAGNOSTIC_VALIDATION.VALID_SCORES.join(', ')}`);
+                    }
+                });
+                
+                // Verificar se todas as respostas são de tipos válidos (com flexibilidade)
+                const answersWithInvalidTypes = diagnosticPayload.body.diagnosticAnswers.filter(a => 
+                    !DIAGNOSTIC_VALIDATION.VALID_ANSWER_TYPES.includes(a.answer as any) && 
+                    typeof a.answer !== 'string'
+                );
+                
+                if (answersWithInvalidTypes.length > 0) {
+                    console.warn('⚠️ Respostas com tipos não padrão (mas válidas):');
+                    answersWithInvalidTypes.forEach(a => {
+                        console.warn(`   Pergunta ${a.questionId}: "${a.answer}"`);
+                    });
+                }
+                
+                // Gerar checksum do payload para detectar alterações
+                const payloadChecksum = diagnosticPayload.body.diagnosticAnswers
+                    .map(a => `${a.questionId}:${a.answer}:${a.score}`)
+                    .join('|');
+                console.log('🔐 Checksum do payload:', payloadChecksum);
+                
+                // Verificação final de integridade
+                const integrityCheck = diagnosticPayload.body.diagnosticAnswers.every(a => 
+                    typeof a.questionId === 'number' &&
+                    typeof a.question === 'string' &&
+                    typeof a.answer === 'string' &&
+                    typeof a.description === 'string' &&
+                    typeof a.score === 'number' &&
+                    a.questionId > 0 && a.questionId <= 9 &&
+                    a.question.length > 0 &&
+                    a.answer.length > 0 &&
+                    a.description.length > 0
+                );
+                
+                if (!integrityCheck) {
+                    throw new Error('Falha na verificação de integridade do payload');
+                }
+                
+                console.log('✅ VALIDAÇÃO FINAL APROVADA - PAYLOAD ÍNTEGRO');
+                console.log('📊 Resumo das respostas validadas:');
+                diagnosticPayload.body.diagnosticAnswers.forEach((a, idx) => {
+                    console.log(`   ${idx + 1}. "${a.answer}" (Q${a.questionId}, Score: ${a.score})`);
+                });
+                console.log('🚀 INICIANDO ENVIO PARA N8N...');
 
                 // Envio direto via fetch para o webhook
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
