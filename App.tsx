@@ -8,6 +8,7 @@ import CalculadoraOTE from './components/CalculadoraOTE';
 import OpportunityFeedbackPage from './components/OpportunityFeedbackPage';
 import Header from './components/Header';
 import CallsList from './components/Calls/CallsList';
+import CallsPlaceholder from './components/Calls/CallsPlaceholder';
 import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
@@ -177,7 +178,13 @@ const AppContent: React.FC = () => {
         return <OpportunityFeedbackPage />;
       case Module.Calls:
         console.log('📞 APP - Renderizando Calls');
-        return <CallsList />;
+        // Flag para desativar chamadas reais enquanto a feature está em desenvolvimento
+        const CALLS_UNDER_DEVELOPMENT = (
+          typeof import.meta !== 'undefined' &&
+          (import.meta as any).env &&
+          typeof (import.meta as any).env.VITE_CALLS_UNDER_DEV !== 'undefined'
+        ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : true; // default seguro: true
+        return CALLS_UNDER_DEVELOPMENT ? <CallsPlaceholder /> : <CallsList />;
       case Module.ReativacaoLeads:
         console.log('🔄 APP - Renderizando Reativação');
         return <ReativacaoLeadsPage />;

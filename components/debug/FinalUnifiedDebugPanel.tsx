@@ -588,7 +588,6 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
                   📤 Diag POST
                 </button>
                 <button
-                <button
                   onClick={() => runTest('feedback_post', tests.feedback_post)}
                   className="bg-teal-700 text-white py-2 px-3 rounded-lg hover:bg-teal-800 text-sm font-medium"
                 >

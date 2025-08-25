@@ -17,7 +17,11 @@ export default function CallsList() {
   const [data, setData] = useState<{ items: Call[]; total: number }>({ items: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const IS_UNDER_DEVELOPMENT = true;
+  const IS_UNDER_DEVELOPMENT = (
+    typeof import.meta !== 'undefined' &&
+    (import.meta as any).env &&
+    typeof (import.meta as any).env.VITE_CALLS_UNDER_DEV !== 'undefined'
+  ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : true; // default seguro: true
 
   useEffect(() => {
     if (IS_UNDER_DEVELOPMENT) {

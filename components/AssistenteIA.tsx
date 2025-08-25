@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { AIMode, type AIMessage, type AIPersona, type ConversationHistories, type StoredKnowledgeDocument, Module } from '../types';
 import { getAIAssistantResponseStream, getLastSourcesMeta } from '../services/aiRouterClient';
-import { findMostRelevantDocuments } from '../services/embeddingService';
+import { findMostRelevantDocuments, findRelevant } from '../services/embeddingService';
 import { getLocalDocuments, syncQueuedDocuments } from '../services/localKnowledgeStore';
 import * as SupabaseService from '../services/supabaseService';
 import { PaperAirplaneIcon, RobotIcon, TrashIcon, ExclamationTriangleIcon, ClipboardDocumentIcon, CheckCircleIcon, RefreshIcon, PencilIcon } from './ui/icons';
@@ -239,29 +239,51 @@ const AssistenteIA: React.FC = () => {
             console.log('🧠 CONHECIMENTO - Iniciando busca por documentos relevantes...');
             console.log('📚 Total de documentos disponíveis:', knowledgeDocuments.length);
             console.log('🔍 Pergunta do usuário:', currentInput);
-            
-            // FAQ reforça o contexto: criamos pseudo-documentos de FAQ como parte do corpus
-            let relevantDocs = await findMostRelevantDocuments(currentInput, knowledgeDocuments);
-            
-            // Fallback: se nada encontrado, use os melhores documentos disponíveis
-            if (relevantDocs.length === 0 && knowledgeDocuments.length > 0) {
-                console.warn('⚠️ Sem resultados de similaridade. Usando fallback com os primeiros documentos.');
-                relevantDocs = knowledgeDocuments.slice(0, 2) as any;
+
+            // 1) Tenta RAG remoto (kd_match/ko_match) com timeout curto
+            let kdDocs: Array<{ id?: string; name?: string; score?: number; content?: string }> = [];
+            let koDocs: Array<{ id?: string; title?: string; score?: number; content?: string }> = [];
+            try {
+              const rag = await Promise.race([
+                findRelevant({ query: currentInput, topKDocs: 4, topKOverview: 2 }),
+                new Promise(resolve => setTimeout(() => resolve({ kdDocs: [], koDocs: [], confidenceHint: 'low' as const }), 1800))
+              ]) as any;
+              kdDocs = Array.isArray(rag?.kdDocs) ? rag.kdDocs : [];
+              koDocs = Array.isArray(rag?.koDocs) ? rag.koDocs : [];
+              (globalThis as any).__RAG_CONFIDENCE__ = rag?.confidenceHint;
+            } catch {
+              kdDocs = [];
+              koDocs = [];
             }
-            
-            console.log('✅ Documentos relevantes selecionados:', relevantDocs.length);
-            relevantDocs.forEach((doc, index) => {
-                console.log(`📄 Doc ${index + 1}: ${doc.name} (similaridade: ${(doc as any).similarity?.toFixed(3) || 'N/A'})`);
+
+            // 2) Fallback local se remoto não retornou nada
+            if ((kdDocs.length + koDocs.length) === 0) {
+              console.warn('⚠️ RAG remoto vazio/indisponível. Usando busca local por similaridade.');
+              let relevantDocs = await findMostRelevantDocuments(currentInput, knowledgeDocuments);
+              if (relevantDocs.length === 0 && knowledgeDocuments.length > 0) {
+                  console.warn('⚠️ Sem resultados de similaridade. Usando fallback com os primeiros documentos.');
+                  relevantDocs = knowledgeDocuments.slice(0, 2) as any;
+              }
+              kdDocs = (relevantDocs || []).map((d: any) => ({ id: d.id, name: d.name, score: d.similarity, content: d.content }));
+            }
+
+            console.log('✅ Documentos kd selecionados:', kdDocs.length);
+            kdDocs.forEach((doc, index) => {
+              console.log(`📄 Doc ${index + 1}: ${(doc.name || doc.id)} (score: ${(doc as any).score?.toFixed?.(3) || 'N/A'})`);
             });
-            
+
             // Truncar para evitar prompts gigantes
             const truncate = (t: string, max = 3000) => t.length > max ? t.slice(0, max) + '\n...[conteúdo truncado]' : t;
             const overviewBlock = (window as any).__GGV_OVERVIEW__
                 ? `--- OVERVIEW GGV ---\n${truncate((window as any).__GGV_OVERVIEW__)}\n--- FIM OVERVIEW ---\n\n`
                 : '';
-            const knowledgeBase = overviewBlock + (relevantDocs.length > 0
-                ? relevantDocs.map(doc => `--- DOC: ${doc.name} ---\n${truncate(doc.content || '')}\n--- FIM DOC ---`).join('\n\n')
-                : 'Nenhum documento relevante encontrado.');
+            const remoteOverviewMatches = (koDocs || []).length > 0
+                ? (koDocs || []).map(d => `--- OVERVIEW MATCH: ${d.title || d.id} ---\n${truncate(d.content || '')}\n--- FIM OVERVIEW MATCH ---`).join('\n\n') + '\n\n'
+                : '';
+            const docsBlock = (kdDocs || []).length > 0
+                ? kdDocs.map(doc => `--- DOC: ${doc.name || doc.id} ---\n${truncate(doc.content || '')}\n--- FIM DOC ---`).join('\n\n')
+                : 'Nenhum documento relevante encontrado.';
+            const knowledgeBase = overviewBlock + remoteOverviewMatches + docsBlock;
                 
             console.log('📝 Contexto enviado para IA:', knowledgeBase.substring(0, 200) + '...');
 

@@ -55,6 +55,15 @@ export const AppErrorBoundaryEnhanced: React.FC<{ children: React.ReactNode }> =
               url: typeof window !== 'undefined' ? window.location.href : '',
               stack: error?.stack || '',
               componentStack: errorInfo.componentStack,
+              // Include logged user if available (stored by auth/session utilities)
+              user: ((): any => {
+                try {
+                  const raw = localStorage.getItem('ggv-user') || sessionStorage.getItem('ggv-user') || localStorage.getItem('ggv-emergency-user');
+                  return raw ? JSON.parse(raw) : undefined;
+                } catch {
+                  return undefined;
+                }
+              })(),
               userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
               appVersion: (typeof window !== 'undefined' && (window as any).__APP_VERSION__) || ''
             }

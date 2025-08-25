@@ -64,10 +64,17 @@ type CriticalFetchOptions = {
 
 function getStoredUserSafe(): { name?: string; email?: string; role?: string } | undefined {
   try {
-    const raw = localStorage.getItem('ggv-user-session');
+    // Prefer session saved by current auth flow
+    const rawPrimary = localStorage.getItem('ggv-user') || sessionStorage.getItem('ggv-user');
+    const rawEmergency = localStorage.getItem('ggv-emergency-user');
+    const raw = rawPrimary || rawEmergency || '';
     if (!raw) return undefined;
     const u = JSON.parse(raw);
-    return { name: u?.name, email: u?.email, role: u?.role };
+    // Normalize common fields
+    const name = u?.name || u?.full_name || u?.user_metadata?.name || u?.user?.name;
+    const email = u?.email || u?.user_metadata?.email || u?.user?.email;
+    const role = u?.role || u?.user_metadata?.role || u?.user?.role;
+    return { name, email, role };
   } catch {
     return undefined;
   }

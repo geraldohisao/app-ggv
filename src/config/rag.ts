@@ -10,7 +10,8 @@ export type RAGDefaults = {
 export const RAG_DEFAULTS: RAGDefaults = {
   maxDocs: 3,
   maxCharsPerDoc: 600,
-  minScore: 0.2,
+  // Reduzido para aumentar recall de respostas simples presentes no banco
+  minScore: 0.12,
   topKDocs: 4,
   topKOverview: 2,
   dedupeBy: 'id|name|title',

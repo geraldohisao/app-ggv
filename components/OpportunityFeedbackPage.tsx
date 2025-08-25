@@ -48,6 +48,15 @@ const OpportunityFeedbackPage: React.FC = () => {
     talked_to_decision_maker: undefined,
   });
 
+  // Permitir definir/editar manualmente o Deal ID quando não vier por link
+  const handleSetDealId = () => {
+    const current = data.pipedrive_deal_id || '';
+    const input = window.prompt('Informe o Deal ID do Pipedrive', current);
+    if (input === null) return; // cancelado
+    const normalized = (input || '').toString().trim().replace(/[^0-9]/g, '');
+    setData({ ...data, pipedrive_deal_id: normalized || undefined });
+  };
+
   const totalQuestionsStep2 = 5;
   const answeredStep2 = useMemo(() => [
     data.accept_as_potential_client,
@@ -256,11 +265,21 @@ const OpportunityFeedbackPage: React.FC = () => {
         </div>
         <div className="flex items-center justify-between mt-1">
           <p className="text-sm text-slate-500">Preencha em menos de 1 minuto. Usaremos estes dados para ICP e Pipedrive.</p>
-          {dealId && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
-              Deal ID: {dealId}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {data.pipedrive_deal_id && (
+              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                Deal ID: {data.pipedrive_deal_id}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSetDealId}
+              className="text-xs px-2 py-1 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+              title={data.pipedrive_deal_id ? 'Editar Deal ID' : 'Definir Deal ID'}
+            >
+              {data.pipedrive_deal_id ? 'Editar Deal ID' : 'Definir Deal ID'}
+            </button>
+          </div>
         </div>
         <div className="mt-4 w-full bg-slate-200/70 h-2 rounded-full overflow-hidden">
           <div className="h-2 bg-blue-800 transition-all" style={{ width: `${progress}%` }}></div>

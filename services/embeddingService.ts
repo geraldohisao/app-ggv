@@ -4,10 +4,11 @@ import { startStep } from '../src/utils/logger';
 
 // Cache simples e flag para controlar o uso de rede (desligado por padrão para máxima estabilidade)
 let cachedApiKey: string | null | undefined = undefined;
-let disableNetworkEmbedding = true;
+// Habilitar embeddings remotos por padrão; só desliga se flag local exigir
+let disableNetworkEmbedding = false;
 if (typeof window !== 'undefined') {
   const flag = (window as any).APP_CONFIG_LOCAL?.USE_REMOTE_EMBEDDINGS;
-  if (flag === true) disableNetworkEmbedding = false;
+  if (flag === false) disableNetworkEmbedding = true;
 }
 
 // Cache de embeddings para queries repetidas
