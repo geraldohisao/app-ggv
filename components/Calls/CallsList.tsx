@@ -17,8 +17,13 @@ export default function CallsList() {
   const [data, setData] = useState<{ items: Call[]; total: number }>({ items: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const IS_UNDER_DEVELOPMENT = true;
 
   useEffect(() => {
+    if (IS_UNDER_DEVELOPMENT) {
+      // Evita chamadas ao backend enquanto a seção estiver em desenvolvimento
+      return;
+    }
     const run = async () => {
       setLoading(true);
       setError(null);
@@ -53,10 +58,16 @@ export default function CallsList() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Chamadas</h1>
         <div className="text-xs text-slate-500">
-          <span className="bg-green-100 text-green-800 px-2 py-1 rounded">Supabase</span>
+          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Em desenvolvimento</span>
+          <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded">Supabase</span>
           <span className="ml-2">Total: {data.total}</span>
         </div>
       </div>
+      {IS_UNDER_DEVELOPMENT && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4">
+          <strong>Em desenvolvimento:</strong> Estamos construindo a seção de chamadas. Em breve você verá os dados reais aqui.
+        </div>
+      )}
       
       {loading && (
         <div className="flex items-center justify-center py-8">
@@ -70,7 +81,7 @@ export default function CallsList() {
         </div>
       )}
       
-      {!loading && !error && (
+      {!loading && !error && !IS_UNDER_DEVELOPMENT && (
         <>
           {data.items.length === 0 ? (
             <div className="text-center py-8 text-slate-500">

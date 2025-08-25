@@ -249,9 +249,6 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json().catch(() => ({ ok: true }));
-    },
-    feedback_get: async () => {
-      throw new Error('GET não suportado pelo fluxo de Feedback. Use apenas POST.');
     }
   };
 
@@ -591,11 +588,6 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
                   📤 Diag POST
                 </button>
                 <button
-                  onClick={() => runTest('feedback_get', tests.feedback_get)}
-                  className="bg-teal-600 text-white py-2 px-3 rounded-lg hover:bg-teal-700 text-sm font-medium"
-                >
-                  📨 Feedback GET
-                </button>
                 <button
                   onClick={() => runTest('feedback_post', tests.feedback_post)}
                   className="bg-teal-700 text-white py-2 px-3 rounded-lg hover:bg-teal-800 text-sm font-medium"
