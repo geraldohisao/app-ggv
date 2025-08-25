@@ -303,7 +303,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
     const allDataForPdf = { companyData, segment, answers, totalScore, maturity, summaryInsights, detailedAnalysis, scoresByArea };
 
+    const hasAIReady = Boolean(summaryInsights && detailedAnalysis);
+
     const handleOpenPublicReport = async () => {
+        if (!hasAIReady) return;
         try {
             const isProduction = window.location.hostname === 'app.grupoggv.com';
             const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
@@ -355,10 +358,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             </div>
 
             <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-200/50 flex flex-wrap items-center justify-center gap-4">
-                <button onClick={() => setShowEmailModal(true)} className="flex items-center gap-2 text-sm font-semibold bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors">
+                <button onClick={() => hasAIReady && setShowEmailModal(true)} disabled={!hasAIReady} className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-colors ${hasAIReady ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-slate-50 text-slate-400 cursor-not-allowed'}`} aria-disabled={!hasAIReady}>
                     <EnvelopeIcon className="w-5 h-5" /> Enviar por E-mail
                 </button>
-                <button onClick={handleOpenPublicReport} className="flex items-center gap-2 text-sm font-semibold bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors">
+                <button onClick={handleOpenPublicReport} disabled={!hasAIReady} className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-colors ${hasAIReady ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-slate-50 text-slate-400 cursor-not-allowed'}`} aria-disabled={!hasAIReady}>
                     <DocumentTextIcon className="w-5 h-5" /> Abrir Relatório Público
                 </button>
                 <button onClick={onRetry} className="flex items-center gap-2 text-sm font-semibold bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors">
