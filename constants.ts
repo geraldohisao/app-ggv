@@ -254,10 +254,11 @@ export const SDR_REMUNERATION = {
         { threshold: 0.75, label: '75%' },
     ],
     values: {
-        level1: [1000, 850, 750],
-        level2: [1200, 1020, 900],
-        level3: [1400, 1190, 1050],
-        level4: [1600, 1360, 1200],
+        // Valores corretos por nível (100%, 85%, 75%)
+        level1: [630.00, 535.50, 472.50],
+        level2: [1030.00, 875.50, 772.50],
+        level3: [1430.00, 1215.50, 1072.50],
+        level4: [1830.00, 1555.50, 1372.50],
     }
   },
   quarterlyBonus: {

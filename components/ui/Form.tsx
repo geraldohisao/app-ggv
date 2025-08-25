@@ -62,6 +62,42 @@ export const FormattedInputField: React.FC<FormattedInputProps> = ({ label, name
         onChange(syntheticEvent);
     };
 
+    // Allow clearing with Backspace/Delete when the suffix/prefix is focused
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (formatType !== 'percentage' && formatType !== 'currency') return;
+        const displayValue = formatForDisplay(value);
+        const input = e.currentTarget;
+        const selStart = input.selectionStart ?? 0;
+        const selEnd = input.selectionEnd ?? 0;
+
+        // Only intercept when there is no selection (caret only)
+        const hasSelection = selEnd > selStart;
+        if (hasSelection) return;
+
+        // If caret is at end and user presses Backspace, remove last digit of raw value
+        const atEnd = selStart === displayValue.length;
+        if (e.key === 'Backspace' && atEnd) {
+            e.preventDefault();
+            const newRaw = (value || '').slice(0, -1);
+            const syntheticEvent = {
+                target: { name, value: newRaw }
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            onChange(syntheticEvent);
+            return;
+        }
+
+        // If caret at start and user presses Delete, also remove first digit of raw value
+        const atStart = selStart === 0;
+        if (e.key === 'Delete' && atStart) {
+            e.preventDefault();
+            const newRaw = (value || '').slice(1);
+            const syntheticEvent = {
+                target: { name, value: newRaw }
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            onChange(syntheticEvent);
+        }
+    };
+
     return (
         <FormGroup>
             <label htmlFor={name} className={formLabelClass}>{label}</label>
@@ -70,6 +106,7 @@ export const FormattedInputField: React.FC<FormattedInputProps> = ({ label, name
                 name={name}
                 value={formatForDisplay(value)}
                 onChange={handleLocalChange}
+                onKeyDown={handleKeyDown}
                 className={formInputClass}
                 {...props}
             />
