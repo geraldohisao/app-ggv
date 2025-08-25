@@ -22,9 +22,11 @@ CREATE TABLE IF NOT EXISTS public.automation_history (
 -- 2. Índices para performance
 CREATE INDEX IF NOT EXISTS idx_automation_history_user_id ON public.automation_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_automation_history_status ON public.automation_history(status);
-CREATE INDEX IF NOT EXISTS idx_automation_history_workflow_id ON public.automation_history USING GIN ((n8n_response->>'workflowId'));
+-- Índice por workflowId dentro do JSON (usar BTREE para expressão de texto)
+CREATE INDEX IF NOT EXISTS idx_automation_history_workflow_id ON public.automation_history ((n8n_response->>'workflowId'));
 CREATE INDEX IF NOT EXISTS idx_automation_history_created_at ON public.automation_history(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_automation_history_real ON public.automation_history USING GIN ((n8n_response->>'real'));
+-- Índice auxiliar por flag "real" no JSON
+CREATE INDEX IF NOT EXISTS idx_automation_history_real ON public.automation_history ((n8n_response->>'real'));
 
 -- 3. Habilitar RLS
 ALTER TABLE public.automation_history ENABLE ROW LEVEL SECURITY;
