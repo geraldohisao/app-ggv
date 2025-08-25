@@ -143,7 +143,7 @@ const PublicDiagnosticReport: React.FC = () => {
             <img 
               src="https://ggvinteligencia.com.br/wp-content/uploads/2023/12/image-1.svg" 
               alt="GGV Inteligência" 
-              className="h-14 mx-auto mb-3"
+              className="h-16 mx-auto mb-3"
             />
           </div>
 
