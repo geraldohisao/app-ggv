@@ -102,10 +102,14 @@ exports.handler = async (event, _context) => {
 
     const text = lines.join('\n');
 
-    const webhookUrl =
-      process.env.GOOGLE_CHAT_WEBHOOK_URL ||
-      // Fallback: provided by the user (consider moving to env var in production)
-      'https://chat.googleapis.com/v1/spaces/AAQAMN9CQQU/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=kZkEuSHZ8k_AfpIgeFQ7kFHxJgsjG4cDQMczyBmGojw';
+    const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
+    if (!webhookUrl) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Missing GOOGLE_CHAT_WEBHOOK_URL environment variable' })
+      };
+    }
 
     // Prepare image URLs
     const imageUrls = [];

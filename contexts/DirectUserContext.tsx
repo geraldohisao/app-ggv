@@ -22,7 +22,7 @@ export const UserContext = createContext<UserContextType>({
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [showAuth, setShowAuth] = useState(true);
+    const [showAuth, setShowAuth] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
     
     // Ativar keep-alive da sessão apenas quando usuário estiver logado
@@ -125,8 +125,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } catch (e) {
                 console.warn('⚠️ DIRECT CONTEXT - Erro ao verificar sessão Supabase:', e);
             }
+
+            // Se chegou aqui, não há sessão válida em nenhum mecanismo
+            setShowAuth(true);
+            setLoading(false);
         };
         
+        // Executar verificação antes de decidir exibir login
         checkAuthStatus();
 
         // Verificar se estamos retornando do OAuth
@@ -137,8 +142,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         if (hasOAuthParams) {
             console.log('🔄 DIRECT CONTEXT - Detectado retorno OAuth, processando...');
-            setShowAuth(true);
-            setLoading(false);
+            // Não forçar tela de login durante processamento do OAuth
             return;
         }
 
@@ -164,10 +168,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Nenhum usuário encontrado, mostrar tela de login
-        console.log('🔐 DIRECT CONTEXT - Nenhum usuário encontrado, mostrar login');
-        setShowAuth(true);
-        setLoading(false);
+        // A decisão de mostrar login é tomada em checkAuthStatus
+        console.log('🔐 DIRECT CONTEXT - Aguardando verificação de sessão antes de mostrar login');
 
         // Cleanup do listener
         return () => {

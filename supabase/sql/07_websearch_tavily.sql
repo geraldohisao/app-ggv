@@ -39,8 +39,9 @@ where not exists (select 1 from public.app_settings where key='WEB_TIMEOUT_MS');
 
 -- setar a sua chave Tavily (substituir aqui no SQL OU usar a UI/admin):
 -- Exemplo (opcional):
+-- NUNCA comitar chaves reais. Valor inicial vazio por padrão.
 insert into public.app_settings(key, value)
-values ('TAVILY_API_KEY', to_jsonb('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'))
-on conflict (key) do update set value=excluded.value, updated_at=now();
+values ('TAVILY_API_KEY', to_jsonb(''::text))
+on conflict (key) do nothing;
 
 

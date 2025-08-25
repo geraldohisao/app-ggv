@@ -7,14 +7,28 @@ const MarkdownRenderer: React.FC<{ text: string, inline?: boolean, className?: s
     const stripEmojis = (s: string) => s;
 
     const renderContent = (line: string) => {
-        // Negrito e itálico
-        line = line.replace(/(^|\s)(\*\*|__)([^\*_][\s\S]*?)\2/g, '$1<strong>$3</strong>');
-        line = line.replace(/(^|\s)(\*|_)([^\*_][\s\S]*?)\2/g, '$1<em>$3</em>');
+        // Sanitização básica: escapar HTML primeiro para evitar XSS, depois aplicar marcações controladas
+        const escapeHtml = (s: string) => s
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
         // Remover tokens de emoji estilo :warning:, :bulb:, :check:
-        line = line.replace(/:(warning|bulb|check):/g, '');
-        // Links Markdown [text](url)
-        line = line.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-        return <span dangerouslySetInnerHTML={{ __html: line }} />;
+        let safe = line.replace(/:(warning|bulb|check):/g, '');
+
+        // Escapar todo o conteúdo
+        safe = escapeHtml(safe);
+
+        // Aplicar negrito e itálico em cima do texto já escapado
+        safe = safe.replace(/(^|\s)(\*\*|__)([^\*_][\s\S]*?)\2/g, '$1<strong>$3</strong>');
+        safe = safe.replace(/(^|\s)(\*|_)([^\*_][\s\S]*?)\2/g, '$1<em>$3</em>');
+
+        // Links Markdown [text](url) — somente https permitido
+        safe = safe.replace(/\[([^\]]+)\]\((https:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+
+        return <span dangerouslySetInnerHTML={{ __html: safe }} />;
     };
     
     if (inline) {
