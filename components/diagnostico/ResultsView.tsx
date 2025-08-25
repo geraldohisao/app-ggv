@@ -4,7 +4,6 @@ import { getSummaryInsights, getDetailedAIAnalysis } from '../../services/gemini
 import { diagnosticQuestions } from '../../data/diagnosticoQuestions';
 import { ArrowLeftIcon, ArrowRightIcon, EnvelopeIcon, DocumentTextIcon, RefreshIcon, ExclamationTriangleIcon } from '../ui/icons';
 import { EmailModal } from './modals/EmailModal';
-import { PdfModal } from './modals/PdfModal';
 import { CoverTab, DashboardTab, SegmentedAnalysisTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
 import { getCurrentUserDisplayName, sendDiagnosticToN8n, createPublicReport } from '../../services/supabaseService';
 import { DIAGNOSTIC_FIX_VERSION } from '../../src/buildId';
@@ -35,7 +34,7 @@ interface ResultsViewProps {
 export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, answers, totalScore, dealId, onRetry }) => {
     const [activeTab, setActiveTab] = useState(REPORT_TABS[0]);
     const [showEmailModal, setShowEmailModal] = useState(false);
-    const [showPdfModal, setShowPdfModal] = useState(false);
+    // Removido: modal de PDF em favor do relatório público em nova guia
 
     const [summaryInsights, setSummaryInsights] = useState<SummaryInsights | null>(null);
     const [detailedAnalysis, setDetailedAnalysis] = useState<DetailedAIAnalysis | null>(null);
@@ -304,6 +303,19 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
     const allDataForPdf = { companyData, segment, answers, totalScore, maturity, summaryInsights, detailedAnalysis, scoresByArea };
 
+    const handleOpenPublicReport = async () => {
+        try {
+            const isProduction = window.location.hostname === 'app.grupoggv.com';
+            const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+            const reportData = allDataForPdf;
+            const { token } = await createPublicReport(reportData, undefined, undefined, dealId);
+            const url = `${baseUrl}/r/${token}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            console.error('Falha ao abrir relatório público:', e);
+        }
+    };
+
     return (
         <div className="w-full max-w-7xl mx-auto animate-fade-in space-y-6">
             <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-lg border border-slate-200/50">
@@ -346,8 +358,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 <button onClick={() => setShowEmailModal(true)} className="flex items-center gap-2 text-sm font-semibold bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors">
                     <EnvelopeIcon className="w-5 h-5" /> Enviar por E-mail
                 </button>
-                <button onClick={() => setShowPdfModal(true)} className="flex items-center gap-2 text-sm font-semibold bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors">
-                    <DocumentTextIcon className="w-5 h-5" /> Visualizar PDF
+                <button onClick={handleOpenPublicReport} className="flex items-center gap-2 text-sm font-semibold bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors">
+                    <DocumentTextIcon className="w-5 h-5" /> Abrir Relatório Público
                 </button>
                 <button onClick={onRetry} className="flex items-center gap-2 text-sm font-semibold bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors">
                     <RefreshIcon className="w-5 h-5" /> Refazer
@@ -355,7 +367,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             </div>
 
             {showEmailModal && <EmailModal onClose={() => setShowEmailModal(false)} companyData={companyData} reportData={allDataForPdf} dealId={dealId} />}
-            {showPdfModal && <PdfModal onClose={() => setShowPdfModal(false)} reportData={allDataForPdf} />}
         </div>
     );
 };
