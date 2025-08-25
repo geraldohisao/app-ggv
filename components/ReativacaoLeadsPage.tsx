@@ -271,6 +271,31 @@ const ReativacaoLeadsPage: React.FC = () => {
     );
   };
 
+  // Determina o status exibido considerando salvaguardas (ex.: N8N retornou failed mas processou leads)
+  const getDisplayStatus = (item: AutomationHistoryItem): string => {
+    try {
+      const rawStatus = (item?.status || '').toString();
+      const n8nResponse: any = (item as any)?.n8nResponse || {};
+      const leadsProcessed = Number(
+        safeGet(n8nResponse, 'leadsProcessed', safeGet(n8nResponse, 'data.leadsProcessed', 0))
+      ) || 0;
+      const errors = safeGet(n8nResponse, 'data.errors', null);
+      const hasErrors = Array.isArray(errors) ? errors.length > 0 : Boolean(errors);
+
+      // Se status já está como sucesso/concluído, mantemos
+      if (rawStatus === 'success' || rawStatus === 'completed') return 'completed';
+
+      // Salvaguarda: se retornou failed, mas processou 1+ leads e não há erros, considerar concluído
+      if (rawStatus === 'failed' && leadsProcessed > 0 && !hasErrors) {
+        return 'completed';
+      }
+
+      return rawStatus || 'pending';
+    } catch {
+      return item?.status || 'pending';
+    }
+  };
+
   // Função para renderizar progresso
   const renderProgress = (item: AutomationHistoryItem) => {
     // Verificação de segurança para n8nResponse
@@ -678,7 +703,7 @@ const ReativacaoLeadsPage: React.FC = () => {
                   <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        {getStatusBadge(item.status)}
+                        {getStatusBadge(getDisplayStatus(item))}
                         <div>
                           <p className="font-medium text-slate-900">{item.filtro}</p>
                           <p className="text-sm text-slate-600">
@@ -715,7 +740,7 @@ const ReativacaoLeadsPage: React.FC = () => {
                     {renderProgress(item)}
 
                     {/* Botão para marcar como concluído manualmente */}
-                    {item.status !== 'completed' && item.status !== 'error' && item.status !== 'success' && item.status !== 'failed' && (
+                    {getDisplayStatus(item) !== 'completed' && getDisplayStatus(item) !== 'error' && getDisplayStatus(item) !== 'success' && getDisplayStatus(item) !== 'failed' && (
                       <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="flex items-center justify-between">
                           <div>
@@ -745,7 +770,7 @@ const ReativacaoLeadsPage: React.FC = () => {
                           <strong>Status N8N:</strong>
                         </div>
                         <div className="mt-2 font-mono text-xs bg-white p-2 rounded border">
-                          {item.status === 'success' || item.status === 'completed' ? (
+                          {getDisplayStatus(item) === 'completed' ? (
                             <div className="text-green-600">
                               ✅ Workflow executado com sucesso
                               {safeGet(item.n8nResponse, 'leadsProcessed') && (
@@ -754,7 +779,7 @@ const ReativacaoLeadsPage: React.FC = () => {
                                 </div>
                               )}
                             </div>
-                          ) : item.status === 'failed' ? (
+                          ) : getDisplayStatus(item) === 'failed' ? (
                             <div className="text-red-600">
                               ❌ Workflow falhou no N8N
                               {safeGet(item.n8nResponse, 'message') && (
@@ -768,11 +793,11 @@ const ReativacaoLeadsPage: React.FC = () => {
                                 </div>
                               )}
                             </div>
-                          ) : item.status === 'processing' || item.status === 'starting' || item.status === 'started' || item.status === 'finalizing' || item.status === 'connecting' || item.status === 'fetching' ? (
+                          ) : getDisplayStatus(item) === 'processing' || getDisplayStatus(item) === 'starting' || getDisplayStatus(item) === 'started' || getDisplayStatus(item) === 'finalizing' || getDisplayStatus(item) === 'connecting' || getDisplayStatus(item) === 'fetching' ? (
                             <div className="text-blue-600">
                               🔄 Workflow em execução no N8N...
                             </div>
-                          ) : item.status === 'error' ? (
+                          ) : getDisplayStatus(item) === 'error' ? (
                             <div className="text-red-600">
                               ❌ Erro na execução do workflow
                             </div>

@@ -21,8 +21,14 @@ import UserMenu from './components/UserMenu';
 import AppBrand from './components/common/AppBrand';
 import FinalLoginPage from './components/FinalLoginPage';
 import { getModuleFromPath, isStandalonePage } from './utils/router';
-import SessionDebugPanel from './components/debug/SessionDebugPanel';
-import RoleTestPanel from './components/debug/RoleTestPanel';
+import EnhancedSessionDebugPanel from './components/debug/EnhancedSessionDebugPanel';
+import EnhancedRoleTestPanel from './components/debug/EnhancedRoleTestPanel';
+import SuperAdminDebugPanel from './components/debug/SuperAdminDebugPanel';
+import TestDebugAccess from './components/debug/TestDebugAccess';
+import SuperAdminDebugPanelV2 from './components/debug/SuperAdminDebugPanelV2';
+import FinalUnifiedDebugPanel from './components/debug/FinalUnifiedDebugPanel';
+import FeedbackWidget from './components/ui/FeedbackWidget';
+import { enableCriticalFetchAlerts } from './src/utils/net';
 
 
 const AppContent: React.FC = () => {
@@ -54,6 +60,11 @@ const AppContent: React.FC = () => {
   // Logos desabilitados temporariamente para evitar erros 404
   useEffect(() => {
     console.log('📱 APP - Inicializado sem buscar logos (evitando erros 404)');
+  }, []);
+
+  // Habilitar alertas críticos de fetch (erros 5xx/rede em rotas críticas)
+  useEffect(() => {
+    enableCriticalFetchAlerts();
   }, []);
 
   // Listener para mudanças de rota
@@ -187,13 +198,10 @@ const AppContent: React.FC = () => {
         {renderModule()}
       </main>
       
-      {/* Painéis de debug - apenas em desenvolvimento */}
-      {process.env.NODE_ENV === 'development' && (
-        <>
-          <SessionDebugPanel />
-          <RoleTestPanel />
-        </>
-      )}
+      {/* Painel de debug unificado */}
+      <FinalUnifiedDebugPanel />
+      {/* Floating feedback for non-admin users */}
+      <FeedbackWidget />
     </div>
   );
 };

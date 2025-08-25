@@ -34,12 +34,14 @@ export async function* getAssistantStream(
     const payload = {
       message,
       personaId,
+      persona,
       history,
+      knowledgeBase,
       flags: {
         forceWeb: options.forceWeb || false
       },
       requestId
-    };
+    } as any;
 
     const base = (typeof import.meta !== 'undefined' && (import.meta as any).env)
       ? ((import.meta as any).env.VITE_API_BASE_URL || '')
@@ -105,10 +107,7 @@ export async function* getAssistantStream(
       reader.releaseLock();
     }
 
-    // Yield final complete text
-    if (fullText) {
-      yield fullText;
-    }
+    // Do not yield full text again; deltas already streamed
 
   } catch (error) {
     console.error('AI Router stream error:', error);

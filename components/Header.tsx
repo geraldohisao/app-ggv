@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule, onLogout
                 <div className="flex items-center justify-between h-16">
                     {/* Left side: Logo (dinâmico via app_settings, com fallback local) */}
                     <div className="flex-shrink-0">
-                        <AppBrand className="h-12" />
+                        <AppBrand size="md-compact" />
                     </div>
 
                     {/* Center: Main Navigation */}

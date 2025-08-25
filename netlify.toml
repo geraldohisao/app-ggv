@@ -30,6 +30,25 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/ai/stream"
+  to = "/.netlify/functions/ai-stream"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/alert"
+  to = "/.netlify/functions/alert"
+  status = 200
+  force = true
+
+# Feedback forward proxy
+[[redirects]]
+  from = "/api/feedback"
+  to = "/.netlify/functions/feedback"
+  status = 200
+  force = true
+
 # Redirects para SPA (Single Page Application) - deve ficar por último
 [[redirects]]
   from = "/*"

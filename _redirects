@@ -1,10 +1,7 @@
-# Redirects para SPA (Single Page Application)
-/*    /index.html   200
+# SPA redirects only (serverless function redirects live in netlify.toml)
+/*  /index.html  200
 
-# API redirects para o novo domínio
-/api/*  https://app.grupoggv.com/api/:splat  200
-
-# Redirects específicos para o novo domínio
+# Specific SPA routes
 /diagnostico*  /index.html  200
 /resultado-diagnostico*  /index.html  200
 /r/*  /index.html  200

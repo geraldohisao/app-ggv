@@ -2,7 +2,7 @@ import React from 'react';
 
 interface GGVLogoProps {
   className?: string;
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'medium' | 'medium-compact' | 'large';
   variant?: 'horizontal' | 'vertical' | 'icon-only';
 }
 
@@ -21,29 +21,53 @@ export const GGVLogo: React.FC<GGVLogoProps> = ({
   const sizeClasses = {
     small: 'h-8',
     medium: 'h-12',
+    'medium-compact': 'h-10', // 15% menor que medium (h-12 = 48px, h-10 = 40px ≈ 15% redução)
     large: 'h-16'
   };
 
   // Fallback SVG caso a imagem não carregue
-  const FallbackLogo = () => (
-    <div className={`flex items-center gap-2 ${sizeClasses[size]}`}>
-      <div className={`${size === 'small' ? 'w-8 h-8' : size === 'medium' ? 'w-12 h-12' : 'w-16 h-16'} rounded-xl bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center shadow-lg`}>
-        <span className={`text-white font-bold ${size === 'small' ? 'text-sm' : size === 'medium' ? 'text-xl' : 'text-2xl'}`}>
-          G
-        </span>
-      </div>
-      {variant !== 'icon-only' && (
-        <div className="flex flex-col">
-          <span className={`font-extrabold text-slate-900 leading-none ${size === 'small' ? 'text-lg' : size === 'medium' ? 'text-2xl' : 'text-3xl'}`}>
-            GRUPO
-          </span>
-          <span className={`font-extrabold text-teal-600 leading-none ${size === 'small' ? 'text-lg' : size === 'medium' ? 'text-2xl' : 'text-3xl'}`}>
-            GGV
+  const FallbackLogo = () => {
+    const getIconSize = () => {
+      if (size === 'small') return 'w-8 h-8';
+      if (size === 'medium-compact') return 'w-10 h-10';
+      if (size === 'medium') return 'w-12 h-12';
+      return 'w-16 h-16';
+    };
+
+    const getTextSize = () => {
+      if (size === 'small') return 'text-sm';
+      if (size === 'medium-compact') return 'text-lg';
+      if (size === 'medium') return 'text-xl';
+      return 'text-2xl';
+    };
+
+    const getBrandTextSize = () => {
+      if (size === 'small') return 'text-lg';
+      if (size === 'medium-compact') return 'text-xl';
+      if (size === 'medium') return 'text-2xl';
+      return 'text-3xl';
+    };
+
+    return (
+      <div className={`flex items-center gap-2 ${sizeClasses[size]}`}>
+        <div className={`${getIconSize()} rounded-xl bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center shadow-lg`}>
+          <span className={`text-white font-bold ${getTextSize()}`}>
+            G
           </span>
         </div>
-      )}
-    </div>
-  );
+        {variant !== 'icon-only' && (
+          <div className="flex flex-col">
+            <span className={`font-extrabold text-slate-900 leading-none ${getBrandTextSize()}`}>
+              GRUPO
+            </span>
+            <span className={`font-extrabold text-teal-600 leading-none ${getBrandTextSize()}`}>
+              GGV
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Se for apenas ícone, usar o fallback sempre
   if (variant === 'icon-only') {
@@ -73,14 +97,35 @@ export const GGVLogo: React.FC<GGVLogoProps> = ({
             // Substituir por fallback
             target.style.display = 'none';
             const fallbackDiv = document.createElement('div');
+            const getIconSizeClass = () => {
+              if (size === 'small') return 'w-8 h-8';
+              if (size === 'medium-compact') return 'w-10 h-10';
+              if (size === 'medium') return 'w-12 h-12';
+              return 'w-16 h-16';
+            };
+
+            const getTextSizeClass = () => {
+              if (size === 'small') return 'text-sm';
+              if (size === 'medium-compact') return 'text-lg';
+              if (size === 'medium') return 'text-xl';
+              return 'text-2xl';
+            };
+
+            const getBrandTextSizeClass = () => {
+              if (size === 'small') return 'text-lg';
+              if (size === 'medium-compact') return 'text-xl';
+              if (size === 'medium') return 'text-2xl';
+              return 'text-3xl';
+            };
+
             fallbackDiv.innerHTML = `
               <div class="flex items-center gap-2">
-                <div class="${size === 'small' ? 'w-8 h-8' : size === 'medium' ? 'w-12 h-12' : 'w-16 h-16'} rounded-xl bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center shadow-lg">
-                  <span class="text-white font-bold ${size === 'small' ? 'text-sm' : size === 'medium' ? 'text-xl' : 'text-2xl'}">G</span>
+                <div class="${getIconSizeClass()} rounded-xl bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center shadow-lg">
+                  <span class="text-white font-bold ${getTextSizeClass()}">G</span>
                 </div>
                 <div class="flex flex-col">
-                  <span class="font-extrabold text-slate-900 leading-none ${size === 'small' ? 'text-lg' : size === 'medium' ? 'text-2xl' : 'text-3xl'}">GRUPO</span>
-                  <span class="font-extrabold text-teal-600 leading-none ${size === 'small' ? 'text-lg' : size === 'medium' ? 'text-2xl' : 'text-3xl'}">GGV</span>
+                  <span class="font-extrabold text-slate-900 leading-none ${getBrandTextSizeClass()}">GRUPO</span>
+                  <span class="font-extrabold text-teal-600 leading-none ${getBrandTextSizeClass()}">GGV</span>
                 </div>
               </div>
             `;

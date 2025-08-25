@@ -92,3 +92,5 @@ docker-compose.override.yml
 
 # Supabase
 .supabase/
+# Local Netlify folder
+.netlify

@@ -3,7 +3,8 @@ import React, { useMemo } from 'react';
 const MarkdownRenderer: React.FC<{ text: string, inline?: boolean, className?: string }> = ({ text, className, inline = false }) => {
     if (!text) return null;
 
-    const stripEmojis = (s: string) => s.replace(/[\p{Extended_Pictographic}\p{Emoji_Component}]/gu, '');
+    // Mantém emojis/emoticons exatamente como vieram da IA
+    const stripEmojis = (s: string) => s;
 
     const renderContent = (line: string) => {
         // Negrito e itálico
@@ -60,15 +61,15 @@ const MarkdownRenderer: React.FC<{ text: string, inline?: boolean, className?: s
     
     const flushList = () => {
         if (currentList.length > 0) {
-            groupedElements.push(<ul key={`ul-${groupedElements.length}`} className="list-disc pl-5 space-y-1 my-2">{currentList}</ul>);
+            groupedElements.push(<ul key={`ul-${groupedElements.length}`} className="list-disc pl-5 space-y-1 my-2 ml-1">{currentList}</ul>);
             currentList = [];
         }
         if (currentOList.length > 0) {
-            groupedElements.push(<ol key={`ol-${groupedElements.length}`} className="list-decimal pl-5 space-y-1 my-2">{currentOList}</ol>);
+            groupedElements.push(<ol key={`ol-${groupedElements.length}`} className="list-decimal pl-5 space-y-1 my-2 ml-1">{currentOList}</ol>);
             currentOList = [];
         }
         if (inParagraph.length > 0) {
-            groupedElements.push(<p key={`p-${groupedElements.length}`} className="my-2 leading-relaxed">{inParagraph}</p>);
+            groupedElements.push(<p key={`p-${groupedElements.length}`} className="my-3 leading-7">{inParagraph}</p>);
             inParagraph = [];
         }
     };
@@ -82,13 +83,13 @@ const MarkdownRenderer: React.FC<{ text: string, inline?: boolean, className?: s
             flushList();
             switch(el.type) {
                 case 'h1':
-                    groupedElements.push(<h1 key={el.key} className="text-2xl font-extrabold mt-5 mb-3 border-b-2 pb-2">{renderContent(el.content)}</h1>);
+                    groupedElements.push(<h1 key={el.key} className="text-2xl md:text-[26px] font-extrabold mt-2 mb-3">{renderContent(el.content)}</h1>);
                     break;
                 case 'h2':
-                    groupedElements.push(<h2 key={el.key} className="text-xl font-bold mt-4 mb-2 border-b pb-1">{renderContent(el.content)}</h2>);
+                    groupedElements.push(<h2 key={el.key} className="text-xl md:text-[20px] font-bold mt-3 mb-2">{renderContent(el.content)}</h2>);
                     break;
                 case 'h3':
-                    groupedElements.push(<h3 key={el.key} className="text-lg font-semibold mt-3 mb-1">{renderContent(el.content)}</h3>);
+                    groupedElements.push(<h3 key={el.key} className="text-lg font-semibold mt-2 mb-1">{renderContent(el.content)}</h3>);
                     break;
                 case 'p':
                     if (el.content) inParagraph.push(<span key={el.key} className="block">{renderContent(el.content)}</span>);
@@ -100,7 +101,7 @@ const MarkdownRenderer: React.FC<{ text: string, inline?: boolean, className?: s
     
     flushList();
 
-    return <div className={`prose-sm md:prose-base prose-slate max-w-none break-words whitespace-pre-wrap ${className}`}>{groupedElements}</div>;
+    return <div className={`max-w-none break-words whitespace-normal leading-7 ${className}`}>{groupedElements}</div>;
 };
 
 export default MarkdownRenderer;

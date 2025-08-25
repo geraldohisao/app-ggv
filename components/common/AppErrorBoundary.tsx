@@ -1,5 +1,6 @@
 import React from 'react';
 import { EnhancedErrorBoundary } from '../debug/ErrorBoundary';
+import { postCriticalAlert } from '../../src/utils/net';
 
 type State = { hasError: boolean };
 
@@ -44,6 +45,21 @@ export const AppErrorBoundaryEnhanced: React.FC<{ children: React.ReactNode }> =
             }
           );
         }
+
+        // Enviar alerta crítico
+        try {
+          postCriticalAlert({
+            title: 'Erro na aplicação',
+            message: error?.message || String(error),
+            context: {
+              url: typeof window !== 'undefined' ? window.location.href : '',
+              stack: error?.stack || '',
+              componentStack: errorInfo.componentStack,
+              userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+              appVersion: (typeof window !== 'undefined' && (window as any).__APP_VERSION__) || ''
+            }
+          });
+        } catch {}
       }}
       fallback={({ error, retry }) => (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">

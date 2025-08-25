@@ -106,6 +106,12 @@ export const LightBulbIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+export const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 21l-1.062-5.096A4.5 4.5 0 0 0 5.096 16L0 15l5.096-1a4.5 4.5 0 0 0 2.842-1.904L9 7l1.062 5.096A4.5 4.5 0 0 0 12.904 14L18 15l-5.096 1a4.5 4.5 0 0 0-3.091-.096zM16 3l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3zm4 10 1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" />
+  </svg>
+);
+
 export const ChartPieIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 100 15 7.5 7.5 0 000-15zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -117,6 +123,12 @@ export const ArrowPathIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-11.664 0l4.5-4.5m-4.5 4.5L7.5 4.5m12 0l-3.181 3.183a8.25 8.25 0 01-11.664 0L2.985 15.356" />
     </svg>
+);
+
+export const ChatBubbleLeftRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75c0 .44.09.86.254 1.243A3.749 3.749 0 0 0 6 16.5h3.75l3 3v-3H18a3.75 3.75 0 0 0 3.496-2.507c.164-.383.254-.804.254-1.243v-6A3.75 3.75 0 0 0 18 3.75H6A3.75 3.75 0 0 0 2.25 7.5v5.25z" />
+  </svg>
 );
 
 // Refresh icon (duas setas circulares) – mais reconhecível para ação de atualizar

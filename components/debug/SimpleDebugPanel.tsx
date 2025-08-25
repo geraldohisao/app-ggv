@@ -1,170 +1,134 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useUser } from '../../contexts/UserContext';
+import { UserRole } from '../../types';
 
-interface SimpleDebugPanelProps {
-  className?: string;
-}
+export const SimpleDebugPanel: React.FC = () => {
+  const { user } = useUser();
+  const [isOpen, setIsOpen] = useState(false);
 
-export const SimpleDebugPanel: React.FC<SimpleDebugPanelProps> = ({ className = '' }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  // Log para debug
+  console.log('🔥 SimpleDebugPanel - Renderizando sempre');
+  console.log('🔥 User:', user);
+  console.log('🔥 User role:', user?.role);
 
-  // Toggle com Ctrl+Shift+D
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-        e.preventDefault();
-        setIsVisible(prev => !prev);
-      }
-    };
+  // Verificar acesso (temporariamente mais permissivo)
+  const hasAccess = user?.role === UserRole.SuperAdmin || 
+                   user?.role === UserRole.Admin || 
+                   user !== null; // Qualquer usuário logado
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  console.log('🔥 Has access:', hasAccess);
 
-  // Capturar erros globais
-  useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      const errorMsg = `ERROR: ${event.message} (${event.filename}:${event.lineno})`;
-      setLogs(prev => [...prev.slice(-9), errorMsg]);
-      console.error('🐛 [DEBUG] Erro capturado:', event);
-    };
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      const errorMsg = `PROMISE REJECTION: ${event.reason}`;
-      setLogs(prev => [...prev.slice(-9), errorMsg]);
-      console.error('🐛 [DEBUG] Promise rejeitada:', event.reason);
-    };
-
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    // Função global simples
-    (window as any).debugLog = (message: string) => {
-      const timestamp = new Date().toLocaleTimeString();
-      const logMsg = `${timestamp}: ${message}`;
-      setLogs(prev => [...prev.slice(-9), logMsg]);
-      console.log('🐛 [DEBUG]', message);
-    };
-
-    // Log inicial
-    setLogs(['Sistema de debug inicializado']);
-
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
-
-  if (!isVisible) {
-    return (
-      <button
-        onClick={() => setIsVisible(true)}
-        className="fixed bottom-4 right-4 w-12 h-12 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 z-50 flex items-center justify-center text-xl"
-        title="Abrir debug (Ctrl+Shift+D)"
-      >
-        🐛
-      </button>
-    );
-  }
-
+  // SEMPRE renderizar algo para debug
   return (
-    <div className={`fixed top-0 right-0 w-80 h-full bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-red-50">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🐛</span>
-          <h2 className="font-semibold text-gray-900">Debug Simples</h2>
-        </div>
+    <div className="fixed top-20 right-4 z-50">
+      {/* Indicador sempre visível */}
+      <div className="bg-red-500 text-white p-2 rounded mb-2 text-xs">
+        🔥 Debug: {user ? 'Logado' : 'Não logado'}
+      </div>
+
+      {/* Botão de acesso */}
+      {hasAccess && (
         <button
-          onClick={() => setIsVisible(false)}
-          className="p-1 text-gray-400 hover:text-gray-600"
-          title="Fechar"
+          onClick={() => {
+            console.log('🔥 Botão clicado!');
+            setIsOpen(!isOpen);
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg mb-2 block w-full"
         >
-          ✕
+          {isOpen ? '❌ Fechar' : '🛡️ Debug Panel'}
         </button>
-      </div>
+      )}
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="mb-4">
-          <button
-            onClick={() => setLogs([])}
-            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-          >
-            Limpar Logs
-          </button>
-          <button
-            onClick={() => {
-              (window as any).debugLog('Teste manual do sistema');
-            }}
-            className="ml-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-          >
-            Teste
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <h3 className="font-semibold">Logs ({logs.length})</h3>
-          {logs.length === 0 ? (
-            <div className="text-gray-500 text-sm">Nenhum log ainda</div>
-          ) : (
-            <div className="space-y-1 text-xs font-mono bg-gray-100 p-2 rounded max-h-60 overflow-y-auto">
-              {logs.map((log, i) => (
-                <div key={i} className="text-gray-700">
-                  {log}
-                </div>
-              ))}
+      {/* Painel principal */}
+      {isOpen && hasAccess && (
+        <div className="bg-white border-2 border-blue-500 rounded-lg shadow-xl p-4 w-80 max-h-96 overflow-y-auto">
+          <h3 className="font-bold text-lg mb-3 text-blue-800">🛡️ Debug Panel</h3>
+          
+          {/* Info do usuário */}
+          <div className="bg-gray-100 p-3 rounded mb-3">
+            <h4 className="font-semibold mb-2">👤 Usuário</h4>
+            <div className="text-sm space-y-1">
+              <div><strong>Email:</strong> {user?.email || 'N/A'}</div>
+              <div><strong>Nome:</strong> {user?.name || 'N/A'}</div>
+              <div><strong>Role:</strong> 
+                <span className="bg-red-100 text-red-800 px-2 py-1 rounded ml-2 text-xs">
+                  {user?.role || 'N/A'}
+                </span>
+              </div>
             </div>
-          )}
-        </div>
-
-        <div className="mt-4 space-y-2">
-          <h3 className="font-semibold">Informações do Sistema</h3>
-          <div className="text-xs space-y-1 bg-gray-100 p-2 rounded">
-            <div>URL: {window.location.href}</div>
-            <div>User Agent: {navigator.userAgent.slice(0, 50)}...</div>
-            <div>Online: {navigator.onLine ? '✅' : '❌'}</div>
-            <div>Timestamp: {new Date().toLocaleString()}</div>
           </div>
-        </div>
 
-        <div className="mt-4">
-          <h3 className="font-semibold mb-2">Testes</h3>
+          {/* Ações rápidas */}
           <div className="space-y-2">
+            <h4 className="font-semibold">🧪 Testes Rápidos</h4>
+            
             <button
               onClick={() => {
-                throw new Error('Teste de erro intencional');
+                console.log('🔥 Teste 1: Log simples');
+                alert('Teste 1: Log enviado para console!');
               }}
-              className="w-full px-3 py-2 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded text-sm"
             >
-              Gerar Erro de Teste
+              📝 Teste Log
             </button>
+
             <button
-              onClick={() => {
-                Promise.reject('Teste de promise rejection');
+              onClick={async () => {
+                console.log('🔥 Teste 2: Testando fetch...');
+                try {
+                  const response = await fetch('/api/test', { method: 'HEAD' });
+                  console.log('🔥 Response status:', response.status);
+                  alert(`Teste 2: Status ${response.status}`);
+                } catch (error) {
+                  console.log('🔥 Fetch error:', error);
+                  alert('Teste 2: Erro na requisição (normal)');
+                }
               }}
-              className="w-full px-3 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700"
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-3 rounded text-sm"
             >
-              Gerar Promise Rejection
+              🌐 Teste API
             </button>
+
             <button
               onClick={() => {
-                console.log('Teste de console.log');
-                console.warn('Teste de console.warn');
-                console.error('Teste de console.error');
+                console.log('🔥 Teste 3: Info do sistema');
+                const info = {
+                  url: window.location.href,
+                  userAgent: navigator.userAgent.slice(0, 50),
+                  online: navigator.onLine,
+                  language: navigator.language
+                };
+                console.log('🔥 System info:', info);
+                alert('Teste 3: Info enviada para console!');
               }}
-              className="w-full px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded text-sm"
             >
-              Testar Console Logs
+              💻 Info Sistema
+            </button>
+
+            <button
+              onClick={() => {
+                console.log('🔥 Teste 4: Simulando erro...');
+                try {
+                  throw new Error('Erro simulado para teste');
+                } catch (error) {
+                  console.error('🔥 Erro capturado:', error);
+                  alert('Teste 4: Erro simulado (veja console)');
+                }
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded text-sm"
+            >
+              💥 Simular Erro
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Footer */}
-      <div className="p-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 text-center">
-        Ctrl+Shift+D para toggle
-      </div>
+          {/* Footer */}
+          <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-600">
+            <div>🕐 {new Date().toLocaleTimeString()}</div>
+            <div>🌍 {window.location.hostname}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

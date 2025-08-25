@@ -37,4 +37,113 @@ export async function fetchWithTimeout(
   return attempt(0);
 }
 
+export async function postCriticalAlert(payload: {
+  title: string;
+  message: string;
+  context?: any;
+}) {
+  try {
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    let endpoint = '/api/alert';
+    if (isLocalhost && typeof window !== 'undefined' && window.location.port !== '8888') {
+      endpoint = 'http://localhost:8888/.netlify/functions/alert';
+    }
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  } catch {}
+}
+
+type CriticalFetchOptions = {
+  enable?: boolean;
+  urlPatterns?: (string | RegExp)[];
+  minStatusToAlert?: number; // e.g., 500
+};
+
+function getStoredUserSafe(): { name?: string; email?: string; role?: string } | undefined {
+  try {
+    const raw = localStorage.getItem('ggv-user-session');
+    if (!raw) return undefined;
+    const u = JSON.parse(raw);
+    return { name: u?.name, email: u?.email, role: u?.role };
+  } catch {
+    return undefined;
+  }
+}
+
+export function enableCriticalFetchAlerts(options: CriticalFetchOptions = {}) {
+  if (typeof window === 'undefined' || (window as any).__CRIT_FETCH_PATCHED__) return;
+  const {
+    enable = true,
+    minStatusToAlert = 500,
+    urlPatterns = [
+      '/api/',
+      '/.netlify/functions/',
+      /https?:\/\/[^/]*supabase\.(?:co|in)\//
+    ]
+  } = options;
+
+  if (!enable) return;
+
+  const origFetch = window.fetch.bind(window);
+  (window as any).__CRIT_FETCH_PATCHED__ = true;
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : (input as any)?.url || String(input);
+    const method = (init?.method || (typeof input !== 'string' && (input as Request)?.method) || 'GET').toUpperCase();
+
+    const matchesCritical = () => {
+      try {
+        return urlPatterns.some(p => typeof p === 'string' ? url.includes(p) : (p as RegExp).test(url));
+      } catch {
+        return false;
+      }
+    };
+
+    try {
+      const res = await origFetch(input as any, init);
+      if (matchesCritical() && res.status >= minStatusToAlert) {
+        // clone response safely
+        let bodySnippet = '';
+        try {
+          const text = await res.clone().text();
+          bodySnippet = text.slice(0, 500);
+        } catch {}
+        postCriticalAlert({
+          title: `HTTP ${res.status} em ${method}`,
+          message: `Falha em requisição crítica` ,
+          context: {
+            url,
+            method,
+            status: res.status,
+            responsePreview: bodySnippet,
+            user: getStoredUserSafe(),
+            userAgent: navigator.userAgent,
+            appVersion: (window as any).__APP_VERSION__ || ''
+          }
+        });
+      }
+      return res;
+    } catch (err: any) {
+      if (matchesCritical()) {
+        postCriticalAlert({
+          title: `Erro de rede em ${method}`,
+          message: err?.message || String(err),
+          context: {
+            url,
+            method,
+            errorName: err?.name,
+            user: getStoredUserSafe(),
+            userAgent: navigator.userAgent,
+            appVersion: (window as any).__APP_VERSION__ || ''
+          }
+        });
+      }
+      throw err;
+    }
+  };
+}
+
 

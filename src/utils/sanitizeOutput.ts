@@ -6,9 +6,8 @@ export function sanitizeOutput(text: string, maxChars = 4000): string {
   // remove possíveis linhas internas
   text = text.replace(/^\s*(system:|internal:).*$\n?/gmi, '');
   // remover emojis unicode e aliases :emoji:
-  try {
-    text = text.replace(/[\p{Extended_Pictographic}\p{Emoji_Component}]/gu, '');
-  } catch {}
+  // Não remover emojis; manter fidelidade à resposta da IA
+  // Apenas remover aliases :emoji: que às vezes aparecem como tokens literais
   text = text.replace(/:[a-z_]+:/gi, '');
   // truncar preservando palavra
   if (text.length > maxChars) {
