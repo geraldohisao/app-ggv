@@ -318,12 +318,21 @@ export const CLOSER_REMUNERATION = {
     ]
   },
   teamBonus: {
-    threshold: 0.75, // Paid from 75% of team goal
+    // Premiação coletiva baseada no atingimento da meta global do time
+    // Tiers ordenados do maior para o menor para uso com getTieredValue
+    tiers: [
+      { threshold: 1.50, label: 'Acima de 150%' },
+      { threshold: 1.30, label: '130% a 149,99%' },
+      { threshold: 1.00, label: '100% a 129,99%' },
+      { threshold: 0.85, label: '85% a 99,99%' },
+      { threshold: 0.75, label: '75% a 84,99%' },
+    ],
     values: {
-      level1: 1500.00,
-      level2: 1800.00,
-      level3: 2100.00,
-      level4: 2400.00,
+      // Valores por nível (150%+, 130-149.99%, 100-129.99%, 85-99.99%, 75-84.99%)
+      level1: [1600.00, 1300.00, 1000.00, 750.00, 500.00],
+      level2: [2000.00, 1600.00, 1250.00, 1000.00, 750.00],
+      level3: [2400.00, 1800.00, 1500.00, 1250.00, 1000.00],
+      level4: [2800.00, 2000.00, 1750.00, 1500.00, 1250.00],
     }
   },
   quarterlyBonus: { // Based on Venda/SQL conversion, with a specific threshold per level

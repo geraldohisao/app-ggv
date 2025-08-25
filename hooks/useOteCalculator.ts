@@ -85,7 +85,11 @@ export const useOteCalculator = (
             const comissaoRate = getTieredRate(progressoMensal, CLOSER_REMUNERATION.individualCommission.tiers);
             const comissaoIndividualMeta = vendasRealizadas * comissaoRate;
 
-            const premiacaoColetiva = metaColetivaGlobalPerc >= CLOSER_REMUNERATION.teamBonus.threshold ? CLOSER_REMUNERATION.teamBonus.values[nivelKey as keyof typeof CLOSER_REMUNERATION.teamBonus.values] : 0;
+            const premiacaoColetiva = getTieredValue(
+                metaColetivaGlobalPerc,
+                CLOSER_REMUNERATION.teamBonus.tiers,
+                CLOSER_REMUNERATION.teamBonus.values[nivelKey as keyof typeof CLOSER_REMUNERATION.teamBonus.values]
+            );
 
             const conversaoTrimestral = sqlsDoTrimestre > 0 ? (vendasDoTrimestre / sqlsDoTrimestre) : 0;
             const quarterlyBonusRule = CLOSER_REMUNERATION.quarterlyBonus[nivelKey as keyof typeof CLOSER_REMUNERATION.quarterlyBonus];
