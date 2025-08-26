@@ -194,11 +194,30 @@ const OpportunityFeedbackPage: React.FC = () => {
       console.log('📊 WEBHOOK - Status:', response.status);
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Tentar obter corpo de erro para diagnosticar
+        let errorBody = '';
+        try { errorBody = await response.text(); } catch {}
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorBody ? ` - ${errorBody.slice(0, 200)}` : ''}`);
       }
 
-      const result = await response.json();
-      console.log('✅ WEBHOOK - Enviado com sucesso');
+      // Alguns ambientes retornam texto simples em 200; não falhar se não for JSON
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      let result: any = null;
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch {
+          // Fallback silencioso
+          result = null;
+        }
+      } else {
+        try {
+          result = await response.text();
+        } catch {
+          result = null;
+        }
+      }
+      console.log('✅ WEBHOOK - Enviado com sucesso', result);
       return result;
     } catch (error) {
       console.error('❌ WEBHOOK - Falha na requisição:', error);
