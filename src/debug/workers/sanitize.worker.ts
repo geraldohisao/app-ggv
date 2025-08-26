@@ -3,8 +3,7 @@
  * Processa payloads de erro em background thread
  */
 
-// Importar funções de sanitização (serão copiadas para o worker)
-import { sanitizeErrorData } from '../../utils/sanitizeErrorData';
+// Nota: implementação local definida no final do arquivo para evitar conflitos de import
 
 export interface SanitizeRequest {
   id: string;

@@ -4,6 +4,7 @@ import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import ErrorEventsAdmin from './ErrorEventsAdmin';
+import DebugLogsAdmin from './DebugLogsAdmin';
 import { getSessionInfo } from '../../utils/sessionUtils';
 
 interface DebugLog {
@@ -433,7 +434,8 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
           { key: 'system', label: 'Sistema', icon: '💻' },
           { key: 'session', label: 'Sessão', icon: '🕐' },
           { key: 'permissions', label: 'Roles', icon: '🔐' },
-          { key: 'incidents', label: 'Incidentes', icon: '🚨' }
+          { key: 'incidents', label: 'Incidentes', icon: '🚨' },
+          { key: 'logs_admin', label: 'Logs (Histórico)', icon: '🗄️' }
         ].map(tab => (
           <button
             key={tab.key}
@@ -1027,6 +1029,13 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
         {activeTab === 'incidents' && (
           <div className="h-full overflow-hidden">
             <ErrorEventsAdmin />
+          </div>
+        )}
+
+        {/* Logs Admin Tab (persistidos) */}
+        {activeTab === 'logs_admin' && (
+          <div className="h-full overflow-hidden">
+            <DebugLogsAdmin />
           </div>
         )}
 

@@ -141,11 +141,14 @@ export const ErrorEventsAdmin: React.FC = () => {
       }, {});
 
       const chartDataArray = Object.entries(dailyData)
-        .map(([date, count]) => ({
-          date,
-          count,
-          severity: count >= 10 ? 'critical' : count >= 5 ? 'high' : count >= 2 ? 'medium' : 'low'
-        }))
+        .map(([date, count]) => {
+          const n = typeof count === 'number' ? count : Number(count as any) || 0;
+          return {
+            date,
+            count: n,
+            severity: n >= 10 ? 'critical' : n >= 5 ? 'high' : n >= 2 ? 'medium' : 'low'
+          };
+        })
         .sort((a, b) => a.date.localeCompare(b.date))
         .slice(-7); // Last 7 days
 

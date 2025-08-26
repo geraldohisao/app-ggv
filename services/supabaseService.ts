@@ -1170,15 +1170,52 @@ export const migratePlatformLogosToAppSettings = async (): Promise<boolean> => {
 };
 
 export const getAppSetting = async (key: string): Promise<any> => {
-    if (!supabase) throw new Error("Supabase client is not initialized.");
+    // Fallback imediato para configuração local (usado em ambientes restritos/offline)
+    const readLocalFallback = (): any => {
+        try {
+            const local: any = (globalThis as any).APP_CONFIG_LOCAL;
+            if (local && Object.prototype.hasOwnProperty.call(local, key)) return local[key];
+        } catch {}
+        // Cache leve em localStorage (sobrevive a intermitências de rede)
+        try {
+            const raw = (typeof window !== 'undefined') ? localStorage.getItem('ggv-app-settings-cache') : null;
+            const cache: Record<string, { v: any; at: number }> = raw ? JSON.parse(raw) : {};
+            const hit = cache[key];
+            if (hit && typeof hit === 'object') return hit.v;
+        } catch {}
+        return null;
+    };
+
+    if (!supabase) {
+        const v = readLocalFallback();
+        if (v != null) return v;
+        throw new Error('Supabase client is not initialized.');
+    }
+
     try {
-        const { data, error } = await supabase.rpc('get_app_setting', { p_key: key });
-        if (error) throw error;
+        // Usar utilitário com timeout para evitar travas que levam a "Failed to fetch"
+        const data = await rpcWithTimeout<any>('get_app_setting', { p_key: key }, 8000);
+        // Atualizar cache local em caso de sucesso
+        try {
+            if (typeof window !== 'undefined') {
+                const raw = localStorage.getItem('ggv-app-settings-cache');
+                const cache: Record<string, { v: any; at: number }> = raw ? JSON.parse(raw) : {};
+                cache[key] = { v: data ?? null, at: Date.now() };
+                localStorage.setItem('ggv-app-settings-cache', JSON.stringify(cache));
+            }
+        } catch {}
         return data ?? null;
     } catch (error: any) {
+        // Permissões: manter mensagem amigável
         const msg = (error?.message || '').toLowerCase();
         if (msg.includes('permissão negada') || msg.includes('permission')) {
             throw new Error('Apenas administradores podem alterar preferências.');
+        }
+        // Fallback silencioso para valores locais quando houver erro de rede/timeout/Abort
+        const name = (error?.name || '').toString();
+        if (name === 'AbortError' || msg.includes('fetch') || msg.includes('network') || msg.includes('timeout')) {
+            const v = readLocalFallback();
+            if (v != null) return v;
         }
         throw new Error('Falha ao consultar configuração.');
     }

@@ -173,6 +173,15 @@ export function enableCriticalFetchAlerts(options: CriticalFetchOptions = {}) {
       }
     };
 
+    // Pequena lista de URLs/paths para não alertar em falhas conhecidas/ruidosas
+    const shouldSkipOnError = () => {
+      try {
+        // Evitar ruído de RPCs frequentes de settings
+        if (/\/rpc\/get_app_setting\b/.test(url)) return true;
+      } catch {}
+      return false;
+    };
+
     try {
       const res = await origFetch(input as any, init);
       if (matchesCritical() && res.status >= minStatusToAlert) {
@@ -198,7 +207,7 @@ export function enableCriticalFetchAlerts(options: CriticalFetchOptions = {}) {
       }
       return res;
     } catch (err: any) {
-      if (matchesCritical()) {
+      if (matchesCritical() && !shouldSkipOnError()) {
         postCriticalAlert({
           title: `Erro de rede em ${method}`,
           message: err?.message || String(err),

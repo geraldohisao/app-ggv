@@ -34,6 +34,7 @@ import ErrorEventsAdminPage from './components/ErrorEventsAdminPage';
 import { enableCriticalFetchAlerts } from './src/utils/net';
 import { ProductionSafeDebugPanel } from './components/debug/ProductionSafeDebugPanel';
 import RemoteIncidentsWidget from './components/debug/RemoteIncidentsWidget';
+import LogCapture from './components/debug/LogCapture';
 
 // Componente wrapper para carregamento lazy do debug panel
 const DebugPanelWrapper: React.FC<{ user: any }> = ({ user }) => {
@@ -83,6 +84,8 @@ const AppContent: React.FC = () => {
   
   // Verificar se é a página de admin de incidentes
   const isErrorEventsAdminPage = window.location.pathname === '/admin/incidents';
+  // Verificar se é a página de admin de logs
+  const isDebugLogsAdminPage = window.location.pathname === '/admin/logs';
   
   // Verificar se é uma página standalone (sem header)
   const isStandalone = isStandalonePage(window.location.pathname);
@@ -211,6 +214,12 @@ const AppContent: React.FC = () => {
   if (isErrorEventsAdminPage) {
     return <ErrorEventsAdminPage />;
   }
+  // Se for página de admin de logs persistidos
+  if (isDebugLogsAdminPage) {
+    // @ts-ignore lazy import to avoid type resolution issues during build
+    const DebugLogsAdminPage = require('./components/DebugLogsAdminPage').default;
+    return <DebugLogsAdminPage />;
+  }
   
   // Se for página de diagnóstico, usar componente específico
   if (isDiagnosticPage) {
@@ -312,6 +321,8 @@ const AppContent: React.FC = () => {
       </main>
       
       {/* Painel de debug carregado lazy */}
+      {/* Captura e persistência de logs para usuários autenticados */}
+      <LogCapture />
       <DebugPanelWrapper user={user} />
       {/* Widget de incidentes remotos (Super Admin + flag) */}
       <ProductionSafeDebugPanel />

@@ -19,7 +19,7 @@ interface IncidentData {
 /**
  * Normaliza stack trace para gerar hash estável
  */
-function normalizeStack(stack: string): string {
+export function normalizeStack(stack: string): string {
   if (!stack) return '';
   
   let normalized = stack;
@@ -61,7 +61,7 @@ function normalizeStack(stack: string): string {
 /**
  * Extrai tipo de erro da mensagem ou stack
  */
-function extractErrorType(message: string, stack: string): string {
+export function extractErrorType(message: string, stack: string): string {
   // Padrões comuns de tipos de erro
   const errorPatterns = [
     /TypeError: (.+)/,
