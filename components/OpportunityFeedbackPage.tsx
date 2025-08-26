@@ -5,6 +5,7 @@ import { OpportunityFeedback } from '../types';
 import OpportunityFeedbackSuccess from './OpportunityFeedbackSuccess';
 import { GGVLogo } from './ui/GGVLogo';
 import { renewSessionTimestamp } from '../utils/sessionUtils';
+import { postCriticalAlert } from '../src/utils/net';
 import AccessDenied from './AccessDenied';
 
 const ToggleYesNo: React.FC<{ value: boolean | null; onChange: (v: boolean) => void }>
@@ -216,11 +217,36 @@ const OpportunityFeedbackPage: React.FC = () => {
         } catch {
           result = null;
         }
+
+        // Notificar incidente: recebemos 200 porém sem JSON (comportamento inesperado)
+        try {
+          await postCriticalAlert({
+            title: 'Webhook Feedback retornou 200 sem JSON',
+            message: 'Resposta não JSON do endpoint de feedback',
+            context: {
+              url: webhookUrl,
+              user: { email: user?.email, role: user?.role },
+              responsePreview: typeof result === 'string' ? result.slice(0, 300) : String(result),
+              contentType
+            }
+          });
+        } catch {}
       }
       console.log('✅ WEBHOOK - Enviado com sucesso', result);
       return result;
     } catch (error) {
       console.error('❌ WEBHOOK - Falha na requisição:', error);
+      try {
+        await postCriticalAlert({
+          title: 'Falha ao enviar Feedback de Oportunidade',
+          message: (error as any)?.message || String(error),
+          context: {
+            url: webhookUrl,
+            user: { email: user?.email, role: user?.role },
+            stack: (error as any)?.stack || ''
+          }
+        });
+      } catch {}
       throw error;
     }
   };
