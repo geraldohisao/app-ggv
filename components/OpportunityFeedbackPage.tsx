@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { formInputClass, formLabelClass, formTextareaClass } from './ui/Form';
 import { useUser } from '../contexts/DirectUserContext';
 import { OpportunityFeedback } from '../types';
@@ -16,7 +16,7 @@ const ToggleYesNo: React.FC<{ value: boolean | null; onChange: (v: boolean) => v
 );
 
 const OpportunityFeedbackPage: React.FC = () => {
-  const { user } = useUser();
+  const { user, refreshUser } = useUser();
   const [step, setStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -31,6 +31,13 @@ const OpportunityFeedbackPage: React.FC = () => {
     // Verificar função comercial - apenas Closer e Gestor
     return user.user_function === 'Closer' || user.user_function === 'Gestor';
   }, [user]);
+
+  // Se o usuário não tiver função carregada ainda, tentar atualizar silenciosamente
+  useEffect(() => {
+    if (user && !user.user_function && typeof refreshUser === 'function') {
+      refreshUser();
+    }
+  }, [user?.id, user?.user_function]);
 
   // Extrair deal_id da URL
   const urlParams = new URLSearchParams(window.location.search);

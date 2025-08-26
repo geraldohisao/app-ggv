@@ -14,6 +14,10 @@ export function stripSourceTags(s: string): string {
   // remover sobras de overview_ggv_parte_X
   out = out.replace(/\(\s*overview_ggv_parte_?\d+\s*\)/gi, '');
   out = out.replace(/\boverview_ggv_parte_?\d+\b/gi, '');
+  // remover citações numéricas genéricas [1], [1,2], [i], [iv]
+  out = out.replace(/\[\s*\]/g, '');
+  out = out.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, '');
+  out = out.replace(/\[[ivxlcdm]+\]/gi, '');
   // remover linhas que são apenas nomes de arquivos (pdf/doc/ppt/xlsx/md)
   out = out.replace(/^[\t\s]*[-•]?\s*[\w\s\-–—_]+\.(pdf|docx?|pptx?|xlsx|md)\s*$/gmi, '');
   // normalizar espaços múltiplos e quebras de linha excessivas

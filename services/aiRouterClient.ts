@@ -27,6 +27,25 @@ export async function* getAssistantStream(
   options: AIStreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
   try {
+    // Fast-path: quando explicitamente solicitada busca web, usa o pipeline local
+    // (geminiService) que integra RAG + Web Search. O roteador Netlify atual
+    // não executa web search, então delegamos diretamente aqui.
+    if (options.forceWeb === true) {
+      const mod = await import('./geminiService');
+      const stream = mod.getAIAssistantResponseStream as any;
+      const it = stream(message, persona, history, knowledgeBase, { forceWeb: true, requestId: options.requestId });
+      for await (const delta of it) {
+        yield delta as string;
+      }
+      try {
+        const metas = (mod as any).getLastSourcesMeta?.();
+        if (metas) {
+          (globalThis as any).__LAST_SOURCES_META__ = metas;
+        }
+      } catch {}
+      return;
+    }
+
     const requestId = options.requestId || `req_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     
     const personaId = typeof persona === 'string' ? persona : persona?.id || 'sdr';

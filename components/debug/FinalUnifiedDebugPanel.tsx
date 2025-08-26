@@ -3,6 +3,7 @@ import { postCriticalAlert } from '../../src/utils/net';
 import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
 import { supabase } from '../../services/supabaseClient';
+import ErrorEventsAdmin from './ErrorEventsAdmin';
 import { getSessionInfo } from '../../utils/sessionUtils';
 
 interface DebugLog {
@@ -431,7 +432,8 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
           { key: 'tests', label: 'Testes', icon: '🧪' },
           { key: 'system', label: 'Sistema', icon: '💻' },
           { key: 'session', label: 'Sessão', icon: '🕐' },
-          { key: 'permissions', label: 'Roles', icon: '🔐' }
+          { key: 'permissions', label: 'Roles', icon: '🔐' },
+          { key: 'incidents', label: 'Incidentes', icon: '🚨' }
         ].map(tab => (
           <button
             key={tab.key}
@@ -1018,6 +1020,13 @@ export const FinalUnifiedDebugPanel: React.FC = () => {
                 🗑️ Limpar Sessão Local
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Incidents Tab */}
+        {activeTab === 'incidents' && (
+          <div className="h-full overflow-hidden">
+            <ErrorEventsAdmin />
           </div>
         )}
 

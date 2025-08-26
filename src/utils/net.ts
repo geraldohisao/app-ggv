@@ -1,3 +1,6 @@
+import { sanitizeErrorData, logSensitiveDataAttempt } from './sanitizeErrorData';
+import { generateIncidentHash } from './incidentGrouping';
+
 export type FetchWithTimeoutOptions = RequestInit & {
   timeoutMs?: number;
   retries?: number; // number of retries after the first attempt (idempotent only)
@@ -43,6 +46,56 @@ export async function postCriticalAlert(payload: {
   context?: any;
 }) {
   try {
+    // Sanitizar dados antes do processamento
+    const originalPayload = { ...payload };
+    const sanitizedPayload = {
+      title: payload.title,
+      message: payload.message,
+      context: sanitizeErrorData({
+        title: payload.title,
+        message: payload.message,
+        stack: payload.context?.stack || '',
+        context: payload.context,
+        url: payload.context?.url || '',
+        user: payload.context?.user
+      }).context
+    };
+    
+    // Log de segurança se dados foram sanitizados
+    if (JSON.stringify(originalPayload) !== JSON.stringify(sanitizedPayload)) {
+      logSensitiveDataAttempt(originalPayload, sanitizedPayload, 'postCriticalAlert');
+    }
+    
+    // Gerar hash de incidente robusto
+    const incidentHash = generateIncidentHash({
+      title: sanitizedPayload.title,
+      message: sanitizedPayload.message,
+      stack: sanitizedPayload.context?.stack || '',
+      url: sanitizedPayload.context?.url || '',
+      context: sanitizedPayload.context
+    });
+    
+    // Deduplication and rate limiting to avoid flooding Chat
+    const now = Date.now();
+    const keySource = `${sanitizedPayload.title}|${sanitizedPayload.message}|${incidentHash}`;
+    let key = keySource;
+    try {
+      key = btoa(unescape(encodeURIComponent(keySource))).slice(0, 100);
+    } catch {}
+    const windowMs = 60_000; // 1 minute window
+    const maxPerWindow = 3;
+    const storeKey = `crit-alert:${key}`;
+    const raw = sessionStorage.getItem(storeKey);
+    let info: { count: number; windowStart: number } = raw ? JSON.parse(raw) : { count: 0, windowStart: now };
+    if (now - info.windowStart > windowMs) {
+      info = { count: 0, windowStart: now };
+    }
+    if (info.count >= maxPerWindow) {
+      return; // drop excessive alerts
+    }
+    info.count += 1;
+    sessionStorage.setItem(storeKey, JSON.stringify(info));
+
     const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     let endpoint = '/api/alert';
     if (isLocalhost && typeof window !== 'undefined' && window.location.port !== '8888') {
@@ -51,7 +104,18 @@ export async function postCriticalAlert(payload: {
     await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        ...sanitizedPayload,
+        incidentHash, // Adicionar hash do incidente
+        context: {
+          ...(sanitizedPayload.context || {}),
+          // Always attach minimal environment info
+          href: typeof window !== 'undefined' ? window.location.href : '',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          language: typeof navigator !== 'undefined' ? navigator.language : '',
+          appVersion: (typeof window !== 'undefined' && (window as any).__APP_VERSION__) || '',
+        }
+      })
     }).catch(() => {});
   } catch {}
 }

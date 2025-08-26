@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste do Sistema de Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .error-btn { background: #dc3545; }
+        .error-btn:hover { background: #c82333; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste do Sistema de Debug</h1>
+        <p>Esta página testa as funcionalidades do sistema de debug implementado.</p>
+
+        <div class="test-section info">
+            <h3>📋 Checklist de Funcionalidades</h3>
+            <ul>
+                <li>✅ Tabela error_events criada no Supabase</li>
+                <li>✅ Painel de debug acessível via Ctrl+Shift+D</li>
+                <li>✅ Aba "Incidentes" disponível para Super Admins</li>
+                <li>✅ Alertas automáticos para Google Chat</li>
+                <li>✅ Rate limiting e deduplicação</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Testes de Funcionalidade</h3>
+            
+            <h4>1. Teste de Logs</h4>
+            <button onclick="testLogs()">📝 Testar Logs</button>
+            <button onclick="testError()">❌ Simular Erro</button>
+            <button onclick="testPromiseRejection()">🔴 Simular Promise Rejeitada</button>
+            
+            <h4>2. Teste de Alertas</h4>
+            <button onclick="testCriticalAlert()" class="error-btn">🚨 Testar Alerta Crítico</button>
+            <button onclick="testFetchError()" class="error-btn">🌐 Simular Erro de Fetch</button>
+            
+            <h4>3. Teste de Interface</h4>
+            <button onclick="openDebugPanel()">🛡️ Abrir Painel de Debug</button>
+            <button onclick="openIncidentsAdmin()">📊 Abrir Admin de Incidentes</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Status do Sistema</h3>
+            <div id="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Logs de Teste</h3>
+            <pre id="logs"></pre>
+        </div>
+    </div>
+
+    <script>
+        let logCount = 0;
+        const logsElement = document.getElementById('logs');
+        const statusElement = document.getElementById('status');
+
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logsElement.textContent += logEntry;
+            logCount++;
+            
+            // Limitar logs visíveis
+            if (logCount > 20) {
+                const lines = logsElement.textContent.split('\n');
+                logsElement.textContent = lines.slice(-20).join('\n');
+            }
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusElement.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        // Teste de logs
+        function testLogs() {
+            addLog('🧪 Teste de logs iniciado');
+            console.log('Teste de console.log');
+            console.warn('Teste de console.warn');
+            console.error('Teste de console.error');
+            addLog('✅ Logs de teste enviados');
+        }
+
+        // Teste de erro
+        function testError() {
+            addLog('🧪 Simulando erro JavaScript');
+            try {
+                throw new Error('Erro de teste gerado manualmente');
+            } catch (error) {
+                console.error('Erro capturado:', error);
+                addLog('✅ Erro simulado e capturado');
+            }
+        }
+
+        // Teste de promise rejeitada
+        function testPromiseRejection() {
+            addLog('🧪 Simulando promise rejeitada');
+            Promise.reject(new Error('Promise rejeitada de teste'))
+                .catch(error => {
+                    console.error('Promise rejeitada capturada:', error);
+                    addLog('✅ Promise rejeitada simulada');
+                });
+        }
+
+        // Teste de alerta crítico
+        function testCriticalAlert() {
+            addLog('🧪 Testando alerta crítico');
+            
+            // Simular chamada para postCriticalAlert
+            if (typeof window !== 'undefined' && window.postCriticalAlert) {
+                window.postCriticalAlert({
+                    title: 'Teste de Alerta Crítico',
+                    message: 'Este é um teste do sistema de alertas automáticos',
+                    context: {
+                        url: window.location.href,
+                        user: { email: 'teste@ggv.com', role: 'SuperAdmin' },
+                        test: true
+                    }
+                });
+                addLog('✅ Alerta crítico enviado');
+            } else {
+                addLog('⚠️ Função postCriticalAlert não disponível');
+            }
+        }
+
+        // Teste de erro de fetch
+        function testFetchError() {
+            addLog('🧪 Simulando erro de fetch');
+            fetch('/api/endpoint-inexistente')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro de fetch capturado:', error);
+                    addLog('✅ Erro de fetch simulado');
+                });
+        }
+
+        // Abrir painel de debug
+        function openDebugPanel() {
+            addLog('🛡️ Tentando abrir painel de debug');
+            if (typeof window !== 'undefined' && window.debugPanel) {
+                window.debugPanel.show();
+                addLog('✅ Painel de debug aberto');
+            } else {
+                addLog('⚠️ Painel de debug não disponível - use Ctrl+Shift+D');
+            }
+        }
+
+        // Abrir admin de incidentes
+        function openIncidentsAdmin() {
+            addLog('📊 Redirecionando para admin de incidentes');
+            window.open('/admin/incidents', '_blank');
+        }
+
+        // Verificar status do sistema
+        function checkSystemStatus() {
+            const checks = [];
+            
+            // Verificar se estamos em desenvolvimento
+            checks.push(`🔧 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+            
+            // Verificar se o painel de debug está disponível
+            checks.push(`🛡️ Debug Panel: ${typeof window !== 'undefined' && window.debugPanel ? 'Disponível' : 'Não disponível'}`);
+            
+            // Verificar se a função de alerta está disponível
+            checks.push(`🚨 Alertas: ${typeof window !== 'undefined' && window.postCriticalAlert ? 'Disponível' : 'Não disponível'}`);
+            
+            // Verificar se estamos logados
+            checks.push(`👤 Usuário: ${localStorage.getItem('ggv-user') ? 'Logado' : 'Não logado'}`);
+            
+            updateStatus(checks.join('<br>'), 'info');
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('🚀 Página de teste carregada');
+            checkSystemStatus();
+            
+            // Adicionar listener para erros globais
+            window.addEventListener('error', function(event) {
+                addLog(`❌ Erro global capturado: ${event.message}`);
+            });
+            
+            window.addEventListener('unhandledrejection', function(event) {
+                addLog(`🔴 Promise rejeitada capturada: ${event.reason}`);
+            });
+        });
+
+        // Atalho de teclado para abrir debug panel
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+                event.preventDefault();
+                openDebugPanel();
+            }
+        });
+    </script>
+</body>
+</html>

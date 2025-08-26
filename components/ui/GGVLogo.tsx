@@ -82,6 +82,17 @@ export const GGVLogo: React.FC<GGVLogoProps> = ({
 
   const logoUrl = variant === 'vertical' ? logoUrls.vertical : logoUrls.horizontal;
 
+  // Verificar se estamos em SSR (server-side rendering)
+  const isSSR = typeof window === 'undefined';
+
+  if (isSSR) {
+    return (
+      <div className={className}>
+        <FallbackLogo />
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
       <img

@@ -49,6 +49,25 @@
   status = 200
   force = true
 
+# Error Events Admin API
+[[redirects]]
+  from = "/api/error-events-admin"
+  to = "/.netlify/functions/error-events-admin"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/calls/signed-audio"
+  to = "/.netlify/functions/signed-audio"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/calls/analyze"
+  to = "/.netlify/functions/analyze-call"
+  status = 200
+  force = true
+
 # Redirects para SPA (Single Page Application) - deve ficar por último
 [[redirects]]
   from = "/*"

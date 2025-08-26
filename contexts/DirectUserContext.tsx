@@ -45,6 +45,36 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUser(sessionInfo.user);
                 setLoading(false);
                 setShowAuth(false);
+                // Auto-refresh não bloqueante se função comercial estiver ausente/antiga
+                try {
+                    const needsFunction = !sessionInfo.user.user_function;
+                    if (needsFunction && supabase) {
+                        (async () => {
+                            try {
+                                const { data: { session } } = await supabase.auth.getSession();
+                                if (session?.user) {
+                                    const { data: profile } = await supabase
+                                        .from('profiles')
+                                        .select('role, user_function')
+                                        .eq('id', session.user.id)
+                                        .single();
+                                    if (profile && (profile.user_function || profile.role)) {
+                                        const updatedUser = {
+                                            ...sessionInfo.user,
+                                            role: (profile.role as UserRole) || sessionInfo.user.role,
+                                            user_function: (profile.user_function as any) || sessionInfo.user.user_function,
+                                        } as User;
+                                        setUser(updatedUser);
+                                        saveSession(updatedUser);
+                                        console.log('🔄 DIRECT CONTEXT - Função/role atualizados em background do profiles:', { role: updatedUser.role, user_function: updatedUser.user_function });
+                                    }
+                                }
+                            } catch (bgErr) {
+                                console.warn('⚠️ DIRECT CONTEXT - Refresh silencioso de função falhou (ok continuar):', bgErr);
+                            }
+                        })();
+                    }
+                } catch {}
                 return;
             } else if (sessionInfo.isLoggedIn && !sessionInfo.isValid) {
                 console.log('⏰ DIRECT CONTEXT - Sessão expirada (>100h), limpando dados');

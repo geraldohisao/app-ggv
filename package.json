@@ -8,7 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "build:fast": "vite build",
     "preview": "vite preview",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "test:watch": "vitest --watch",
+    "test:debug": "vitest --run --reporter=verbose",
+    "test:coverage": "vitest --run --coverage",
+    "seed:calls": "node --env-file=.env.local ./scripts/seed-calls.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.5",

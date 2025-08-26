@@ -4,10 +4,30 @@
 
 O sistema de debug foi implementado com sucesso e está funcionando! A aplicação está rodando em modo de desenvolvimento.
 
+## 🚨 Sistema de Alertas Automático
+
+### Funcionalidades Implementadas:
+- ✅ **Captura global de erros** via `AppErrorBoundaryEnhanced`
+- ✅ **Rate limiting** (3 alertas/min por chave) para evitar spam
+- ✅ **Agrupamento por incidente** usando hash SHA1 estável
+- ✅ **Cartões no Google Chat** com ações rápidas
+- ✅ **Persistência no Supabase** (tabela `error_events`)
+- ✅ **Contexto enriquecido** com ambiente, usuário, stack trace
+
+### Configuração:
+```bash
+# Netlify (obrigatório)
+GOOGLE_CHAT_WEBHOOK_URL=https://chat.googleapis.com/v1/spaces/...
+
+# Supabase (opcional - para persistência)
+SUPABASE_URL=https://...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
 ## 🎯 O Que Foi Implementado
 
 ### 1. **Painel de Debug Principal**
-- **Localização**: Ícone 🐛 no canto inferior direito
+- **Localização**: Ícone 🛡️ no canto inferior direito
 - **Ativação**: `Ctrl+Shift+D` ou clique no ícone
 - **Funcionalidades**:
   - ✅ Captura automática de logs
@@ -17,6 +37,7 @@ O sistema de debug foi implementado com sucesso e está funcionando! A aplicaç�
   - ✅ Diagnósticos de autenticação
   - ✅ Filtros avançados por nível e categoria
   - ✅ Exportação de logs em JSON
+  - ✅ **Nova aba "🚨 Incidentes"** com admin completo
 
 ### 2. **Error Boundaries Aprimorados**
 - ✅ Sistema robusto de captura de erros React
@@ -29,12 +50,30 @@ O sistema de debug foi implementado com sucesso e está funcionando! A aplicaç�
 - ✅ `useErrorHandler` - Captura de erros em componentes funcionais
 - ✅ Função global `window.debugLog()`
 
+### 4. **Admin de Incidentes** 🚨
+- ✅ **Interface completa** com filtros avançados
+- ✅ **Três visualizações**: Agrupados, Individuais, Gráfico
+- ✅ **Agrupamento inteligente** por hash de incidente
+- ✅ **Estatísticas em tempo real** com métricas de severidade
+- ✅ **Modal de detalhes** com stack trace completo
+- ✅ **Acesso direto**: `/admin/incidents` ou via debug panel
+- ✅ **API endpoint**: `/.netlify/functions/error-events-admin`
+
 ## 🚀 Como Usar
 
 ### Ativação Rápida
-1. Pressione `Ctrl+Shift+D` ou clique no ícone 🐛
-2. Use as abas: **Logs**, **Sistema**, **Auth**
+1. Pressione `Ctrl+Shift+D` ou clique no ícone 🛡️
+2. Use as abas: **Geral**, **Logs**, **Testes**, **Sistema**, **Sessão**, **Roles**, **🚨 Incidentes**
 3. Filtre logs por nível, categoria ou busca
+
+### Admin de Incidentes
+1. **Via Debug Panel**: `Ctrl+Shift+D` → aba "🚨 Incidentes"
+2. **Acesso direto**: `/admin/incidents` (apenas Super Admins)
+3. **Funcionalidades**:
+   - Filtros por busca, usuário, hash, datas
+   - Visualização agrupada por incidente
+   - Gráfico de tendências dos últimos 7 dias
+   - Estatísticas de severidade
 
 ### Função Global
 ```javascript
@@ -48,6 +87,12 @@ window.debugLog('Erro crítico', 'error', 'api', { endpoint: '/users' });
 - `Ctrl+Shift+C`: Limpar logs
 - `Ctrl+Shift+E`: Exportar logs
 
+### Alertas Automáticos
+- **Erros JavaScript**: Capturados automaticamente e enviados ao Google Chat
+- **Falhas de API**: Requisições 5xx em rotas críticas
+- **Promises rejeitadas**: Capturadas e reportadas
+- **Rate limiting**: Máximo 3 alertas/min por incidente
+
 ## 🔧 Problemas Resolvidos
 
 ### Erros de Build Corrigidos:
@@ -56,6 +101,12 @@ window.debugLog('Erro crítico', 'error', 'api', { endpoint: '/users' });
 3. ✅ **Propriedade onClose faltando** → Corrigido no ResetCacheModal
 4. ✅ **Erro de destructuring** → Corrigido no UserContext
 5. ✅ **Função saveLogoUrls** → Corrigidos parâmetros
+
+### Problemas de Runtime Corrigidos:
+1. ✅ **Tabela error_events não existe** → Script SQL + verificação automática
+2. ✅ **404s de logos** → Fallback SVG em desenvolvimento
+3. ✅ **Rate limiting de alertas** → Implementado dedupe por chave
+4. ✅ **Contexto de alertas** → Enriquecido com ambiente e usuário
 
 ### Status dos Erros Restantes:
 - ⚠️ **packages/worker/**: Módulos não instalados (não críticos para funcionamento principal)

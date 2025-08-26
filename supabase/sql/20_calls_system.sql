@@ -12,9 +12,18 @@ CREATE TABLE IF NOT EXISTS calls (
     from_number TEXT,
     to_number TEXT,
     agent_id TEXT,
+    -- novos campos para integração completa
+    sdr_id UUID,
+    deal_id TEXT,
+    call_type TEXT,
+    direction TEXT CHECK (direction IN ('inbound','outbound')),
     status TEXT DEFAULT 'received' CHECK (status IN ('received', 'processing', 'processed', 'failed')),
     duration INTEGER DEFAULT 0,
     recording_url TEXT,
+    audio_bucket TEXT,
+    audio_path TEXT,
+    transcript_status TEXT,
+    ai_status TEXT,
     transcription TEXT,
     insights JSONB DEFAULT '{}',
     scorecard JSONB DEFAULT '{}',
@@ -46,6 +55,10 @@ CREATE INDEX IF NOT EXISTS idx_calls_provider_call_id ON calls(provider_call_id)
 CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
 CREATE INDEX IF NOT EXISTS idx_calls_created_at ON calls(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_agent_id ON calls(agent_id);
+CREATE INDEX IF NOT EXISTS idx_calls_sdr_id ON calls(sdr_id);
+CREATE INDEX IF NOT EXISTS idx_calls_deal_id ON calls(deal_id);
+CREATE INDEX IF NOT EXISTS idx_calls_call_type ON calls(call_type);
+CREATE INDEX IF NOT EXISTS idx_calls_direction ON calls(direction);
 
 -- =========================================
 -- ETAPA 4: FUNÇÃO PARA BUSCAR CALLS
@@ -96,6 +109,62 @@ $$;
 -- Dar permissões para a função
 GRANT EXECUTE ON FUNCTION public.get_calls(INTEGER, INTEGER, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_calls(INTEGER, INTEGER, TEXT) TO service_role;
+
+-- =========================================
+-- ETAPA 4B: FUNÇÃO AVANÇADA COM FILTROS
+-- =========================================
+
+CREATE OR REPLACE FUNCTION public.get_calls_v2(
+    p_limit INTEGER DEFAULT 50,
+    p_offset INTEGER DEFAULT 0,
+    p_sdr_id UUID DEFAULT NULL,
+    p_status TEXT DEFAULT NULL,
+    p_call_type TEXT DEFAULT NULL,
+    p_start TIMESTAMPTZ DEFAULT NULL,
+    p_end TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS TABLE (
+    id UUID,
+    provider_call_id TEXT,
+    company TEXT,
+    deal_id TEXT,
+    sdr_id UUID,
+    status TEXT,
+    duration INTEGER,
+    call_type TEXT,
+    created_at TIMESTAMPTZ,
+    total_count BIGINT
+)
+LANGUAGE SQL
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH base AS (
+    SELECT * FROM calls
+    WHERE (p_sdr_id IS NULL OR sdr_id = p_sdr_id)
+      AND (p_status IS NULL OR status = p_status)
+      AND (p_call_type IS NULL OR call_type = p_call_type)
+      AND (p_start IS NULL OR created_at >= p_start)
+      AND (p_end   IS NULL OR created_at <= p_end)
+  ), total AS (SELECT COUNT(*) FROM base)
+  SELECT
+    b.id,
+    b.provider_call_id,
+    COALESCE((b.insights->>'company'), (b.meta->>'company')) AS company,
+    b.deal_id,
+    b.sdr_id,
+    b.status,
+    b.duration,
+    b.call_type,
+    b.created_at,
+    (SELECT * FROM total) AS total_count
+  FROM base b
+  ORDER BY b.created_at DESC
+  LIMIT p_limit OFFSET p_offset;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_calls_v2(INTEGER, INTEGER, UUID, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_calls_v2(INTEGER, INTEGER, UUID, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
 
 -- =========================================
 -- ETAPA 5: FUNÇÃO PARA DETALHES DE UMA CALL

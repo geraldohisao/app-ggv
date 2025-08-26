@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { Module } from './types';
 import { DiagnosticoComercial } from './components/DiagnosticoComercial';
 import AssistenteIA from './components/AssistenteIA';
-import AppErrorBoundary from './components/common/AppErrorBoundary';
+import AppErrorBoundary, { AppErrorBoundaryEnhanced } from './components/common/AppErrorBoundary';
 import CalculadoraOTE from './components/CalculadoraOTE';
 import OpportunityFeedbackPage from './components/OpportunityFeedbackPage';
 import Header from './components/Header';
 import CallsList from './components/Calls/CallsList';
 import CallsPlaceholder from './components/Calls/CallsPlaceholder';
+import CallsApp from './components/Calls/CallsApp';
 import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
@@ -27,9 +28,34 @@ import EnhancedRoleTestPanel from './components/debug/EnhancedRoleTestPanel';
 import SuperAdminDebugPanel from './components/debug/SuperAdminDebugPanel';
 import TestDebugAccess from './components/debug/TestDebugAccess';
 import SuperAdminDebugPanelV2 from './components/debug/SuperAdminDebugPanelV2';
-import FinalUnifiedDebugPanel from './components/debug/FinalUnifiedDebugPanel';
+import { canUseDebug, shouldLoadDebugPanel } from './src/debug/config';
 import FeedbackWidget from './components/ui/FeedbackWidget';
+import ErrorEventsAdminPage from './components/ErrorEventsAdminPage';
 import { enableCriticalFetchAlerts } from './src/utils/net';
+import { ProductionSafeDebugPanel } from './components/debug/ProductionSafeDebugPanel';
+import RemoteIncidentsWidget from './components/debug/RemoteIncidentsWidget';
+
+// Componente wrapper para carregamento lazy do debug panel
+const DebugPanelWrapper: React.FC<{ user: any }> = ({ user }) => {
+  const [DebugPanel, setDebugPanel] = React.useState<React.ComponentType | null>(null);
+
+  React.useEffect(() => {
+    const loadDebugPanel = async () => {
+      if (shouldLoadDebugPanel(import.meta.env.PROD, user?.role)) {
+        try {
+          const { ProductionSafeDebugPanel } = await import('./components/debug/ProductionSafeDebugPanel');
+          setDebugPanel(() => ProductionSafeDebugPanel);
+        } catch (error) {
+          console.warn('Failed to load debug panel:', error);
+        }
+      }
+    };
+
+    loadDebugPanel();
+  }, [user?.role]);
+
+  return DebugPanel ? <DebugPanel /> : null;
+};
 
 
 const AppContent: React.FC = () => {
@@ -55,17 +81,99 @@ const AppContent: React.FC = () => {
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
   
+  // Verificar se é a página de admin de incidentes
+  const isErrorEventsAdminPage = window.location.pathname === '/admin/incidents';
+  
   // Verificar se é uma página standalone (sem header)
   const isStandalone = isStandalonePage(window.location.pathname);
 
-  // Logos desabilitados temporariamente para evitar erros 404
+  // Inicialização do app
   useEffect(() => {
-    console.log('📱 APP - Inicializado sem buscar logos (evitando erros 404)');
+    console.log('📱 APP - Inicializado');
   }, []);
 
   // Habilitar alertas críticos de fetch (erros 5xx/rede em rotas críticas)
   useEffect(() => {
     enableCriticalFetchAlerts();
+  }, []);
+
+  // Captura global de erros e rejeições para alertas críticos
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      try {
+        const error = event.error || new Error(event.message);
+        // @ts-ignore lazy import to avoid cycle
+        const { postCriticalAlert } = require('./src/utils/net');
+        
+        // Fallback seguro se postCriticalAlert falhar
+        const safePostAlert = (data: any) => {
+          try {
+            postCriticalAlert(data);
+          } catch (alertError) {
+            console.warn('🔒 Erro ao enviar alerta crítico:', alertError);
+            // Log local como fallback
+            console.error('🚨 Erro global capturado:', {
+              title: data.title,
+              message: data.message,
+              timestamp: new Date().toISOString()
+            });
+          }
+        };
+        
+        safePostAlert({
+          title: 'Erro global não tratado',
+          message: error?.message || String(error),
+          context: {
+            url: window.location.href,
+            stack: error?.stack || '',
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno
+          }
+        });
+      } catch (fallbackError) {
+        console.warn('🔒 Erro no handler de erro global:', fallbackError);
+      }
+    };
+    
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      try {
+        // @ts-ignore lazy import to avoid cycle
+        const { postCriticalAlert } = require('./src/utils/net');
+        
+        // Fallback seguro se postCriticalAlert falhar
+        const safePostAlert = (data: any) => {
+          try {
+            postCriticalAlert(data);
+          } catch (alertError) {
+            console.warn('🔒 Erro ao enviar alerta crítico:', alertError);
+            // Log local como fallback
+            console.error('🚨 Promise rejeitada capturada:', {
+              title: data.title,
+              message: data.message,
+              timestamp: new Date().toISOString()
+            });
+          }
+        };
+        
+        safePostAlert({
+          title: 'Promise rejeitada não tratada',
+          message: String(event.reason),
+          context: {
+            url: window.location.href,
+            reason: event.reason
+          }
+        });
+      } catch (fallbackError) {
+        console.warn('🔒 Erro no handler de promise rejeitada:', fallbackError);
+      }
+    };
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, []);
 
   // Listener para mudanças de rota
@@ -97,6 +205,11 @@ const AppContent: React.FC = () => {
   // Se for página de relatório público com deal_id, não precisa de autenticação
   if (isPublicDiagnosticReport) {
     return <PublicDiagnosticReport />;
+  }
+  
+  // Se for página de admin de incidentes
+  if (isErrorEventsAdminPage) {
+    return <ErrorEventsAdminPage />;
   }
   
   // Se for página de diagnóstico, usar componente específico
@@ -163,9 +276,7 @@ const AppContent: React.FC = () => {
       case Module.Assistente:
         console.log('🤖 APP - Renderizando Assistente');
         return (
-          <AppErrorBoundary>
-            <AssistenteIA />
-          </AppErrorBoundary>
+          <AssistenteIA />
         );
       case Module.Calculadora:
         console.log('🧮 APP - Renderizando Calculadora');
@@ -178,13 +289,8 @@ const AppContent: React.FC = () => {
         return <OpportunityFeedbackPage />;
       case Module.Calls:
         console.log('📞 APP - Renderizando Calls');
-        // Flag para desativar chamadas reais enquanto a feature está em desenvolvimento
-        const CALLS_UNDER_DEVELOPMENT = (
-          typeof import.meta !== 'undefined' &&
-          (import.meta as any).env &&
-          typeof (import.meta as any).env.VITE_CALLS_UNDER_DEV !== 'undefined'
-        ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : true; // default seguro: true
-        return CALLS_UNDER_DEVELOPMENT ? <CallsPlaceholder /> : <CallsList />;
+        // Nova UX dentro do app principal com roteamento via hash
+        return <CallsApp />;
       case Module.ReativacaoLeads:
         console.log('🔄 APP - Renderizando Reativação');
         return <ReativacaoLeadsPage />;
@@ -205,8 +311,11 @@ const AppContent: React.FC = () => {
         {renderModule()}
       </main>
       
-      {/* Painel de debug unificado */}
-      <FinalUnifiedDebugPanel />
+      {/* Painel de debug carregado lazy */}
+      <DebugPanelWrapper user={user} />
+      {/* Widget de incidentes remotos (Super Admin + flag) */}
+      <ProductionSafeDebugPanel />
+      <RemoteIncidentsWidget />
       {/* Floating feedback for non-admin users */}
       <FeedbackWidget />
     </div>
@@ -216,7 +325,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <UserProvider>
-      <AppContent />
+      <AppErrorBoundaryEnhanced>
+        <AppContent />
+      </AppErrorBoundaryEnhanced>
     </UserProvider>
   );
 };
