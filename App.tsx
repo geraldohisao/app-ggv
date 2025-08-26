@@ -33,7 +33,6 @@ import FeedbackWidget from './components/ui/FeedbackWidget';
 import ErrorEventsAdminPage from './components/ErrorEventsAdminPage';
 import { enableCriticalFetchAlerts } from './src/utils/net';
 import { ProductionSafeDebugPanel } from './components/debug/ProductionSafeDebugPanel';
-import RemoteIncidentsWidget from './components/debug/RemoteIncidentsWidget';
 import LogCapture from './components/debug/LogCapture';
 
 // Componente wrapper para carregamento lazy do debug panel
@@ -324,9 +323,8 @@ const AppContent: React.FC = () => {
       {/* Captura e persistência de logs para usuários autenticados */}
       <LogCapture />
       <DebugPanelWrapper user={user} />
-      {/* Widget de incidentes remotos (Super Admin + flag) */}
+      {/* Painel unificado já inclui aba de Incidentes e Logs persistidos */}
       <ProductionSafeDebugPanel />
-      <RemoteIncidentsWidget />
       {/* Floating feedback for non-admin users */}
       <FeedbackWidget />
     </div>

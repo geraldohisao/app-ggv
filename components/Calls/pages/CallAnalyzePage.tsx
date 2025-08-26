@@ -80,7 +80,7 @@ export default function CallAnalyzePage({ callId }: { callId: string }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [transcriptSearch, setTranscriptSearch] = useState('');
-  const [useMockData, setUseMockData] = useState(true); // Force mock data for now
+  const [useMockData, setUseMockData] = useState(false); // usar dados reais por padrão
   const commentsRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToComments = () => {
@@ -188,6 +188,19 @@ export default function CallAnalyzePage({ callId }: { callId: string }) {
     setComments(prev => [newCommentObj, ...prev]);
     console.log('💬 Comentário mock adicionado:', newCommentObj);
   };
+
+  useEffect(() => {
+    const loadCall = async () => {
+      try {
+        const details = await fetchCallDetails(callId);
+        if (details) setCall({ ...call, ...details });
+      } catch (e) {
+        // mantém mock local
+      }
+    };
+    loadCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId]);
 
   if (!call) return <div className="p-6 text-slate-600">Chamada não encontrada.</div>;
 

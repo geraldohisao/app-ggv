@@ -50,9 +50,21 @@ export async function fetchCalls(query: CallsQuery): Promise<{ items: UiCallItem
 
 export async function fetchCallDetails(callId: string) {
   if (!supabase) return null;
-  const { data, error } = await supabase.rpc('get_call_details', { p_call_id: callId });
-  if (error) throw error;
-  return data?.[0] ?? null;
+  // Tenta RPC otimizada primeiro
+  try {
+    const { data } = await supabase.rpc('get_call_details', { p_call_id: callId });
+    if (data && data[0]) return data[0];
+  } catch (e) {
+    // continua com fallback
+  }
+  // Fallback: busca direta na tabela (garante funcionamento mesmo sem a RPC)
+  const { data: row, error: err } = await supabase
+    .from('calls')
+    .select('*')
+    .eq('id', callId)
+    .single();
+  if (err) throw err;
+  return row ?? null;
 }
 
 export interface CallsMetrics {
@@ -104,9 +116,18 @@ export async function listCallComments(callId: string) {
 
 export async function addCallComment(callId: string, text: string, atSeconds: number = 0, author?: { id: string; name: string }) {
   if (!supabase) return null;
-  const row = { call_id: callId, text, at_seconds: atSeconds, author_id: author?.id || null, author_name: author?.name || null };
-  const { data, error } = await supabase.from('call_comments').insert(row).select('*').single();
-  if (error) throw error; return data;
+  let authorId = author?.id || null;
+  let authorName = author?.name || null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) {
+      authorId = data.user.id;
+      authorName = data.user.user_metadata?.full_name || data.user.email || authorName;
+    }
+  } catch {}
+  const row = { call_id: callId, text, at_seconds: atSeconds, author_id: authorId, author_name: authorName };
+  const { data: inserted, error } = await supabase.from('call_comments').insert(row).select('*').single();
+  if (error) throw error; return inserted;
 }
 
 // ---- Scores por critério ----
