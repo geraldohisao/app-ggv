@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
 import { supabase } from '../../services/supabaseClient';
@@ -42,6 +42,8 @@ const DebugLogsAdmin: React.FC = () => {
   const [limit, setLimit] = useState(100);
   const [offset, setOffset] = useState(0);
   const [auto, setAuto] = useState(true);
+  const [live, setLive] = useState(false);
+  const channelRef = useRef<any>(null);
 
   const isSuperAdmin = user?.role === UserRole.SuperAdmin || user?.role === UserRole.Admin;
 
@@ -104,6 +106,56 @@ const DebugLogsAdmin: React.FC = () => {
     return () => window.clearInterval(id);
   }, [auto, canSee, filters, limit, offset]);
 
+  // Realtime live tailing
+  useEffect(() => {
+    if (!canSee) return;
+    try {
+      // Clean up any previous channel
+      if (channelRef.current) {
+        try { supabase.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
+      }
+
+      if (!live) return; // Only attach when live enabled
+
+      const channel = (supabase as any).channel('debug_logs_live');
+      channelRef.current = channel;
+
+      channel.on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'debug_logs' },
+        (payload: any) => {
+          const row = payload?.new as DebugLogRow;
+          if (!row) return;
+          // Apply current filters client-side
+          if (filters.search) {
+            const s = filters.search.toLowerCase();
+            const match = (row.message || '').toLowerCase().includes(s) || (row.category || '').toLowerCase().includes(s);
+            if (!match) return;
+          }
+          if (filters.user_email && row.user_email !== filters.user_email) return;
+          if (filters.level && row.level !== filters.level) return;
+          if (filters.date_from && row.created_at < filters.date_from) return;
+          if (filters.date_to && row.created_at > filters.date_to + 'T23:59:59') return;
+
+          // Prepend new rows, keep virtual window similar to current page size
+          setRows(prev => [row, ...prev].slice(0, limit));
+        }
+      );
+
+      channel.subscribe((status: string) => {
+        // no-op; could expose status if needed
+      });
+
+      return () => {
+        try { if (channelRef.current) supabase.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
+      };
+    } catch {
+      // ignore realtime failures silently
+    }
+  }, [canSee, live, JSON.stringify(filters), limit]);
+
   const levelBadge = (lvl: DebugLogRow['level']) => (
     <span className={`px-2 py-1 rounded text-xs font-medium ${levelColors[lvl] || 'bg-gray-50 text-gray-700'}`}>{lvl}</span>
   );
@@ -121,9 +173,12 @@ const DebugLogsAdmin: React.FC = () => {
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">📝 Logs Persistidos</h2>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-3 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} /> Auto (30s)
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} /> Live (Realtime)
           </label>
           <button onClick={load} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Atualizar</button>
         </div>
@@ -209,5 +264,6 @@ const DebugLogsAdmin: React.FC = () => {
 };
 
 export default DebugLogsAdmin;
+
 
 
