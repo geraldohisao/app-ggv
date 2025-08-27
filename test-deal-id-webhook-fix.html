@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Fix Deal ID Webhook - GGV</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; color: #856404; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .log { margin: 5px 0; padding: 5px; background: #f8f9fa; border-left: 3px solid #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste Fix Deal ID Webhook - GGV</h1>
+        
+        <div class="test-section info">
+            <h2>📋 Problema Identificado</h2>
+            <p><strong>Issue:</strong> O diagnóstico com ID 62719 não enviou o <code>deal_id</code> para o webhook.</p>
+            <p><strong>Causa:</strong> A função <code>sendDiagnosticToPipedrive</code> não estava sendo chamada no <code>ResultsView</code>.</p>
+            <p><strong>Solução:</strong> Adicionada chamada para webhook do Pipedrive + logs de debug.</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Teste 1: Verificar URL com Deal ID</h2>
+            <p>Teste se a URL está capturando o deal_id corretamente:</p>
+            <input type="text" id="dealIdTest" placeholder="Digite o deal_id (ex: 62719)" style="padding: 8px; width: 200px;">
+            <button onclick="testDealIdCapture()">Testar Captura Deal ID</button>
+            <div id="dealIdResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🚀 Teste 2: Simular Diagnóstico com Deal ID</h2>
+            <p>Abrir diagnóstico com deal_id específico:</p>
+            <input type="text" id="dealIdDiagnostic" placeholder="Deal ID (ex: 62719)" value="62719" style="padding: 8px; width: 200px;">
+            <button onclick="openDiagnosticWithDealId()">Abrir Diagnóstico</button>
+            <div id="diagnosticResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Teste 3: Verificar Logs do Console</h2>
+            <p>Após completar um diagnóstico, verifique os logs do console para:</p>
+            <ul>
+                <li>✅ <code>🔍 WEBHOOK DEBUG - dealId recebido:</code></li>
+                <li>✅ <code>📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id:</code></li>
+                <li>✅ <code>✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id:</code></li>
+            </ul>
+            <button onclick="showConsoleInstructions()">Ver Instruções Console</button>
+            <div id="consoleInstructions"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Teste 4: Verificar Payload N8N</h2>
+            <p>Verificar se o payload enviado para N8N contém o deal_id:</p>
+            <button onclick="showPayloadExample()">Ver Exemplo Payload</button>
+            <div id="payloadExample"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Logs de Teste</h2>
+            <div id="testLogs"></div>
+        </div>
+    </div>
+
+    <script>
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('testLogs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            logsDiv.appendChild(logEntry);
+            console.log(`[TESTE] ${message}`);
+        }
+
+        function testDealIdCapture() {
+            const dealId = document.getElementById('dealIdTest').value.trim();
+            const resultDiv = document.getElementById('dealIdResult');
+            
+            if (!dealId) {
+                resultDiv.innerHTML = '<div class="error">❌ Por favor, digite um deal_id</div>';
+                return;
+            }
+
+            addLog(`Testando captura de deal_id: ${dealId}`);
+            
+            // Simular captura da URL
+            const testUrl = `${window.location.origin}/diagnostico/?deal_id=${dealId}`;
+            const urlParams = new URLSearchParams(`?deal_id=${dealId}`);
+            const capturedDealId = urlParams.get('deal_id');
+            
+            if (capturedDealId === dealId) {
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ <strong>Deal ID capturado com sucesso!</strong><br>
+                        URL: <code>${testUrl}</code><br>
+                        Deal ID: <code>${capturedDealId}</code>
+                    </div>
+                `;
+                addLog(`✅ Deal ID capturado: ${capturedDealId}`, 'success');
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Erro na captura do Deal ID</strong><br>
+                        Esperado: <code>${dealId}</code><br>
+                        Capturado: <code>${capturedDealId}</code>
+                    </div>
+                `;
+                addLog(`❌ Erro na captura. Esperado: ${dealId}, Capturado: ${capturedDealId}`, 'error');
+            }
+        }
+
+        function openDiagnosticWithDealId() {
+            const dealId = document.getElementById('dealIdDiagnostic').value.trim();
+            const resultDiv = document.getElementById('diagnosticResult');
+            
+            if (!dealId) {
+                resultDiv.innerHTML = '<div class="error">❌ Por favor, digite um deal_id</div>';
+                return;
+            }
+
+            const diagnosticUrl = `${window.location.origin}/diagnostico/?deal_id=${dealId}`;
+            addLog(`Abrindo diagnóstico com deal_id: ${dealId}`);
+            addLog(`URL: ${diagnosticUrl}`);
+            
+            resultDiv.innerHTML = `
+                <div class="success">
+                    ✅ <strong>Diagnóstico sendo aberto...</strong><br>
+                    URL: <a href="${diagnosticUrl}" target="_blank">${diagnosticUrl}</a><br>
+                    <small>Complete o diagnóstico e verifique os logs do console</small>
+                </div>
+            `;
+            
+            // Abrir em nova aba
+            window.open(diagnosticUrl, '_blank');
+        }
+
+        function showConsoleInstructions() {
+            const instructionsDiv = document.getElementById('consoleInstructions');
+            instructionsDiv.innerHTML = `
+                <div class="info">
+                    <h4>📋 Como verificar os logs:</h4>
+                    <ol>
+                        <li>Abra o DevTools (F12)</li>
+                        <li>Vá para a aba Console</li>
+                        <li>Complete um diagnóstico com deal_id</li>
+                        <li>Procure por estas mensagens:</li>
+                    </ol>
+                    <pre>
+🔍 WEBHOOK DEBUG - dealId recebido: 62719
+🔍 WEBHOOK DEBUG - Tipo do dealId: string
+📤 N8N - VERIFICAÇÃO FINAL do deal_id no payload:
+  - payload.deal_id: 62719
+  - payload.body.deal_id: 62719
+📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id: 62719
+✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id: 62719</pre>
+                </div>
+            `;
+        }
+
+        function showPayloadExample() {
+            const payloadDiv = document.getElementById('payloadExample');
+            payloadDiv.innerHTML = `
+                <div class="info">
+                    <h4>📊 Exemplo de Payload Correto:</h4>
+                    <pre>{
+  "deal_id": "62719",
+  "timestamp": "2025-01-27T18:37:53.095Z",
+  "action": "ai_analysis_completed",
+  "body": {
+    "results": {
+      "maturityPercentage": 56
+    },
+    "resultUrl": "https://app.grupoggv.com/r/diagnostic-1756319872972",
+    "deal_id": "62719",
+    "aiAnalysis": { ... },
+    "diagnosticAnswers": [ ... ]
+  },
+  "companyData": { ... },
+  "segment": { ... },
+  "source": "web-diagnostic",
+  "version": "DIAGNOSTIC_FIX_VERSION"
+}</pre>
+                    <p><strong>✅ Pontos importantes:</strong></p>
+                    <ul>
+                        <li><code>deal_id</code> deve estar presente no nível raiz</li>
+                        <li><code>deal_id</code> deve estar presente em <code>body.deal_id</code></li>
+                        <li>Ambos devem ter o mesmo valor (não null)</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Log inicial
+        addLog('Sistema de teste carregado - Pronto para testar fix do deal_id webhook');
+        addLog('Problema: deal_id null no payload do diagnóstico 62719');
+        addLog('Solução: Adicionada chamada para sendDiagnosticToPipedrive + logs de debug');
+    </script>
+</body>
+</html>

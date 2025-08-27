@@ -168,7 +168,18 @@ const SegmentForm: React.FC<{ segment: MarketSegment | null; onSave: (segment: M
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
-        setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseFloat(value) || 0 : value }));
+        
+        if (type === 'number') {
+            // Permite campo vazio durante edição, mas converte para número quando há valor
+            if (value === '') {
+                setFormData(prev => ({ ...prev, [name]: '' as any }));
+            } else {
+                const numValue = parseFloat(value);
+                setFormData(prev => ({ ...prev, [name]: isNaN(numValue) ? 0 : numValue }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
     
     const handleNestedChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -186,7 +197,20 @@ const SegmentForm: React.FC<{ segment: MarketSegment | null; onSave: (segment: M
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if(canEdit) onSave(formData);
+        if (!canEdit) return;
+        
+        // Validação dos campos numéricos antes do submit
+        const validatedData = {
+            ...formData,
+            benchmarkMedio: typeof formData.benchmarkMedio === 'string' && formData.benchmarkMedio === '' 
+                ? 0 
+                : Number(formData.benchmarkMedio) || 0,
+            topPerformers: typeof formData.topPerformers === 'string' && formData.topPerformers === '' 
+                ? 0 
+                : Number(formData.topPerformers) || 0
+        };
+        
+        onSave(validatedData);
     };
 
     return (
@@ -208,11 +232,37 @@ const SegmentForm: React.FC<{ segment: MarketSegment | null; onSave: (segment: M
                             </FormGroup>
                             <FormGroup>
                                 <label htmlFor="benchmarkMedio" className={formLabelClass}>Benchmark Médio (%)</label>
-                                <input type="number" name="benchmarkMedio" id="benchmarkMedio" value={formData.benchmarkMedio} onChange={handleChange} className={formInputClass} required disabled={!canEdit}/>
+                                <input 
+                                    type="number" 
+                                    name="benchmarkMedio" 
+                                    id="benchmarkMedio" 
+                                    value={formData.benchmarkMedio} 
+                                    onChange={handleChange} 
+                                    className={formInputClass} 
+                                    min="0" 
+                                    max="100" 
+                                    step="1"
+                                    placeholder="Ex: 45"
+                                    required 
+                                    disabled={!canEdit}
+                                />
                             </FormGroup>
                              <FormGroup>
                                 <label htmlFor="topPerformers" className={formLabelClass}>Top Performers (%)</label>
-                                <input type="number" name="topPerformers" id="topPerformers" value={formData.topPerformers} onChange={handleChange} className={formInputClass} required disabled={!canEdit}/>
+                                <input 
+                                    type="number" 
+                                    name="topPerformers" 
+                                    id="topPerformers" 
+                                    value={formData.topPerformers} 
+                                    onChange={handleChange} 
+                                    className={formInputClass} 
+                                    min="0" 
+                                    max="100" 
+                                    step="1"
+                                    placeholder="Ex: 75"
+                                    required 
+                                    disabled={!canEdit}
+                                />
                             </FormGroup>
                         </div>
                          <FormGroup>

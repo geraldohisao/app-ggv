@@ -411,6 +411,7 @@ const WebVersionDebugPanel: React.FC = () => {
             <button
               onClick={() => {
                 setIsVisible(false);
+                setIsMinimized(true);
                 addLog('debug', 'System', 'Painel fechado');
               }}
               className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"

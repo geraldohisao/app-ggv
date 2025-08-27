@@ -105,6 +105,13 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     // Envio ÚNICO para N8N após análise IA estar pronta (ou timeout de emergência)
     useEffect(() => {
         const sendCompleteAnalysis = async () => {
+            // DEBUG CRÍTICO: Verificar deal_id
+            console.log('🔍 WEBHOOK DEBUG - dealId recebido:', dealId);
+            console.log('🔍 WEBHOOK DEBUG - Tipo do dealId:', typeof dealId);
+            console.log('🔍 WEBHOOK DEBUG - dealId é null?', dealId === null);
+            console.log('🔍 WEBHOOK DEBUG - dealId é undefined?', dealId === undefined);
+            console.log('🔍 WEBHOOK DEBUG - dealId é string vazia?', dealId === '');
+            
             // PROTEÇÃO CRÍTICA: Evitar envio duplo
             if (aiSent) {
                 console.log('🚫 N8N - Já enviado, pulando...');
@@ -179,7 +186,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
                 // Payload completo para N8N (inclui score + análise IA se disponível)
                 const payload = {
-                    deal_id: dealId,
+                    deal_id: dealId || null, // Garantir que seja explicitamente null se não houver
                     timestamp: new Date().toISOString(),
                     action: 'ai_analysis_completed',
                     
@@ -188,7 +195,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             maturityPercentage: Math.round((totalScore / 90) * 100)
                         },
                         resultUrl: publicReportUrl,
-                        deal_id: dealId,
+                        deal_id: dealId || null, // Garantir consistência
                         
                         // Incluir análise IA se disponível
                         ...(hasAI && {
@@ -251,6 +258,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 };
 
                 console.log('📤 N8N - Enviando payload completo:', payload);
+                console.log('🔍 N8N - VERIFICAÇÃO FINAL do deal_id no payload:');
+                console.log('  - payload.deal_id:', payload.deal_id);
+                console.log('  - payload.body.deal_id:', payload.body.deal_id);
+                console.log('  - dealId original:', dealId);
+                console.log('  - Tipo do dealId:', typeof dealId);
 
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
                 const response = await fetch(webhookUrl, {
@@ -268,6 +280,30 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     console.log('✅ N8N - Diagnóstico enviado com sucesso');
                 } else {
                     console.warn('⚠️ N8N - Falha ao enviar, status:', response.status);
+                }
+                
+                // ADICIONAR: Envio para webhook do Pipedrive se houver deal_id
+                if (dealId && dealId.trim() !== '') {
+                    console.log('📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id:', dealId);
+                    try {
+                        const { sendDiagnosticToPipedrive } = await import('../../services/supabaseService');
+                        const pipedriveSuccess = await sendDiagnosticToPipedrive(
+                            companyData,
+                            answers,
+                            totalScore,
+                            dealId
+                        );
+                        
+                        if (pipedriveSuccess) {
+                            console.log('✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id:', dealId);
+                        } else {
+                            console.warn('⚠️ PIPEDRIVE - Falha ao enviar webhook para deal_id:', dealId);
+                        }
+                    } catch (pipedriveError) {
+                        console.error('❌ PIPEDRIVE - Erro ao enviar webhook:', pipedriveError);
+                    }
+                } else {
+                    console.log('⚠️ PIPEDRIVE - Deal ID não disponível, pulando webhook do Pipedrive');
                 }
                 
                 setAiSent(true);
