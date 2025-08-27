@@ -1,5 +1,140 @@
-// Netlify Function: Critical error alerts to Google Chat
+// Netlify Function: Critical error alerts to Google Chat and Slack
 // Endpoint: /.netlify/functions/alert
+
+// Helper function to format Slack message
+function formatSlackMessage(title, message, context, incidentHash) {
+  const { user = {}, url = '', stack = '', componentStack = '', userAgent = '', appVersion = '', tags = [] } = context || {};
+  const timestamp = new Date().toISOString();
+  
+  // Build Slack blocks for rich formatting
+  const blocks = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🚨 ALERTA CRÍTICO",
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Título:*\n${title}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Incidente:*\n${incidentHash}`
+        }
+      ]
+    }
+  ];
+
+  if (message) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Mensagem:*\n${message}`
+      }
+    });
+  }
+
+  // Add metadata section
+  const metaFields = [];
+  if (user && (user.email || user.name)) {
+    metaFields.push({
+      type: "mrkdwn",
+      text: `*Usuário:*\n${user.name || 'N/A'} (${user.email || 'sem email'})${user.role ? ` • ${user.role}` : ''}`
+    });
+  }
+  if (url) metaFields.push({ type: "mrkdwn", text: `*Página:*\n${url}` });
+  if (appVersion) metaFields.push({ type: "mrkdwn", text: `*Versão:*\n${appVersion}` });
+  if (userAgent) metaFields.push({ type: "mrkdwn", text: `*Navegador:*\n${userAgent.slice(0, 100)}...` });
+  if (tags && Array.isArray(tags) && tags.length) metaFields.push({ type: "mrkdwn", text: `*Tags:*\n${tags.join(', ')}` });
+  metaFields.push({ type: "mrkdwn", text: `*Enviado:*\n${timestamp}` });
+
+  if (metaFields.length) {
+    blocks.push({
+      type: "section",
+      fields: metaFields
+    });
+  }
+
+  // Add stack trace if available
+  if (stack) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Stack:*\n\`\`\`${String(stack).slice(0, 2000)}\`\`\``
+      }
+    });
+  }
+
+  if (componentStack) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Componente:*\n\`\`\`${String(componentStack).slice(0, 2000)}\`\`\``
+      }
+    });
+  }
+
+  // Add environment info
+  const envInfo = [];
+  try {
+    envInfo.push(`Node: ${process.version}`);
+    if (process.env.VERCEL_GIT_COMMIT_SHA || process.env.COMMIT_REF) {
+      envInfo.push(`Commit: ${process.env.VERCEL_GIT_COMMIT_SHA || process.env.COMMIT_REF}`);
+    }
+    if (process.env.VERCEL_ENV || process.env.CONTEXT || process.env.NODE_ENV) {
+      envInfo.push(`Env: ${process.env.VERCEL_ENV || process.env.CONTEXT || process.env.NODE_ENV}`);
+    }
+  } catch {}
+  
+  if (envInfo.length) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Ambiente:*\n${envInfo.join('\n')}`
+      }
+    });
+  }
+
+  // Add action buttons
+  const actionUrl = url || process.env.APP_DOMAIN || 'https://app.grupoggv.com';
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "Abrir Página",
+          emoji: true
+        },
+        url: actionUrl,
+        action_id: "open_page"
+      },
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "Pesquisar Incidente",
+          emoji: true
+        },
+        url: `https://www.google.com/search?q=${incidentHash}`,
+        action_id: "search_incident"
+      }
+    ]
+  });
+
+  return { blocks };
+}
 
 exports.handler = async (event, _context) => {
   const headers = {
@@ -94,61 +229,117 @@ exports.handler = async (event, _context) => {
 
     const text = lines.join('\n');
 
-    const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
-    if (!webhookUrl) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: 'Missing GOOGLE_CHAT_WEBHOOK_URL environment variable' }) };
+    const googleChatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
+    const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
+
+    // Check if at least one webhook is configured
+    if (!googleChatWebhookUrl && !slackWebhookUrl) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'Missing GOOGLE_CHAT_WEBHOOK_URL or SLACK_WEBHOOK_URL environment variable' }) };
     }
 
-    // Try to send Google Chat message with cards for quick actions
-    let payload = { text };
-    try {
-      const actionUrl = url || process.env.APP_DOMAIN || 'https://app.grupoggv.com';
-      payload = {
-        text,
-        cardsV2: [
-          {
-            card: {
-              header: { title: 'Ações Rápidas' },
+    const notificationResults = [];
+    const notificationPromises = [];
+
+    // Send to Google Chat if configured
+    if (googleChatWebhookUrl) {
+      let googleChatPayload = { text };
+      try {
+        const actionUrl = url || process.env.APP_DOMAIN || 'https://app.grupoggv.com';
+        googleChatPayload = {
+          text,
+          cardsV2: [
+            {
+              card: {
+                header: { title: 'Ações Rápidas' },
+                sections: [
+                  {
+                    widgets: [
+                      { buttonList: { buttons: [
+                        { text: 'Abrir Página', onClick: { openLink: { url: actionUrl } } },
+                        { text: 'Copiar Incidente', onClick: { openLink: { url: `https://www.google.com/search?q=${incidentHash}` } } }
+                      ] } }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          cards: [
+            {
+              header: 'Ações Rápidas',
               sections: [
                 {
                   widgets: [
-                    { buttonList: { buttons: [
-                      { text: 'Abrir Página', onClick: { openLink: { url: actionUrl } } },
-                      { text: 'Copiar Incidente', onClick: { openLink: { url: `https://www.google.com/search?q=${incidentHash}` } } }
-                    ] } }
+                    { buttons: [
+                      { textButton: { text: 'Abrir Página', onClick: { openLink: { url: actionUrl } } } },
+                      { textButton: { text: 'Copiar Incidente', onClick: { openLink: { url: `https://www.google.com/search?q=${incidentHash}` } } } }
+                    ] }
                   ]
                 }
               ]
             }
-          }
-        ],
-        cards: [
-          {
-            header: 'Ações Rápidas',
-            sections: [
-              {
-                widgets: [
-                  { buttons: [
-                    { textButton: { text: 'Abrir Página', onClick: { openLink: { url: actionUrl } } } },
-                    { textButton: { text: 'Copiar Incidente', onClick: { openLink: { url: `https://www.google.com/search?q=${incidentHash}` } } } }
-                  ] }
-                ]
-              }
-            ]
-          }
-        ]
+          ]
+        };
+      } catch {}
+
+      const googleChatPromise = fetch(googleChatWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(googleChatPayload)
+      }).then(async (res) => {
+        if (res.ok) {
+          return { platform: 'Google Chat', status: 'success' };
+        } else {
+          const errText = await res.text().catch(() => '');
+          return { platform: 'Google Chat', status: 'error', error: errText, statusCode: res.status };
+        }
+      }).catch((error) => {
+        return { platform: 'Google Chat', status: 'error', error: error.message };
+      });
+
+      notificationPromises.push(googleChatPromise);
+    }
+
+    // Send to Slack if configured
+    if (slackWebhookUrl) {
+      const slackPayload = formatSlackMessage(title, message, context, incidentHash);
+
+      const slackPromise = fetch(slackWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(slackPayload)
+      }).then(async (res) => {
+        if (res.ok) {
+          return { platform: 'Slack', status: 'success' };
+        } else {
+          const errText = await res.text().catch(() => '');
+          return { platform: 'Slack', status: 'error', error: errText, statusCode: res.status };
+        }
+      }).catch((error) => {
+        return { platform: 'Slack', status: 'error', error: error.message };
+      });
+
+      notificationPromises.push(slackPromise);
+    }
+
+    // Wait for all notifications to complete
+    const results = await Promise.all(notificationPromises);
+    notificationResults.push(...results);
+
+    // Check if any notification was successful
+    const hasSuccess = results.some(result => result.status === 'success');
+    const hasErrors = results.some(result => result.status === 'error');
+
+    if (!hasSuccess) {
+      // All notifications failed
+      return { 
+        statusCode: 502, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Failed to send alerts to all platforms', 
+          results: notificationResults 
+        }) 
       };
-    } catch {}
-
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Failed to send alert', status: res.status, details: errText }) };
     }
 
     // Optional: persist in Supabase if server env available
@@ -183,7 +374,16 @@ exports.handler = async (event, _context) => {
       }
     } catch {}
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    return { 
+      statusCode: 200, 
+      headers, 
+      body: JSON.stringify({ 
+        ok: true, 
+        notifications: notificationResults,
+        successCount: results.filter(r => r.status === 'success').length,
+        errorCount: results.filter(r => r.status === 'error').length
+      }) 
+    };
   } catch (error) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal error', details: error.message }) };
   }
