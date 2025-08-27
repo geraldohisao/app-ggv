@@ -9,6 +9,20 @@ import { prefillFromN8n, sendDiagnosticToN8n, sendDiagnosticToPipedrive } from '
 import { GGVInteligenciaBrand } from './ui/BrandLogos';
 import { usePipedriveData } from '../hooks/usePipedriveData';
 
+// Chaves para localStorage
+const DIAGNOSTIC_STATE_KEY = 'ggv_diagnostic_state';
+const DIAGNOSTIC_TIMESTAMP_KEY = 'ggv_diagnostic_timestamp';
+
+// Interface para estado persistido
+interface DiagnosticPersistedState {
+    step: 'start' | 'companyInfo' | 'questionnaire' | 'results';
+    companyData: CompanyData | null;
+    selectedSegment: MarketSegment | null;
+    answers: Answers;
+    dealId?: string;
+    timestamp: number;
+}
+
 export const DiagnosticoComercial: React.FC = () => {
     const [step, setStep] = useState<'start' | 'companyInfo' | 'questionnaire' | 'results'>('start');
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
@@ -16,6 +30,9 @@ export const DiagnosticoComercial: React.FC = () => {
     const [answers, setAnswers] = useState<Answers>({});
     const [error, setError] = useState<string | null>(null);
     const [prefill, setPrefill] = useState<Partial<CompanyData> | null>(null);
+    
+    // Estado para controlar se deve carregar estado persistido
+    const [shouldLoadPersistedState, setShouldLoadPersistedState] = useState<boolean>(true);
     
     // Estados para busca manual de deal_id
     const [manualDealId, setManualDealId] = useState<string>('');
@@ -27,6 +44,91 @@ export const DiagnosticoComercial: React.FC = () => {
     // Hook para buscar dados do Pipedrive baseado no deal_id da URL
     const { data: pipedriveData, loading: pipedriveLoading, error: pipedriveError, dealId } = usePipedriveData();
     
+    // 💾 FUNÇÕES DE PERSISTÊNCIA
+    const saveStateToLocalStorage = () => {
+        try {
+            const state: DiagnosticPersistedState = {
+                step,
+                companyData,
+                selectedSegment,
+                answers,
+                dealId: dealId || undefined,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(DIAGNOSTIC_STATE_KEY, JSON.stringify(state));
+            console.log('💾 PERSISTÊNCIA - Estado salvo:', state);
+        } catch (error) {
+            console.error('❌ PERSISTÊNCIA - Erro ao salvar estado:', error);
+        }
+    };
+    
+    const loadStateFromLocalStorage = (): DiagnosticPersistedState | null => {
+        try {
+            const savedState = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+            if (!savedState) return null;
+            
+            const state: DiagnosticPersistedState = JSON.parse(savedState);
+            
+            // Verificar se o estado não é muito antigo (24 horas)
+            const maxAge = 24 * 60 * 60 * 1000; // 24 horas em ms
+            if (Date.now() - state.timestamp > maxAge) {
+                console.log('⏰ PERSISTÊNCIA - Estado expirado, removendo...');
+                clearPersistedState();
+                return null;
+            }
+            
+            console.log('📥 PERSISTÊNCIA - Estado carregado:', state);
+            return state;
+        } catch (error) {
+            console.error('❌ PERSISTÊNCIA - Erro ao carregar estado:', error);
+            return null;
+        }
+    };
+    
+    const clearPersistedState = () => {
+        try {
+            localStorage.removeItem(DIAGNOSTIC_STATE_KEY);
+            console.log('🗑️ PERSISTÊNCIA - Estado limpo');
+        } catch (error) {
+            console.error('❌ PERSISTÊNCIA - Erro ao limpar estado:', error);
+        }
+    };
+    
+    // 📥 CARREGAR ESTADO PERSISTIDO NA INICIALIZAÇÃO
+    useEffect(() => {
+        if (!shouldLoadPersistedState) return;
+        
+        const savedState = loadStateFromLocalStorage();
+        if (savedState && savedState.step !== 'start') {
+            console.log('🔄 PERSISTÊNCIA - Restaurando estado salvo...');
+            
+            // Só restaurar se não houver deal_id na URL (para não conflitar com links diretos)
+            const urlDealId = new URLSearchParams(window.location.search).get('deal_id');
+            if (!urlDealId) {
+                setStep(savedState.step);
+                setCompanyData(savedState.companyData);
+                setSelectedSegment(savedState.selectedSegment);
+                setAnswers(savedState.answers);
+                
+                console.log('✅ PERSISTÊNCIA - Estado restaurado com sucesso');
+            } else {
+                console.log('🔗 PERSISTÊNCIA - Deal ID na URL detectado, ignorando estado salvo');
+                clearPersistedState();
+            }
+        }
+        
+        setShouldLoadPersistedState(false);
+    }, [shouldLoadPersistedState]);
+    
+    // 💾 SALVAR ESTADO AUTOMATICAMENTE QUANDO HOUVER MUDANÇAS
+    useEffect(() => {
+        // Não salvar no estado inicial ou se ainda estiver carregando estado persistido
+        if (step === 'start' || shouldLoadPersistedState) return;
+        
+        saveStateToLocalStorage();
+    }, [step, companyData, selectedSegment, answers, shouldLoadPersistedState]);
+
     // Debug do deal_id
     useEffect(() => {
         console.log('🔍 DIAGNOSTICO - Deal ID atual:', dealId);
@@ -167,6 +269,48 @@ export const DiagnosticoComercial: React.FC = () => {
         setAnswers({});
         setError(null);
         setStep('companyInfo');
+        clearPersistedState();
+    };
+    
+    // 🔙 FUNÇÕES DE NAVEGAÇÃO
+    const handleGoBack = () => {
+        switch (step) {
+            case 'companyInfo':
+                setStep('start');
+                break;
+            case 'questionnaire':
+                setStep('companyInfo');
+                break;
+            case 'results':
+                setStep('questionnaire');
+                break;
+            default:
+                setStep('start');
+        }
+    };
+    
+    const handleResetDiagnostic = () => {
+        // Limpar todos os estados
+        setStep('start');
+        setCompanyData(null);
+        setSelectedSegment(null);
+        setAnswers({});
+        setError(null);
+        setPrefill(null);
+        setManualDealId('');
+        setSearchError(null);
+        setManualSearchData(null);
+        setShowSearchField(false);
+        
+        // Limpar estado persistido
+        clearPersistedState();
+        
+        // Limpar URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('deal_id');
+        window.history.replaceState({}, '', url.toString());
+        
+        console.log('🔄 RESET - Diagnóstico reiniciado completamente');
     };
 
     const renderContent = () => {
@@ -375,39 +519,136 @@ export const DiagnosticoComercial: React.FC = () => {
                                 </div>
                             ) : null}
                             
-                            <button
-                                onClick={() => setStep('companyInfo')}
-                                disabled={pipedriveLoading}
-                                className="mt-8 w-full sm:w-auto px-8 py-3 rounded-lg bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-bold shadow-lg inline-flex items-center justify-center gap-2"
-                            >
-                                <span>🚀</span> 
-                                {pipedriveLoading ? 'Carregando...' : 'Iniciar Diagnóstico'}
-                            </button>
+                            {/* Indicador de diagnóstico em andamento */}
+                            {(() => {
+                                const savedState = loadStateFromLocalStorage();
+                                const hasPersistedState = savedState && savedState.step !== 'start';
+                                
+                                if (hasPersistedState) {
+                                    return (
+                                        <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl">
+                                            <div className="flex items-center justify-center gap-2 mb-3">
+                                                <span className="text-green-600 text-lg">📋</span>
+                                                <span className="text-sm font-bold text-green-700">Diagnóstico em Andamento</span>
+                                            </div>
+                                            <p className="text-xs text-green-600 text-center mb-4">
+                                                Você tem um diagnóstico não finalizado. Deseja continuar de onde parou?
+                                            </p>
+                                            <div className="flex gap-2 justify-center">
+                                                <button
+                                                    onClick={() => {
+                                                        const state = loadStateFromLocalStorage();
+                                                        if (state) {
+                                                            setStep(state.step);
+                                                            setCompanyData(state.companyData);
+                                                            setSelectedSegment(state.selectedSegment);
+                                                            setAnswers(state.answers);
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                                >
+                                                    ✅ Continuar
+                                                </button>
+                                                <button
+                                                    onClick={handleResetDiagnostic}
+                                                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg transition-colors"
+                                                >
+                                                    🔄 Refazer
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+                            
+                            <div className="flex flex-col sm:flex-row gap-3 items-center justify-center mt-8">
+                                <button
+                                    onClick={() => setStep('companyInfo')}
+                                    disabled={pipedriveLoading}
+                                    className="w-full sm:w-auto px-8 py-3 rounded-lg bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-bold shadow-lg inline-flex items-center justify-center gap-2"
+                                >
+                                    <span>🚀</span> 
+                                    {pipedriveLoading ? 'Carregando...' : 'Iniciar Diagnóstico'}
+                                </button>
+                                
+                                {/* Botão Refazer sempre visível para casos onde há deal_id mas usuário quer trocar */}
+                                {(dealId || manualSearchData || prefill) && (
+                                    <button
+                                        onClick={handleResetDiagnostic}
+                                        className="w-full sm:w-auto px-6 py-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium shadow-md inline-flex items-center justify-center gap-2 transition-colors"
+                                        title="Limpar dados e inserir novo Deal ID"
+                                    >
+                                        <span>🔄</span> 
+                                        Refazer
+                                    </button>
+                                )}
+                            </div>
                             <p className="mt-4 text-xs text-slate-500">100% gratuito • Resultado em tempo real</p>
                         </div>
                     </div>
                 );
             case 'companyInfo':
-                return <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} prefill={prefill || undefined} />;
+                return (
+                    <div className="w-full max-w-4xl mx-auto space-y-4">
+                        {/* Botão Voltar */}
+                        <div className="flex justify-start">
+                            <button
+                                onClick={handleGoBack}
+                                className="inline-flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                <span>←</span>
+                                <span className="text-sm font-medium">Voltar</span>
+                            </button>
+                        </div>
+                        <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} prefill={prefill || undefined} />
+                    </div>
+                );
             case 'questionnaire':
-                return <QuestionnaireView 
+                return (
+                    <div className="w-full max-w-4xl mx-auto space-y-4">
+                        {/* Botão Voltar */}
+                        <div className="flex justify-start">
+                            <button
+                                onClick={handleGoBack}
+                                className="inline-flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                <span>←</span>
+                                <span className="text-sm font-medium">Voltar</span>
+                            </button>
+                        </div>
+                        <QuestionnaireView 
                             answers={answers}
                             totalScore={totalScore}
                             onSelectAnswer={handleSelectAnswer}
                             onSubmit={handleSubmit}
                             error={error}
-                        />;
+                        />
+                    </div>
+                );
             case 'results':
                 // Render results only if we have all the necessary data
                 return (companyData && selectedSegment) ? (
-                                        <ResultsView
-                        companyData={companyData}
-                        segment={selectedSegment}
-                        answers={answers}
-                        totalScore={totalScore}
-                        dealId={dealId}
-                        onRetry={handleRetry}
-                    />
+                    <div className="w-full max-w-7xl mx-auto space-y-4">
+                        {/* Botão Voltar */}
+                        <div className="flex justify-start">
+                            <button
+                                onClick={handleGoBack}
+                                className="inline-flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                <span>←</span>
+                                <span className="text-sm font-medium">Voltar ao Questionário</span>
+                            </button>
+                        </div>
+                        <ResultsView
+                            companyData={companyData}
+                            segment={selectedSegment}
+                            answers={answers}
+                            totalScore={totalScore}
+                            dealId={dealId}
+                            onRetry={handleRetry}
+                        />
+                    </div>
                 ) : (
                     // Fallback to the first step if data is missing
                     <CompanyInfoForm onSubmit={handleCompanyInfoSubmit} prefill={prefill || undefined} />
