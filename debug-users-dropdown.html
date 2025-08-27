@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Dropdown Usuários</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .result { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 3px; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+        select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .dropdown-test { margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Dropdown Usuários</h1>
+    
+    <div class="debug-section">
+        <h3>1. Configuração do Supabase</h3>
+        <button class="btn" onclick="checkConfig()">Verificar Config</button>
+        <div id="configResult" class="result"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>2. Teste da Função fetchRealUsers</h3>
+        <button class="btn" onclick="testFetchRealUsers()">Testar Função</button>
+        <div id="functionResult" class="result"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>3. Simulação do Dropdown</h3>
+        <button class="btn" onclick="simulateDropdown()">Simular Dropdown</button>
+        <div class="dropdown-test">
+            <select id="userDropdown">
+                <option value="">Carregando usuários...</option>
+            </select>
+        </div>
+        <div id="dropdownResult" class="result"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>4. Teste de Renderização</h3>
+        <button class="btn" onclick="testRendering()">Testar Renderização</button>
+        <div id="renderResult" class="result"></div>
+    </div>
+
+    <script>
+        let supabase;
+        let users = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre class="${isError ? 'error' : 'success'}">${content}</pre>`;
+        }
+        
+        async function checkConfig() {
+            log('🔧 Verificando configuração...');
+            
+            try {
+                // Tentar obter configuração do localStorage
+                const storedConfig = localStorage.getItem('ggv-api-keys');
+                const config = storedConfig ? JSON.parse(storedConfig) : null;
+                
+                log('📋 Configuração armazenada:', config);
+                
+                if (config && config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
+                    supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+                    showResult('configResult', `✅ Configuração encontrada!\nURL: ${config.SUPABASE_URL}\nKey: ${config.SUPABASE_ANON_KEY.substring(0, 20)}...`);
+                } else {
+                    showResult('configResult', '❌ Configuração não encontrada no localStorage. Verifique se o app foi configurado.', true);
+                }
+                
+            } catch (error) {
+                log(`❌ Erro ao verificar configuração: ${error.message}`);
+                showResult('configResult', `❌ Erro ao verificar configuração: ${error.message}`, true);
+            }
+        }
+        
+        async function testFetchRealUsers() {
+            log('🧪 Testando função fetchRealUsers...');
+            
+            if (!supabase) {
+                showResult('functionResult', '❌ Supabase não inicializado. Execute o teste de configuração primeiro.', true);
+                return;
+            }
+            
+            try {
+                log('🔍 Fazendo query na tabela profiles...');
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, avatar_url, role')
+                    .order('full_name');
+                
+                if (error) {
+                    log(`❌ Erro na query: ${error.message}`);
+                    throw error;
+                }
+                
+                log(`✅ Dados brutos recebidos: ${data?.length || 0} registros`);
+                
+                const mappedUsers = (data || []).map((u) => ({
+                    id: u.id,
+                    name: u.full_name || u.email || 'Usuário',
+                    avatarUrl: u.avatar_url,
+                    role: u.role || 'user'
+                }));
+                
+                users = mappedUsers;
+                
+                log(`✅ Usuários mapeados: ${mappedUsers.length}`);
+                showResult('functionResult', `✅ Função executada com sucesso!\n\nUsuários encontrados: ${mappedUsers.length}\n\nPrimeiros 3 usuários:\n${JSON.stringify(mappedUsers.slice(0, 3), null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro na função: ${error.message}`);
+                showResult('functionResult', `❌ Erro na função: ${error.message}`, true);
+            }
+        }
+        
+        function simulateDropdown() {
+            log('🎯 Simulando dropdown...');
+            
+            if (users.length === 0) {
+                showResult('dropdownResult', '❌ Nenhum usuário carregado. Execute o teste da função primeiro.', true);
+                return;
+            }
+            
+            try {
+                const dropdown = document.getElementById('userDropdown');
+                
+                // Limpar opções existentes
+                dropdown.innerHTML = '';
+                
+                // Adicionar opção padrão
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = `Todos os Usuários (${users.length})`;
+                dropdown.appendChild(defaultOption);
+                
+                // Adicionar usuários
+                users.forEach((user, index) => {
+                    console.log(`🎯 Renderizando usuário ${index + 1}:`, user);
+                    
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = `${user.name} (${user.role})`;
+                    dropdown.appendChild(option);
+                });
+                
+                log(`✅ Dropdown renderizado com ${users.length} usuários`);
+                showResult('dropdownResult', `✅ Dropdown renderizado com sucesso!\n\nUsuários no dropdown: ${users.length}\n\nEstrutura do primeiro usuário:\n${JSON.stringify(users[0], null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro ao renderizar dropdown: ${error.message}`);
+                showResult('dropdownResult', `❌ Erro ao renderizar dropdown: ${error.message}`, true);
+            }
+        }
+        
+        function testRendering() {
+            log('🎨 Testando renderização...');
+            
+            try {
+                // Testar se o React está funcionando
+                const testUsers = [
+                    { id: '1', name: 'João Silva', role: 'sdr' },
+                    { id: '2', name: 'Maria Santos', role: 'closer' },
+                    { id: '3', name: 'Pedro Costa', role: 'gestor' }
+                ];
+                
+                const testDropdown = document.createElement('select');
+                testDropdown.innerHTML = '<option value="">Teste de Renderização</option>';
+                
+                testUsers.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = `${user.name} (${user.role})`;
+                    testDropdown.appendChild(option);
+                });
+                
+                log('✅ Renderização de teste funcionando');
+                showResult('renderResult', `✅ Renderização funcionando!\n\nDropdown de teste criado com ${testUsers.length} usuários.\n\nEstrutura:\n${JSON.stringify(testUsers, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro na renderização: ${error.message}`);
+                showResult('renderResult', `❌ Erro na renderização: ${error.message}`, true);
+            }
+        }
+        
+        // Auto-inicializar se possível
+        window.addEventListener('load', () => {
+            log('🔄 Página carregada, verificando configuração...');
+            checkConfig();
+        });
+    </script>
+</body>
+</html>

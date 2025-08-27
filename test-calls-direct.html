@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Direto - Calls System</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste Direto do Sistema de Calls</h1>
+    <div id="results"></div>
+
+    <script>
+        // Configurar Supabase
+        const supabaseUrl = 'https://mwlekwyxbfbxfxskywgx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3l4YmZieGZ4c2t5d2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTIzMjEsImV4cCI6MjA2NTY4ODMyMX0.rFX9H2pcGLNX7n3vKLYGi72JKw_jUw6oG38IZGjO90HE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function testCalls() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>Testando...</h2>';
+
+            try {
+                // Teste 1: Consulta direta na tabela
+                console.log('🔍 Teste 1: Consulta direta na tabela calls');
+                const { data: directData, error: directError } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .limit(5);
+
+                if (directError) {
+                    console.error('❌ Erro na consulta direta:', directError);
+                    resultsDiv.innerHTML += `<p style="color:red">Erro na consulta direta: ${directError.message}</p>`;
+                } else {
+                    console.log('✅ Consulta direta OK:', directData);
+                    resultsDiv.innerHTML += `<h3>✅ Consulta Direta: ${directData.length} registros</h3>`;
+                    resultsDiv.innerHTML += `<pre>${JSON.stringify(directData[0], null, 2)}</pre>`;
+                }
+
+                // Teste 2: RPC get_calls_v2
+                console.log('🔍 Teste 2: RPC get_calls_v2');
+                const { data: rpcData, error: rpcError } = await supabase
+                    .rpc('get_calls_v2', {
+                        p_limit: 5,
+                        p_offset: 0,
+                        p_sdr_id: null,
+                        p_status: null,
+                        p_call_type: null,
+                        p_start: null,
+                        p_end: null
+                    });
+
+                if (rpcError) {
+                    console.error('❌ Erro na RPC:', rpcError);
+                    resultsDiv.innerHTML += `<p style="color:red">Erro na RPC: ${rpcError.message}</p>`;
+                } else {
+                    console.log('✅ RPC OK:', rpcData);
+                    resultsDiv.innerHTML += `<h3>✅ RPC get_calls_v2: ${rpcData.length} registros</h3>`;
+                    resultsDiv.innerHTML += `<pre>${JSON.stringify(rpcData[0], null, 2)}</pre>`;
+                }
+
+            } catch (error) {
+                console.error('❌ Erro geral:', error);
+                resultsDiv.innerHTML += `<p style="color:red">Erro geral: ${error.message}</p>`;
+            }
+        }
+
+        // Executar teste quando a página carregar
+        window.onload = testCalls;
+    </script>
+</body>
+</html>

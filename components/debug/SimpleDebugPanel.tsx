@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
 
 export const SimpleDebugPanel: React.FC = () => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
-import { FinalUnifiedDebugPanel } from './FinalUnifiedDebugPanel';
+import FinalUnifiedDebugPanel from './FinalUnifiedDebugPanel';
 
 /**
  * Painel de debug seguro para produção

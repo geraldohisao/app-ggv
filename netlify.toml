@@ -56,11 +56,7 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/api/calls/signed-audio"
-  to = "/.netlify/functions/signed-audio"
-  status = 200
-  force = true
+# Removido proxy de áudio assinado (não utilizado na versão atual)
 
 [[redirects]]
   from = "/api/calls/analyze"

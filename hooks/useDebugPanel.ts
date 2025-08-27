@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../contexts/DirectUserContext';
 
 export interface DebugLog {
   id: string;

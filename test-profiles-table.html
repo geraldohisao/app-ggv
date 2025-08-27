@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Tabela Profiles</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .result { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 3px; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste da Tabela Profiles</h1>
+    
+    <div class="test-section">
+        <h3>1. Teste de Conexão Supabase</h3>
+        <button class="btn" onclick="testConnection()">Testar Conexão</button>
+        <div id="connectionResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Verificar Tabela Profiles</h3>
+        <button class="btn" onclick="checkProfilesTable()">Verificar Tabela</button>
+        <div id="tableResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Buscar Todos os Usuários</h3>
+        <button class="btn" onclick="fetchAllUsers()">Buscar Usuários</button>
+        <div id="usersResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. Teste da Função fetchRealUsers</h3>
+        <button class="btn" onclick="testFetchRealUsers()">Testar Função</button>
+        <div id="functionResult" class="result"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://your-project.supabase.co';
+        const SUPABASE_ANON_KEY = 'your-anon-key';
+        
+        let supabase;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre class="${isError ? 'error' : 'success'}">${content}</pre>`;
+        }
+        
+        async function testConnection() {
+            log('🔄 Testando conexão com Supabase...');
+            
+            try {
+                // Tentar usar as variáveis de ambiente se disponíveis
+                const url = window.SUPABASE_URL || SUPABASE_URL;
+                const key = window.SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+                
+                if (url === SUPABASE_URL || key === SUPABASE_ANON_KEY) {
+                    throw new Error('Configure as variáveis SUPABASE_URL e SUPABASE_ANON_KEY');
+                }
+                
+                supabase = window.supabase.createClient(url, key);
+                
+                // Teste simples de conexão
+                const { data, error } = await supabase.from('profiles').select('count').limit(1);
+                
+                if (error) throw error;
+                
+                log('✅ Conexão estabelecida com sucesso!');
+                showResult('connectionResult', '✅ Conexão estabelecida com sucesso!');
+                
+            } catch (error) {
+                log(`❌ Erro na conexão: ${error.message}`);
+                showResult('connectionResult', `❌ Erro na conexão: ${error.message}`, true);
+            }
+        }
+        
+        async function checkProfilesTable() {
+            log('🔍 Verificando tabela profiles...');
+            
+            if (!supabase) {
+                showResult('tableResult', '❌ Supabase não inicializado. Execute o teste de conexão primeiro.', true);
+                return;
+            }
+            
+            try {
+                // Verificar se a tabela existe fazendo uma query simples
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, role')
+                    .limit(5);
+                
+                if (error) throw error;
+                
+                log(`✅ Tabela profiles encontrada! Registros: ${data.length}`);
+                showResult('tableResult', `✅ Tabela profiles encontrada!\nRegistros encontrados: ${data.length}\n\nPrimeiros registros:\n${JSON.stringify(data, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro ao verificar tabela: ${error.message}`);
+                showResult('tableResult', `❌ Erro ao verificar tabela: ${error.message}`, true);
+            }
+        }
+        
+        async function fetchAllUsers() {
+            log('👥 Buscando todos os usuários...');
+            
+            if (!supabase) {
+                showResult('usersResult', '❌ Supabase não inicializado.', true);
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, avatar_url, role')
+                    .order('full_name');
+                
+                if (error) throw error;
+                
+                log(`✅ Usuários encontrados: ${data.length}`);
+                
+                // Agrupar por role
+                const usersByRole = data.reduce((acc, user) => {
+                    const role = user.role || 'sem_role';
+                    if (!acc[role]) acc[role] = [];
+                    acc[role].push(user);
+                    return acc;
+                }, {});
+                
+                showResult('usersResult', `✅ Usuários encontrados: ${data.length}\n\nUsuários por Role:\n${JSON.stringify(usersByRole, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro ao buscar usuários: ${error.message}`);
+                showResult('usersResult', `❌ Erro ao buscar usuários: ${error.message}`, true);
+            }
+        }
+        
+        async function testFetchRealUsers() {
+            log('🧪 Testando função fetchRealUsers...');
+            
+            if (!supabase) {
+                showResult('functionResult', '❌ Supabase não inicializado.', true);
+                return;
+            }
+            
+            try {
+                // Simular a função fetchRealUsers
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, avatar_url, role')
+                    .order('full_name');
+                
+                if (error) throw error;
+                
+                const mappedUsers = (data || []).map((u) => ({
+                    id: u.id,
+                    name: u.full_name || u.email || 'Usuário',
+                    avatarUrl: u.avatar_url,
+                    role: u.role || 'user'
+                }));
+                
+                log(`✅ Função simulada - Usuários mapeados: ${mappedUsers.length}`);
+                showResult('functionResult', `✅ Função simulada executada com sucesso!\n\nUsuários mapeados: ${mappedUsers.length}\n\nResultado:\n${JSON.stringify(mappedUsers, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro na função simulada: ${error.message}`);
+                showResult('functionResult', `❌ Erro na função simulada: ${error.message}`, true);
+            }
+        }
+        
+        // Auto-inicializar se as variáveis estiverem disponíveis
+        window.addEventListener('load', () => {
+            if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+                log('🔄 Auto-inicializando Supabase...');
+                supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+            }
+        });
+    </script>
+</body>
+</html>

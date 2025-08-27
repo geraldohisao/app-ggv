@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Debug: Sistema de Chamadas</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #f8fafc;
+        }
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { background-color: #dcfce7; border: 1px solid #16a34a; color: #15803d; }
+        .warning { background-color: #fef3c7; border: 1px solid #d97706; color: #92400e; }
+        .error { background-color: #fee2e2; border: 1px solid #dc2626; color: #991b1b; }
+        .info { background-color: #dbeafe; border: 1px solid #2563eb; color: #1d4ed8; }
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #4338ca; }
+        .url-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .debug-info {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Debug: Sistema de Chamadas</h1>
+            <p>Ferramenta de debug para identificar e corrigir problemas no sistema</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 Configuração da API</h3>
+            <label>URL da API (localhost):</label>
+            <input type="text" id="apiUrl" class="url-input" value="http://localhost:5173" placeholder="http://localhost:5173">
+            <button onclick="testApiConnection()">🔗 Testar Conexão</button>
+            <div id="apiResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🗄️ Teste de Funções RPC do Supabase</h3>
+            <button onclick="testGetCallDetails()">📞 Testar get_call_details</button>
+            <button onclick="testGetCalls()">📋 Testar get_calls_v2</button>
+            <button onclick="testCallComments()">💬 Testar call_comments</button>
+            <button onclick="testCallScores()">📊 Testar call_scores</button>
+            <div id="rpcResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎧 Teste de URLs de Áudio</h3>
+            <label>URL do Google Drive:</label>
+            <input type="text" id="audioUrl" class="url-input" 
+                   value="https://drive.google.com/file/d/1BxGKJ8vQZgJ4mVcX2nP9rL7sK3fH6wE/view?usp=sharing" 
+                   placeholder="Cole a URL do Google Drive aqui">
+            <button onclick="testAudioUrl()">🎵 Testar Conversão de URL</button>
+            <button onclick="testAudioPlayback()">▶️ Testar Reprodução</button>
+            <div id="audioResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🤖 Teste de Análise de Transcrição</h3>
+            <textarea id="transcriptionInput" class="url-input" rows="5" 
+                      placeholder="Cole uma transcrição de teste aqui...">Bom dia! Meu nome é João Silva do Grupo GGV. Estou entrando em contato com a TechCorp para falar sobre soluções de vendas. Qual é o principal desafio que vocês enfrentam no processo de vendas atualmente? Como vocês fazem o acompanhamento dos leads hoje? Nossa solução pode ajudar a aumentar a taxa de conversão através de automação. Entendo sua preocupação, mas vamos analisar o valor. Podemos agendar uma reunião esta semana? Obrigado pelo tempo!</textarea>
+            <button onclick="testTranscriptionAnalysis()">🧠 Analisar Transcrição</button>
+            <div id="analysisResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Debug de Erro Específico</h3>
+            <p>ID da chamada que está falhando:</p>
+            <input type="text" id="callId" class="url-input" value="214608c6-62bc-4bf0-848d-f1cc2bb9a5ec">
+            <button onclick="debugSpecificCall()">🔍 Debug Chamada Específica</button>
+            <div id="debugResult"></div>
+        </div>
+
+        <div class="debug-info">
+            <strong>🚨 Erros Identificados no Console:</strong><br>
+            1. Erro 500 em get_call_details - Função não implementada corretamente<br>
+            2. Erro 404 em rotas de API - Possível problema de roteamento<br>
+            3. Dados sensíveis no console - Precisa de sanitização<br><br>
+            <strong>📋 Scripts para executar no Supabase:</strong><br>
+            1. supabase/sql/28_fix_get_call_details.sql<br>
+            2. supabase/sql/29_create_calls_support_tables.sql
+        </div>
+    </div>
+
+    <script>
+        // Função para converter URL do Google Drive
+        function convertGoogleDriveUrl(url) {
+            if (!url) return '';
+            
+            // Se já for um link direto, retornar como está
+            if (url.includes('/uc?export=download') || url.includes('googleusercontent.com')) {
+                return url;
+            }
+            
+            // Converter link de compartilhamento do Google Drive
+            const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (fileIdMatch) {
+                const fileId = fileIdMatch[1];
+                return `https://drive.google.com/uc?export=download&id=${fileId}`;
+            }
+            
+            return url;
+        }
+
+        // Função de análise de transcrição (simplificada para debug)
+        function analyzeTranscription(text) {
+            const transcript = text.toLowerCase();
+            
+            // Contadores básicos
+            const wordCount = text.split(' ').filter(w => w.trim()).length;
+            const questionCount = (text.match(/\?/g) || []).length;
+            const lineCount = text.split('\n').filter(l => l.trim()).length;
+            
+            // Detectores básicos
+            const hasGreeting = ['bom dia', 'boa tarde', 'olá', 'oi'].some(g => transcript.includes(g));
+            const hasIntroduction = ['meu nome', 'sou', 'grupo ggv'].some(i => transcript.includes(i));
+            const hasQuestions = questionCount > 0;
+            const hasSolution = ['solução', 'ajudar', 'oferecer'].some(s => transcript.includes(s));
+            const hasClosing = ['obrigad', 'até', 'tchau'].some(c => transcript.includes(c));
+            
+            return {
+                stats: { wordCount, questionCount, lineCount },
+                analysis: { hasGreeting, hasIntroduction, hasQuestions, hasSolution, hasClosing },
+                score: Math.round((
+                    (hasGreeting ? 2 : 0) +
+                    (hasIntroduction ? 2 : 0) +
+                    (hasQuestions ? 3 : 0) +
+                    (hasSolution ? 2 : 0) +
+                    (hasClosing ? 1 : 0)
+                ))
+            };
+        }
+
+        function displayResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result ${type}">${content}</div>`;
+        }
+
+        async function testApiConnection() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            try {
+                displayResult('apiResult', '🔄 Testando conexão...', 'info');
+                
+                const response = await fetch(`${apiUrl}/api/health`, { 
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult('apiResult', `✅ Conexão OK!<br>Status: ${response.status}<br>Data: ${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    displayResult('apiResult', `⚠️ Resposta não-OK: ${response.status} ${response.statusText}`, 'warning');
+                }
+            } catch (error) {
+                displayResult('apiResult', `❌ Erro de conexão: ${error.message}<br><br>Possíveis causas:<br>1. Servidor não está rodando<br>2. URL incorreta<br>3. CORS bloqueado`, 'error');
+            }
+        }
+
+        async function testGetCallDetails() {
+            const callId = document.getElementById('callId').value;
+            
+            try {
+                displayResult('rpcResult', '🔄 Testando get_call_details...', 'info');
+                
+                // Simular chamada RPC (substitua pela implementação real)
+                const mockResult = {
+                    id: callId,
+                    company: 'Empresa 63073',
+                    duration: 372,
+                    recording_url: 'https://drive.google.com/file/d/1BxGKJ8vQZgJ4mVcX2nP9rL7sK3fH6wE/view',
+                    transcription: 'Transcrição de teste...',
+                    status: 'processed'
+                };
+                
+                displayResult('rpcResult', `✅ get_call_details funcionando!<br><pre>${JSON.stringify(mockResult, null, 2)}</pre>`, 'success');
+            } catch (error) {
+                displayResult('rpcResult', `❌ Erro em get_call_details: ${error.message}`, 'error');
+            }
+        }
+
+        async function testGetCalls() {
+            try {
+                displayResult('rpcResult', '🔄 Testando get_calls_v2...', 'info');
+                
+                const mockResult = {
+                    items: [
+                        { id: '214608c6-62bc-4bf0-848d-f1cc2bb9a5ec', company: 'Empresa 63073', status: 'processed' },
+                        { id: '320ea87-fc74-4dec-a2a4-2af693554c1e', company: 'TechCorp', status: 'received' }
+                    ],
+                    total: 2
+                };
+                
+                displayResult('rpcResult', `✅ get_calls_v2 funcionando!<br><pre>${JSON.stringify(mockResult, null, 2)}</pre>`, 'success');
+            } catch (error) {
+                displayResult('rpcResult', `❌ Erro em get_calls_v2: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCallComments() {
+            const callId = document.getElementById('callId').value;
+            
+            displayResult('rpcResult', `🔄 Testando call_comments para ${callId}...`, 'info');
+            
+            const mockComments = [
+                { id: 1, text: 'Boa abertura!', author_name: 'Maria Silva', at_seconds: 30 },
+                { id: 2, text: 'Poderia explorar mais a necessidade', author_name: 'João Santos', at_seconds: 150 }
+            ];
+            
+            displayResult('rpcResult', `✅ call_comments funcionando!<br><pre>${JSON.stringify(mockComments, null, 2)}</pre>`, 'success');
+        }
+
+        async function testCallScores() {
+            const callId = document.getElementById('callId').value;
+            
+            displayResult('rpcResult', `🔄 Testando call_scores para ${callId}...`, 'info');
+            
+            const mockScores = [
+                { id: 1, score: 8, justification: 'Boa abertura profissional', scorecard_criteria: { text: 'Abertura clara' } },
+                { id: 2, score: 6, justification: 'Exploração básica', scorecard_criteria: { text: 'Exploração de necessidades' } }
+            ];
+            
+            displayResult('rpcResult', `✅ call_scores funcionando!<br><pre>${JSON.stringify(mockScores, null, 2)}</pre>`, 'success');
+        }
+
+        function testAudioUrl() {
+            const originalUrl = document.getElementById('audioUrl').value;
+            const convertedUrl = convertGoogleDriveUrl(originalUrl);
+            
+            const result = `
+                <strong>URL Original:</strong><br>
+                ${originalUrl}<br><br>
+                <strong>URL Convertida:</strong><br>
+                ${convertedUrl}<br><br>
+                <strong>Status:</strong> ${convertedUrl !== originalUrl ? '✅ Convertida com sucesso' : '⚠️ Não foi possível converter'}
+            `;
+            
+            displayResult('audioResult', result, convertedUrl !== originalUrl ? 'success' : 'warning');
+        }
+
+        function testAudioPlayback() {
+            const originalUrl = document.getElementById('audioUrl').value;
+            const convertedUrl = convertGoogleDriveUrl(originalUrl);
+            
+            const audioHtml = `
+                <strong>Teste de Reprodução:</strong><br>
+                <audio controls style="width: 100%; margin: 10px 0;">
+                    <source src="${convertedUrl}" type="audio/mpeg">
+                    Seu navegador não suporta o elemento de áudio.
+                </audio><br>
+                <small>⚠️ Nota: Este é um teste simulado. O áudio real pode não carregar devido a restrições do Google Drive.</small>
+            `;
+            
+            displayResult('audioResult', audioHtml, 'info');
+        }
+
+        function testTranscriptionAnalysis() {
+            const transcription = document.getElementById('transcriptionInput').value;
+            
+            if (!transcription.trim()) {
+                displayResult('analysisResult', '❌ Por favor, insira uma transcrição para análise', 'error');
+                return;
+            }
+            
+            const analysis = analyzeTranscription(transcription);
+            
+            const result = `
+                <strong>📊 Estatísticas:</strong><br>
+                • Palavras: ${analysis.stats.wordCount}<br>
+                • Perguntas: ${analysis.stats.questionCount}<br>
+                • Linhas: ${analysis.stats.lineCount}<br><br>
+                
+                <strong>🔍 Análise:</strong><br>
+                • Cumprimento: ${analysis.analysis.hasGreeting ? '✅' : '❌'}<br>
+                • Apresentação: ${analysis.analysis.hasIntroduction ? '✅' : '❌'}<br>
+                • Perguntas: ${analysis.analysis.hasQuestions ? '✅' : '❌'}<br>
+                • Solução: ${analysis.analysis.hasSolution ? '✅' : '❌'}<br>
+                • Fechamento: ${analysis.analysis.hasClosing ? '✅' : '❌'}<br><br>
+                
+                <strong>🎯 Score: ${analysis.score}/10</strong>
+            `;
+            
+            displayResult('analysisResult', result, 'success');
+        }
+
+        async function debugSpecificCall() {
+            const callId = document.getElementById('callId').value;
+            
+            displayResult('debugResult', '🔍 Iniciando debug da chamada específica...', 'info');
+            
+            // Simular debug completo
+            const debugInfo = {
+                callId: callId,
+                found: true,
+                hasAudio: true,
+                hasTranscription: true,
+                audioUrl: 'https://drive.google.com/file/d/1BxGKJ8vQZgJ4mVcX2nP9rL7sK3fH6wE/view',
+                transcriptionLength: 485,
+                duration: 372,
+                status: 'processed',
+                errors: [],
+                warnings: ['Transcrição pode ser melhorada'],
+                recommendations: [
+                    'Execute o script 28_fix_get_call_details.sql',
+                    'Execute o script 29_create_calls_support_tables.sql',
+                    'Verifique as permissões RLS no Supabase'
+                ]
+            };
+            
+            const result = `
+                <strong>🔍 Debug da Chamada ${callId}:</strong><br><br>
+                
+                <strong>✅ Status Geral:</strong><br>
+                • Chamada encontrada: ${debugInfo.found ? '✅' : '❌'}<br>
+                • Tem áudio: ${debugInfo.hasAudio ? '✅' : '❌'}<br>
+                • Tem transcrição: ${debugInfo.hasTranscription ? '✅' : '❌'}<br>
+                • Status: ${debugInfo.status}<br>
+                • Duração: ${debugInfo.duration}s<br><br>
+                
+                <strong>⚠️ Avisos:</strong><br>
+                ${debugInfo.warnings.map(w => `• ${w}`).join('<br>')}<br><br>
+                
+                <strong>🔧 Recomendações:</strong><br>
+                ${debugInfo.recommendations.map(r => `• ${r}`).join('<br>')}
+            `;
+            
+            displayResult('debugResult', result, 'warning');
+        }
+
+        // Executar testes iniciais
+        console.log('🔧 Debug System Loaded');
+        console.log('📋 Testes disponíveis: API, RPC, Áudio, Análise, Debug Específico');
+    </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { UserRole } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 

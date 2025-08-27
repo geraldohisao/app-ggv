@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Call Details</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste de Call Details</h1>
+    <div id="result"></div>
+    
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pqzjpqvxgqecxjvmjdpn.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxempwcXZ4Z3FlY3hqdm1qZHBuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEwMjY0NTEsImV4cCI6MjA0NjYwMjQ1MX0.7WoOQBgKvbKfFhwxRzQxzQkYzQqYzQxzQkYzQqYzQkY';
+        
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testCallDetails() {
+            console.log('🔍 Testando fetchCallDetails...');
+            
+            try {
+                // Primeiro, buscar uma chamada existente
+                const { data: calls, error: callsError } = await supabase
+                    .from('calls')
+                    .select('id')
+                    .limit(1);
+                    
+                if (callsError) {
+                    throw callsError;
+                }
+                
+                if (!calls || calls.length === 0) {
+                    document.getElementById('result').innerHTML = '❌ Nenhuma chamada encontrada';
+                    return;
+                }
+                
+                const callId = calls[0].id;
+                console.log('📞 Testando com callId:', callId);
+                
+                // Testar RPC get_call_details
+                const { data: rpcData, error: rpcError } = await supabase
+                    .rpc('get_call_details', { p_call_id: callId });
+                    
+                console.log('📊 RPC resultado:', { rpcData, rpcError });
+                
+                // Testar busca direta
+                const { data: directData, error: directError } = await supabase
+                    .from('calls')
+                    .select(`
+                        *,
+                        sdr_profile:profiles!calls_sdr_id_fkey(full_name, email, avatar_url)
+                    `)
+                    .eq('id', callId)
+                    .single();
+                    
+                console.log('📊 Busca direta resultado:', { directData, directError });
+                
+                document.getElementById('result').innerHTML = `
+                    <h2>Resultados do Teste</h2>
+                    <h3>Call ID: ${callId}</h3>
+                    
+                    <h4>RPC get_call_details:</h4>
+                    <pre>${JSON.stringify({ data: rpcData, error: rpcError }, null, 2)}</pre>
+                    
+                    <h4>Busca Direta:</h4>
+                    <pre>${JSON.stringify({ data: directData, error: directError }, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('❌ Erro no teste:', error);
+                document.getElementById('result').innerHTML = `❌ Erro: ${error.message}`;
+            }
+        }
+        
+        // Executar teste quando a página carregar
+        window.addEventListener('load', testCallDetails);
+    </script>
+</body>
+</html>

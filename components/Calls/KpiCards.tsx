@@ -8,16 +8,38 @@ export interface KpiData {
   avgScore?: number | null;
 }
 
-export default function KpiCards({ data }: { data: KpiData }) {
-  const minutes = Math.floor(data.avgDurationSec / 60);
-  const seconds = Math.round(data.avgDurationSec % 60);
+interface KpiCardsProps {
+  totalCalls?: number;
+  answeredRate?: number;
+  avgDuration?: number;
+  metrics?: any;
+  data?: KpiData;
+}
+
+export default function KpiCards({ 
+  totalCalls, 
+  answeredRate, 
+  avgDuration, 
+  metrics, 
+  data 
+}: KpiCardsProps) {
+  // Usar dados das props diretas ou do objeto data
+  const finalData = {
+    totalCalls: totalCalls ?? data?.totalCalls ?? 0,
+    answerRate: (answeredRate ?? data?.answerRate ?? 0) / 100, // Converter de % para decimal
+    avgDurationSec: avgDuration ?? data?.avgDurationSec ?? 0,
+    avgScore: data?.avgScore ?? null
+  };
+
+  const minutes = Math.floor(finalData.avgDurationSec / 60);
+  const seconds = Math.round(finalData.avgDurationSec % 60);
   const durationLabel = `${minutes}m ${String(seconds).padStart(2, '0')}s`;
 
   const cards = [
-    { title: 'Total de Chamadas', value: data.totalCalls, icon: '📞', href: '#/calls' },
-    { title: 'Taxa de Atendimento', value: `${Math.round((data.answerRate || 0) * 100)}%`, icon: '📈', href: '#/calls?status=answered' },
+    { title: 'Total de Chamadas', value: finalData.totalCalls, icon: '📞', href: '#/calls' },
+    { title: 'Taxa de Atendimento', value: `${Math.round((finalData.answerRate || 0) * 100)}%`, icon: '📈', href: '#/calls?status=answered' },
     { title: 'Duração Média', value: durationLabel, icon: '⏱️', href: '#/calls' },
-    { title: 'Nota Média Geral', value: data.avgScore ?? 'N/A', icon: '🎯', href: '#/calls' },
+    { title: 'Nota Média Geral', value: finalData.avgScore ?? 'N/A', icon: '🎯', href: '#/calls' },
   ];
 
   return (

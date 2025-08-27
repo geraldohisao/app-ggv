@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useDebugPanel, DebugLog } from '../../hooks/useDebugPanel';
-import { useUser } from '../../contexts/UserContext';
+import { useUser } from '../../contexts/DirectUserContext';
 import { supabase } from '../../services/supabaseClient';
 
 // Ícones simples usando Unicode

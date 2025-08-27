@@ -15,7 +15,15 @@ export default function SdrDetailPage({ sdrId }: { sdrId: string }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <img className="w-12 h-12 rounded-full" src={sdr.avatarUrl} alt="avatar" />
+        {sdr.avatarUrl ? (
+          <img className="w-12 h-12 rounded-full" src={sdr.avatarUrl} alt="avatar" />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+            <span className="text-indigo-600 font-medium text-lg">
+              {sdr.name?.charAt(0).toUpperCase() || '?'}
+            </span>
+          </div>
+        )}
         <div>
           <h3 className="text-lg font-semibold text-slate-800">{sdr.name}</h3>
           <p className="text-sm text-slate-600">Visão geral da performance e chamadas.</p>
@@ -59,9 +67,15 @@ export default function SdrDetailPage({ sdrId }: { sdrId: string }) {
                   <div className="text-xs text-slate-500">{call.dealCode}</div>
                 </td>
                 <td className="p-4 text-sm text-slate-600">
-                  {DATE_FORMATTER.format(new Date(call.date))}
-                  <span className="text-slate-400"> • </span>
-                  {TIME_FORMATTER.format(new Date(call.date))}
+                  {call.date || call.created_at ? (
+                    <>
+                      {DATE_FORMATTER.format(new Date(call.date || call.created_at))}
+                      <span className="text-slate-400"> • </span>
+                      {TIME_FORMATTER.format(new Date(call.date || call.created_at))}
+                    </>
+                  ) : (
+                    'Data não disponível'
+                  )}
                 </td>
                 <td className="p-4">{secondsToHuman(call.durationSec)}</td>
                 <td className="p-4 text-sm font-semibold">{typeof call.score === 'number' ? call.score : 'N/A'}</td>

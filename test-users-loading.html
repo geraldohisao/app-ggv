@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Carregamento de Usuários</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste de Carregamento de Usuários</h1>
+    
+    <div>
+        <button onclick="testProfiles()">Testar Profiles</button>
+        <button onclick="testUserMapping()">Testar User Mapping</button>
+        <button onclick="testCalls()">Testar Calls</button>
+        <button onclick="testAllUsers()">Testar Todos os Usuários</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Configuração do Supabase (substitua pelas suas credenciais)
+        const SUPABASE_URL = 'https://your-project.supabase.co';
+        const SUPABASE_ANON_KEY = 'your-anon-key';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testProfiles() {
+            log('🔍 Testando tabela profiles...');
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, created_at')
+                    .not('full_name', 'is', null)
+                    .limit(10);
+
+                if (error) {
+                    log(`❌ Erro ao buscar profiles: ${error.message}`, 'error');
+                } else {
+                    log(`✅ Profiles encontrados: ${data?.length || 0}`, 'success');
+                    log(`📋 Dados: ${JSON.stringify(data, null, 2)}`);
+                }
+            } catch (err) {
+                log(`❌ Erro: ${err.message}`, 'error');
+            }
+        }
+
+        async function testUserMapping() {
+            log('🔍 Testando tabela user_mapping...');
+            try {
+                const { data, error } = await supabase
+                    .from('user_mapping')
+                    .select('agent_id, full_name, email, created_at')
+                    .not('full_name', 'is', null)
+                    .limit(10);
+
+                if (error) {
+                    log(`❌ Erro ao buscar user_mapping: ${error.message}`, 'error');
+                } else {
+                    log(`✅ User mapping encontrados: ${data?.length || 0}`, 'success');
+                    log(`📋 Dados: ${JSON.stringify(data, null, 2)}`);
+                }
+            } catch (err) {
+                log(`❌ Erro: ${err.message}`, 'error');
+            }
+        }
+
+        async function testCalls() {
+            log('🔍 Testando tabela calls...');
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('agent_id, sdr_name, sdr_id, created_at')
+                    .not('agent_id', 'is', null)
+                    .limit(10);
+
+                if (error) {
+                    log(`❌ Erro ao buscar calls: ${error.message}`, 'error');
+                } else {
+                    log(`✅ Calls encontrados: ${data?.length || 0}`, 'success');
+                    log(`📋 Dados: ${JSON.stringify(data, null, 2)}`);
+                }
+            } catch (err) {
+                log(`❌ Erro: ${err.message}`, 'error');
+            }
+        }
+
+        async function testAllUsers() {
+            log('🔍 Testando função fetchRealUsers completa...');
+            try {
+                // Simular a função fetchRealUsers
+                const userMap = new Map();
+
+                // 1. Buscar profiles
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, avatar_url')
+                    .not('full_name', 'is', null)
+                    .limit(100);
+
+                if (!profilesError && profilesData) {
+                    profilesData.forEach((profile) => {
+                        if (profile.id && profile.full_name) {
+                            userMap.set(profile.id, {
+                                id: profile.id,
+                                name: profile.full_name,
+                                email: profile.email || '',
+                                avatar_url: profile.avatar_url,
+                                role: 'user'
+                            });
+                        }
+                    });
+                    log(`✅ Profiles processados: ${profilesData.length}`, 'success');
+                }
+
+                // 2. Buscar user_mapping
+                const { data: mappingData, error: mappingError } = await supabase
+                    .from('user_mapping')
+                    .select('agent_id, full_name, email')
+                    .not('full_name', 'is', null)
+                    .limit(100);
+
+                if (!mappingError && mappingData) {
+                    mappingData.forEach((mapping) => {
+                        if (mapping.agent_id && mapping.full_name) {
+                            userMap.set(mapping.agent_id, {
+                                id: mapping.agent_id,
+                                name: mapping.full_name,
+                                email: mapping.email || '',
+                                role: 'agent'
+                            });
+                        }
+                    });
+                    log(`✅ User mapping processados: ${mappingData.length}`, 'success');
+                }
+
+                // 3. Fallback para calls
+                if (userMap.size === 0) {
+                    log('🔄 Nenhum usuário encontrado, tentando calls...');
+                    const { data: callsData, error: callsError } = await supabase
+                        .from('calls')
+                        .select('agent_id, sdr_id, sdr_name')
+                        .not('agent_id', 'is', null)
+                        .limit(100);
+
+                    if (!callsError && callsData) {
+                        callsData.forEach((call) => {
+                            if (call.agent_id && call.sdr_name) {
+                                userMap.set(call.agent_id, {
+                                    id: call.agent_id,
+                                    name: call.sdr_name,
+                                    email: '',
+                                    role: 'user'
+                                });
+                            }
+                        });
+                        log(`✅ Calls processados: ${callsData.length}`, 'success');
+                    }
+                }
+
+                const mappedUsers = Array.from(userMap.values());
+                log(`🎉 Total de usuários únicos: ${mappedUsers.length}`, 'success');
+                log(`📋 Usuários finais: ${JSON.stringify(mappedUsers, null, 2)}`);
+
+            } catch (err) {
+                log(`❌ Erro: ${err.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -98,8 +98,9 @@ export async function postCriticalAlert(payload: {
 
     const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     let endpoint = '/api/alert';
-    if (isLocalhost && typeof window !== 'undefined' && window.location.port !== '8888') {
-      endpoint = 'http://localhost:8888/.netlify/functions/alert';
+    // Em desenvolvimento, usar a mesma porta do frontend (5173) com proxy do Vite
+    if (isLocalhost && typeof window !== 'undefined') {
+      endpoint = '/.netlify/functions/alert';
     }
     await fetch(endpoint, {
       method: 'POST',

@@ -12,6 +12,7 @@ export interface CallItem {
   dealCode: string;
   sdr: SdrUser;
   date: string; // ISO
+  created_at?: string; // Alias for date
   durationSec: number;
   status: CallStatus;
   score?: number; // 0-100
@@ -28,6 +29,7 @@ export interface ScorecardDefinition {
   id: string;
   name: string;
   conversationType: string;
+  callType: string; // Tipo de ligação para vinculação automática
   updatedAt: string; // ISO
   active: boolean;
   criteria: ScorecardCriterion[];

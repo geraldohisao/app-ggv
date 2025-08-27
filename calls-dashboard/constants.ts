@@ -93,6 +93,7 @@ export const SCORECARDS: ScorecardDefinition[] = [
     id: 'sc-1',
     name: 'Diagnóstico Comercial [Consultoria em Vendas]',
     conversationType: '[GGV] - Reunião de Diagnóstico',
+    callType: 'diagnostico',
     updatedAt: new Date().toISOString(),
     active: false,
     criteria: [
@@ -107,8 +108,9 @@ export const SCORECARDS: ScorecardDefinition[] = [
     id: 'sc-2',
     name: 'Ligação [Consultoria em Vendas]',
     conversationType: '[GGV] - Ligação',
+    callType: 'ligacao',
     updatedAt: new Date(Date.now() - 3*24*3600*1000).toISOString(),
-    active: false,
+    active: true, // ATIVADO para análise automática
     criteria: [
       { id: 'c1', name: 'Abertura', description: 'Início da chamada', weight: 20 },
       { id: 'c2', name: 'Objetivo', description: 'Definiu objetivo', weight: 30 },
@@ -120,6 +122,7 @@ export const SCORECARDS: ScorecardDefinition[] = [
     id: 'sc-3',
     name: 'Proposta Comercial [Consultoria em Vendas]',
     conversationType: '[GGV] - Reunião de Proposta',
+    callType: 'proposta',
     updatedAt: new Date(Date.now() - 18*24*3600*1000).toISOString(),
     active: false,
     criteria: [

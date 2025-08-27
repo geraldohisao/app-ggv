@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Filtros - Chamadas</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Filtros - Sistema de Chamadas</h1>
+    
+    <div class="debug-section info">
+        <h3>📊 Status do Sistema</h3>
+        <div id="status"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>👥 Teste de Usuários</h3>
+        <button class="btn-primary" onclick="testUsers()">Buscar Todos os Usuários</button>
+        <div id="usersResult"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>📞 Teste de Chamadas</h3>
+        <button class="btn-primary" onclick="testCalls()">Buscar Chamadas</button>
+        <button class="btn-success" onclick="testCallsWithFilters()">Buscar com Filtros</button>
+        <div id="callsResult"></div>
+    </div>
+
+            <div class="debug-section">
+            <h3>🔧 Teste de Filtros Individuais</h3>
+            <button class="btn-warning" onclick="testSdrFilter()">Filtro SDR</button>
+            <button class="btn-warning" onclick="testStatusFilter()">Filtro Status</button>
+            <button class="btn-warning" onclick="testCallTypeFilter()">Filtro Tipo</button>
+            <button class="btn-warning" onclick="testDateFilter()">Filtro Data</button>
+            <button class="btn-warning" onclick="testCallsWithoutSdr()">Chamadas sem SDR</button>
+            <div id="filterResult"></div>
+        </div>
+
+    <script>
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://mwlekwyxbfbxfxskywgx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3liZmJ4Znhza3l3Z3giLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNTI5NzI5MCwiZXhwIjoyMDUwODczMjkwfQ.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            statusDiv.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+        }
+
+        async function testUsers() {
+            log('🔍 Testando busca de usuários...');
+            const resultDiv = document.getElementById('usersResult');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, avatar_url, role')
+                    .order('full_name');
+                
+                if (error) throw error;
+                
+                log(`✅ Usuários encontrados: ${data.length}`, 'success');
+                
+                // Agrupar por role para melhor visualização
+                const usersByRole = data.reduce((acc, user) => {
+                    const role = user.role || 'sem_role';
+                    if (!acc[role]) acc[role] = [];
+                    acc[role].push(user);
+                    return acc;
+                }, {});
+                
+                resultDiv.innerHTML = `<pre>Usuários por Role:\n${JSON.stringify(usersByRole, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro ao buscar usuários: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testCalls() {
+            log('🔍 Testando busca de chamadas...');
+            const resultDiv = document.getElementById('callsResult');
+            
+            try {
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_id: null,
+                    p_status: null,
+                    p_call_type: null,
+                    p_start: null,
+                    p_end: null
+                });
+                
+                if (error) throw error;
+                
+                log(`✅ Chamadas encontradas: ${data.length}`, 'success');
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro ao buscar chamadas: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testCallsWithFilters() {
+            log('🔍 Testando busca com filtros...');
+            const resultDiv = document.getElementById('callsResult');
+            
+            try {
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_id: 'test-sdr-id',
+                    p_status: 'processed',
+                    p_call_type: 'ligacao',
+                    p_start: '2025-01-01',
+                    p_end: '2025-12-31'
+                });
+                
+                if (error) throw error;
+                
+                log(`✅ Chamadas com filtros encontradas: ${data.length}`, 'success');
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro ao buscar chamadas com filtros: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testSdrFilter() {
+            log('🔍 Testando filtro SDR...');
+            const resultDiv = document.getElementById('filterResult');
+            
+            try {
+                // Primeiro buscar usuários
+                const { data: users, error: usersError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, role')
+                    .limit(5);
+                
+                if (usersError) throw usersError;
+                
+                if (users.length === 0) {
+                    log('⚠️ Nenhum usuário encontrado para testar filtro SDR', 'error');
+                    return;
+                }
+                
+                log(`👥 Usuários encontrados: ${users.map(u => `${u.full_name} (${u.role || 'sem_role'})`).join(', ')}`);
+                
+                // Testar com cada usuário
+                let allResults = [];
+                for (const user of users) {
+                    const testSdrId = user.id;
+                    log(`🧪 Testando com SDR ID: ${testSdrId} (${user.full_name})`);
+                    
+                    const { data, error } = await supabase.rpc('get_calls_v2', {
+                        p_limit: 5,
+                        p_offset: 0,
+                        p_sdr_id: testSdrId,
+                        p_status: null,
+                        p_call_type: null,
+                        p_start: null,
+                        p_end: null
+                    });
+                    
+                    if (error) {
+                        log(`❌ Erro para ${user.full_name}: ${error.message}`, 'error');
+                        continue;
+                    }
+                    
+                    log(`✅ Chamadas do SDR ${user.full_name}: ${data.length}`, 'success');
+                    allResults.push({
+                        user: user.full_name,
+                        sdr_id: testSdrId,
+                        calls_count: data.length,
+                        sample_call: data[0] || null
+                    });
+                }
+                
+                resultDiv.innerHTML = `<pre>Resultados do Filtro SDR:\n${JSON.stringify(allResults, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro no filtro SDR: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testStatusFilter() {
+            log('🔍 Testando filtro Status...');
+            const resultDiv = document.getElementById('filterResult');
+            
+            try {
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 5,
+                    p_offset: 0,
+                    p_sdr_id: null,
+                    p_status: 'processed',
+                    p_call_type: null,
+                    p_start: null,
+                    p_end: null
+                });
+                
+                if (error) throw error;
+                
+                log(`✅ Chamadas com status 'processed': ${data.length}`, 'success');
+                resultDiv.innerHTML = `<pre>Filtro Status (processed): ${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro no filtro Status: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testCallTypeFilter() {
+            log('🔍 Testando filtro Call Type...');
+            const resultDiv = document.getElementById('filterResult');
+            
+            try {
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 5,
+                    p_offset: 0,
+                    p_sdr_id: null,
+                    p_status: null,
+                    p_call_type: 'ligacao',
+                    p_start: null,
+                    p_end: null
+                });
+                
+                if (error) throw error;
+                
+                log(`✅ Chamadas com call_type 'ligacao': ${data.length}`, 'success');
+                resultDiv.innerHTML = `<pre>Filtro Call Type (ligacao): ${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro no filtro Call Type: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testDateFilter() {
+            log('🔍 Testando filtro Data...');
+            const resultDiv = document.getElementById('filterResult');
+            
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 5,
+                    p_offset: 0,
+                    p_sdr_id: null,
+                    p_status: null,
+                    p_call_type: null,
+                    p_start: lastWeek,
+                    p_end: today
+                });
+                
+                if (error) throw error;
+                
+                log(`✅ Chamadas entre ${lastWeek} e ${today}: ${data.length}`, 'success');
+                resultDiv.innerHTML = `<pre>Filtro Data (${lastWeek} a ${today}): ${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro no filtro Data: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        async function testCallsWithoutSdr() {
+            log('🔍 Testando chamadas sem SDR...');
+            const resultDiv = document.getElementById('filterResult');
+            
+            try {
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_id: null,
+                    p_status: null,
+                    p_call_type: null,
+                    p_start: null,
+                    p_end: null
+                });
+                
+                if (error) throw error;
+                
+                // Analisar estrutura dos dados
+                const callsWithoutSdr = data.filter(call => !call.sdr_id && !call.agent_id);
+                const callsWithSdr = data.filter(call => call.sdr_id || call.agent_id);
+                
+                log(`📊 Total de chamadas: ${data.length}`, 'info');
+                log(`📊 Chamadas com SDR: ${callsWithSdr.length}`, 'info');
+                log(`📊 Chamadas sem SDR: ${callsWithoutSdr.length}`, 'info');
+                
+                const analysis = {
+                    total_calls: data.length,
+                    calls_with_sdr: callsWithSdr.length,
+                    calls_without_sdr: callsWithoutSdr.length,
+                    sample_calls_with_sdr: callsWithSdr.slice(0, 3).map(c => ({
+                        id: c.id,
+                        sdr_id: c.sdr_id,
+                        agent_id: c.agent_id,
+                        sdr_name: c.sdr_name
+                    })),
+                    sample_calls_without_sdr: callsWithoutSdr.slice(0, 3).map(c => ({
+                        id: c.id,
+                        sdr_id: c.sdr_id,
+                        agent_id: c.agent_id,
+                        sdr_name: c.sdr_name
+                    }))
+                };
+                
+                resultDiv.innerHTML = `<pre>Análise de Chamadas:\n${JSON.stringify(analysis, null, 2)}</pre>`;
+                
+            } catch (error) {
+                log(`❌ Erro ao analisar chamadas: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<pre class="error">${error.message}</pre>`;
+            }
+        }
+
+        // Inicialização
+        log('🚀 Sistema de debug iniciado');
+        log('📋 Clique nos botões para testar cada funcionalidade');
+    </script>
+</body>
+</html>

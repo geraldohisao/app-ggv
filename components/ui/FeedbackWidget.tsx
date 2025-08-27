@@ -125,9 +125,9 @@ const FeedbackWidget: React.FC = () => {
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       let endpoint = '/api/feedback';
-      if (isLocalhost && window.location.port !== '8888') {
-        // Chamar a função Netlify diretamente para evitar conflitos de proxy (Vite)
-        endpoint = 'http://localhost:8888/.netlify/functions/feedback';
+      if (isLocalhost) {
+        // Em desenvolvimento local, usar proxy do Vite
+        endpoint = '/.netlify/functions/feedback';
       }
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -154,7 +154,7 @@ const FeedbackWidget: React.FC = () => {
       {/* Floating trigger button - smaller/cleaner */}
       <button
         onClick={onOpen}
-        className={`fixed ${isSuperAdmin ? 'bottom-6 right-24' : 'bottom-5 right-5'} z-40 bg-slate-900 text-white shadow-md rounded-full px-3 py-2 flex items-center gap-2 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400`}
+        className={`fixed bottom-20 right-4 z-40 bg-slate-900 text-white shadow-md rounded-full px-3 py-2 flex items-center gap-2 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400`}
         aria-label="Enviar feedback"
       >
         <ChatBubbleLeftRightIcon className="w-4 h-4" />

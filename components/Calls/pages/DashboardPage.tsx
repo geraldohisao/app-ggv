@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import CallVolumeChart from '../../../calls-dashboard/components/CallVolumeChart';
 import SdrScoreChart from '../../../calls-dashboard/components/SdrScoreChart';
 import { CALLS, SDRS } from '../../../calls-dashboard/constants';
-import { fetchCalls } from '../../../services/callsService';
+import { fetchCalls, fetchRealUsers, computeRankings } from '../../../services/callsService';
 import RelativeDateRange from '../RelativeDateRange';
 import KpiCards from '../KpiCards';
 import { RankingScore, RankingVolume } from '../Rankings';
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [query, setQuery] = useState('');
 
   const [remote, setRemote] = useState<any[] | null>(null);
+  const [users, setUsers] = useState<any[]>([]);
   const source = remote ?? CALLS;
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
@@ -29,17 +30,41 @@ export default function DashboardPage() {
     setEnd(fmt(endD));
   };
 
+  const handleDateClick = (date: string) => {
+    setStart(date);
+    setEnd(date);
+  };
+
+  // Carregar usuários reais uma vez
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const realUsers = await fetchRealUsers();
+        console.log('👥 Dashboard - Usuários reais carregados:', realUsers);
+        setUsers(realUsers);
+      } catch (error) {
+        console.error('❌ Dashboard - Erro ao carregar usuários:', error);
+        setUsers([]); // Fallback para array vazio
+      }
+    };
+    loadUsers();
+  }, []);
+
   useEffect(() => {
     const run = async () => {
       try {
+        console.log('🔍 Dashboard - Buscando dados reais com filtros:', { sdr, status, start, end });
         const { items } = await fetchCalls({
           sdrId: sdr || undefined,
           status: status || undefined,
           start: start || undefined,
           end: end || undefined,
+          limit: 100, // Aumentar limite para dashboard
         });
+        console.log('📊 Dashboard - Dados recebidos:', items);
         setRemote(items);
-      } catch {
+      } catch (error) {
+        console.error('❌ Dashboard - Erro ao buscar dados:', error);
         setRemote(null);
       }
     };
@@ -66,6 +91,15 @@ export default function DashboardPage() {
   const avgDuration = filtered.reduce((a: number, c: any) => a + (c.durationSec ?? c.duration ?? 0), 0) / (totalCalls || 1);
 
   const metrics = computeMetricsClientSide(filtered as any);
+  
+  // Computar rankings com dados reais
+  const { scoreRanking, volumeRanking } = useMemo(() => {
+    // USAR APENAS USUÁRIOS REAIS - NÃO USAR FALLBACK PARA SDRS SIMULADOS
+    if (users.length === 0) {
+      return { scoreRanking: [], volumeRanking: [] };
+    }
+    return computeRankings(filtered, users);
+  }, [filtered, users]);
 
   return (
     <div className="space-y-6">
@@ -73,7 +107,11 @@ export default function DashboardPage() {
         <input className="border border-slate-300 rounded px-2.5 py-2 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300" placeholder="Empresa ou Deal ID..." value={query} onChange={(e) => setQuery(e.target.value)} />
         <select className="border border-slate-300 rounded px-2.5 py-2 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300" value={sdr} onChange={(e) => setSdr(e.target.value)}>
           <option value="">Todos os SDRs</option>
-          {SDRS.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.name || user.full_name || user.email}
+            </option>
+          ))}
         </select>
         <select className="border border-slate-300 rounded px-2.5 py-2 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">Todos os Tipos</option>
@@ -85,16 +123,31 @@ export default function DashboardPage() {
           <RelativeDateRange onChange={(r) => { setStart(r.start); setEnd(r.end); }} />
         </div>
       </div>
-      <KpiCards data={{ totalCalls, answerRate: (answeredRate/100), avgDurationSec: avgDuration, avgScore: null }} />
+      <KpiCards
+        totalCalls={totalCalls}
+        answeredRate={answeredRate}
+        avgDuration={avgDuration}
+        metrics={metrics}
+      />
 
-      <CallVolumeChart data={filtered} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RankingScore items={SDRS.map((u) => ({ user: u as any, calls: filtered.filter((c) => (c.sdr?.id || c.sdr_id) === u.id).length, avgScore: null }))} />
-        <RankingVolume items={SDRS.map((u) => ({ user: u as any, calls: filtered.filter((c) => (c.sdr?.id || c.sdr_id) === u.id).length }))} />
+      {/* Gráfico de Volume - Horizontal */}
+      <div className="w-full">
+        <CallVolumeChart 
+          selectedPeriod={14} 
+          onDateClick={handleDateClick}
+          startDate={start}
+          endDate={end}
+        />
       </div>
 
-      <RecentCalls items={[...filtered].sort((a: any, b: any) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()).slice(0,5)} />
+      {/* Rankings - Duas colunas limitadas a 6 usuários */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RankingVolume data={volumeRanking.slice(0, 6)} />
+        <RankingScore data={scoreRanking.slice(0, 6)} />
+      </div>
+
+      {/* Chamadas recentes */}
+      <RecentCalls calls={filtered.slice(0, 10)} />
 
       <div className="bg-white border border-slate-200 rounded-lg p-3">
         <div className="text-xs text-slate-500 mb-2">Filtros salvos</div>

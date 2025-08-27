@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Sistema de Chamadas</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+        .success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .warning { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+        .info { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .loading { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 4px;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        .results {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+        .card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .metric {
+            text-align: center;
+            padding: 16px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Teste Completo do Sistema de Chamadas</h1>
+        <p>Este teste verifica todos os componentes do sistema de chamadas no Supabase.</p>
+        
+        <div>
+            <button onclick="runFullTest()">🔍 Executar Teste Completo</button>
+            <button onclick="testConnection()">🔌 Testar Conexão</button>
+            <button onclick="testCallsTable()">📊 Testar Tabela Calls</button>
+            <button onclick="testRPC()">⚡ Testar RPC get_calls_v2</button>
+            <button onclick="testUsers()">👥 Testar Usuários</button>
+            <button onclick="clearResults()">🗑️ Limpar Resultados</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📋 Resultados dos Testes</h2>
+        <div id="results"></div>
+    </div>
+
+    <div class="container">
+        <h2>📈 Métricas do Sistema</h2>
+        <div class="grid" id="metrics"></div>
+    </div>
+
+    <script>
+        let supabase = null;
+        let testResults = [];
+
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://your-project.supabase.co'; // Substitua pela sua URL
+        const SUPABASE_ANON_KEY = 'your-anon-key'; // Substitua pela sua chave
+
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`;
+            resultsDiv.appendChild(statusDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            
+            testResults.push({ message, type, timestamp: new Date() });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('metrics').innerHTML = '';
+            testResults = [];
+        }
+
+        function updateMetrics(metrics) {
+            const metricsDiv = document.getElementById('metrics');
+            metricsDiv.innerHTML = '';
+            
+            Object.entries(metrics).forEach(([key, value]) => {
+                const card = document.createElement('div');
+                card.className = 'card metric';
+                card.innerHTML = `
+                    <div class="metric-value">${value}</div>
+                    <div class="metric-label">${key}</div>
+                `;
+                metricsDiv.appendChild(card);
+            });
+        }
+
+        async function initializeSupabase() {
+            try {
+                if (!SUPABASE_URL || SUPABASE_URL === 'https://your-project.supabase.co') {
+                    throw new Error('Configure SUPABASE_URL no código');
+                }
+                if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'your-anon-key') {
+                    throw new Error('Configure SUPABASE_ANON_KEY no código');
+                }
+
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                addResult('✅ Cliente Supabase inicializado', 'success');
+                return true;
+            } catch (error) {
+                addResult(`❌ Erro ao inicializar Supabase: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testConnection() {
+            addResult('🔌 Testando conexão com Supabase...', 'loading');
+            
+            if (!await initializeSupabase()) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) throw error;
+                
+                addResult('✅ Conexão com Supabase estabelecida com sucesso', 'success');
+                return true;
+            } catch (error) {
+                addResult(`❌ Erro de conexão: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testCallsTable() {
+            addResult('📊 Testando tabela calls...', 'loading');
+            
+            if (!supabase) {
+                addResult('❌ Supabase não inicializado', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .limit(5);
+                
+                if (error) throw error;
+                
+                addResult(`✅ Tabela calls OK - ${data?.length || 0} registros encontrados`, 'success');
+                
+                if (data && data.length > 0) {
+                    const example = data[0];
+                    addResult(`📋 Exemplo: ID=${example.id}, Agent=${example.agent_id}, Status=${example.status}`, 'info');
+                }
+                
+                return data?.length || 0;
+            } catch (error) {
+                addResult(`❌ Erro na tabela calls: ${error.message}`, 'error');
+                return 0;
+            }
+        }
+
+        async function testRPC() {
+            addResult('⚡ Testando RPC get_calls_v2...', 'loading');
+            
+            if (!supabase) {
+                addResult('❌ Supabase não inicializado', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.rpc('get_calls_v2', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_id: null,
+                    p_status: null,
+                    p_call_type: null,
+                    p_start: null,
+                    p_end: null
+                });
+                
+                if (error) throw error;
+                
+                addResult(`✅ RPC get_calls_v2 OK - ${data?.length || 0} registros retornados`, 'success');
+                
+                if (data && data.length > 0) {
+                    const example = data[0];
+                    addResult(`📋 RPC Exemplo: ID=${example.id}, SDR=${example.sdr_name}, Company=${example.company}`, 'info');
+                }
+                
+                return data?.length || 0;
+            } catch (error) {
+                addResult(`❌ Erro na RPC get_calls_v2: ${error.message}`, 'error');
+                addResult('🔧 Execute o script fix-calls-function-agent-id.sql no Supabase SQL Editor', 'warning');
+                return 0;
+            }
+        }
+
+        async function testUsers() {
+            addResult('👥 Testando busca de usuários...', 'loading');
+            
+            if (!supabase) {
+                addResult('❌ Supabase não inicializado', 'error');
+                return;
+            }
+
+            try {
+                // Testar tabela user_mapping
+                const { data: mappingData, error: mappingError } = await supabase
+                    .from('user_mapping')
+                    .select('*')
+                    .limit(5);
+                
+                if (mappingError) {
+                    addResult(`⚠️ Tabela user_mapping: ${mappingError.message}`, 'warning');
+                } else {
+                    addResult(`✅ Tabela user_mapping OK - ${mappingData?.length || 0} registros`, 'success');
+                }
+
+                // Testar tabela profiles
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .limit(5);
+                
+                if (profilesError) {
+                    addResult(`⚠️ Tabela profiles: ${profilesError.message}`, 'warning');
+                } else {
+                    addResult(`✅ Tabela profiles OK - ${profilesData?.length || 0} registros`, 'success');
+                }
+
+                // Testar busca de usuários reais
+                const { data: usersData, error: usersError } = await supabase
+                    .from('calls')
+                    .select('agent_id, sdr_name')
+                    .not('agent_id', 'is', null)
+                    .limit(10);
+                
+                if (usersError) {
+                    addResult(`❌ Erro ao buscar usuários: ${usersError.message}`, 'error');
+                } else {
+                    const userMap = new Map();
+                    usersData?.forEach(call => {
+                        if (call.agent_id) {
+                            userMap.set(call.agent_id, call.sdr_name || `Usuário ${call.agent_id}`);
+                        }
+                    });
+                    
+                    const uniqueUsers = Array.from(userMap.values());
+                    addResult(`✅ Usuários únicos encontrados: ${uniqueUsers.length}`, 'success');
+                    
+                    if (uniqueUsers.length > 0) {
+                        addResult(`👥 Exemplos: ${uniqueUsers.slice(0, 3).join(', ')}`, 'info');
+                    }
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro geral nos testes de usuários: ${error.message}`, 'error');
+            }
+        }
+
+        async function runFullTest() {
+            clearResults();
+            addResult('🚀 Iniciando teste completo do sistema de chamadas...', 'info');
+            
+            const metrics = {};
+            
+            // 1. Testar conexão
+            const connectionOk = await testConnection();
+            metrics['Conexão'] = connectionOk ? '✅ OK' : '❌ ERRO';
+            
+            if (!connectionOk) {
+                addResult('❌ Teste interrompido devido a erro de conexão', 'error');
+                updateMetrics(metrics);
+                return;
+            }
+            
+            // 2. Testar tabela calls
+            const callsCount = await testCallsTable();
+            metrics['Chamadas'] = callsCount;
+            
+            // 3. Testar RPC
+            const rpcCount = await testRPC();
+            metrics['RPC'] = rpcCount;
+            
+            // 4. Testar usuários
+            await testUsers();
+            
+            // 5. Resumo final
+            addResult('📋 Resumo do teste completo:', 'info');
+            addResult(`✅ Conexão: ${connectionOk ? 'OK' : 'ERRO'}`, connectionOk ? 'success' : 'error');
+            addResult(`✅ Tabela calls: ${callsCount} registros`, callsCount > 0 ? 'success' : 'warning');
+            addResult(`✅ RPC get_calls_v2: ${rpcCount} registros`, rpcCount > 0 ? 'success' : 'error');
+            
+            if (rpcCount === 0) {
+                addResult('🔧 AÇÕES NECESSÁRIAS:', 'warning');
+                addResult('1. Execute o script fix-calls-function-agent-id.sql no Supabase SQL Editor', 'warning');
+                addResult('2. Verifique se as tabelas user_mapping e profiles existem', 'warning');
+                addResult('3. Teste novamente após as correções', 'warning');
+            } else {
+                addResult('🎉 Sistema de chamadas funcionando corretamente!', 'success');
+            }
+            
+            updateMetrics(metrics);
+        }
+
+        // Inicializar quando a página carregar
+        window.addEventListener('load', () => {
+            addResult('📱 Página carregada. Configure as credenciais do Supabase e execute os testes.', 'info');
+        });
+    </script>
+</body>
+</html>

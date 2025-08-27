@@ -17,44 +17,20 @@ import PublicResultPage from './components/PublicResultPage';
 import PublicDiagnosticReport from './components/PublicDiagnosticReport';
 import { UserProvider, useUser } from './contexts/DirectUserContext';
 import { LoadingSpinner } from './components/ui/Feedback';
-// Debug panels removidos para evitar conflitos
 import { initializeLogos } from './utils/fetchLogosFromDatabase';
 import UserMenu from './components/UserMenu';
 import AppBrand from './components/common/AppBrand';
 import FinalLoginPage from './components/FinalLoginPage';
 import { getModuleFromPath, isStandalonePage } from './utils/router';
-import EnhancedSessionDebugPanel from './components/debug/EnhancedSessionDebugPanel';
-import EnhancedRoleTestPanel from './components/debug/EnhancedRoleTestPanel';
-import SuperAdminDebugPanel from './components/debug/SuperAdminDebugPanel';
-import TestDebugAccess from './components/debug/TestDebugAccess';
-import SuperAdminDebugPanelV2 from './components/debug/SuperAdminDebugPanelV2';
-import { canUseDebug, shouldLoadDebugPanel } from './src/debug/config';
-import FeedbackWidget from './components/ui/FeedbackWidget';
-import ErrorEventsAdminPage from './components/ErrorEventsAdminPage';
 import { enableCriticalFetchAlerts } from './src/utils/net';
-import { ProductionSafeDebugPanel } from './components/debug/ProductionSafeDebugPanel';
-import LogCapture from './components/debug/LogCapture';
+// Debug Panel exatamente igual à versão web
+import WebVersionDebugPanel from './components/debug/WebVersionDebugPanel';
+// Widget de feedback para usuários
+import FeedbackWidget from './components/ui/FeedbackWidget';
 
-// Componente wrapper para carregamento lazy do debug panel
+// Debug Panel idêntico à versão web com 6 abas
 const DebugPanelWrapper: React.FC<{ user: any }> = ({ user }) => {
-  const [DebugPanel, setDebugPanel] = React.useState<React.ComponentType | null>(null);
-
-  React.useEffect(() => {
-    const loadDebugPanel = async () => {
-      if (shouldLoadDebugPanel(import.meta.env.PROD, user?.role)) {
-        try {
-          const { ProductionSafeDebugPanel } = await import('./components/debug/ProductionSafeDebugPanel');
-          setDebugPanel(() => ProductionSafeDebugPanel);
-        } catch (error) {
-          console.warn('Failed to load debug panel:', error);
-        }
-      }
-    };
-
-    loadDebugPanel();
-  }, [user?.role]);
-
-  return DebugPanel ? <DebugPanel /> : null;
+  return <WebVersionDebugPanel />;
 };
 
 
@@ -81,10 +57,10 @@ const AppContent: React.FC = () => {
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
   
-  // Verificar se é a página de admin de incidentes
-  const isErrorEventsAdminPage = window.location.pathname === '/admin/incidents';
-  // Verificar se é a página de admin de logs
-  const isDebugLogsAdminPage = window.location.pathname === '/admin/logs';
+  // Verificar se é a página de admin de incidentes (temporariamente desabilitada)
+  const isErrorEventsAdminPage = false;
+  // Verificar se é a página de admin de logs (temporariamente desabilitada)
+  const isDebugLogsAdminPage = false;
   
   // Verificar se é uma página standalone (sem header)
   const isStandalone = isStandalonePage(window.location.pathname);
@@ -209,9 +185,9 @@ const AppContent: React.FC = () => {
     return <PublicDiagnosticReport />;
   }
   
-  // Se for página de admin de incidentes
+  // Se for página de admin de incidentes (temporariamente desabilitada)
   if (isErrorEventsAdminPage) {
-    return <ErrorEventsAdminPage />;
+    return <div>Página temporariamente indisponível</div>;
   }
   // Se for página de admin de logs persistidos
   if (isDebugLogsAdminPage) {
@@ -319,14 +295,11 @@ const AppContent: React.FC = () => {
         {renderModule()}
       </main>
       
-      {/* Painel de debug carregado lazy */}
-      {/* Captura e persistência de logs para usuários autenticados */}
-      <LogCapture />
-      <DebugPanelWrapper user={user} />
-      {/* Painel unificado já inclui aba de Incidentes e Logs persistidos */}
-      <ProductionSafeDebugPanel />
-      {/* Floating feedback for non-admin users */}
+      {/* Widget de feedback para usuários */}
       <FeedbackWidget />
+      
+      {/* SuperAdmin Debug Panel com logs globais e Google Chat */}
+      <DebugPanelWrapper user={user} />
     </div>
   );
 };

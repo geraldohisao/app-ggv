@@ -47,6 +47,12 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
             secure: false,
           },
+          // Netlify Functions proxy temporariamente desabilitado
+          // '/.netlify/functions': {
+          //   target: 'http://localhost:8888',
+          //   changeOrigin: true,
+          //   secure: false,
+          // },
         },
       },
       define: {
