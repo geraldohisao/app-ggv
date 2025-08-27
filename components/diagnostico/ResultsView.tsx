@@ -33,6 +33,21 @@ interface ResultsViewProps {
 
 export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, answers, totalScore, dealId, onRetry }) => {
     const [activeTab, setActiveTab] = useState(REPORT_TABS[0]);
+    
+    // FALLBACK: Capturar deal_id diretamente da URL se não vier via props
+    const fallbackDealId = (() => {
+        if (dealId) return dealId;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const dealIdFromUrl = urlParams.get('deal_id');
+        
+        console.log('🔄 RESULTS - FALLBACK: Capturando deal_id da URL:', dealIdFromUrl);
+        return dealIdFromUrl;
+    })();
+    
+    console.log('🎯 RESULTS - Deal ID final usado:', fallbackDealId);
+    console.log('🎯 RESULTS - Deal ID original (prop):', dealId);
+    console.log('🎯 RESULTS - Usando fallback?', dealId !== fallbackDealId);
     const [showEmailModal, setShowEmailModal] = useState(false);
     // Removido: modal de PDF em favor do relatório público em nova guia
 
@@ -106,11 +121,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
     useEffect(() => {
         const sendCompleteAnalysis = async () => {
             // DEBUG CRÍTICO: Verificar deal_id
-            console.log('🔍 WEBHOOK DEBUG - dealId recebido:', dealId);
-            console.log('🔍 WEBHOOK DEBUG - Tipo do dealId:', typeof dealId);
-            console.log('🔍 WEBHOOK DEBUG - dealId é null?', dealId === null);
-            console.log('🔍 WEBHOOK DEBUG - dealId é undefined?', dealId === undefined);
-            console.log('🔍 WEBHOOK DEBUG - dealId é string vazia?', dealId === '');
+            console.log('🔍 WEBHOOK DEBUG - dealId recebido (prop):', dealId);
+            console.log('🔍 WEBHOOK DEBUG - fallbackDealId (final):', fallbackDealId);
+            console.log('🔍 WEBHOOK DEBUG - Tipo do fallbackDealId:', typeof fallbackDealId);
+            console.log('🔍 WEBHOOK DEBUG - fallbackDealId é null?', fallbackDealId === null);
+            console.log('🔍 WEBHOOK DEBUG - fallbackDealId é undefined?', fallbackDealId === undefined);
+            console.log('🔍 WEBHOOK DEBUG - fallbackDealId é string vazia?', fallbackDealId === '');
             
             // PROTEÇÃO CRÍTICA: Evitar envio duplo
             if (aiSent) {
@@ -158,7 +174,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
                 };
                 
-                const secureToken = dealId ? generateSecureToken(dealId) : 'diagnostic-' + Date.now();
+                const secureToken = fallbackDealId ? generateSecureToken(fallbackDealId) : 'diagnostic-' + Date.now();
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
                 // Salvar relatório público
@@ -172,7 +188,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         summaryInsights,
                         detailedAnalysis,
                         scoresByArea: scoresByArea,
-                        dealId: dealId || null
+                        dealId: fallbackDealId || null
                     };
                     
                     console.log('💾 N8N - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
@@ -186,7 +202,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
                 // Payload completo para N8N (inclui score + análise IA se disponível)
                 const payload = {
-                    deal_id: dealId || null, // Garantir que seja explicitamente null se não houver
+                    deal_id: fallbackDealId || null, // Usar fallback deal_id
                     timestamp: new Date().toISOString(),
                     action: 'ai_analysis_completed',
                     
@@ -195,7 +211,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             maturityPercentage: Math.round((totalScore / 90) * 100)
                         },
                         resultUrl: publicReportUrl,
-                        deal_id: dealId || null, // Garantir consistência
+                        deal_id: fallbackDealId || null, // Usar fallback deal_id
                         
                         // Incluir análise IA se disponível
                         ...(hasAI && {
@@ -261,8 +277,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 console.log('🔍 N8N - VERIFICAÇÃO FINAL do deal_id no payload:');
                 console.log('  - payload.deal_id:', payload.deal_id);
                 console.log('  - payload.body.deal_id:', payload.body.deal_id);
-                console.log('  - dealId original:', dealId);
-                console.log('  - Tipo do dealId:', typeof dealId);
+                console.log('  - dealId original (prop):', dealId);
+                console.log('  - fallbackDealId (usado):', fallbackDealId);
+                console.log('  - Tipo do fallbackDealId:', typeof fallbackDealId);
 
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
                 const response = await fetch(webhookUrl, {
@@ -283,21 +300,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 }
                 
                 // ADICIONAR: Envio para webhook do Pipedrive se houver deal_id
-                if (dealId && dealId.trim() !== '') {
-                    console.log('📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id:', dealId);
+                if (fallbackDealId && fallbackDealId.trim() !== '') {
+                    console.log('📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id:', fallbackDealId);
                     try {
                         const { sendDiagnosticToPipedrive } = await import('../../services/supabaseService');
                         const pipedriveSuccess = await sendDiagnosticToPipedrive(
                             companyData,
                             answers,
                             totalScore,
-                            dealId
+                            fallbackDealId
                         );
                         
                         if (pipedriveSuccess) {
-                            console.log('✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id:', dealId);
+                            console.log('✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id:', fallbackDealId);
                         } else {
-                            console.warn('⚠️ PIPEDRIVE - Falha ao enviar webhook para deal_id:', dealId);
+                            console.warn('⚠️ PIPEDRIVE - Falha ao enviar webhook para deal_id:', fallbackDealId);
                         }
                     } catch (pipedriveError) {
                         console.error('❌ PIPEDRIVE - Erro ao enviar webhook:', pipedriveError);
@@ -315,7 +332,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         };
 
         sendCompleteAnalysis();
-    }, [summaryInsights, detailedAnalysis, emergencyTimeout, aiSent, companyData, answers, totalScore, dealId]);
+    }, [summaryInsights, detailedAnalysis, emergencyTimeout, aiSent, companyData, answers, totalScore, fallbackDealId]);
 
     const handleNextTab = () => {
         const currentIndex = REPORT_TABS.indexOf(activeTab);

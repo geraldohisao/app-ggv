@@ -134,7 +134,15 @@ export const DiagnosticoComercial: React.FC = () => {
         console.log('🔍 DIAGNOSTICO - Deal ID atual:', dealId);
         console.log('🔍 DIAGNOSTICO - Tipo do dealId:', typeof dealId);
         console.log('🔍 DIAGNOSTICO - URL atual:', window.location.href);
-    }, [dealId]);
+        console.log('🔍 DIAGNOSTICO - PipedriveData:', pipedriveData);
+        console.log('🔍 DIAGNOSTICO - PipedriveLoading:', pipedriveLoading);
+        console.log('🔍 DIAGNOSTICO - PipedriveError:', pipedriveError);
+        
+        // Verificar URL params diretamente
+        const urlParams = new URLSearchParams(window.location.search);
+        const dealIdFromUrl = urlParams.get('deal_id');
+        console.log('🔍 DIAGNOSTICO - Deal ID direto da URL:', dealIdFromUrl);
+    }, [dealId, pipedriveData, pipedriveLoading, pipedriveError]);
 
     // Atualizar prefill quando dados do Pipedrive estiverem disponíveis
     useEffect(() => {
@@ -640,14 +648,22 @@ export const DiagnosticoComercial: React.FC = () => {
                                 <span className="text-sm font-medium">Voltar ao Questionário</span>
                             </button>
                         </div>
-                        <ResultsView
-                            companyData={companyData}
-                            segment={selectedSegment}
-                            answers={answers}
-                            totalScore={totalScore}
-                            dealId={dealId}
-                            onRetry={handleRetry}
-                        />
+                        {(() => {
+                            console.log('🚀 DIAGNOSTICO - Renderizando ResultsView com dealId:', dealId);
+                            console.log('🚀 DIAGNOSTICO - Tipo do dealId sendo passado:', typeof dealId);
+                            console.log('🚀 DIAGNOSTICO - dealId é null?', dealId === null);
+                            console.log('🚀 DIAGNOSTICO - dealId é undefined?', dealId === undefined);
+                            return (
+                                <ResultsView
+                                    companyData={companyData}
+                                    segment={selectedSegment}
+                                    answers={answers}
+                                    totalScore={totalScore}
+                                    dealId={dealId}
+                                    onRetry={handleRetry}
+                                />
+                            );
+                        })()}
                     </div>
                 ) : (
                     // Fallback to the first step if data is missing
