@@ -133,7 +133,7 @@ function generateIncidentHash(event: DebugEvent): Promise<string> {
 }
 
 /**
- * Envia eventos para o servidor
+ * Envia eventos para ambos os canais (Google Chat e Slack)
  */
 async function postAlerts(batch: AlertPayload[]): Promise<SendResult> {
   const result: SendResult = {
@@ -144,26 +144,63 @@ async function postAlerts(batch: AlertPayload[]): Promise<SendResult> {
   };
 
   try {
-    const response = await fetch('/.netlify/functions/alert', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Batch-Size': batch.length.toString(),
-        'X-Debug-Environment': import.meta.env.MODE,
-      },
-      body: JSON.stringify({
-        events: batch,
-        timestamp: Date.now(),
-        version: '2.0',
-      }),
+    // Import unified notification system
+    const { sendNotifications } = await import('../utils/notifications');
+    
+    // Send each event to both channels
+    const notificationPromises = batch.map(async (alertPayload) => {
+      try {
+        const notificationPayload = {
+          title: alertPayload.title,
+          message: alertPayload.message,
+          incidentHash: alertPayload.incidentHash,
+          context: {
+            ...alertPayload.context,
+            url: alertPayload.url,
+            userAgent: alertPayload.userAgent,
+            appVersion: alertPayload.context?.appVersion,
+            level: alertPayload.level,
+            category: alertPayload.category,
+            timestamp: alertPayload.timestamp,
+            environment: alertPayload.environment,
+          }
+        };
+
+        const results = await sendNotifications(notificationPayload, ['google-chat', 'slack']);
+        
+        // Check if at least one channel succeeded
+        const hasSuccess = results.some(r => r.success);
+        if (!hasSuccess) {
+          throw new Error(`All notification channels failed: ${results.map(r => r.error).join(', ')}`);
+        }
+        
+        return { success: true, alertPayload };
+      } catch (error) {
+        return { 
+          success: false, 
+          alertPayload, 
+          error: error instanceof Error ? error.message : String(error) 
+        };
+      }
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
+    const results = await Promise.allSettled(notificationPromises);
+    
+    results.forEach((promiseResult, index) => {
+      if (promiseResult.status === 'fulfilled' && promiseResult.value.success) {
+        result.sent++;
+      } else {
+        result.failed++;
+        const errorMsg = promiseResult.status === 'rejected' 
+          ? promiseResult.reason 
+          : (promiseResult.value as any).error;
+        result.errors.push(`Event ${index}: ${errorMsg}`);
+      }
+    });
 
-    const responseData = await response.json();
-    result.sent = responseData.sent || batch.length;
+    if (result.failed > 0) {
+      result.success = false;
+    }
     
   } catch (error) {
     result.success = false;

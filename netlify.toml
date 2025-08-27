@@ -42,6 +42,12 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/slack-alert"
+  to = "/.netlify/functions/slack-alert"
+  status = 200
+  force = true
+
 # Feedback forward proxy
 [[redirects]]
   from = "/api/feedback"
