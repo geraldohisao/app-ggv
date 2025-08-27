@@ -96,27 +96,59 @@ export async function postCriticalAlert(payload: {
     info.count += 1;
     sessionStorage.setItem(storeKey, JSON.stringify(info));
 
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    let endpoint = '/api/alert';
-    if (isLocalhost && typeof window !== 'undefined' && window.location.port !== '8888') {
-      endpoint = 'http://localhost:8888/.netlify/functions/alert';
-    }
-    await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...sanitizedPayload,
-        incidentHash, // Adicionar hash do incidente
+    // Send to both Google Chat and Slack using unified notification system
+    try {
+      const { sendNotifications } = await import('./notifications');
+      
+      const notificationPayload = {
+        title: sanitizedPayload.title,
+        message: sanitizedPayload.message,
+        incidentHash,
         context: {
           ...(sanitizedPayload.context || {}),
           // Always attach minimal environment info
-          href: typeof window !== 'undefined' ? window.location.href : '',
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          appVersion: (typeof window !== 'undefined' && (window as any).__APP_VERSION__) || '',
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           language: typeof navigator !== 'undefined' ? navigator.language : '',
-          appVersion: (typeof window !== 'undefined' && (window as any).__APP_VERSION__) || '',
         }
-      })
-    }).catch(() => {});
+      };
+
+      // Send to both channels in parallel
+      const results = await sendNotifications(notificationPayload, ['google-chat', 'slack']);
+      
+      // Log results for debugging
+      results.forEach(result => {
+        if (!result.success) {
+          console.error(`Failed to send alert to ${result.channel}:`, result.error);
+        }
+      });
+    } catch (error) {
+      // Fallback to original method if notifications module fails
+      console.error('Unified notifications failed, using fallback:', error);
+      
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      let endpoint = '/api/alert';
+      if (isLocalhost && typeof window !== 'undefined' && window.location.port !== '8888') {
+        endpoint = 'http://localhost:8888/.netlify/functions/alert';
+      }
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...sanitizedPayload,
+          incidentHash,
+          context: {
+            ...(sanitizedPayload.context || {}),
+            href: typeof window !== 'undefined' ? window.location.href : '',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            language: typeof navigator !== 'undefined' ? navigator.language : '',
+            appVersion: (typeof window !== 'undefined' && (window as any).__APP_VERSION__) || '',
+          }
+        })
+      }).catch(() => {});
+    }
   } catch {}
 }
 

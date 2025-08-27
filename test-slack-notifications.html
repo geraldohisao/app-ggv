@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste de Notificações Slack</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .test-group {
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #007bff;
+    }
+    .test-group h3 {
+      margin: 0 0 15px 0;
+      color: #007bff;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button.danger {
+      background: #dc3545;
+    }
+    button.danger:hover {
+      background: #c82333;
+    }
+    button.warning {
+      background: #ffc107;
+      color: #212529;
+    }
+    button.warning:hover {
+      background: #e0a800;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+    .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+    .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    
+    .status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status.success { background: #28a745; color: white; }
+    .status.error { background: #dc3545; color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚨 Teste de Sistema de Notificações</h1>
+    <p>Este teste verifica se o sistema de notificações está enviando alertas para Slack e Google Chat corretamente.</p>
+
+    <div class="test-group">
+      <h3>🧪 Testes Básicos</h3>
+      <button onclick="testSimpleAlert()">Teste Simples</button>
+      <button onclick="testCriticalError()" class="danger">Erro Crítico</button>
+      <button onclick="testNetworkError()" class="warning">Erro de Rede</button>
+    </div>
+
+    <div class="test-group">
+      <h3>⚡ Testes de Contexto Rico</h3>
+      <button onclick="testWithUserContext()">Com Contexto de Usuário</button>
+      <button onclick="testWithStackTrace()" class="danger">Com Stack Trace</button>
+      <button onclick="testWithFullContext()" class="danger">Contexto Completo</button>
+    </div>
+
+    <div class="test-group">
+      <h3>🔄 Testes de Sistema</h3>
+      <button onclick="testBothChannels()">Teste Dual (Slack + Google Chat)</button>
+      <button onclick="testSlackOnly()">Apenas Slack</button>
+      <button onclick="testBatch()">Teste em Lote (3 alertas)</button>
+    </div>
+
+    <div id="results"></div>
+  </div>
+
+  <script>
+    function addResult(message, type = 'info') {
+      const results = document.getElementById('results');
+      const div = document.createElement('div');
+      div.className = `result ${type}`;
+      div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+      results.insertBefore(div, results.firstChild);
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+    }
+
+    async function sendNotification(payload, channels = ['google-chat', 'slack']) {
+      try {
+        // Simular o sistema de notificações
+        const results = [];
+        
+        for (const channel of channels) {
+          const endpoint = channel === 'slack' 
+            ? '/.netlify/functions/slack-alert'
+            : '/.netlify/functions/alert';
+          
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+              results.push({ success: true, channel });
+              addResult(`✅ ${channel}: Enviado com sucesso`, 'success');
+            } else {
+              const error = await response.text();
+              results.push({ success: false, channel, error: `HTTP ${response.status}` });
+              addResult(`❌ ${channel}: ${error}`, 'error');
+            }
+          } catch (error) {
+            results.push({ success: false, channel, error: error.message });
+            addResult(`❌ ${channel}: ${error.message}`, 'error');
+          }
+        }
+        
+        return results;
+      } catch (error) {
+        addResult(`❌ Erro geral: ${error.message}`, 'error');
+        return [];
+      }
+    }
+
+    async function testSimpleAlert() {
+      clearResults();
+      addResult('🧪 Iniciando teste simples...', 'info');
+      
+      const payload = {
+        title: 'Teste Simples de Notificação',
+        message: 'Este é um teste básico do sistema de notificações.',
+        context: {
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      await sendNotification(payload);
+    }
+
+    async function testCriticalError() {
+      clearResults();
+      addResult('🚨 Iniciando teste de erro crítico...', 'info');
+      
+      const payload = {
+        title: 'ERRO CRÍTICO: Falha no Sistema',
+        message: 'Sistema principal apresentou falha crítica e requer atenção imediata.',
+        context: {
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          stack: `Error: Critical system failure
+    at testCriticalError (test-slack-notifications.html:145:12)
+    at HTMLButtonElement.onclick (test-slack-notifications.html:1:1)
+    at performTask (system.js:234:15)
+    at processQueue (system.js:456:8)`,
+          componentStack: `ComponentStack:
+    at ErrorBoundary
+    at MainApp
+    at Router`,
+          status: 500,
+          method: 'GET',
+          tags: ['critical', 'system-failure', 'urgent']
+        }
+      };
+
+      await sendNotification(payload);
+    }
+
+    async function testNetworkError() {
+      clearResults();
+      addResult('🌐 Iniciando teste de erro de rede...', 'info');
+      
+      const payload = {
+        title: 'Erro de Rede: Conexão Perdida',
+        message: 'Falha ao conectar com o servidor principal.',
+        context: {
+          url: 'https://api.example.com/users',
+          method: 'POST',
+          status: 0,
+          userAgent: navigator.userAgent,
+          responsePreview: 'ERR_NETWORK_TIMEOUT',
+          tags: ['network', 'timeout']
+        }
+      };
+
+      await sendNotification(payload);
+    }
+
+    async function testWithUserContext() {
+      clearResults();
+      addResult('👤 Iniciando teste com contexto de usuário...', 'info');
+      
+      const payload = {
+        title: 'Erro na Sessão do Usuário',
+        message: 'Falha ao carregar dados do perfil do usuário.',
+        context: {
+          user: {
+            name: 'João Silva',
+            email: 'joao.silva@empresa.com',
+            role: 'admin'
+          },
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          appVersion: '2.1.3',
+          tags: ['user-session', 'profile']
+        }
+      };
+
+      await sendNotification(payload);
+    }
+
+    async function testWithStackTrace() {
+      clearResults();
+      addResult('📚 Iniciando teste com stack trace...', 'info');
+      
+      const payload = {
+        title: 'ReferenceError: Variável Indefinida',
+        message: 'Tentativa de acessar variável não definida.',
+        context: {
+          stack: `ReferenceError: undefinedVariable is not defined
+    at processData (main.js:42:15)
+    at handleSubmit (form.js:28:9)
+    at HTMLFormElement.<anonymous> (form.js:15:5)
+    at HTMLFormElement.dispatch (jquery.js:2435:27)
+    at HTMLFormElement.elemData.handle (jquery.js:2181:28)
+    at Object.trigger (jquery.js:2430:12)
+    at HTMLFormElement.<anonymous> (jquery.js:2699:17)
+    at Function.each (jquery.js:345:19)
+    at Object.jQuery.fn.init.each (jquery.js:170:17)
+    at new Object.jQuery.fn.init (jquery.js:73:21)`,
+          componentStack: `ComponentStack:
+    at DataProcessor (DataProcessor.jsx:42)
+    at FormHandler (FormHandler.jsx:28)
+    at MainForm (MainForm.jsx:15)
+    at App (App.jsx:123)`,
+          url: window.location.href,
+          userAgent: navigator.userAgent
+        }
+      };
+
+      await sendNotification(payload);
+    }
+
+    async function testWithFullContext() {
+      clearResults();
+      addResult('🔍 Iniciando teste com contexto completo...', 'info');
+      
+      const payload = {
+        title: 'Falha Completa do Sistema',
+        message: 'Sistema apresentou múltiplas falhas simultâneas.',
+        context: {
+          user: {
+            name: 'Maria Santos',
+            email: 'maria.santos@empresa.com',
+            role: 'super_admin'
+          },
+          url: 'https://app.grupoggv.com/dashboard/analytics',
+          method: 'POST',
+          status: 500,
+          userAgent: navigator.userAgent,
+          appVersion: '2.1.3',
+          stack: `TypeError: Cannot read property 'data' of undefined
+    at Analytics.processMetrics (analytics.js:156:23)
+    at Analytics.render (analytics.js:89:15)
+    at ReactDOMComponent.render (react-dom.js:1247:18)`,
+          componentStack: `ComponentStack:
+    at Analytics (Analytics.jsx:156)
+    at Dashboard (Dashboard.jsx:89)
+    at Router (Router.jsx:45)
+    at App (App.jsx:12)`,
+          responsePreview: '{"error": "Internal server error", "code": "ANALYTICS_FAIL"}',
+          tags: ['analytics', 'dashboard', 'critical', 'system-wide']
+        }
+      };
+
+      await sendNotification(payload);
+    }
+
+    async function testBothChannels() {
+      clearResults();
+      addResult('🔄 Testando envio para ambos os canais...', 'info');
+      
+      const payload = {
+        title: 'Teste de Integração Dual',
+        message: 'Verificando se ambos os canais (Slack e Google Chat) recebem as notificações.',
+        context: {
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          tags: ['integration-test', 'dual-channel']
+        }
+      };
+
+      await sendNotification(payload, ['google-chat', 'slack']);
+    }
+
+    async function testSlackOnly() {
+      clearResults();
+      addResult('📱 Testando envio apenas para Slack...', 'info');
+      
+      const payload = {
+        title: 'Teste Exclusivo do Slack',
+        message: 'Esta notificação deve aparecer apenas no Slack.',
+        context: {
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          tags: ['slack-only', 'exclusive-test']
+        }
+      };
+
+      await sendNotification(payload, ['slack']);
+    }
+
+    async function testBatch() {
+      clearResults();
+      addResult('📦 Iniciando teste em lote...', 'info');
+      
+      const alerts = [
+        {
+          title: 'Erro #1: Falha de Autenticação',
+          message: 'Token expirado detectado.',
+          context: { tags: ['auth', 'token'], status: 401 }
+        },
+        {
+          title: 'Erro #2: Timeout na Base de Dados',
+          message: 'Consulta demorou mais de 30 segundos.',
+          context: { tags: ['database', 'timeout'], status: 504 }
+        },
+        {
+          title: 'Erro #3: Limite de API Excedido',
+          message: 'Rate limit atingido para API externa.',
+          context: { tags: ['api', 'rate-limit'], status: 429 }
+        }
+      ];
+
+      for (let i = 0; i < alerts.length; i++) {
+        addResult(`📤 Enviando alerta ${i + 1}/3...`, 'info');
+        await sendNotification(alerts[i]);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between alerts
+      }
+      
+      addResult('✅ Teste em lote concluído!', 'success');
+    }
+
+    // Initial status check
+    window.addEventListener('load', () => {
+      addResult('🎯 Sistema de testes carregado. Selecione um teste para executar.', 'info');
+    });
+  </script>
+</body>
+</html>
