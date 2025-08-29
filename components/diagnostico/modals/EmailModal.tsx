@@ -90,9 +90,9 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                     <div style="margin-bottom:16px">
                       <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png" 
                            alt="GGV Inteligência" 
-                           style="max-width:200px;height:auto;display:block;margin:0 auto;border:0"/>
+                           style="max-width:200px;height:auto;display:block;margin:0 auto;border:0;cursor:default"/>
                     </div>
-                    <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;letter-spacing:-0.5px">Inteligência em Vendas</h1>
+                    <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;letter-spacing:-0.5px">Relatório de Maturidade Comercial</h1>
                   </div>
                   
                   <!-- Content -->
@@ -100,21 +100,21 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                     <h2 style="color:#1e293b;font-size:20px;font-weight:600;margin:0 0 16px 0">Olá,</h2>
                     
                     <p style="color:#475569;line-height:1.6;margin:0 0 24px 0">
-                      Preparamos o seu diagnóstico comercial com base nas respostas e benchmarks do mercado. 
-                      Acesse pelo botão abaixo:
+                      Preparamos o seu <strong>Relatório de Maturidade Comercial</strong> personalizado com base nas suas respostas e benchmarks do mercado. 
+                      Acesse seu diagnóstico completo pelo botão abaixo:
                     </p>
                     
                     <!-- CTA Button -->
                     <div style="text-align:center;margin:32px 0">
                       <a href="${publicUrl}" 
                          style="display:inline-block;background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%);color:#ffffff;padding:16px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(15, 118, 110, 0.3)">
-                        📊 Abrir relatório
+                        📊 Acessar Relatório de Maturidade
                       </a>
                     </div>
                     
                     <div style="background:#f1f5f9;border-left:4px solid #0f766e;padding:16px;margin:24px 0;border-radius:0 8px 8px 0">
                       <p style="color:#475569;margin:0;font-size:14px">
-                        💡 <strong>Dica:</strong> Salve este e-mail para acessar seu diagnóstico sempre que precisar.
+                        💡 <strong>Dica:</strong> Salve este e-mail para acessar seu relatório sempre que precisar.
                       </p>
                     </div>
                     
@@ -134,7 +134,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
                       <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
                            alt="Grupo GGV" 
-                           style="max-width:120px;height:auto;display:block;margin:0 auto;border:0;opacity:0.7"/>
+                           style="max-width:120px;height:auto;display:block;margin:0 auto;border:0;opacity:0.7;cursor:default;pointer-events:none"/>
                     </div>
                   </div>
                 </div>
