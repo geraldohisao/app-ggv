@@ -161,6 +161,10 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                 setError('⚙️ Configuração do Gmail não encontrada. Entre em contato com o suporte.');
             } else if (err?.message?.includes('não configurado')) {
                 setError('⚙️ Sistema de e-mail não configurado. Entre em contato com o suporte.');
+            } else if (err?.message?.includes('CSP') || err?.message?.includes('Content Security Policy')) {
+                setError('🛡️ Política de segurança bloqueou o Google. Recarregue a página e tente novamente.');
+            } else if (err?.message?.includes('script-src') || err?.message?.includes('violates')) {
+                setError('🔒 Erro de segurança detectado. Recarregue a página completamente (Ctrl+F5).');
             } else {
                 setError(`❌ ${err?.message || 'Falha ao enviar e-mail pelo Gmail. Tente novamente.'}`);
             }

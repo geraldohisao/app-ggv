@@ -80,6 +80,7 @@
             <h3>🔧 Verificação de Configuração</h3>
             <div class="status info" id="config-status">Aguardando verificação...</div>
             <button onclick="checkConfiguration()">Verificar Configuração</button>
+            <button onclick="checkCSP()">Verificar CSP</button>
         </div>
 
         <div class="section">
@@ -343,6 +344,42 @@
             });
 
             log('✅ Tokens limpos');
+        }
+
+        async function checkCSP() {
+            log('🛡️ Verificando Content Security Policy...');
+            
+            try {
+                // Tentar carregar um script do Google para testar CSP
+                const testScript = document.createElement('script');
+                testScript.src = 'https://accounts.google.com/gsi/client';
+                
+                const cspTest = new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Timeout - possível bloqueio de CSP'));
+                    }, 5000);
+                    
+                    testScript.onload = () => {
+                        clearTimeout(timeout);
+                        resolve('CSP permite carregamento de scripts do Google');
+                    };
+                    
+                    testScript.onerror = (error) => {
+                        clearTimeout(timeout);
+                        reject(new Error('CSP bloqueou o carregamento do script'));
+                    };
+                });
+                
+                document.head.appendChild(testScript);
+                const result = await cspTest;
+                
+                log(`✅ CSP OK: ${result}`);
+                updateStatus('config-status', 'success', '✅ CSP permite Google Services');
+                
+            } catch (error) {
+                log(`❌ Problema de CSP: ${error.message}`);
+                updateStatus('config-status', 'error', `❌ CSP bloqueando: ${error.message}`);
+            }
         }
 
         async function testEmailSend() {

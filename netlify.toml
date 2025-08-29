@@ -70,13 +70,14 @@
   to = "/index.html"
   status = 200
 
-# Headers de segurança
+# Headers de segurança com CSP permissivo para Google Services
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://cdn.tailwindcss.com; connect-src 'self' https://*.supabase.co https://*.supabase.io https://accounts.google.com https://oauth2.googleapis.com https://gmail.googleapis.com https://api-test.ggvinteligencia.com.br https://automation-test.ggvinteligencia.com.br wss://*.supabase.co wss://*.supabase.io; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https: blob:; font-src 'self' data:; frame-src 'self' https://accounts.google.com; object-src 'none'; base-uri 'self';"
 
 # Cache para assets estáticos
 [[headers]]

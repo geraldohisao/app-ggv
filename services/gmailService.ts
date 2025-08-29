@@ -33,11 +33,13 @@ async function ensureGis(): Promise<void> {
     s.src = 'https://accounts.google.com/gsi/client';
     s.async = true; 
     s.defer = true;
+    s.crossOrigin = 'anonymous'; // Adicionar crossOrigin para CSP
     
     // Timeout aumentado para conexões lentas
     const timeout = setTimeout(() => {
       console.error('⏰ GMAIL - Timeout ao carregar Google Identity Services');
-      reject(new Error('Timeout ao carregar Google Identity Services. Verifique sua conexão com a internet.'));
+      // Tentar método alternativo se timeout
+      tryAlternativeLoad(resolve, reject);
     }, 15000);
     
     s.onload = () => {
@@ -51,21 +53,70 @@ async function ensureGis(): Promise<void> {
           resolve();
         } else {
           console.error('❌ GMAIL - Google Identity Services não inicializou');
-          reject(new Error('Google Identity Services não inicializou corretamente. Tente recarregar a página.'));
+          // Tentar método alternativo
+          tryAlternativeLoad(resolve, reject);
         }
       }, 500);
     };
     
     s.onerror = (error) => {
       clearTimeout(timeout);
-      console.error('❌ GMAIL - Erro ao carregar script:', error);
-      reject(new Error('Falha ao carregar Google Identity Services. Verifique sua conexão com a internet.'));
+      console.error('❌ GMAIL - Erro ao carregar script (CSP?):', error);
+      // Tentar método alternativo se erro de CSP
+      tryAlternativeLoad(resolve, reject);
     };
     
-    document.head.appendChild(s);
+    try {
+      document.head.appendChild(s);
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error('❌ GMAIL - Erro ao adicionar script ao DOM:', error);
+      tryAlternativeLoad(resolve, reject);
+    }
   });
   
   gisLoaded = true;
+}
+
+// Método alternativo para carregar Google Identity Services
+function tryAlternativeLoad(resolve: () => void, reject: (error: Error) => void): void {
+  console.log('🔄 GMAIL - Tentando método alternativo de carregamento...');
+  
+  // Verificar se o Google já está disponível globalmente
+  if ((window as any).google?.accounts?.oauth2) {
+    console.log('✅ GMAIL - Google Identity Services já disponível globalmente');
+    resolve();
+    return;
+  }
+  
+  // Tentar carregar via fetch e eval (fallback para CSP restritivo)
+  fetch('https://accounts.google.com/gsi/client')
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    })
+    .then(scriptContent => {
+      console.log('📦 GMAIL - Script obtido via fetch, executando...');
+      
+      // Criar script inline (pode funcionar mesmo com CSP restritivo)
+      const script = document.createElement('script');
+      script.textContent = scriptContent;
+      document.head.appendChild(script);
+      
+      // Aguardar inicialização
+      setTimeout(() => {
+        if ((window as any).google?.accounts?.oauth2) {
+          console.log('✅ GMAIL - Método alternativo funcionou!');
+          resolve();
+        } else {
+          reject(new Error('Método alternativo falhou. Possível problema de CSP ou bloqueio de rede.'));
+        }
+      }, 1000);
+    })
+    .catch(fetchError => {
+      console.error('❌ GMAIL - Método alternativo também falhou:', fetchError);
+      reject(new Error(`Falha ao carregar Google Identity Services. CSP ou conectividade podem estar bloqueando. Erro: ${fetchError.message}`));
+    });
 }
 
 function base64UrlEncode(input: string): string {
