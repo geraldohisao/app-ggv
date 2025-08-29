@@ -151,12 +151,61 @@ function buildMime({ to, subject, html, fromName, fromEmail }: { to: string; sub
   return base64UrlEncode(raw);
 }
 
+// Cache persistente de tokens
+const TOKEN_CACHE_KEY = 'ggv_gmail_token_cache';
+const TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutos de buffer
+
+interface TokenCache {
+  access_token: string;
+  expires_at: number;
+  scope?: string;
+  refresh_token?: string;
+}
+
+function saveTokenToCache(token: string, expiresIn: number = 3600): void {
+  try {
+    const cache: TokenCache = {
+      access_token: token,
+      expires_at: Date.now() + (expiresIn * 1000) - TOKEN_EXPIRY_BUFFER,
+      scope: 'gmail.send gmail.compose'
+    };
+    localStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify(cache));
+    console.log('💾 GMAIL - Token salvo no cache persistente');
+  } catch (error) {
+    console.warn('⚠️ GMAIL - Erro ao salvar token no cache:', error);
+  }
+}
+
+function getTokenFromCache(): string | null {
+  try {
+    const cacheStr = localStorage.getItem(TOKEN_CACHE_KEY);
+    if (!cacheStr) return null;
+    
+    const cache: TokenCache = JSON.parse(cacheStr);
+    
+    // Verificar se token ainda é válido
+    if (Date.now() < cache.expires_at) {
+      console.log('💾 GMAIL - Token válido encontrado no cache');
+      return cache.access_token;
+    } else {
+      console.log('⏰ GMAIL - Token no cache expirou, removendo...');
+      localStorage.removeItem(TOKEN_CACHE_KEY);
+      return null;
+    }
+  } catch (error) {
+    console.warn('⚠️ GMAIL - Erro ao ler token do cache:', error);
+    localStorage.removeItem(TOKEN_CACHE_KEY);
+    return null;
+  }
+}
+
 async function clearCachedTokens(): Promise<void> {
   cachedAccessToken = null;
   tokenClient = null;
   
-  // Limpar tokens do localStorage/sessionStorage
+  // Limpar cache persistente
   try {
+    localStorage.removeItem(TOKEN_CACHE_KEY);
     localStorage.removeItem('gmail_access_token');
     sessionStorage.removeItem('gmail_access_token');
   } catch {}
@@ -165,18 +214,34 @@ async function clearCachedTokens(): Promise<void> {
 }
 
 async function getAccessToken(): Promise<string> {
-  if (cachedAccessToken) return cachedAccessToken;
+  // 1) Verificar cache em memória primeiro
+  if (cachedAccessToken) {
+    console.log('🔄 GMAIL - Usando token da memória');
+    return cachedAccessToken;
+  }
   
-  // 0) Tenta reusar token do provedor (Supabase) quando disponível
+  // 2) Verificar cache persistente
+  const cachedToken = getTokenFromCache();
+  if (cachedToken) {
+    cachedAccessToken = cachedToken;
+    return cachedToken;
+  }
+  
+  // 3) Tenta reusar token do provedor (Supabase) quando disponível
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const anySess: any = session as any;
     const prov = (anySess?.provider_token as string) || (anySess?.provider_access_token as string) || null;
     if (prov) {
+      console.log('✅ GMAIL - Token do Supabase OAuth encontrado');
       cachedAccessToken = prov;
+      // Salvar no cache persistente (assumindo 1 hora de validade)
+      saveTokenToCache(prov, 3600);
       return prov;
     }
-  } catch {}
+  } catch (error) {
+    console.warn('⚠️ GMAIL - Erro ao obter token do Supabase:', error);
+  }
 
   await ensureGis();
   const clientId = await getGoogleClientId();
@@ -236,6 +301,9 @@ async function getAccessToken(): Promise<string> {
   }
   
   cachedAccessToken = token;
+  // Salvar token no cache persistente (tokens do Google geralmente duram 1 hora)
+  saveTokenToCache(token, 3600);
+  console.log('✅ GMAIL - Token obtido e salvo no cache');
   return token;
 }
 
@@ -263,10 +331,21 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
       // Testar permissões antes de tentar enviar
       const hasPermissions = await testGmailPermissions(token);
       if (!hasPermissions) {
-        console.log('⚠️ GMAIL - Permissões insuficientes, tentando reautenticar...');
-        await clearCachedTokens();
-        retryCount++;
-        continue;
+        console.log('⚠️ GMAIL - Token inválido ou permissões insuficientes');
+        // Limpar apenas o cache, não forçar nova autorização ainda
+        cachedAccessToken = null;
+        const cacheToken = getTokenFromCache();
+        if (cacheToken) {
+          console.log('🔄 GMAIL - Tentando token do cache persistente...');
+          // Se há token no cache, tentar uma vez mais
+          retryCount++;
+          continue;
+        } else {
+          console.log('🔄 GMAIL - Limpando cache e tentando reautenticar...');
+          await clearCachedTokens();
+          retryCount++;
+          continue;
+        }
       }
       
       // Dados do usuário para From (opcional)
