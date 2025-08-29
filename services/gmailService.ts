@@ -19,105 +19,107 @@ async function getGoogleClientId(): Promise<string> {
 async function ensureGis(): Promise<void> {
   if (gisLoaded) return;
   
-  // Verificar se já existe o script
-  const existingScript = document.querySelector('script[src*="gsi/client"]');
-  if (existingScript && (window as any).google?.accounts?.oauth2) {
+  // Verificar se já existe globalmente
+  if ((window as any).google?.accounts?.oauth2) {
+    console.log('✅ GMAIL - Google Identity Services já disponível');
     gisLoaded = true;
     return;
   }
   
   console.log('🔄 GMAIL - Carregando Google Identity Services...');
   
+  // Remover scripts antigos que podem estar corrompidos
+  const existingScripts = document.querySelectorAll('script[src*="gsi/client"]');
+  existingScripts.forEach(script => {
+    console.log('🧹 GMAIL - Removendo script antigo');
+    script.remove();
+  });
+  
   await new Promise<void>((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true; 
-    s.defer = true;
-    s.crossOrigin = 'anonymous'; // Adicionar crossOrigin para CSP
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = false; // Carregar de forma síncrona para evitar problemas
+    script.defer = false;
     
-    // Timeout aumentado para conexões lentas
-    const timeout = setTimeout(() => {
-      console.error('⏰ GMAIL - Timeout ao carregar Google Identity Services');
-      // Tentar método alternativo se timeout
-      tryAlternativeLoad(resolve, reject);
-    }, 15000);
+    let resolved = false;
     
-    s.onload = () => {
-      clearTimeout(timeout);
-      console.log('📦 GMAIL - Script Google Identity Services carregado');
-      
-      // Aguardar mais tempo para garantir que a API está disponível
-      setTimeout(() => {
-        if ((window as any).google?.accounts?.oauth2) {
-          console.log('✅ GMAIL - Google Identity Services inicializado com sucesso');
-          resolve();
-        } else {
-          console.error('❌ GMAIL - Google Identity Services não inicializou');
-          // Tentar método alternativo
-          tryAlternativeLoad(resolve, reject);
-        }
-      }, 500);
+    const cleanup = () => {
+      if (resolved) return;
+      resolved = true;
     };
     
-    s.onerror = (error) => {
+    const checkGoogle = () => {
+      if ((window as any).google?.accounts?.oauth2) {
+        cleanup();
+        console.log('✅ GMAIL - Google Identity Services carregado com sucesso');
+        resolve();
+        return true;
+      }
+      return false;
+    };
+    
+    // Timeout mais longo para dar tempo ao script carregar
+    const timeout = setTimeout(() => {
+      if (resolved) return;
+      console.error('⏰ GMAIL - Timeout ao carregar Google Identity Services');
+      
+      // Verificar uma última vez se carregou
+      if (!checkGoogle()) {
+        cleanup();
+        reject(new Error('Timeout ao carregar Google Identity Services após 20 segundos'));
+      }
+    }, 20000);
+    
+    script.onload = () => {
+      console.log('📦 GMAIL - Script carregado, aguardando inicialização...');
+      
+      // Aguardar inicialização com polling
+      let attempts = 0;
+      const maxAttempts = 50; // 5 segundos total
+      
+      const pollForGoogle = () => {
+        attempts++;
+        
+        if (checkGoogle()) {
+          clearTimeout(timeout);
+          return;
+        }
+        
+        if (attempts < maxAttempts) {
+          setTimeout(pollForGoogle, 100);
+        } else {
+          cleanup();
+          clearTimeout(timeout);
+          console.error('❌ GMAIL - Google não inicializou após carregamento do script');
+          reject(new Error('Google Identity Services não inicializou após carregamento'));
+        }
+      };
+      
+      setTimeout(pollForGoogle, 100);
+    };
+    
+    script.onerror = (error) => {
+      cleanup();
       clearTimeout(timeout);
-      console.error('❌ GMAIL - Erro ao carregar script (CSP?):', error);
-      // Tentar método alternativo se erro de CSP
-      tryAlternativeLoad(resolve, reject);
+      console.error('❌ GMAIL - Erro ao carregar script:', error);
+      reject(new Error('Falha ao carregar script do Google Identity Services'));
     };
     
     try {
-      document.head.appendChild(s);
+      document.head.appendChild(script);
+      console.log('📦 GMAIL - Script adicionado ao DOM');
     } catch (error) {
+      cleanup();
       clearTimeout(timeout);
       console.error('❌ GMAIL - Erro ao adicionar script ao DOM:', error);
-      tryAlternativeLoad(resolve, reject);
+      reject(new Error('Erro ao adicionar script ao DOM'));
     }
   });
   
   gisLoaded = true;
 }
 
-// Método alternativo para carregar Google Identity Services
-function tryAlternativeLoad(resolve: () => void, reject: (error: Error) => void): void {
-  console.log('🔄 GMAIL - Tentando método alternativo de carregamento...');
-  
-  // Verificar se o Google já está disponível globalmente
-  if ((window as any).google?.accounts?.oauth2) {
-    console.log('✅ GMAIL - Google Identity Services já disponível globalmente');
-    resolve();
-    return;
-  }
-  
-  // Tentar carregar via fetch e eval (fallback para CSP restritivo)
-  fetch('https://accounts.google.com/gsi/client')
-    .then(response => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.text();
-    })
-    .then(scriptContent => {
-      console.log('📦 GMAIL - Script obtido via fetch, executando...');
-      
-      // Criar script inline (pode funcionar mesmo com CSP restritivo)
-      const script = document.createElement('script');
-      script.textContent = scriptContent;
-      document.head.appendChild(script);
-      
-      // Aguardar inicialização
-      setTimeout(() => {
-        if ((window as any).google?.accounts?.oauth2) {
-          console.log('✅ GMAIL - Método alternativo funcionou!');
-          resolve();
-        } else {
-          reject(new Error('Método alternativo falhou. Possível problema de CSP ou bloqueio de rede.'));
-        }
-      }, 1000);
-    })
-    .catch(fetchError => {
-      console.error('❌ GMAIL - Método alternativo também falhou:', fetchError);
-      reject(new Error(`Falha ao carregar Google Identity Services. CSP ou conectividade podem estar bloqueando. Erro: ${fetchError.message}`));
-    });
-}
+
 
 function base64UrlEncode(input: string): string {
   // btoa lida com ASCII; para UTF-8 usamos TextEncoder
@@ -312,29 +314,6 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
       console.error(`❌ GMAIL - Erro na tentativa ${retryCount + 1}:`, error);
       
       if (retryCount >= maxRetries) {
-        // Tentar fallback via Netlify Functions (funciona em localhost e produção)
-        console.log('🔄 GMAIL - Tentando fallback via Netlify Functions...');
-        try {
-          const fallbackResult = await sendEmailViaNetlify({ to, subject, html });
-          if (fallbackResult) {
-            console.log('✅ FALLBACK - E-mail enviado via Netlify Functions');
-            return true;
-          }
-        } catch (fallbackError) {
-          console.error('❌ FALLBACK - Erro no fallback Netlify:', fallbackError);
-          
-          // Segundo fallback via Supabase Edge Functions
-          console.log('🔄 GMAIL - Tentando segundo fallback via Supabase Edge Functions...');
-          try {
-            const supabaseFallback = await sendEmailViaSupabase({ to, subject, html });
-            if (supabaseFallback) {
-              console.log('✅ FALLBACK - E-mail enviado via Supabase Edge Functions');
-              return true;
-            }
-          } catch (supabaseError) {
-            console.error('❌ FALLBACK - Erro no fallback Supabase:', supabaseError);
-          }
-        }
         
         // Se for erro de permissão, fornecer instruções específicas
         if (error instanceof Error && (error.message.includes('insufficient authentication scopes') || error.message.includes('insufficient permissions'))) {
@@ -353,71 +332,7 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
   throw new Error('Gmail API: Falha após múltiplas tentativas');
 }
 
-// Fallback principal via Netlify Functions (funciona em localhost e produção)
-async function sendEmailViaNetlify({ to, subject, html }: { to: string; subject: string; html: string; }): Promise<boolean> {
-  try {
-    console.log('📧 NETLIFY - Enviando e-mail via Netlify Functions...');
-    
-    // Detectar ambiente e usar endpoint apropriado
-    const isLocal = window.location.hostname === 'localhost';
-    const baseUrl = isLocal 
-      ? 'https://app.grupoggv.com/.netlify/functions'  // Usar produção mesmo em local para teste
-      : 'https://app.grupoggv.com/.netlify/functions'; // Produção
-    
-    const response = await fetch(`${baseUrl}/send-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ to, subject, html }),
-    });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(`Netlify Function error: ${response.status} - ${errorData.error || errorData.message}`);
-    }
-
-    const data = await response.json();
-    
-    if (data?.success) {
-      console.log('✅ NETLIFY - E-mail enviado com sucesso:', data.messageId);
-      return true;
-    }
-
-    throw new Error('Netlify Function retornou falha');
-
-  } catch (error) {
-    console.error('❌ NETLIFY - Erro no fallback:', error);
-    throw error;
-  }
-}
-
-// Segundo fallback via Supabase Edge Functions
-async function sendEmailViaSupabase({ to, subject, html }: { to: string; subject: string; html: string; }): Promise<boolean> {
-  try {
-    console.log('📧 SUPABASE - Enviando e-mail via Edge Functions...');
-    
-    const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html }
-    });
-
-    if (error) {
-      console.error('❌ SUPABASE - Erro na Edge Function:', error);
-      throw new Error(`Supabase Edge Function error: ${error.message}`);
-    }
-
-    if (data?.success) {
-      console.log('✅ SUPABASE - E-mail enviado com sucesso:', data.messageId);
-      return true;
-    }
-
-    throw new Error('Supabase Edge Function retornou falha');
-
-  } catch (error) {
-    console.error('❌ SUPABASE - Erro no fallback:', error);
-    throw error;
-  }
-}
 
 // Função para forçar reautenticação
 export async function forceGmailReauth(): Promise<void> {
