@@ -312,6 +312,30 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
       console.error(`❌ GMAIL - Erro na tentativa ${retryCount + 1}:`, error);
       
       if (retryCount >= maxRetries) {
+        // Tentar fallback via Netlify Functions (funciona em localhost e produção)
+        console.log('🔄 GMAIL - Tentando fallback via Netlify Functions...');
+        try {
+          const fallbackResult = await sendEmailViaNetlify({ to, subject, html });
+          if (fallbackResult) {
+            console.log('✅ FALLBACK - E-mail enviado via Netlify Functions');
+            return true;
+          }
+        } catch (fallbackError) {
+          console.error('❌ FALLBACK - Erro no fallback Netlify:', fallbackError);
+          
+          // Segundo fallback via Supabase Edge Functions
+          console.log('🔄 GMAIL - Tentando segundo fallback via Supabase Edge Functions...');
+          try {
+            const supabaseFallback = await sendEmailViaSupabase({ to, subject, html });
+            if (supabaseFallback) {
+              console.log('✅ FALLBACK - E-mail enviado via Supabase Edge Functions');
+              return true;
+            }
+          } catch (supabaseError) {
+            console.error('❌ FALLBACK - Erro no fallback Supabase:', supabaseError);
+          }
+        }
+        
         // Se for erro de permissão, fornecer instruções específicas
         if (error instanceof Error && (error.message.includes('insufficient authentication scopes') || error.message.includes('insufficient permissions'))) {
           throw new Error('Gmail API: Permissões insuficientes. Por favor, faça logout e login novamente para conceder permissões de envio de e-mail.');
@@ -327,6 +351,72 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
   }
   
   throw new Error('Gmail API: Falha após múltiplas tentativas');
+}
+
+// Fallback principal via Netlify Functions (funciona em localhost e produção)
+async function sendEmailViaNetlify({ to, subject, html }: { to: string; subject: string; html: string; }): Promise<boolean> {
+  try {
+    console.log('📧 NETLIFY - Enviando e-mail via Netlify Functions...');
+    
+    // Detectar ambiente e usar endpoint apropriado
+    const isLocal = window.location.hostname === 'localhost';
+    const baseUrl = isLocal 
+      ? 'https://app.grupoggv.com/.netlify/functions'  // Usar produção mesmo em local para teste
+      : 'https://app.grupoggv.com/.netlify/functions'; // Produção
+    
+    const response = await fetch(`${baseUrl}/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ to, subject, html }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(`Netlify Function error: ${response.status} - ${errorData.error || errorData.message}`);
+    }
+
+    const data = await response.json();
+    
+    if (data?.success) {
+      console.log('✅ NETLIFY - E-mail enviado com sucesso:', data.messageId);
+      return true;
+    }
+
+    throw new Error('Netlify Function retornou falha');
+
+  } catch (error) {
+    console.error('❌ NETLIFY - Erro no fallback:', error);
+    throw error;
+  }
+}
+
+// Segundo fallback via Supabase Edge Functions
+async function sendEmailViaSupabase({ to, subject, html }: { to: string; subject: string; html: string; }): Promise<boolean> {
+  try {
+    console.log('📧 SUPABASE - Enviando e-mail via Edge Functions...');
+    
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: { to, subject, html }
+    });
+
+    if (error) {
+      console.error('❌ SUPABASE - Erro na Edge Function:', error);
+      throw new Error(`Supabase Edge Function error: ${error.message}`);
+    }
+
+    if (data?.success) {
+      console.log('✅ SUPABASE - E-mail enviado com sucesso:', data.messageId);
+      return true;
+    }
+
+    throw new Error('Supabase Edge Function retornou falha');
+
+  } catch (error) {
+    console.error('❌ SUPABASE - Erro no fallback:', error);
+    throw error;
+  }
 }
 
 // Função para forçar reautenticação

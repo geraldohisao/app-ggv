@@ -64,6 +64,13 @@
   status = 200
   force = true
 
+# Email sending service
+[[redirects]]
+  from = "/api/send-email"
+  to = "/.netlify/functions/send-email"
+  status = 200
+  force = true
+
 # Redirects para SPA (Single Page Application) - deve ficar por último
 [[redirects]]
   from = "/*"
