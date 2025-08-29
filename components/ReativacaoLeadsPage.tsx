@@ -180,22 +180,34 @@ const ReativacaoLeadsPage: React.FC = () => {
   const loadHistory = async (page: number = 1) => {
     try {
       setIsLoadingHistory(true);
-      console.log('📊 Carregando histórico de reativação...');
+      console.log('📊 REATIVACAO PAGE - Iniciando carregamento do histórico...', { page, showHistory });
       
       const response = await getReactivatedLeadsHistory(page, 10);
       
-      console.log('✅ Histórico carregado:', response);
+      console.log('✅ REATIVACAO PAGE - Histórico carregado:', {
+        dataLength: response.data?.length,
+        pagination: response.pagination,
+        firstItem: response.data?.[0]
+      });
       
-      setHistory(response.data);
-      setTotalPages(response.pagination.pages);
-      setCurrentPage(page);
+      if (response.data && response.data.length > 0) {
+        console.log('📊 REATIVACAO PAGE - Dados encontrados, atualizando state...');
+        setHistory(response.data);
+        setTotalPages(response.pagination.pages);
+        setCurrentPage(page);
+      } else {
+        console.log('⚠️ REATIVACAO PAGE - Nenhum dado encontrado!');
+        setHistory([]);
+        setTotalPages(0);
+      }
       
     } catch (error: any) {
-      console.error('❌ Erro ao carregar histórico:', error);
+      console.error('❌ REATIVACAO PAGE - Erro ao carregar histórico:', error);
       setResult({
         success: false,
         message: `❌ Erro ao carregar histórico: ${error.message}`,
       });
+      setHistory([]);
     } finally {
       setIsLoadingHistory(false);
     }
@@ -674,14 +686,26 @@ const ReativacaoLeadsPage: React.FC = () => {
               </button>
               
               {showHistory && (
-                <button
-                  onClick={handleResetHistory}
-                  className="flex items-center gap-2 bg-orange-100 text-orange-700 font-semibold px-4 py-2 rounded-lg hover:bg-orange-200 transition-colors"
-                  title="Reinicializar histórico com dados de teste"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  Reset
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      console.log('🔄 REATIVACAO PAGE - Forçando reload do histórico...');
+                      loadHistory(1);
+                    }}
+                    className="flex items-center gap-1 bg-green-100 text-green-700 font-semibold px-3 py-2 rounded-lg hover:bg-green-200 transition-colors text-sm"
+                    title="Recarregar histórico"
+                  >
+                    🔄
+                  </button>
+                  <button
+                    onClick={handleResetHistory}
+                    className="flex items-center gap-2 bg-orange-100 text-orange-700 font-semibold px-4 py-2 rounded-lg hover:bg-orange-200 transition-colors"
+                    title="Reinicializar histórico com dados de teste"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                    Reset
+                  </button>
+                </>
               )}
             </div>
           </div>

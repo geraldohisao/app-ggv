@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Histórico Reativação</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 Debug Histórico de Reativação</h1>
+    <div id="results"></div>
+    
+    <script>
+        // Configuração do Supabase (usando as mesmas variáveis do projeto)
+        const SUPABASE_URL = 'https://pqmjfwmbitodwtpedlle.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbWpmd21iaXRvZHd0cGVkbGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjM2NTAzOTIsImV4cCI6MjAzOTIyNjM5Mn0.Ov_15HvlNEv7wEjYhMgCjjsKTgzE7xNZKgOtAULKIHE';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        async function testReactivationHistory() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>🔄 Executando testes...</h2>';
+            
+            try {
+                // 1. Teste direto na tabela
+                console.log('🔍 1. Testando acesso direto à tabela...');
+                results.innerHTML += '<h3>1. Teste Direto na Tabela</h3>';
+                
+                const { data: directData, error: directError, count } = await supabase
+                    .from('reactivated_leads')
+                    .select('*', { count: 'exact' });
+                
+                console.log('📊 Resultado direto:', { directData, directError, count });
+                results.innerHTML += `
+                    <p><strong>Erro:</strong> ${directError ? directError.message : 'Nenhum'}</p>
+                    <p><strong>Total de registros:</strong> ${count || 0}</p>
+                    <p><strong>Dados:</strong> ${directData ? directData.length : 0} registros encontrados</p>
+                    <pre>${JSON.stringify(directData, null, 2)}</pre>
+                `;
+                
+                // 2. Teste da função RPC
+                console.log('🔍 2. Testando função RPC...');
+                results.innerHTML += '<h3>2. Teste Função RPC</h3>';
+                
+                const { data: rpcData, error: rpcError } = await supabase.rpc('get_reactivated_leads_history', {
+                    p_page: 1,
+                    p_limit: 10,
+                    p_sdr: null,
+                    p_status: null
+                });
+                
+                console.log('📊 Resultado RPC:', { rpcData, rpcError });
+                results.innerHTML += `
+                    <p><strong>Erro:</strong> ${rpcError ? rpcError.message : 'Nenhum'}</p>
+                    <p><strong>Dados:</strong> ${rpcData ? rpcData.length : 0} registros encontrados</p>
+                    <pre>${JSON.stringify(rpcData, null, 2)}</pre>
+                `;
+                
+                // 3. Teste de autenticação
+                console.log('🔍 3. Testando autenticação...');
+                results.innerHTML += '<h3>3. Status de Autenticação</h3>';
+                
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                console.log('👤 Usuário:', { user, authError });
+                results.innerHTML += `
+                    <p><strong>Usuário logado:</strong> ${user ? user.email : 'Não logado'}</p>
+                    <p><strong>Erro de auth:</strong> ${authError ? authError.message : 'Nenhum'}</p>
+                `;
+                
+            } catch (error) {
+                console.error('❌ Erro no teste:', error);
+                results.innerHTML += `<p style="color: red;"><strong>Erro geral:</strong> ${error.message}</p>`;
+            }
+        }
+        
+        // Executar teste automaticamente
+        window.addEventListener('load', testReactivationHistory);
+    </script>
+</body>
+</html>

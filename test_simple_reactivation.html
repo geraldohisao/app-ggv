@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Simples - Reativação</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 Teste Simples - Histórico Reativação</h1>
+    <button onclick="testDirect()">1. Teste Direto</button>
+    <button onclick="testRPC()">2. Teste RPC</button>
+    <button onclick="testAuth()">3. Verificar Auth</button>
+    <div id="output"></div>
+
+    <script>
+        const supabase = window.supabase.createClient(
+            'https://pqmjfwmbitodwtpedlle.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbWpmd21iaXRvZHd0cGVkbGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjM2NTAzOTIsImV4cCI6MjAzOTIyNjM5Mn0.Ov_15HvlNEv7wEjYhMgCjjsKTgzE7xNZKgOtAULKIHE'
+        );
+
+        function log(message) {
+            document.getElementById('output').innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+
+        async function testDirect() {
+            log('🔍 Testando acesso direto...');
+            try {
+                const { data, error, count } = await supabase
+                    .from('reactivated_leads')
+                    .select('*', { count: 'exact' });
+                
+                log(`✅ Direto: ${count} registros, erro: ${error?.message || 'nenhum'}`);
+                if (data) log(`📊 Primeiros dados: ${JSON.stringify(data.slice(0, 2), null, 2)}`);
+            } catch (e) {
+                log(`❌ Erro direto: ${e.message}`);
+            }
+        }
+
+        async function testRPC() {
+            log('🔍 Testando RPC...');
+            try {
+                const { data, error } = await supabase.rpc('get_reactivated_leads_history', {
+                    p_page: 1,
+                    p_limit: 5,
+                    p_sdr: null,
+                    p_status: null
+                });
+                
+                log(`✅ RPC: ${data?.length || 0} registros, erro: ${error?.message || 'nenhum'}`);
+                if (data) log(`📊 Dados RPC: ${JSON.stringify(data, null, 2)}`);
+            } catch (e) {
+                log(`❌ Erro RPC: ${e.message}`);
+            }
+        }
+
+        async function testAuth() {
+            log('🔍 Verificando autenticação...');
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                log(`👤 Usuário: ${user?.email || 'não logado'}, erro: ${error?.message || 'nenhum'}`);
+            } catch (e) {
+                log(`❌ Erro auth: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
