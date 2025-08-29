@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Verificar Funções RPC</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .error { background: #fee2e2; color: #dc2626; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .success { background: #dcfce7; color: #166534; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .info { background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 5px; }
+        pre { background: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+        .function-test { border: 1px solid #e5e7eb; margin: 10px 0; padding: 15px; border-radius: 6px; }
+        .function-name { font-weight: bold; color: #1f2937; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Verificar Funções RPC</h1>
+    
+    <div class="container">
+        <button onclick="testAllFunctions()">Testar Todas as Funções</button>
+        <button onclick="testCurrentService()">Testar Service Atual</button>
+        <button onclick="checkDatabase()">Verificar Banco</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://qmlekowxbfbxfskywmx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtbGVrb3d4YmZieGZza3l3bXgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTcyOTU0NjQwMCwiZXhwIjoyMDQ1MTIyNDAwfQ.wEJY_wuHjQmMWCqWJhBdZOLdP0kKHBxkLOLcQfKEhQo';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function showResult(html) {
+            document.getElementById('result').innerHTML = html;
+        }
+
+        async function testAllFunctions() {
+            showResult('<div class="info">🔍 Testando todas as funções...</div>');
+            
+            const functions = [
+                // Funções que o frontend atual está tentando usar
+                { name: 'get_dashboard_metrics', params: { p_days: 14 } },
+                { name: 'get_calls_with_filters', params: { p_limit: 5, p_offset: 0, p_sdr_email: null, p_status: null, p_start_date: null, p_end_date: null, p_search: null } },
+                { name: 'get_call_details', params: { p_call_id: '00000000-0000-0000-0000-000000000000' } },
+                { name: 'get_unique_sdrs', params: {} },
+                
+                // Funções novas que criamos
+                { name: 'get_dashboard_metrics_cached', params: { p_days: 14 } },
+                { name: 'get_calls_with_filters_v2', params: { p_limit: 5, p_offset: 0, p_sdr_email: null, p_status: null, p_start_date: null, p_end_date: null, p_search: null } },
+                { name: 'refresh_calls_enriched_smart', params: {} },
+                { name: 'search_calls_advanced', params: { p_query: 'test', p_limit: 5, p_offset: 0, p_search_type: 'smart' } }
+            ];
+
+            let html = '<div class="info">📋 Resultados dos Testes:</div>';
+
+            for (const func of functions) {
+                try {
+                    console.log(`Testando ${func.name}...`);
+                    const { data, error } = await supabase.rpc(func.name, func.params);
+                    
+                    if (error) {
+                        if (error.code === '42883') {
+                            html += `<div class="function-test">
+                                <div class="function-name">❌ ${func.name}</div>
+                                <div class="error">FUNÇÃO NÃO EXISTE</div>
+                            </div>`;
+                        } else {
+                            html += `<div class="function-test">
+                                <div class="function-name">⚠️ ${func.name}</div>
+                                <div class="error">ERRO: ${error.message}</div>
+                            </div>`;
+                        }
+                    } else {
+                        html += `<div class="function-test">
+                            <div class="function-name">✅ ${func.name}</div>
+                            <div class="success">FUNCIONANDO - ${Array.isArray(data) ? data.length : 1} resultado(s)</div>
+                        </div>`;
+                    }
+                } catch (err) {
+                    html += `<div class="function-test">
+                        <div class="function-name">💥 ${func.name}</div>
+                        <div class="error">ERRO INESPERADO: ${err.message}</div>
+                    </div>`;
+                }
+            }
+
+            showResult(html);
+        }
+
+        async function testCurrentService() {
+            showResult('<div class="info">🔍 Testando service atual (callsService.ts)...</div>');
+            
+            let html = '<div class="info">📋 Testando funções que o frontend está chamando:</div>';
+
+            // Simular as chamadas que o frontend atual faz
+            const tests = [
+                {
+                    name: 'fetchDashboardMetrics',
+                    rpc: 'get_dashboard_metrics',
+                    params: { p_days: 14 }
+                },
+                {
+                    name: 'fetchCalls',
+                    rpc: 'get_calls_with_filters',
+                    params: { 
+                        p_limit: 50, 
+                        p_offset: 0, 
+                        p_sdr_email: null, 
+                        p_status: null, 
+                        p_start_date: null, 
+                        p_end_date: null, 
+                        p_search: null 
+                    }
+                },
+                {
+                    name: 'fetchUniqueSdrs',
+                    rpc: 'get_unique_sdrs',
+                    params: {}
+                }
+            ];
+
+            for (const test of tests) {
+                try {
+                    const { data, error } = await supabase.rpc(test.rpc, test.params);
+                    
+                    if (error) {
+                        html += `<div class="function-test">
+                            <div class="function-name">❌ ${test.name} (${test.rpc})</div>
+                            <div class="error">ERRO: ${error.message}</div>
+                            <pre>${JSON.stringify(error, null, 2)}</pre>
+                        </div>`;
+                    } else {
+                        html += `<div class="function-test">
+                            <div class="function-name">✅ ${test.name} (${test.rpc})</div>
+                            <div class="success">FUNCIONANDO - ${Array.isArray(data) ? data.length : 1} resultado(s)</div>
+                        </div>`;
+                    }
+                } catch (err) {
+                    html += `<div class="function-test">
+                        <div class="function-name">💥 ${test.name} (${test.rpc})</div>
+                        <div class="error">ERRO INESPERADO: ${err.message}</div>
+                    </div>`;
+                }
+            }
+
+            showResult(html);
+        }
+
+        async function checkDatabase() {
+            showResult('<div class="info">🔍 Verificando estrutura do banco...</div>');
+            
+            let html = '<div class="info">📋 Verificações do Banco:</div>';
+
+            // Verificar se a tabela calls existe
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('id, agent_id, deal_id, status, created_at')
+                    .limit(3);
+
+                if (error) {
+                    html += `<div class="function-test">
+                        <div class="function-name">❌ Tabela 'calls'</div>
+                        <div class="error">ERRO: ${error.message}</div>
+                    </div>`;
+                } else {
+                    html += `<div class="function-test">
+                        <div class="function-name">✅ Tabela 'calls'</div>
+                        <div class="success">EXISTE - ${data.length} registros encontrados</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>`;
+                }
+            } catch (err) {
+                html += `<div class="function-test">
+                    <div class="function-name">💥 Tabela 'calls'</div>
+                    <div class="error">ERRO: ${err.message}</div>
+                </div>`;
+            }
+
+            // Verificar se a view calls_enriched existe
+            try {
+                const { data, error } = await supabase
+                    .from('calls_enriched')
+                    .select('id, company_name, sdr_name')
+                    .limit(3);
+
+                if (error) {
+                    html += `<div class="function-test">
+                        <div class="function-name">❌ View 'calls_enriched'</div>
+                        <div class="error">ERRO: ${error.message}</div>
+                    </div>`;
+                } else {
+                    html += `<div class="function-test">
+                        <div class="function-name">✅ View 'calls_enriched'</div>
+                        <div class="success">EXISTE - ${data.length} registros encontrados</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>`;
+                }
+            } catch (err) {
+                html += `<div class="function-test">
+                    <div class="function-name">💥 View 'calls_enriched'</div>
+                    <div class="error">ERRO: ${err.message}</div>
+                </div>`;
+            }
+
+            showResult(html);
+        }
+
+        // Auto-executar ao carregar
+        window.onload = function() {
+            console.log('🔍 Debug page loaded');
+            testCurrentService();
+        };
+    </script>
+</body>
+</html>

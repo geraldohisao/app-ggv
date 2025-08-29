@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Novo Sistema de Calls</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        .calls-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .calls-table th,
+        .calls-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .calls-table th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status.processed { background: #dcfce7; color: #166534; }
+        .status.received { background: #fef3c7; color: #92400e; }
+        .status.failed { background: #fee2e2; color: #dc2626; }
+        .sdr-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sdr-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        .error {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .test-section {
+            margin-bottom: 30px;
+        }
+        .test-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #1f2937;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Teste - Novo Sistema de Calls</h1>
+    
+    <div class="test-section">
+        <div class="test-title">1. Métricas do Dashboard</div>
+        <div class="container">
+            <button onclick="testDashboardMetrics()">Testar Métricas</button>
+            <div id="metrics-result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">2. Lista de SDRs</div>
+        <div class="container">
+            <button onclick="testUniqueSdrs()">Testar SDRs</button>
+            <div id="sdrs-result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">3. Lista de Calls</div>
+        <div class="container">
+            <button onclick="testCallsList()">Testar Lista</button>
+            <button onclick="testCallsWithFilters()">Testar com Filtros</button>
+            <div id="calls-result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">4. Detalhes de Call</div>
+        <div class="container">
+            <button onclick="testCallDetails()">Testar Detalhes</button>
+            <div id="details-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://qmlekowxbfbxfskywmx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtbGVrb3d4YmZieGZza3l3bXgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTcyOTU0NjQwMCwiZXhwIjoyMDQ1MTIyNDAwfQ.wEJY_wuHjQmMWCqWJhBdZOLdP0kKHBxkLOLcQfKEhQo';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Função para mostrar loading
+        function showLoading(elementId) {
+            document.getElementById(elementId).innerHTML = '<div class="loading">⏳ Carregando...</div>';
+        }
+
+        // Função para mostrar erro
+        function showError(elementId, error) {
+            document.getElementById(elementId).innerHTML = `<div class="error">❌ Erro: ${error.message || error}</div>`;
+        }
+
+        // Função para mostrar sucesso
+        function showSuccess(elementId, message) {
+            document.getElementById(elementId).innerHTML = `<div class="success">✅ ${message}</div>`;
+        }
+
+        // Teste 1: Métricas do Dashboard
+        async function testDashboardMetrics() {
+            showLoading('metrics-result');
+            try {
+                const { data, error } = await supabase.rpc('get_dashboard_metrics', { p_days: 14 });
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    showError('metrics-result', 'Nenhuma métrica encontrada');
+                    return;
+                }
+
+                const metrics = data[0];
+                const html = `
+                    <div class="success">✅ Métricas carregadas com sucesso!</div>
+                    <div class="metrics">
+                        <div class="metric-card">
+                            <div class="metric-value">${metrics.total_calls}</div>
+                            <div class="metric-label">Total de Calls</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">${metrics.answered_calls}</div>
+                            <div class="metric-label">Calls Atendidas</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">${metrics.answered_rate}%</div>
+                            <div class="metric-label">Taxa de Resposta</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">${Math.round(metrics.avg_duration)}s</div>
+                            <div class="metric-label">Duração Média</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">${metrics.total_sdrs}</div>
+                            <div class="metric-label">SDRs Ativos</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('metrics-result').innerHTML = html;
+            } catch (error) {
+                showError('metrics-result', error);
+            }
+        }
+
+        // Teste 2: Lista de SDRs
+        async function testUniqueSdrs() {
+            showLoading('sdrs-result');
+            try {
+                const { data, error } = await supabase.rpc('get_unique_sdrs');
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    showError('sdrs-result', 'Nenhum SDR encontrado');
+                    return;
+                }
+
+                let html = `<div class="success">✅ ${data.length} SDRs encontrados!</div><table class="calls-table">
+                    <thead>
+                        <tr>
+                            <th>SDR</th>
+                            <th>Email</th>
+                            <th>Calls</th>
+                            <th>Taxa Sucesso</th>
+                            <th>Duração Média</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                data.forEach(sdr => {
+                    html += `
+                        <tr>
+                            <td>
+                                <div class="sdr-info">
+                                    <img src="${sdr.sdr_avatar_url}" alt="${sdr.sdr_name}" class="sdr-avatar">
+                                    <span>${sdr.sdr_name}</span>
+                                </div>
+                            </td>
+                            <td>${sdr.sdr_email}</td>
+                            <td>${sdr.call_count}</td>
+                            <td>${sdr.success_rate}%</td>
+                            <td>${Math.round(sdr.avg_duration || 0)}s</td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('sdrs-result').innerHTML = html;
+            } catch (error) {
+                showError('sdrs-result', error);
+            }
+        }
+
+        // Teste 3: Lista de Calls
+        async function testCallsList() {
+            showLoading('calls-result');
+            try {
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_search: null
+                });
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    showError('calls-result', 'Nenhuma call encontrada');
+                    return;
+                }
+
+                let html = `<div class="success">✅ ${data.length} calls encontradas!</div><table class="calls-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Pessoa</th>
+                            <th>SDR</th>
+                            <th>Status</th>
+                            <th>Duração</th>
+                            <th>Score</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                data.forEach(call => {
+                    html += `
+                        <tr>
+                            <td>${call.company_name}</td>
+                            <td>${call.person_name}</td>
+                            <td>
+                                <div class="sdr-info">
+                                    <img src="${call.sdr_avatar_url}" alt="${call.sdr_name}" class="sdr-avatar">
+                                    <span>${call.sdr_name}</span>
+                                </div>
+                            </td>
+                            <td><span class="status ${call.status}">${call.status}</span></td>
+                            <td>${call.duration}s</td>
+                            <td>${call.score || '-'}</td>
+                            <td>${new Date(call.created_at).toLocaleDateString('pt-BR')}</td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('calls-result').innerHTML = html;
+            } catch (error) {
+                showError('calls-result', error);
+            }
+        }
+
+        // Teste 3b: Calls com Filtros
+        async function testCallsWithFilters() {
+            showLoading('calls-result');
+            try {
+                // Primeiro, pegar um SDR da lista
+                const { data: sdrs } = await supabase.rpc('get_unique_sdrs');
+                if (!sdrs || sdrs.length === 0) {
+                    showError('calls-result', 'Nenhum SDR encontrado para filtrar');
+                    return;
+                }
+
+                const firstSdr = sdrs[0];
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 5,
+                    p_offset: 0,
+                    p_sdr_email: firstSdr.sdr_email,
+                    p_status: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_search: null
+                });
+                
+                if (error) throw error;
+                
+                showSuccess('calls-result', `Filtro por SDR "${firstSdr.sdr_name}" funcionou! ${data.length} calls encontradas.`);
+            } catch (error) {
+                showError('calls-result', error);
+            }
+        }
+
+        // Teste 4: Detalhes de Call
+        async function testCallDetails() {
+            showLoading('details-result');
+            try {
+                // Primeiro, pegar uma call da lista
+                const { data: calls } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 1,
+                    p_offset: 0,
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_search: null
+                });
+                
+                if (!calls || calls.length === 0) {
+                    showError('details-result', 'Nenhuma call encontrada para testar detalhes');
+                    return;
+                }
+
+                const callId = calls[0].id;
+                const { data, error } = await supabase.rpc('get_call_details', {
+                    p_call_id: callId
+                });
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    showError('details-result', 'Detalhes da call não encontrados');
+                    return;
+                }
+
+                const call = data[0];
+                const html = `
+                    <div class="success">✅ Detalhes da call carregados!</div>
+                    <div style="background: #f9fafb; padding: 15px; border-radius: 6px; margin-top: 10px;">
+                        <h4>Call ID: ${call.id}</h4>
+                        <p><strong>Empresa:</strong> ${call.company_name}</p>
+                        <p><strong>Pessoa:</strong> ${call.person_name} (${call.person_email || 'N/A'})</p>
+                        <p><strong>SDR:</strong> ${call.sdr_name} (${call.sdr_email})</p>
+                        <p><strong>Status:</strong> <span class="status ${call.status}">${call.status}</span></p>
+                        <p><strong>Duração:</strong> ${call.duration}s</p>
+                        <p><strong>Score:</strong> ${call.score || 'N/A'}</p>
+                        <p><strong>Audio URL:</strong> ${call.audio_url ? '✅ Disponível' : '❌ Não disponível'}</p>
+                        <p><strong>Transcrição:</strong> ${call.transcription ? '✅ Disponível' : '❌ Não disponível'}</p>
+                        <p><strong>Comentários:</strong> ${call.comments ? JSON.parse(call.comments).length : 0} comentários</p>
+                    </div>
+                `;
+                document.getElementById('details-result').innerHTML = html;
+            } catch (error) {
+                showError('details-result', error);
+            }
+        }
+
+        // Auto-executar teste básico ao carregar
+        window.onload = function() {
+            console.log('🚀 Sistema de Calls - Página de teste carregada');
+        };
+    </script>
+</body>
+</html>

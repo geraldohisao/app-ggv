@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Configuração Supabase</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .error { background: #fee2e2; color: #dc2626; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .success { background: #dcfce7; color: #166534; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .info { background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .warning { background: #fef3c7; color: #92400e; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 5px; }
+        pre { background: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; font-size: 12px; }
+        .test-result { border: 1px solid #e5e7eb; margin: 10px 0; padding: 15px; border-radius: 6px; }
+        .config-item { margin: 10px 0; padding: 10px; background: #f8fafc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Configuração Supabase</h1>
+    
+    <div class="container">
+        <button onclick="checkConfig()">1. Verificar Configuração</button>
+        <button onclick="testDirectSQL()">2. Testar SQL Direto</button>
+        <button onclick="testRPCDirect()">3. Testar RPC Direto</button>
+        <button onclick="checkCORS()">4. Verificar CORS</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Configurações atuais
+        const supabaseUrl = 'https://qmlekowxbfbxfskywmx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtbGVrb3d4YmZieGZza3l3bXgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTcyOTU0NjQwMCwiZXhwIjoyMDQ1MTIyNDAwfQ.wEJY_wuHjQmMWCqWJhBdZOLdP0kKHBxkLOLcQfKEhQo';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function showResult(html) {
+            document.getElementById('result').innerHTML = html;
+        }
+
+        function checkConfig() {
+            showResult(`
+                <div class="info">🔍 Verificando Configuração do Supabase...</div>
+                
+                <div class="config-item">
+                    <strong>URL:</strong> ${supabaseUrl}
+                </div>
+                
+                <div class="config-item">
+                    <strong>Key (primeiros 50 chars):</strong> ${supabaseKey.substring(0, 50)}...
+                </div>
+                
+                <div class="config-item">
+                    <strong>Supabase Client:</strong> ${supabase ? 'Criado com sucesso' : 'ERRO na criação'}
+                </div>
+                
+                <div class="config-item">
+                    <strong>Versão Supabase-JS:</strong> ${window.supabase.version || 'Não detectada'}
+                </div>
+                
+                <div class="warning">
+                    <strong>⚠️ POSSÍVEIS PROBLEMAS:</strong><br>
+                    1. Key do Supabase pode ter expirado<br>
+                    2. URL pode estar incorreta<br>
+                    3. Projeto pode estar pausado<br>
+                    4. RLS (Row Level Security) muito restritivo<br>
+                    5. CORS bloqueando requisições
+                </div>
+            `);
+        }
+
+        async function testDirectSQL() {
+            showResult('<div class="info">🔍 Testando SQL direto...</div>');
+            
+            let html = '<div class="info">📋 Testes SQL Diretos:</div>';
+
+            // Teste 1: Contar registros na tabela calls
+            try {
+                const { data, error, count } = await supabase
+                    .from('calls')
+                    .select('*', { count: 'exact', head: true });
+
+                if (error) {
+                    html += `
+                        <div class="test-result">
+                            <div class="error">❌ Erro ao contar calls</div>
+                            <div><strong>Código:</strong> ${error.code}</div>
+                            <div><strong>Mensagem:</strong> ${error.message}</div>
+                            <div><strong>Detalhes:</strong> ${error.details}</div>
+                            <div><strong>Hint:</strong> ${error.hint}</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="test-result">
+                            <div class="success">✅ Contagem de calls: ${count} registros</div>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                html += `
+                    <div class="test-result">
+                        <div class="error">💥 Erro inesperado: ${err.message}</div>
+                    </div>
+                `;
+            }
+
+            // Teste 2: Buscar alguns registros
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('id, agent_id, deal_id, status, created_at')
+                    .limit(3);
+
+                if (error) {
+                    html += `
+                        <div class="test-result">
+                            <div class="error">❌ Erro ao buscar calls</div>
+                            <div><strong>Código:</strong> ${error.code}</div>
+                            <div><strong>Mensagem:</strong> ${error.message}</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="test-result">
+                            <div class="success">✅ Busca de calls: ${data.length} registros retornados</div>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                html += `
+                    <div class="test-result">
+                        <div class="error">💥 Erro inesperado: ${err.message}</div>
+                    </div>
+                `;
+            }
+
+            showResult(html);
+        }
+
+        async function testRPCDirect() {
+            showResult('<div class="info">🔍 Testando RPC com diferentes métodos...</div>');
+            
+            let html = '<div class="info">📋 Testes RPC Diretos:</div>';
+
+            // Teste com diferentes headers e configurações
+            const tests = [
+                {
+                    name: 'RPC Padrão',
+                    method: async () => await supabase.rpc('get_dashboard_metrics', { p_days: 7 })
+                },
+                {
+                    name: 'RPC com Headers Customizados',
+                    method: async () => {
+                        const { data, error } = await supabase
+                            .rpc('get_dashboard_metrics', { p_days: 7 })
+                            .select();
+                        return { data, error };
+                    }
+                },
+                {
+                    name: 'Fetch Direto',
+                    method: async () => {
+                        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/get_dashboard_metrics`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': supabaseKey,
+                                'Authorization': `Bearer ${supabaseKey}`,
+                                'Prefer': 'return=representation'
+                            },
+                            body: JSON.stringify({ p_days: 7 })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const data = await response.json();
+                        return { data, error: null };
+                    }
+                }
+            ];
+
+            for (const test of tests) {
+                try {
+                    const result = await test.method();
+                    
+                    if (result.error) {
+                        html += `
+                            <div class="test-result">
+                                <div class="error">❌ ${test.name}</div>
+                                <div><strong>Erro:</strong> ${result.error.message}</div>
+                                <div><strong>Código:</strong> ${result.error.code}</div>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="test-result">
+                                <div class="success">✅ ${test.name}</div>
+                                <div>Dados retornados com sucesso</div>
+                                <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                            </div>
+                        `;
+                    }
+                } catch (err) {
+                    html += `
+                        <div class="test-result">
+                            <div class="error">💥 ${test.name}</div>
+                            <div><strong>Erro:</strong> ${err.message}</div>
+                        </div>
+                    `;
+                }
+            }
+
+            showResult(html);
+        }
+
+        async function checkCORS() {
+            showResult('<div class="info">🔍 Verificando CORS e conectividade...</div>');
+            
+            let html = '<div class="info">📋 Verificações de Conectividade:</div>';
+
+            // Teste 1: Ping básico
+            try {
+                const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+                    method: 'HEAD',
+                    headers: {
+                        'apikey': supabaseKey
+                    }
+                });
+
+                html += `
+                    <div class="test-result">
+                        <div class="${response.ok ? 'success' : 'error'}">
+                            ${response.ok ? '✅' : '❌'} Ping Supabase: ${response.status} ${response.statusText}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                html += `
+                    <div class="test-result">
+                        <div class="error">❌ Ping Supabase: ${err.message}</div>
+                    </div>
+                `;
+            }
+
+            // Teste 2: Verificar headers CORS
+            try {
+                const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'apikey,authorization,content-type'
+                    }
+                });
+
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+                };
+
+                html += `
+                    <div class="test-result">
+                        <div class="info">📋 Headers CORS:</div>
+                        <pre>${JSON.stringify(corsHeaders, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (err) {
+                html += `
+                    <div class="test-result">
+                        <div class="error">❌ Verificação CORS: ${err.message}</div>
+                    </div>
+                `;
+            }
+
+            // Teste 3: Verificar se é problema de localhost
+            html += `
+                <div class="test-result">
+                    <div class="info">📋 Informações do Ambiente:</div>
+                    <div><strong>Origin:</strong> ${window.location.origin}</div>
+                    <div><strong>Protocol:</strong> ${window.location.protocol}</div>
+                    <div><strong>Host:</strong> ${window.location.host}</div>
+                    <div><strong>User Agent:</strong> ${navigator.userAgent.substring(0, 100)}...</div>
+                </div>
+            `;
+
+            showResult(html);
+        }
+
+        // Auto-executar verificação de configuração ao carregar
+        window.onload = function() {
+            console.log('🔍 Debug de configuração carregado');
+            checkConfig();
+        };
+    </script>
+</body>
+</html>

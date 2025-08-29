@@ -116,7 +116,7 @@ exports.handler = async (event, context) => {
       } : null
     };
 
-    // Atualizar registro no banco
+    // Atualizar registro no banco (automation_history)
     const { data: updatedRecord, error } = await supabase
       .from('automation_history')
       .update({
@@ -130,19 +130,67 @@ exports.handler = async (event, context) => {
       .single();
 
     if (error) {
-      console.error('❌ N8N CALLBACK - Erro ao atualizar registro:', error);
+      console.error('❌ N8N CALLBACK - Erro ao atualizar automation_history:', error);
+    } else {
+      console.log('✅ N8N CALLBACK - automation_history atualizado:', updatedRecord?.id || 'N/A');
+    }
+
+    // 💾 ATUALIZAR TAMBÉM A TABELA REACTIVATED_LEADS
+    try {
+      // Determinar status mapeado
+      let mappedStatus = 'processing';
+      if (status === 'completed' || status === 'success') {
+        mappedStatus = 'completed';
+      } else if (status === 'failed' || status === 'error') {
+        mappedStatus = 'failed';
+      }
+
+      // Extrair quantidade de leads processados
+      const countLeads = leadsProcessed || 
+                        (deals ? deals.length : 0) || 
+                        (data && data.leadsProcessed) || 
+                        0;
+
+      // Atualizar registro na tabela reactivated_leads
+      const { data: reactivatedRecord, error: reactivatedError } = await supabase
+        .from('reactivated_leads')
+        .update({
+          status: mappedStatus,
+          count_leads: countLeads,
+          execution_id: executionId,
+          n8n_data: n8nResponseData,
+          error_message: status === 'failed' ? message : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('workflow_id', workflowId)
+        .select()
+        .single();
+
+      if (reactivatedError) {
+        console.warn('⚠️ N8N CALLBACK - Erro ao atualizar reactivated_leads:', reactivatedError.message);
+      } else {
+        console.log('✅ N8N CALLBACK - reactivated_leads atualizado:', {
+          id: reactivatedRecord?.id,
+          status: mappedStatus,
+          count_leads: countLeads
+        });
+      }
+    } catch (reactivatedUpdateError) {
+      console.warn('⚠️ N8N CALLBACK - Erro ao processar reactivated_leads:', reactivatedUpdateError.message);
+    }
+
+    // Se houve erro na tabela principal, retornar erro
+    if (error) {
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({ 
-          error: 'Failed to update record', 
+          error: 'Failed to update automation_history', 
           details: error.message,
           workflowId: workflowId
         })
       };
     }
-
-    console.log('✅ N8N CALLBACK - Registro atualizado:', updatedRecord?.id || 'N/A');
 
     return {
       statusCode: 200,

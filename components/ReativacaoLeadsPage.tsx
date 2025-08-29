@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '../contexts/DirectUserContext';
 import { UserRole } from '../types';
 import { reativacaoSchema, ReativacaoPayload } from '../src/schemas/reativacao';
-import { triggerReativacao, getAutomationHistory, AutomationHistoryItem } from '../services/automationService';
+import { 
+  triggerReativacao, 
+  getAutomationHistory, 
+  AutomationHistoryItem,
+  getReactivatedLeadsHistory,
+  ReactivatedLeadHistoryItem
+} from '../services/automationService';
 
 // Tipo para o estado do formulário (permite valores temporários durante digitação)
 type FormData = Omit<ReativacaoPayload, 'numero_negocio'> & {
@@ -33,7 +39,7 @@ const ReativacaoLeadsPage: React.FC = () => {
   });
   
   // Estado para histórico
-  const [history, setHistory] = useState<AutomationHistoryItem[]>([]);
+  const [history, setHistory] = useState<ReactivatedLeadHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -170,31 +176,26 @@ const ReativacaoLeadsPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Função para carregar histórico (faz merge para reduzir flicker)
+  // Função para carregar histórico da nova tabela reactivated_leads
   const loadHistory = async (page: number = 1) => {
     try {
       setIsLoadingHistory(true);
-      const response = await getAutomationHistory(page, 10);
-
-      setHistory(prev => {
-        // Mantém a ordem vinda do servidor, mas reaproveita objetos já existentes quando possível
-        const prevById = new Map(prev.map(p => [p.id, p] as const));
-        return response.data.map(item => {
-          const existing = prevById.get(item.id);
-          if (!existing) return item;
-          // Se não houve mudança relevante, preserve a mesma referência
-          const unchanged =
-            existing.status === item.status &&
-            existing.updatedAt === item.updatedAt &&
-            JSON.stringify(existing.n8nResponse) === JSON.stringify(item.n8nResponse);
-          return unchanged ? existing : item;
-        });
-      });
-
+      console.log('📊 Carregando histórico de reativação...');
+      
+      const response = await getReactivatedLeadsHistory(page, 10);
+      
+      console.log('✅ Histórico carregado:', response);
+      
+      setHistory(response.data);
       setTotalPages(response.pagination.pages);
       setCurrentPage(page);
-    } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar histórico:', error);
+      setResult({
+        success: false,
+        message: `❌ Erro ao carregar histórico: ${error.message}`,
+      });
     } finally {
       setIsLoadingHistory(false);
     }
@@ -703,147 +704,55 @@ const ReativacaoLeadsPage: React.FC = () => {
                   <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        {getStatusBadge(getDisplayStatus(item))}
+                        {getStatusBadge(item.status)}
                         <div>
-                          <p className="font-medium text-slate-900">{item.filtro}</p>
+                          <p className="font-medium text-slate-900">{item.filter}</p>
                           <p className="text-sm text-slate-600">
-                            SDR: {item.proprietario} • {item.numeroNegocio} leads
+                            SDR: {item.sdr} • {item.count_leads} leads
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-500">{formatDate(item.createdAt)}</p>
-                        <p className="text-xs text-slate-400">{item.userEmail}</p>
+                        <p className="text-xs text-slate-500">{formatDate(item.created_at)}</p>
+                        <p className="text-xs text-slate-400">Reativação automática</p>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-slate-500">Cadência:</span>
-                        <span className="ml-2 text-slate-900">{item.cadencia}</span>
+                        <span className="ml-2 text-slate-900">{item.cadence || 'N/A'}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500">Executado por:</span>
-                        <span className="ml-2 text-slate-900">{getUserFullName(item.userEmail)}</span>
+                        <span className="text-slate-500">Workflow ID:</span>
+                        <span className="ml-2 text-slate-900 font-mono text-xs">{item.workflow_id || 'N/A'}</span>
                       </div>
                     </div>
 
-                    {item.errorMessage && (
+                    {item.error_message && (
                       <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-700">
-                          <strong>Erro:</strong> {item.errorMessage}
+                          <strong>Erro:</strong> {item.error_message}
                         </p>
                       </div>
                     )}
 
-                    {/* Progresso em tempo real */}
-                    {renderProgress(item)}
-
-                    {/* Botão para marcar como concluído manualmente */}
-                    {getDisplayStatus(item) !== 'completed' && getDisplayStatus(item) !== 'error' && getDisplayStatus(item) !== 'success' && getDisplayStatus(item) !== 'failed' && (
+                    {/* Status visual baseado no status da tabela */}
+                    {item.status === 'processing' && (
                       <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-blue-800 font-medium">🔄 Workflow em processamento real no N8N</p>
-                            <p className="text-xs text-blue-600">
-                              Aguardando callback automático. Se já terminou, marque como concluído.
-                            </p>
-                            <div className="mt-2 flex items-center gap-2 text-xs text-blue-700">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                              <span>Processamento em tempo real • Dados 100% reais</span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleManualComplete(item)}
-                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                          >
-                            ✅ Marcar Concluído
-                          </button>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          <p className="text-sm text-blue-800 font-medium">🔄 Processando leads no N8N</p>
                         </div>
                       </div>
                     )}
 
-                    {/* Status visual direto - similar ao print */}
-                    {item.n8nResponse && (
+                    {/* Dados do N8N se disponíveis */}
+                    {item.n8n_data && Object.keys(item.n8n_data).length > 0 && (
                       <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
                         <div className="text-sm text-slate-700">
-                          <strong>Status N8N:</strong>
+                          <strong>Dados do N8N:</strong>
                         </div>
-                        <div className="mt-2 font-mono text-xs bg-white p-2 rounded border">
-                          {getDisplayStatus(item) === 'completed' ? (
-                            <div className="text-green-600">
-                              ✅ Workflow executado com sucesso
-                              {safeGet(item.n8nResponse, 'leadsProcessed') && (
-                                <div className="mt-1 text-slate-600">
-                                  📊 {safeGet(item.n8nResponse, 'leadsProcessed', 0)} leads processados
-                                </div>
-                              )}
-                            </div>
-                          ) : getDisplayStatus(item) === 'failed' ? (
-                            <div className="text-red-600">
-                              ❌ Workflow falhou no N8N
-                              {safeGet(item.n8nResponse, 'message') && (
-                                <div className="mt-1 text-slate-600">
-                                  📋 {safeGet(item.n8nResponse, 'message')}
-                                </div>
-                              )}
-                              {safeGet(item.n8nResponse, 'leadsProcessed') !== null && (
-                                <div className="mt-1 text-slate-600">
-                                  📊 {safeGet(item.n8nResponse, 'leadsProcessed', 0)} leads processados
-                                </div>
-                              )}
-                            </div>
-                          ) : getDisplayStatus(item) === 'processing' || getDisplayStatus(item) === 'starting' || getDisplayStatus(item) === 'started' || getDisplayStatus(item) === 'finalizing' || getDisplayStatus(item) === 'connecting' || getDisplayStatus(item) === 'fetching' ? (
-                            <div className="text-blue-600">
-                              🔄 Workflow em execução no N8N...
-                            </div>
-                          ) : getDisplayStatus(item) === 'error' ? (
-                            <div className="text-red-600">
-                              ❌ Erro na execução do workflow
-                            </div>
-                          ) : (
-                            <div className="text-yellow-600">
-                              ⏳ Workflow pendente
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Mostrar resumo se disponível */}
-                        {safeGet(item.n8nResponse, 'summary') && (
-                          <div className="mt-2 text-xs text-slate-600">
-                            <strong>Resumo:</strong> {safeGet(item.n8nResponse, 'summary')}
-                          </div>
-                        )}
-                        
-                        {/* Mostrar dados do Pipedrive se disponível */}
-                        {safeGet(item.n8nResponse, 'pipedriveData') && (
-                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                            <div className="text-xs text-blue-800 font-medium">📊 Dados do Pipedrive:</div>
-                            <div className="text-xs text-blue-700 mt-1">
-                              {safeGet(item.n8nResponse, 'pipedriveData.person.name') && (
-                                <div>👤 Pessoa: {safeGet(item.n8nResponse, 'pipedriveData.person.name')}</div>
-                              )}
-                              {safeGet(item.n8nResponse, 'pipedriveData.organization.name') && (
-                                <div>🏢 Empresa: {safeGet(item.n8nResponse, 'pipedriveData.organization.name')}</div>
-                              )}
-                              {safeGet(item.n8nResponse, 'pipedriveData.deal.title') && (
-                                <div>💼 Deal: {safeGet(item.n8nResponse, 'pipedriveData.deal.title')}</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Mensagem específica do N8N */}
-                        {item.n8nResponse && item.n8nResponse.message && (
-                          <div className="mt-2 text-xs text-slate-600">
-                            <strong>Resposta:</strong> {item.n8nResponse.message}
-                            {item.n8nResponse.data?.dev_mode && (
-                              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
-                                DEV MODE
-                              </span>
-                            )}
-                          </div>
-                        )}
                         
                         {/* Detalhes técnicos expandíveis */}
                         <details className="mt-2">
@@ -851,7 +760,7 @@ const ReativacaoLeadsPage: React.FC = () => {
                             Ver detalhes técnicos
                           </summary>
                           <pre className="mt-2 text-xs bg-slate-100 p-3 rounded overflow-auto max-h-32">
-                            {JSON.stringify(item.n8nResponse, null, 2)}
+                            {JSON.stringify(item.n8n_data, null, 2)}
                           </pre>
                         </details>
                       </div>

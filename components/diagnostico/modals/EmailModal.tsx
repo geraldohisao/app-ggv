@@ -148,15 +148,21 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
         } catch (err: any) {
             console.error('❌ EMAIL - Erro ao enviar:', err);
             
-            // Tratar erros específicos do Gmail
+            // Tratar erros específicos do Gmail com mensagens mais claras
             if (err?.message?.includes('insufficient authentication scopes') || err?.message?.includes('insufficient permissions')) {
-                setError('Gmail API: Permissões insuficientes. Clique em "Reautenticar" para resolver.');
+                setError('🔐 Permissões insuficientes. Clique em "Reautenticar" para conceder acesso ao Gmail.');
             } else if (err?.message?.includes('Google Identity Services')) {
-                setError('Erro ao carregar Google Services. Tente recarregar a página e tentar novamente.');
+                setError('⚠️ Erro ao carregar serviços do Google. Recarregue a página e tente novamente.');
             } else if (err?.message?.includes('Timeout')) {
-                setError('Timeout na conexão com Google. Verifique sua internet e tente novamente.');
+                setError('⏰ Conexão lenta com o Google. Verifique sua internet e tente novamente.');
+            } else if (err?.message?.includes('pop-ups')) {
+                setError('🚫 Pop-ups bloqueados. Habilite pop-ups para este site e tente novamente.');
+            } else if (err?.message?.includes('GOOGLE_OAUTH_CLIENT_ID')) {
+                setError('⚙️ Configuração do Gmail não encontrada. Entre em contato com o suporte.');
+            } else if (err?.message?.includes('não configurado')) {
+                setError('⚙️ Sistema de e-mail não configurado. Entre em contato com o suporte.');
             } else {
-                setError(err?.message || 'Falha ao enviar e-mail pelo Gmail.');
+                setError(`❌ ${err?.message || 'Falha ao enviar e-mail pelo Gmail. Tente novamente.'}`);
             }
         } finally {
             setLoading(false);

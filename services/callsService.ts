@@ -472,8 +472,8 @@ export async function fetchRealUsers() {
       .limit(50);
     
     if (error) {
-      console.log('⚠️ Query otimizada falhou, usando método alternativo:', error);
-      return await fetchUsersAlternative();
+      console.log('⚠️ Query otimizada falhou, retornando lista vazia:', error);
+      return []; // Não usar fetchUsersAlternative pois tabela profiles não existe
     }
     
     // Processar dados e remover duplicatas
@@ -517,16 +517,19 @@ export async function fetchRealUsers() {
     
   } catch (error) {
     console.error('❌ fetchRealUsers - Erro na query otimizada:', error);
-    return await fetchUsersAlternative();
+    return []; // Não usar fetchUsersAlternative pois tabela profiles não existe
   }
 }
 
-// Método alternativo mais simples
+// Método alternativo mais simples - DESABILITADO (tabela profiles não existe)
 async function fetchUsersAlternative() {
-  console.log('🔄 fetchUsersAlternative - Usando método simples...');
+  console.log('🔄 fetchUsersAlternative - DESABILITADO (tabela profiles não existe)');
+  
+  // RETORNAR LISTA VAZIA PARA EVITAR ERROS
+  return [];
   
   try {
-    // Buscar apenas usuários únicos da tabela profiles
+    // DESABILITADO: Buscar apenas usuários únicos da tabela profiles
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name, email')

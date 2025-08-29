@@ -1,0 +1,543 @@
+# calls-api-spec.yaml
+# OpenAPI 3.0 specification para API REST do sistema de calls
+
+openapi: 3.0.3
+info:
+  title: Calls Management API
+  description: API REST para gerenciamento de chamadas com funcionalidades avançadas
+  version: 2.0.0
+  contact:
+    name: Grupo GGV
+    email: dev@grupoggv.com
+
+servers:
+  - url: https://api.grupoggv.com/v2
+    description: Produção
+  - url: https://staging-api.grupoggv.com/v2
+    description: Staging
+  - url: http://localhost:3000/v2
+    description: Desenvolvimento
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  /calls:
+    get:
+      summary: Listar calls com filtros
+      description: Retorna lista paginada de calls com filtros opcionais
+      tags: [Calls]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: sdr_email
+          in: query
+          schema:
+            type: string
+            format: email
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/CallStatus'
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: search
+          in: query
+          schema:
+            type: string
+            minLength: 2
+      responses:
+        '200':
+          description: Lista de calls
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /calls/{callId}:
+    get:
+      summary: Obter detalhes de uma call
+      tags: [Calls]
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalhes da call
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /calls/search:
+    get:
+      summary: Busca full-text em calls
+      tags: [Calls]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Resultados da busca
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+
+  /dashboard/metrics:
+    get:
+      summary: Métricas do dashboard
+      tags: [Dashboard]
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 14
+      responses:
+        '200':
+          description: Métricas do dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardMetrics'
+
+  /sdrs:
+    get:
+      summary: Listar SDRs únicos
+      tags: [SDRs]
+      responses:
+        '200':
+          description: Lista de SDRs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SdrUser'
+
+  /analytics/volume:
+    get:
+      summary: Gráfico de volume de calls
+      tags: [Analytics]
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 14
+      responses:
+        '200':
+          description: Dados do gráfico de volume
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolumeData'
+
+  /analytics/scores:
+    get:
+      summary: Gráfico de scores por SDR
+      tags: [Analytics]
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 14
+      responses:
+        '200':
+          description: Dados do gráfico de scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScoreData'
+
+  /webhooks/call-updated:
+    post:
+      summary: Webhook para atualizações de call
+      tags: [Webhooks]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallWebhook'
+      responses:
+        '200':
+          description: Webhook processado
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    CallStatus:
+      type: string
+      enum: [received, processing, processed, failed, answered, missed, voicemail, analyzed]
+
+    CallListItem:
+      type: object
+      required: [id, company_name, person_name, sdr_name, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider_call_id:
+          type: string
+        deal_id:
+          type: string
+        company_name:
+          type: string
+        person_name:
+          type: string
+        person_email:
+          type: string
+          format: email
+          nullable: true
+        sdr_name:
+          type: string
+        sdr_email:
+          type: string
+          format: email
+        sdr_avatar_url:
+          type: string
+          format: uri
+        status:
+          $ref: '#/components/schemas/CallStatus'
+        duration:
+          type: integer
+          minimum: 0
+        call_type:
+          type: string
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        audio_url:
+          type: string
+          format: uri
+          nullable: true
+        transcription:
+          type: string
+          nullable: true
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    CallDetails:
+      allOf:
+        - $ref: '#/components/schemas/CallListItem'
+        - type: object
+          properties:
+            recording_url:
+              type: string
+              format: uri
+              nullable: true
+            audio_bucket:
+              type: string
+              nullable: true
+            audio_path:
+              type: string
+              nullable: true
+            transcript_status:
+              type: string
+            ai_status:
+              type: string
+            insights:
+              type: object
+            scorecard:
+              type: object
+            from_number:
+              type: string
+              nullable: true
+            to_number:
+              type: string
+              nullable: true
+            agent_id:
+              type: string
+            updated_at:
+              type: string
+              format: date-time
+            processed_at:
+              type: string
+              format: date-time
+              nullable: true
+            comments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Comment'
+            detailed_scores:
+              type: array
+              items:
+                $ref: '#/components/schemas/DetailedScore'
+
+    Comment:
+      type: object
+      required: [id, text, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        text:
+          type: string
+        at_seconds:
+          type: integer
+          minimum: 0
+        author_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DetailedScore:
+      type: object
+      required: [criterion_id, score]
+      properties:
+        criterion_id:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+          maximum: 10
+        justification:
+          type: string
+
+    SdrUser:
+      type: object
+      required: [id, name, email, callCount]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        avatarUrl:
+          type: string
+          format: uri
+        callCount:
+          type: integer
+          minimum: 0
+        lastCallDate:
+          type: string
+          format: date-time
+        avgDuration:
+          type: number
+          minimum: 0
+        successRate:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    DashboardMetrics:
+      type: object
+      required: [total_calls, answered_calls, answered_rate, avg_duration, total_sdrs]
+      properties:
+        total_calls:
+          type: integer
+          minimum: 0
+        answered_calls:
+          type: integer
+          minimum: 0
+        answered_rate:
+          type: number
+          minimum: 0
+          maximum: 100
+        avg_duration:
+          type: number
+          minimum: 0
+        total_sdrs:
+          type: integer
+          minimum: 0
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+
+    SearchResult:
+      type: object
+      required: [id, company_name, person_name, sdr_name, deal_id, created_at, rank]
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+        person_name:
+          type: string
+        sdr_name:
+          type: string
+        deal_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        rank:
+          type: number
+          minimum: 0
+
+    VolumeData:
+      type: object
+      required: [date, total_calls, answered_calls, missed_calls]
+      properties:
+        date:
+          type: string
+          format: date
+        total_calls:
+          type: integer
+          minimum: 0
+        answered_calls:
+          type: integer
+          minimum: 0
+        missed_calls:
+          type: integer
+          minimum: 0
+
+    ScoreData:
+      type: object
+      required: [sdr_name, avg_score, call_count, score_trend]
+      properties:
+        sdr_name:
+          type: string
+        avg_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        call_count:
+          type: integer
+          minimum: 0
+        score_trend:
+          type: string
+          enum: [excellent, good, average, needs_improvement]
+
+    CallWebhook:
+      type: object
+      required: [event, call_id, timestamp]
+      properties:
+        event:
+          type: string
+          enum: [call.created, call.updated, call.analyzed, call.transcribed]
+        call_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        data:
+          type: object
+
+    CallsResponse:
+      type: object
+      required: [data, totalCount, hasMore, currentPage, totalPages]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallListItem'
+        totalCount:
+          type: integer
+          minimum: 0
+        hasMore:
+          type: boolean
+        currentPage:
+          type: integer
+          minimum: 1
+        totalPages:
+          type: integer
+          minimum: 1
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Não autorizado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

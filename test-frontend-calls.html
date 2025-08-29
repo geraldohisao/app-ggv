@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Frontend - Sistema de Calls</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .error { background: #fee2e2; color: #dc2626; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .success { background: #dcfce7; color: #166534; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .info { background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 5px; }
+        pre { background: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; font-size: 12px; }
+        .test-result { border: 1px solid #e5e7eb; margin: 10px 0; padding: 15px; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+        th { background: #f8fafc; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste Frontend - Sistema de Calls</h1>
+    
+    <div class="container">
+        <div class="info">
+            <strong>🎯 TESTANDO EXATAMENTE COMO O FRONTEND FAZ:</strong><br>
+            Simulando as mesmas chamadas que o React faz para diagnosticar o problema.
+        </div>
+        
+        <button onclick="testDashboardMetrics()">1. Testar Dashboard Metrics</button>
+        <button onclick="testUniqueSdrs()">2. Testar SDRs Únicos</button>
+        <button onclick="testCallsList()">3. Testar Lista de Calls</button>
+        <button onclick="testFullFlow()">4. Fluxo Completo</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // CREDENCIAIS CORRETAS (mesmas do index.html)
+        const supabaseUrl = 'https://mwlekwyxbfbxfxskywgx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3l4YmZieGZ4c2t5d2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTIzMjEsImV4cCI6MjA2NTY4ODMyMX0.rFX9H2pcGLNX7n3vKLYGi72JKwjUw6oG38IZGjO90HE';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function showResult(html) {
+            document.getElementById('result').innerHTML = html;
+        }
+
+        async function testDashboardMetrics() {
+            showResult('<div class="info">🔍 Testando Dashboard Metrics (como o frontend)...</div>');
+            
+            try {
+                console.log('🔍 CALLS SERVICE - Buscando métricas do dashboard');
+
+                const { data, error } = await supabase.rpc('get_dashboard_metrics', {
+                    p_days: 14
+                });
+
+                if (error) {
+                    showResult(`
+                        <div class="test-result">
+                            <div class="error">❌ ERRO Dashboard Metrics</div>
+                            <div><strong>Código:</strong> ${error.code}</div>
+                            <div><strong>Mensagem:</strong> ${error.message}</div>
+                            <div><strong>Detalhes:</strong> ${error.details}</div>
+                        </div>
+                    `);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    showResult(`
+                        <div class="test-result">
+                            <div class="error">📭 Nenhuma métrica encontrada</div>
+                        </div>
+                    `);
+                    return;
+                }
+
+                const metrics = data[0];
+                showResult(`
+                    <div class="test-result">
+                        <div class="success">✅ Dashboard Metrics OK</div>
+                        <table>
+                            <tr><th>Métrica</th><th>Valor</th></tr>
+                            <tr><td>Total de Calls</td><td>${metrics.total_calls}</td></tr>
+                            <tr><td>Calls Atendidas</td><td>${metrics.answered_calls}</td></tr>
+                            <tr><td>Taxa de Resposta</td><td>${metrics.answered_rate}%</td></tr>
+                            <tr><td>Duração Média</td><td>${Math.round(metrics.avg_duration)}s</td></tr>
+                            <tr><td>Total SDRs</td><td>${metrics.total_sdrs}</td></tr>
+                        </table>
+                    </div>
+                `);
+
+            } catch (err) {
+                showResult(`
+                    <div class="test-result">
+                        <div class="error">💥 ERRO INESPERADO</div>
+                        <pre>${err.message}</pre>
+                    </div>
+                `);
+            }
+        }
+
+        async function testUniqueSdrs() {
+            showResult('<div class="info">🔍 Testando SDRs Únicos (como o frontend)...</div>');
+            
+            try {
+                console.log('🔍 CALLS SERVICE - Buscando SDRs únicos');
+
+                const { data, error } = await supabase.rpc('get_unique_sdrs');
+
+                if (error) {
+                    showResult(`
+                        <div class="test-result">
+                            <div class="error">❌ ERRO SDRs Únicos</div>
+                            <div><strong>Código:</strong> ${error.code}</div>
+                            <div><strong>Mensagem:</strong> ${error.message}</div>
+                        </div>
+                    `);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    showResult(`
+                        <div class="test-result">
+                            <div class="error">📭 Nenhum SDR encontrado</div>
+                        </div>
+                    `);
+                    return;
+                }
+
+                let html = `
+                    <div class="test-result">
+                        <div class="success">✅ SDRs Únicos OK (${data.length} encontrados)</div>
+                        <table>
+                            <tr><th>Avatar</th><th>Nome</th><th>Email</th><th>Calls</th><th>Taxa Sucesso</th></tr>
+                `;
+
+                data.forEach(sdr => {
+                    html += `
+                        <tr>
+                            <td><img src="${sdr.sdr_avatar_url}" alt="avatar" class="avatar" /></td>
+                            <td>${sdr.sdr_name}</td>
+                            <td>${sdr.sdr_email}</td>
+                            <td>${sdr.call_count}</td>
+                            <td>${sdr.success_rate}%</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</table></div>`;
+                showResult(html);
+
+            } catch (err) {
+                showResult(`
+                    <div class="test-result">
+                        <div class="error">💥 ERRO INESPERADO</div>
+                        <pre>${err.message}</pre>
+                    </div>
+                `);
+            }
+        }
+
+        async function testCallsList() {
+            showResult('<div class="info">🔍 Testando Lista de Calls (como o frontend)...</div>');
+            
+            try {
+                console.log('🔍 CALLS SERVICE - Buscando calls com filtros');
+
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_search: null
+                });
+
+                if (error) {
+                    showResult(`
+                        <div class="test-result">
+                            <div class="error">❌ ERRO Lista de Calls</div>
+                            <div><strong>Código:</strong> ${error.code}</div>
+                            <div><strong>Mensagem:</strong> ${error.message}</div>
+                        </div>
+                    `);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    showResult(`
+                        <div class="test-result">
+                            <div class="error">📭 Nenhuma call encontrada</div>
+                        </div>
+                    `);
+                    return;
+                }
+
+                let html = `
+                    <div class="test-result">
+                        <div class="success">✅ Lista de Calls OK (${data.length} encontradas)</div>
+                        <div><strong>Total Count:</strong> ${data[0].total_count}</div>
+                        <table>
+                            <tr><th>Empresa</th><th>Pessoa</th><th>SDR</th><th>Status</th><th>Duração</th><th>Score</th></tr>
+                `;
+
+                data.slice(0, 5).forEach(call => {
+                    html += `
+                        <tr>
+                            <td>${call.company_name}<br><small>${call.deal_id}</small></td>
+                            <td>${call.person_name}<br><small>${call.person_email || 'N/A'}</small></td>
+                            <td>${call.sdr_name}<br><small>${call.sdr_email}</small></td>
+                            <td>${call.status}</td>
+                            <td>${call.duration}s</td>
+                            <td>${call.score || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</table></div>`;
+                showResult(html);
+
+            } catch (err) {
+                showResult(`
+                    <div class="test-result">
+                        <div class="error">💥 ERRO INESPERADO</div>
+                        <pre>${err.message}</pre>
+                    </div>
+                `);
+            }
+        }
+
+        async function testFullFlow() {
+            showResult('<div class="info">🔍 Testando fluxo completo (simulando React)...</div>');
+            
+            let html = '<div class="info">📋 Fluxo Completo do Frontend:</div>';
+
+            // 1. Dashboard Metrics
+            try {
+                const { data: metricsData, error: metricsError } = await supabase.rpc('get_dashboard_metrics', { p_days: 14 });
+                
+                if (metricsError) {
+                    html += `<div class="error">❌ Dashboard Metrics: ${metricsError.message}</div>`;
+                } else if (!metricsData || metricsData.length === 0) {
+                    html += `<div class="error">❌ Dashboard Metrics: Sem dados</div>`;
+                } else {
+                    html += `<div class="success">✅ Dashboard Metrics: ${metricsData[0].total_calls} calls</div>`;
+                }
+            } catch (err) {
+                html += `<div class="error">❌ Dashboard Metrics: ${err.message}</div>`;
+            }
+
+            // 2. SDRs Únicos
+            try {
+                const { data: sdrsData, error: sdrsError } = await supabase.rpc('get_unique_sdrs');
+                
+                if (sdrsError) {
+                    html += `<div class="error">❌ SDRs Únicos: ${sdrsError.message}</div>`;
+                } else if (!sdrsData || sdrsData.length === 0) {
+                    html += `<div class="error">❌ SDRs Únicos: Sem dados</div>`;
+                } else {
+                    html += `<div class="success">✅ SDRs Únicos: ${sdrsData.length} SDRs encontrados</div>`;
+                }
+            } catch (err) {
+                html += `<div class="error">❌ SDRs Únicos: ${err.message}</div>`;
+            }
+
+            // 3. Lista de Calls
+            try {
+                const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 50,
+                    p_offset: 0,
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_search: null
+                });
+                
+                if (callsError) {
+                    html += `<div class="error">❌ Lista de Calls: ${callsError.message}</div>`;
+                } else if (!callsData || callsData.length === 0) {
+                    html += `<div class="error">❌ Lista de Calls: Sem dados</div>`;
+                } else {
+                    html += `<div class="success">✅ Lista de Calls: ${callsData.length} calls encontradas (Total: ${callsData[0].total_count})</div>`;
+                }
+            } catch (err) {
+                html += `<div class="error">❌ Lista de Calls: ${err.message}</div>`;
+            }
+
+            // 4. Resumo
+            html += `
+                <div class="info">
+                    <strong>🎯 DIAGNÓSTICO:</strong><br>
+                    Se todos os testes acima estão ✅, então o problema pode ser:<br>
+                    • Cache do navegador<br>
+                    • Configuração do Supabase Client no frontend<br>
+                    • Problema de CORS ou headers<br>
+                    • Erro de conversão de dados no frontend
+                </div>
+            `;
+
+            showResult(html);
+        }
+
+        // Auto-executar teste completo ao carregar
+        window.onload = function() {
+            console.log('🔍 Testando frontend calls system');
+            testFullFlow();
+        };
+    </script>
+</body>
+</html>

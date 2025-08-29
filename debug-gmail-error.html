@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Debug Gmail Error - app.grupoggv.com</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .code {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Debug Gmail Error - app.grupoggv.com</h1>
+        <p><strong>Objetivo:</strong> Diagnosticar e resolver o erro do Google Identity Services no envio de e-mail.</p>
+
+        <div class="section">
+            <h3>🌐 Informações do Ambiente</h3>
+            <div class="code" id="env-info">Carregando...</div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Verificação de Configuração</h3>
+            <div class="status info" id="config-status">Aguardando verificação...</div>
+            <button onclick="checkConfiguration()">Verificar Configuração</button>
+        </div>
+
+        <div class="section">
+            <h3>📦 Google Identity Services</h3>
+            <div class="status info" id="gis-status">Aguardando verificação...</div>
+            <button onclick="testGoogleIdentityServices()">Testar Google Identity Services</button>
+            <button onclick="forceReloadGIS()">Recarregar GIS</button>
+        </div>
+
+        <div class="section">
+            <h3>🔑 Teste de Autenticação</h3>
+            <div class="status info" id="auth-status">Aguardando teste...</div>
+            <button onclick="testAuthentication()">Testar Autenticação</button>
+            <button onclick="clearTokens()">Limpar Tokens</button>
+        </div>
+
+        <div class="section">
+            <h3>📧 Teste de Envio</h3>
+            <div>
+                <label>E-mail de teste:</label>
+                <input type="email" id="test-email" value="test@grupoggv.com" style="width: 300px; padding: 5px; margin: 5px;">
+            </div>
+            <div class="status info" id="send-status">Aguardando teste...</div>
+            <button onclick="testEmailSend()">Testar Envio</button>
+        </div>
+
+        <div class="section">
+            <h3>📊 Logs de Debug</h3>
+            <button onclick="clearLog()">Limpar Log</button>
+            <button onclick="exportLog()">Exportar Log</button>
+            <div class="log" id="debug-log"></div>
+        </div>
+    </div>
+
+    <script>
+        let debugLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            debugLog.push({ timestamp, message, type });
+            
+            const logElement = document.getElementById('debug-log');
+            logElement.innerHTML += logEntry + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(logEntry);
+        }
+
+        function updateStatus(elementId, status, message) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${status}`;
+            element.textContent = message;
+        }
+
+        function clearLog() {
+            debugLog = [];
+            document.getElementById('debug-log').innerHTML = '';
+        }
+
+        function exportLog() {
+            const logText = debugLog.map(entry => 
+                `[${entry.timestamp}] ${entry.message}`
+            ).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gmail-debug-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Verificar informações do ambiente
+        function loadEnvironmentInfo() {
+            const info = {
+                hostname: window.location.hostname,
+                protocol: window.location.protocol,
+                port: window.location.port,
+                userAgent: navigator.userAgent.substring(0, 100) + '...',
+                cookiesEnabled: navigator.cookieEnabled,
+                localStorage: typeof(Storage) !== "undefined",
+                isProduction: window.location.hostname === 'app.grupoggv.com',
+                hasLocalConfig: !!window.APP_CONFIG_LOCAL,
+                googleAvailable: !!(window.google && window.google.accounts),
+                currentTime: new Date().toISOString()
+            };
+
+            document.getElementById('env-info').innerHTML = Object.entries(info)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join('<br>');
+
+            log('🌐 Informações do ambiente carregadas');
+        }
+
+        async function checkConfiguration() {
+            log('🔧 Verificando configuração...');
+            updateStatus('config-status', 'info', 'Verificando...');
+
+            try {
+                // Verificar Client ID
+                let clientId = null;
+                
+                // Tentar obter do localStorage/configuração local
+                if (window.APP_CONFIG_LOCAL && window.APP_CONFIG_LOCAL.GOOGLE_OAUTH_CLIENT_ID) {
+                    clientId = window.APP_CONFIG_LOCAL.GOOGLE_OAUTH_CLIENT_ID;
+                    log('✅ Client ID encontrado na configuração local');
+                } else {
+                    log('❌ Client ID não encontrado na configuração local');
+                }
+
+                if (clientId) {
+                    log(`🔑 Client ID: ${clientId.substring(0, 20)}...`);
+                    updateStatus('config-status', 'success', '✅ Configuração OK');
+                } else {
+                    updateStatus('config-status', 'error', '❌ Client ID não configurado');
+                    log('❌ GOOGLE_OAUTH_CLIENT_ID não configurado');
+                }
+
+            } catch (error) {
+                log(`❌ Erro na verificação: ${error.message}`);
+                updateStatus('config-status', 'error', '❌ Erro na verificação');
+            }
+        }
+
+        async function testGoogleIdentityServices() {
+            log('📦 Testando Google Identity Services...');
+            updateStatus('gis-status', 'info', 'Carregando...');
+
+            try {
+                // Verificar se já está carregado
+                if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+                    log('✅ Google Identity Services já carregado');
+                    updateStatus('gis-status', 'success', '✅ GIS carregado');
+                    return;
+                }
+
+                // Tentar carregar
+                log('🔄 Carregando Google Identity Services...');
+                
+                const script = document.createElement('script');
+                script.src = 'https://accounts.google.com/gsi/client';
+                script.async = true;
+                script.defer = true;
+
+                const loadPromise = new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Timeout ao carregar Google Identity Services'));
+                    }, 15000);
+
+                    script.onload = () => {
+                        clearTimeout(timeout);
+                        setTimeout(() => {
+                            if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+                                resolve(true);
+                            } else {
+                                reject(new Error('Google Identity Services não inicializou'));
+                            }
+                        }, 500);
+                    };
+
+                    script.onerror = () => {
+                        clearTimeout(timeout);
+                        reject(new Error('Falha ao carregar script'));
+                    };
+                });
+
+                document.head.appendChild(script);
+                await loadPromise;
+
+                log('✅ Google Identity Services carregado com sucesso');
+                updateStatus('gis-status', 'success', '✅ GIS carregado');
+
+            } catch (error) {
+                log(`❌ Erro no GIS: ${error.message}`);
+                updateStatus('gis-status', 'error', `❌ ${error.message}`);
+            }
+        }
+
+        async function forceReloadGIS() {
+            log('🔄 Forçando recarga do Google Identity Services...');
+            
+            // Remover scripts existentes
+            const existingScripts = document.querySelectorAll('script[src*="gsi/client"]');
+            existingScripts.forEach(script => script.remove());
+            
+            // Limpar variáveis globais
+            if (window.google) {
+                delete window.google;
+            }
+            
+            log('🧹 Scripts antigos removidos');
+            
+            // Recarregar
+            await testGoogleIdentityServices();
+        }
+
+        async function testAuthentication() {
+            log('🔑 Testando autenticação...');
+            updateStatus('auth-status', 'info', 'Testando...');
+
+            try {
+                // Verificar se GIS está disponível
+                if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+                    throw new Error('Google Identity Services não disponível');
+                }
+
+                // Obter Client ID
+                let clientId = null;
+                if (window.APP_CONFIG_LOCAL && window.APP_CONFIG_LOCAL.GOOGLE_OAUTH_CLIENT_ID) {
+                    clientId = window.APP_CONFIG_LOCAL.GOOGLE_OAUTH_CLIENT_ID;
+                } else {
+                    throw new Error('Client ID não configurado');
+                }
+
+                log(`🔑 Usando Client ID: ${clientId.substring(0, 20)}...`);
+
+                // Criar token client
+                const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose',
+                    prompt: 'consent',
+                    callback: (response) => {
+                        if (response.access_token) {
+                            log('✅ Token obtido com sucesso');
+                            updateStatus('auth-status', 'success', '✅ Autenticação OK');
+                        } else {
+                            log(`❌ Erro na resposta: ${response.error || 'Desconhecido'}`);
+                            updateStatus('auth-status', 'error', '❌ Erro na autenticação');
+                        }
+                    }
+                });
+
+                log('🔄 Solicitando token...');
+                tokenClient.requestAccessToken();
+
+            } catch (error) {
+                log(`❌ Erro na autenticação: ${error.message}`);
+                updateStatus('auth-status', 'error', `❌ ${error.message}`);
+            }
+        }
+
+        function clearTokens() {
+            log('🧹 Limpando tokens...');
+            
+            // Limpar localStorage
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('gmail') || key.includes('google') || key.includes('token')) {
+                    localStorage.removeItem(key);
+                    log(`🗑️ Removido: ${key}`);
+                }
+            });
+
+            // Limpar sessionStorage
+            Object.keys(sessionStorage).forEach(key => {
+                if (key.includes('gmail') || key.includes('google') || key.includes('token')) {
+                    sessionStorage.removeItem(key);
+                    log(`🗑️ Removido: ${key}`);
+                }
+            });
+
+            log('✅ Tokens limpos');
+        }
+
+        async function testEmailSend() {
+            const email = document.getElementById('test-email').value;
+            if (!email) {
+                updateStatus('send-status', 'error', '❌ Digite um e-mail');
+                return;
+            }
+
+            log(`📧 Testando envio para: ${email}`);
+            updateStatus('send-status', 'info', 'Enviando...');
+
+            try {
+                // Este é apenas um teste de simulação
+                // Na aplicação real, seria chamado sendEmailViaGmail
+                
+                log('⚠️ Teste simulado - função real não disponível neste contexto');
+                updateStatus('send-status', 'warning', '⚠️ Teste simulado');
+                
+                setTimeout(() => {
+                    log('✅ Teste simulado concluído');
+                    updateStatus('send-status', 'info', '✅ Teste simulado OK');
+                }, 2000);
+
+            } catch (error) {
+                log(`❌ Erro no envio: ${error.message}`);
+                updateStatus('send-status', 'error', `❌ ${error.message}`);
+            }
+        }
+
+        // Executar verificações iniciais
+        window.addEventListener('load', () => {
+            loadEnvironmentInfo();
+            setTimeout(() => {
+                checkConfiguration();
+                testGoogleIdentityServices();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

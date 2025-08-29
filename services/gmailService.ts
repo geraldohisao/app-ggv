@@ -26,32 +26,40 @@ async function ensureGis(): Promise<void> {
     return;
   }
   
+  console.log('🔄 GMAIL - Carregando Google Identity Services...');
+  
   await new Promise<void>((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
     s.async = true; 
     s.defer = true;
     
-    // Timeout para evitar travamento
+    // Timeout aumentado para conexões lentas
     const timeout = setTimeout(() => {
-      reject(new Error('Timeout ao carregar Google Identity Services'));
-    }, 10000);
+      console.error('⏰ GMAIL - Timeout ao carregar Google Identity Services');
+      reject(new Error('Timeout ao carregar Google Identity Services. Verifique sua conexão com a internet.'));
+    }, 15000);
     
     s.onload = () => {
       clearTimeout(timeout);
-      // Aguardar um pouco para garantir que a API está disponível
+      console.log('📦 GMAIL - Script Google Identity Services carregado');
+      
+      // Aguardar mais tempo para garantir que a API está disponível
       setTimeout(() => {
         if ((window as any).google?.accounts?.oauth2) {
+          console.log('✅ GMAIL - Google Identity Services inicializado com sucesso');
           resolve();
         } else {
-          reject(new Error('Google Identity Services não inicializou corretamente'));
+          console.error('❌ GMAIL - Google Identity Services não inicializou');
+          reject(new Error('Google Identity Services não inicializou corretamente. Tente recarregar a página.'));
         }
-      }, 100);
+      }, 500);
     };
     
-    s.onerror = () => {
+    s.onerror = (error) => {
       clearTimeout(timeout);
-      reject(new Error('Falha ao carregar Google Identity Services'));
+      console.error('❌ GMAIL - Erro ao carregar script:', error);
+      reject(new Error('Falha ao carregar Google Identity Services. Verifique sua conexão com a internet.'));
     };
     
     document.head.appendChild(s);
@@ -142,7 +150,7 @@ async function getAccessToken(): Promise<string> {
         finished = true;
         reject(new Error('Timeout ao obter token do Google'));
       }
-    }, 10000); // Aumentado para 10 segundos
+    }, 15000); // Aumentado para 15 segundos
     
     tokenClient.callback = (resp: any) => {
       if (finished) return;
@@ -165,8 +173,13 @@ async function getAccessToken(): Promise<string> {
   try {
     token = await tryRequest('consent');
   } catch (error) {
-    console.log('🔄 GMAIL - Tentando sem consentimento...');
-    token = await tryRequest('');
+    console.warn('⚠️ GMAIL - Falha com consent, tentando sem:', error);
+    try {
+      token = await tryRequest('');
+    } catch (secondError) {
+      console.error('❌ GMAIL - Falha em ambas as tentativas:', secondError);
+      throw new Error('Não foi possível obter autorização do Google. Verifique se os pop-ups estão habilitados e tente novamente.');
+    }
   }
   
   cachedAccessToken = token;

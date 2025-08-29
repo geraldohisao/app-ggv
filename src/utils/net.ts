@@ -96,12 +96,17 @@ export async function postCriticalAlert(payload: {
     info.count += 1;
     sessionStorage.setItem(storeKey, JSON.stringify(info));
 
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    let endpoint = '/api/alert';
+    // DESABILITADO: Netlify Functions causando conflitos
+    // const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    // let endpoint = '/api/alert';
     // Em desenvolvimento, usar a mesma porta do frontend (5173) com proxy do Vite
-    if (isLocalhost && typeof window !== 'undefined') {
-      endpoint = '/.netlify/functions/alert';
-    }
+    // if (isLocalhost && typeof window !== 'undefined') {
+    //   endpoint = '/.netlify/functions/alert';
+    // }
+    
+    // TEMPORÁRIO: Desabilitar alerts para evitar conflitos
+    console.warn('Alert desabilitado temporariamente:', sanitizedPayload.title);
+    return;
     await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

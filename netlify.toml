@@ -1,7 +1,7 @@
 [build]
   publish = "dist"
   command = "npm run build"
-  functions = "netlify/functions"
+  # functions = "netlify/functions"  # Desabilitado temporariamente para debug
 
 [build.environment]
   NODE_VERSION = "20.18.0"

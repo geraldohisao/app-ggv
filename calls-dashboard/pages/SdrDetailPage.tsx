@@ -26,7 +26,11 @@ export default function SdrDetailPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <img className="w-12 h-12 rounded-full" src={sdr.avatarUrl} alt="avatar" />
+        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+          <span className="text-indigo-600 font-medium">
+            {sdr.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+          </span>
+        </div>
         <div>
           <h2 className="text-xl font-semibold text-slate-800">{sdr.name}</h2>
           <p className="text-sm text-slate-600">Visão geral da performance e chamadas de {sdr.name}.</p>

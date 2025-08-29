@@ -20,7 +20,7 @@ export default function AiAssistant({ call }: Props) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-slate-800">Feedback de IA</h3>
+        <h3 className="font-semibold text-slate-800">Análise IA</h3>
         {loading && <span className="text-xs text-slate-500">Analisando...</span>}
       </div>
       <div className="space-y-2">

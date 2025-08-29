@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Verificar Funções RPC</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .error {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        pre {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verificar Funções RPC</h1>
+    
+    <div class="container">
+        <button onclick="checkFunctions()">Verificar Funções</button>
+        <button onclick="testDirectSQL()">Testar SQL Direto</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://qmlekowxbfbxfskywmx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtbGVrb3d4YmZieGZza3l3bXgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTcyOTU0NjQwMCwiZXhwIjoyMDQ1MTIyNDAwfQ.wEJY_wuHjQmMWCqWJhBdZOLdP0kKHBxkLOLcQfKEhQo';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function checkFunctions() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="info">🔍 Verificando funções...</div>';
+
+            const functionsToCheck = [
+                'get_dashboard_metrics',
+                'get_calls_with_filters', 
+                'get_call_details',
+                'get_unique_sdrs',
+                'get_call_volume_chart',
+                'get_sdr_score_chart',
+                'normalize_sdr_email',
+                'get_sdr_display_name',
+                'extract_company_name',
+                'extract_person_data'
+            ];
+
+            let html = '<div class="info">📋 Verificando funções RPC:</div>';
+            
+            for (const funcName of functionsToCheck) {
+                try {
+                    // Tentar chamar a função com parâmetros mínimos
+                    let result;
+                    
+                    if (funcName === 'get_dashboard_metrics') {
+                        result = await supabase.rpc(funcName, { p_days: 1 });
+                    } else if (funcName === 'get_calls_with_filters') {
+                        result = await supabase.rpc(funcName, { 
+                            p_limit: 1, 
+                            p_offset: 0,
+                            p_sdr_email: null,
+                            p_status: null,
+                            p_start_date: null,
+                            p_end_date: null,
+                            p_search: null
+                        });
+                    } else if (funcName === 'get_call_details') {
+                        result = await supabase.rpc(funcName, { p_call_id: '00000000-0000-0000-0000-000000000000' });
+                    } else if (funcName === 'get_unique_sdrs') {
+                        result = await supabase.rpc(funcName);
+                    } else if (funcName === 'get_call_volume_chart') {
+                        result = await supabase.rpc(funcName, { p_days: 1 });
+                    } else if (funcName === 'get_sdr_score_chart') {
+                        result = await supabase.rpc(funcName, { p_days: 1 });
+                    } else if (funcName === 'normalize_sdr_email') {
+                        result = await supabase.rpc(funcName, { email_input: 'test@test.com' });
+                    } else if (funcName === 'get_sdr_display_name') {
+                        result = await supabase.rpc(funcName, { agent_id: 'test' });
+                    } else if (funcName === 'extract_company_name') {
+                        result = await supabase.rpc(funcName, { 
+                            insights: {}, 
+                            deal_id: 'test', 
+                            call_id: '00000000-0000-0000-0000-000000000000' 
+                        });
+                    } else if (funcName === 'extract_person_data') {
+                        result = await supabase.rpc(funcName, { insights: {} });
+                    }
+
+                    if (result.error) {
+                        if (result.error.code === '42883') {
+                            html += `<div class="error">❌ ${funcName} - FUNÇÃO NÃO EXISTE</div>`;
+                        } else {
+                            html += `<div class="success">✅ ${funcName} - EXISTE (erro: ${result.error.message})</div>`;
+                        }
+                    } else {
+                        html += `<div class="success">✅ ${funcName} - FUNCIONANDO</div>`;
+                    }
+                } catch (error) {
+                    if (error.message.includes('does not exist')) {
+                        html += `<div class="error">❌ ${funcName} - FUNÇÃO NÃO EXISTE</div>`;
+                    } else {
+                        html += `<div class="success">✅ ${funcName} - EXISTE (erro: ${error.message})</div>`;
+                    }
+                }
+            }
+
+            resultDiv.innerHTML = html;
+        }
+
+        async function testDirectSQL() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="info">🔍 Testando SQL direto...</div>';
+
+            try {
+                // Testar uma consulta SQL simples
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('id, agent_id, deal_id, status, created_at')
+                    .limit(5);
+
+                if (error) {
+                    resultDiv.innerHTML = `<div class="error">❌ Erro na consulta: ${error.message}</div>`;
+                    return;
+                }
+
+                let html = `<div class="success">✅ Conexão com tabela 'calls' funcionando!</div>`;
+                html += `<div class="info">📊 Encontradas ${data.length} calls</div>`;
+                
+                if (data.length > 0) {
+                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                }
+
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Erro inesperado: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-executar ao carregar
+        window.onload = function() {
+            checkFunctions();
+        };
+    </script>
+</body>
+</html>

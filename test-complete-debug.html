@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Completo - Sistema de Chamadas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #ef4444;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #f59e0b;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .data-table th {
+            background: #f3f4f6;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .data-table tr:hover {
+            background: #f9fafb;
+        }
+        .json-display {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .button {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #5a67d8;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-success { background: #d1fae5; color: #065f46; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .status-warning { background: #fed7aa; color: #92400e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Debug Completo - Sistema de Chamadas</h1>
+            <p>Análise detalhada de todos os componentes do sistema</p>
+            <p id="timestamp"></p>
+        </div>
+
+        <!-- Teste 1: Conexão com Supabase -->
+        <div class="test-section">
+            <div class="test-title">1. CONEXÃO COM SUPABASE</div>
+            <div id="connection-test">
+                <div class="loading"></div> Testando conexão...
+            </div>
+        </div>
+
+        <!-- Teste 2: Estrutura da Tabela -->
+        <div class="test-section">
+            <div class="test-title">2. ESTRUTURA DA TABELA CALLS</div>
+            <div id="table-structure">
+                <div class="loading"></div> Verificando estrutura...
+            </div>
+        </div>
+
+        <!-- Teste 3: Dados Reais -->
+        <div class="test-section">
+            <div class="test-title">3. DADOS REAIS NA TABELA</div>
+            <div id="real-data">
+                <div class="loading"></div> Buscando dados...
+            </div>
+        </div>
+
+        <!-- Teste 4: Funções RPC -->
+        <div class="test-section">
+            <div class="test-title">4. FUNÇÕES RPC</div>
+            <div id="rpc-functions">
+                <div class="loading"></div> Testando funções...
+            </div>
+        </div>
+
+        <!-- Teste 5: get_calls_with_filters -->
+        <div class="test-section">
+            <div class="test-title">5. FUNÇÃO get_calls_with_filters</div>
+            <div id="calls-filter">
+                <div class="loading"></div> Executando função...
+            </div>
+        </div>
+
+        <!-- Teste 6: get_unique_sdrs -->
+        <div class="test-section">
+            <div class="test-title">6. FUNÇÃO get_unique_sdrs</div>
+            <div id="unique-sdrs">
+                <div class="loading"></div> Buscando SDRs...
+            </div>
+        </div>
+
+        <!-- Teste 7: Frontend Service -->
+        <div class="test-section">
+            <div class="test-title">7. SIMULAÇÃO DO FRONTEND</div>
+            <div id="frontend-simulation">
+                <div class="loading"></div> Simulando chamadas do frontend...
+            </div>
+        </div>
+
+        <!-- Teste 8: Diagnóstico Final -->
+        <div class="test-section">
+            <div class="test-title">8. DIAGNÓSTICO FINAL</div>
+            <div id="final-diagnosis">
+                <div class="loading"></div> Analisando problemas...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://mwlekwyxbfbxfxskywgx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3l4YmZieGZ4c2t5d2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTIzMjEsImV4cCI6MjA2NTY4ODMyMX0.rFX9H2pcGLNX7n3vKLYGi72JKwjUw6oG38IZGjO90HE';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Timestamp
+        document.getElementById('timestamp').innerHTML = `<strong>Executado em:</strong> ${new Date().toLocaleString('pt-BR')}`;
+
+        // Função auxiliar para exibir JSON
+        function displayJSON(data) {
+            return `<pre class="json-display">${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        // Função auxiliar para criar tabela
+        function createTable(data, columns) {
+            if (!data || data.length === 0) {
+                return '<p class="warning">Nenhum dado encontrado</p>';
+            }
+
+            let html = '<table class="data-table"><thead><tr>';
+            columns.forEach(col => {
+                html += `<th>${col}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                columns.forEach(col => {
+                    let value = row[col.toLowerCase().replace(/\s/g, '_')];
+                    if (value === null || value === undefined) value = '-';
+                    if (typeof value === 'object') value = JSON.stringify(value);
+                    html += `<td>${value}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // TESTE 1: Conexão
+        async function testConnection() {
+            const div = document.getElementById('connection-test');
+            try {
+                const { data, error } = await supabase.from('calls').select('count', { count: 'exact', head: true });
+                
+                if (error) throw error;
+                
+                div.innerHTML = `
+                    <div class="success">✅ Conexão estabelecida com sucesso!</div>
+                    <div class="info">URL: ${SUPABASE_URL}</div>
+                `;
+            } catch (error) {
+                div.innerHTML = `
+                    <div class="error">❌ Erro na conexão: ${error.message}</div>
+                    ${displayJSON(error)}
+                `;
+            }
+        }
+
+        // TESTE 2: Estrutura da tabela
+        async function testTableStructure() {
+            const div = document.getElementById('table-structure');
+            try {
+                // Buscar uma linha para ver as colunas
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    const columns = Object.keys(data[0]);
+                    div.innerHTML = `
+                        <div class="success">✅ Tabela 'calls' encontrada com ${columns.length} colunas</div>
+                        <div class="info">Colunas disponíveis:</div>
+                        <ul>
+                            ${columns.map(col => `<li><strong>${col}</strong></li>`).join('')}
+                        </ul>
+                    `;
+                    
+                    // Verificar colunas críticas
+                    const criticalColumns = ['enterprise', 'person', 'agent_id', 'deal_id'];
+                    const missingColumns = criticalColumns.filter(col => !columns.includes(col));
+                    
+                    if (missingColumns.length > 0) {
+                        div.innerHTML += `<div class="warning">⚠️ Colunas faltando: ${missingColumns.join(', ')}</div>`;
+                    }
+                } else {
+                    div.innerHTML = '<div class="warning">⚠️ Tabela vazia ou sem dados</div>';
+                }
+            } catch (error) {
+                div.innerHTML = `
+                    <div class="error">❌ Erro ao verificar estrutura: ${error.message}</div>
+                `;
+            }
+        }
+
+        // TESTE 3: Dados reais
+        async function testRealData() {
+            const div = document.getElementById('real-data');
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('id, deal_id, agent_id, enterprise, person, status, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    div.innerHTML = `
+                        <div class="success">✅ ${data.length} registros encontrados</div>
+                        ${createTable(data, ['Deal ID', 'Agent ID', 'Enterprise', 'Person', 'Status'])}
+                    `;
+                    
+                    // Verificar qualidade dos dados
+                    const withEnterprise = data.filter(d => d.enterprise && d.enterprise !== '').length;
+                    const withPerson = data.filter(d => d.person && d.person !== '').length;
+                    
+                    div.innerHTML += `
+                        <div class="info">
+                            📊 Qualidade dos dados:<br>
+                            - Com nome de empresa: ${withEnterprise}/${data.length}<br>
+                            - Com nome de pessoa: ${withPerson}/${data.length}
+                        </div>
+                    `;
+                } else {
+                    div.innerHTML = '<div class="warning">⚠️ Nenhum dado encontrado na tabela</div>';
+                }
+            } catch (error) {
+                div.innerHTML = `
+                    <div class="error">❌ Erro ao buscar dados: ${error.message}</div>
+                `;
+            }
+        }
+
+        // TESTE 4: Funções RPC
+        async function testRPCFunctions() {
+            const div = document.getElementById('rpc-functions');
+            const functions = [
+                'get_dashboard_metrics',
+                'get_calls_with_filters',
+                'get_call_details',
+                'get_unique_sdrs'
+            ];
+            
+            let html = '';
+            let allSuccess = true;
+            
+            for (const func of functions) {
+                try {
+                    let params = {};
+                    if (func === 'get_call_details') {
+                        // Precisa de um ID válido
+                        const { data: firstCall } = await supabase
+                            .from('calls')
+                            .select('id')
+                            .limit(1)
+                            .single();
+                        
+                        if (firstCall) {
+                            params = { p_call_id: firstCall.id };
+                        } else {
+                            html += `<div class="warning">⚠️ ${func}: Sem dados para testar</div>`;
+                            continue;
+                        }
+                    }
+                    
+                    const { data, error } = await supabase.rpc(func, params);
+                    
+                    if (error) throw error;
+                    
+                    html += `<div class="success">✅ ${func}: Funcionando</div>`;
+                } catch (error) {
+                    html += `<div class="error">❌ ${func}: ${error.message}</div>`;
+                    allSuccess = false;
+                }
+            }
+            
+            div.innerHTML = html;
+            
+            if (allSuccess) {
+                div.innerHTML = '<div class="success">✅ Todas as funções RPC estão funcionando!</div>' + div.innerHTML;
+            } else {
+                div.innerHTML = '<div class="error">❌ Algumas funções RPC com erro</div>' + div.innerHTML;
+            }
+        }
+
+        // TESTE 5: get_calls_with_filters detalhado
+        async function testCallsFilter() {
+            const div = document.getElementById('calls-filter');
+            try {
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 3,
+                    p_offset: 0
+                });
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    div.innerHTML = `
+                        <div class="success">✅ Função retornou ${data.length} registros</div>
+                        <h4>Dados retornados:</h4>
+                    `;
+                    
+                    data.forEach((call, index) => {
+                        div.innerHTML += `
+                            <div class="info">
+                                <strong>Chamada ${index + 1}:</strong><br>
+                                - Deal ID: ${call.deal_id || '-'}<br>
+                                - Empresa: ${call.company_name || '-'}<br>
+                                - Pessoa: ${call.person_name || '-'}<br>
+                                - SDR ID: ${call.sdr_id || '-'}<br>
+                                - SDR Nome: ${call.sdr_name || '-'}<br>
+                                - Agent ID: ${call.agent_id || '-'}<br>
+                                - Status: ${call.status || '-'}
+                            </div>
+                        `;
+                    });
+                    
+                    // Verificar problemas
+                    const problems = [];
+                    data.forEach(call => {
+                        if (!call.company_name || call.company_name.includes('Empresa 0') || call.company_name === 'Empresa Desconhecida') {
+                            problems.push('Nome de empresa genérico ou vazio');
+                        }
+                        if (!call.sdr_id || !call.agent_id) {
+                            problems.push('SDR/Agent ID não identificado');
+                        }
+                    });
+                    
+                    if (problems.length > 0) {
+                        div.innerHTML += `<div class="warning">⚠️ Problemas detectados: ${[...new Set(problems)].join(', ')}</div>`;
+                    }
+                } else {
+                    div.innerHTML = '<div class="warning">⚠️ Função não retornou dados</div>';
+                }
+            } catch (error) {
+                div.innerHTML = `
+                    <div class="error">❌ Erro na função: ${error.message}</div>
+                    ${displayJSON(error)}
+                `;
+            }
+        }
+
+        // TESTE 6: get_unique_sdrs
+        async function testUniqueSDRs() {
+            const div = document.getElementById('unique-sdrs');
+            try {
+                const { data, error } = await supabase.rpc('get_unique_sdrs');
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    div.innerHTML = `
+                        <div class="success">✅ ${data.length} SDRs encontrados</div>
+                        ${createTable(data, ['SDR ID', 'SDR Name', 'SDR Email', 'Call Count'])}
+                    `;
+                } else {
+                    div.innerHTML = '<div class="warning">⚠️ Nenhum SDR encontrado</div>';
+                }
+            } catch (error) {
+                div.innerHTML = `
+                    <div class="error">❌ Erro: ${error.message}</div>
+                `;
+            }
+        }
+
+        // TESTE 7: Simulação do Frontend
+        async function testFrontendSimulation() {
+            const div = document.getElementById('frontend-simulation');
+            try {
+                // Simular exatamente o que o frontend faz
+                div.innerHTML = '<h4>Simulando chamadas do frontend...</h4>';
+                
+                // 1. Dashboard metrics
+                const { data: metrics, error: metricsError } = await supabase.rpc('get_dashboard_metrics', { p_days: 14 });
+                
+                if (metricsError) {
+                    div.innerHTML += `<div class="error">❌ Dashboard metrics: ${metricsError.message}</div>`;
+                } else {
+                    div.innerHTML += `<div class="success">✅ Dashboard metrics: OK (${metrics.total_calls} calls)</div>`;
+                }
+                
+                // 2. Calls with filters
+                const { data: calls, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 50,
+                    p_offset: 0
+                });
+                
+                if (callsError) {
+                    div.innerHTML += `<div class="error">❌ Calls list: ${callsError.message}</div>`;
+                } else {
+                    div.innerHTML += `<div class="success">✅ Calls list: OK (${calls?.length || 0} calls)</div>`;
+                }
+                
+                // 3. Unique SDRs
+                const { data: sdrs, error: sdrsError } = await supabase.rpc('get_unique_sdrs');
+                
+                if (sdrsError) {
+                    div.innerHTML += `<div class="error">❌ SDRs list: ${sdrsError.message}</div>`;
+                } else {
+                    div.innerHTML += `<div class="success">✅ SDRs list: OK (${sdrs?.length || 0} SDRs)</div>`;
+                }
+                
+            } catch (error) {
+                div.innerHTML = `
+                    <div class="error">❌ Erro na simulação: ${error.message}</div>
+                `;
+            }
+        }
+
+        // TESTE 8: Diagnóstico Final
+        async function finalDiagnosis() {
+            const div = document.getElementById('final-diagnosis');
+            
+            const problems = [];
+            const solutions = [];
+            
+            // Verificar dados
+            const { data: sampleData } = await supabase
+                .from('calls')
+                .select('enterprise, person, agent_id, company_name')
+                .limit(5);
+            
+            if (sampleData) {
+                // Verificar se há dados de teste
+                const hasTestData = sampleData.some(d => 
+                    d.enterprise?.includes('Empresa 0') || 
+                    d.company_name?.includes('Empresa 0')
+                );
+                
+                if (hasTestData) {
+                    problems.push('Ainda existem dados de teste no banco');
+                    solutions.push('Execute o script 52_clean_test_data_use_real.sql novamente');
+                }
+                
+                // Verificar se enterprise está vazio
+                const emptyEnterprise = sampleData.filter(d => !d.enterprise || d.enterprise === '').length;
+                if (emptyEnterprise > 0) {
+                    problems.push(`${emptyEnterprise} registros sem nome de empresa`);
+                    solutions.push('Preencher a coluna "enterprise" com dados reais');
+                }
+                
+                // Verificar agent_id
+                const emptyAgent = sampleData.filter(d => !d.agent_id || d.agent_id === '').length;
+                if (emptyAgent > 0) {
+                    problems.push(`${emptyAgent} registros sem agent_id`);
+                    solutions.push('Preencher a coluna "agent_id" com emails dos SDRs');
+                }
+            }
+            
+            // Verificar funções
+            const { error: rpcError } = await supabase.rpc('get_calls_with_filters', { p_limit: 1 });
+            if (rpcError) {
+                problems.push('Função get_calls_with_filters com erro');
+                solutions.push('Recriar as funções com o script 51_fix_real_enterprise_data.sql');
+            }
+            
+            // Exibir diagnóstico
+            if (problems.length === 0) {
+                div.innerHTML = `
+                    <div class="success">
+                        ✅ <strong>Sistema funcionando corretamente!</strong><br>
+                        Todos os testes passaram com sucesso.
+                    </div>
+                `;
+            } else {
+                div.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Problemas encontrados:</strong>
+                        <ul>
+                            ${problems.map(p => `<li>${p}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="warning">
+                        💡 <strong>Soluções recomendadas:</strong>
+                        <ol>
+                            ${solutions.map(s => `<li>${s}</li>`).join('')}
+                        </ol>
+                    </div>
+                `;
+            }
+            
+            // Adicionar botão para copiar diagnóstico
+            div.innerHTML += `
+                <button class="button" onclick="copyDiagnosis()">📋 Copiar Diagnóstico</button>
+            `;
+        }
+
+        // Função para copiar diagnóstico
+        function copyDiagnosis() {
+            const text = document.getElementById('final-diagnosis').innerText;
+            navigator.clipboard.writeText(text);
+            alert('Diagnóstico copiado!');
+        }
+
+        // Executar todos os testes
+        async function runAllTests() {
+            await testConnection();
+            await testTableStructure();
+            await testRealData();
+            await testRPCFunctions();
+            await testCallsFilter();
+            await testUniqueSDRs();
+            await testFrontendSimulation();
+            await finalDiagnosis();
+        }
+
+        // Iniciar testes
+        runAllTests();
+    </script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Ambiente Limpo</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .error { background: #fee2e2; color: #dc2626; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .success { background: #dcfce7; color: #166534; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .info { background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin: 5px; }
+        pre { background: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; font-size: 12px; }
+        .test-result { border: 1px solid #e5e7eb; margin: 10px 0; padding: 15px; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+        th { background: #f8fafc; }
+        .call-row { cursor: pointer; }
+        .call-row:hover { background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <h1>🧹 Teste - Ambiente Limpo (Sem Conflitos)</h1>
+    
+    <div class="container">
+        <div class="info">
+            <strong>🎯 TESTE ISOLADO:</strong><br>
+            Testando apenas as funções RPC sem interferência de outras configurações.
+        </div>
+        
+        <button onclick="testSystemComplete()">🚀 Testar Sistema Completo</button>
+        <button onclick="simulateReactApp()">⚛️ Simular App React</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // CREDENCIAIS CORRETAS - ISOLADAS
+        const supabaseUrl = 'https://mwlekwyxbfbxfxskywgx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3l4YmZieGZ4c2t5d2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTIzMjEsImV4cCI6MjA2NTY4ODMyMX0.rFX9H2pcGLNX7n3vKLYGi72JKwjUw6oG38IZGjO90HE';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function showResult(html) {
+            document.getElementById('result').innerHTML = html;
+        }
+
+        // Função para converter dados como o React faz
+        function convertToCallItem(call) {
+            return {
+                id: call.id,
+                company: call.company_name,
+                dealCode: call.deal_id,
+                person_name: call.person_name,
+                person_email: call.person_email,
+                sdr: {
+                    id: call.sdr_email,
+                    name: call.sdr_name,
+                    avatarUrl: call.sdr_avatar_url
+                },
+                date: call.created_at,
+                durationSec: call.duration,
+                status: call.status,
+                score: call.score
+            };
+        }
+
+        async function testSystemComplete() {
+            showResult('<div class="info">🔍 Testando sistema completo...</div>');
+            
+            let html = '<div class="info">📋 Resultados Completos:</div>';
+
+            try {
+                // 1. Dashboard Metrics
+                console.log('🔍 Buscando métricas...');
+                const { data: metricsData, error: metricsError } = await supabase.rpc('get_dashboard_metrics', { p_days: 14 });
+                
+                if (metricsError) {
+                    html += `<div class="error">❌ Dashboard: ${metricsError.message}</div>`;
+                } else {
+                    const metrics = metricsData[0];
+                    html += `
+                        <div class="success">✅ Dashboard Metrics</div>
+                        <div>Total Calls: ${metrics.total_calls} | Atendidas: ${metrics.answered_calls} | Taxa: ${metrics.answered_rate}%</div>
+                    `;
+                }
+
+                // 2. SDRs Únicos
+                console.log('🔍 Buscando SDRs...');
+                const { data: sdrsData, error: sdrsError } = await supabase.rpc('get_unique_sdrs');
+                
+                if (sdrsError) {
+                    html += `<div class="error">❌ SDRs: ${sdrsError.message}</div>`;
+                } else {
+                    html += `<div class="success">✅ SDRs Únicos: ${sdrsData.length} encontrados</div>`;
+                    
+                    html += '<table><tr><th>Nome</th><th>Email</th><th>Calls</th></tr>';
+                    sdrsData.forEach(sdr => {
+                        html += `<tr><td>${sdr.sdr_name}</td><td>${sdr.sdr_email}</td><td>${sdr.call_count}</td></tr>`;
+                    });
+                    html += '</table>';
+                }
+
+                // 3. Lista de Calls
+                console.log('🔍 Buscando calls...');
+                const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_search: null
+                });
+                
+                if (callsError) {
+                    html += `<div class="error">❌ Calls: ${callsError.message}</div>`;
+                } else {
+                    html += `<div class="success">✅ Lista de Calls: ${callsData.length} encontradas (Total: ${callsData[0]?.total_count})</div>`;
+                    
+                    html += '<table><tr><th>Empresa</th><th>Pessoa</th><th>SDR</th><th>Status</th><th>Duração</th></tr>';
+                    callsData.slice(0, 5).forEach(call => {
+                        html += `
+                            <tr class="call-row" onclick="testCallDetail('${call.id}')">
+                                <td>${call.company_name}<br><small>${call.deal_id}</small></td>
+                                <td>${call.person_name}</td>
+                                <td>${call.sdr_name}</td>
+                                <td>${call.status}</td>
+                                <td>${call.duration}s</td>
+                            </tr>
+                        `;
+                    });
+                    html += '</table>';
+                }
+
+                html += `
+                    <div class="info">
+                        <strong>🎯 DIAGNÓSTICO:</strong><br>
+                        Se tudo está ✅ aqui mas não funciona no React, o problema é:<br>
+                        • Configuração do Supabase Client no React<br>
+                        • Cache do navegador<br>
+                        • Conflitos de dependências<br>
+                        • Problemas de CORS ou headers
+                    </div>
+                `;
+
+            } catch (err) {
+                html += `<div class="error">💥 ERRO GERAL: ${err.message}</div>`;
+            }
+
+            showResult(html);
+        }
+
+        async function testCallDetail(callId) {
+            try {
+                const { data, error } = await supabase.rpc('get_call_details', { p_call_id: callId });
+                
+                if (error) {
+                    alert(`Erro ao buscar detalhes: ${error.message}`);
+                } else {
+                    const call = data[0];
+                    alert(`Detalhes da Call:\nEmpresa: ${call.company_name}\nPessoa: ${call.person_name}\nSDR: ${call.sdr_name}\nDuração: ${call.duration}s`);
+                }
+            } catch (err) {
+                alert(`Erro: ${err.message}`);
+            }
+        }
+
+        async function simulateReactApp() {
+            showResult('<div class="info">🔍 Simulando exatamente como o React App...</div>');
+            
+            let html = '<div class="info">⚛️ Simulação do React App:</div>';
+
+            try {
+                // Simular o useEffect do CallsPage.tsx
+                console.log('⚛️ Simulando useEffect - carregando SDRs...');
+                
+                // 1. Carregar SDRs (como no useEffect)
+                const uniqueSdrs = await fetchUniqueSdrs();
+                html += `<div class="success">✅ SDRs carregados: ${uniqueSdrs.length}</div>`;
+
+                // 2. Carregar calls (como no useEffect)
+                console.log('⚛️ Simulando useEffect - carregando calls...');
+                const response = await fetchCalls({
+                    sdr_email: undefined,
+                    status: undefined,
+                    call_type: undefined,
+                    start: undefined,
+                    end: undefined,
+                    limit: 100
+                });
+
+                const callItems = response.calls.map(convertToCallItem);
+                html += `<div class="success">✅ Calls carregadas: ${callItems.length} (Total: ${response.totalCount})</div>`;
+
+                // 3. Mostrar dados como o React mostraria
+                html += '<h3>📋 Dados como apareceriam no React:</h3>';
+                html += '<table><tr><th>Empresa</th><th>Pessoa</th><th>SDR</th><th>Data</th><th>Status</th></tr>';
+                
+                callItems.slice(0, 5).forEach(call => {
+                    const date = new Date(call.date).toLocaleDateString('pt-BR');
+                    html += `
+                        <tr>
+                            <td>${call.company}<br><small>${call.dealCode}</small></td>
+                            <td>${call.person_name || 'N/A'}</td>
+                            <td>${call.sdr.name}</td>
+                            <td>${date}</td>
+                            <td>${call.status}</td>
+                        </tr>
+                    `;
+                });
+                html += '</table>';
+
+                html += `
+                    <div class="success">
+                        <strong>🎉 SUCESSO TOTAL!</strong><br>
+                        Se você vê dados aqui, o backend está 100% funcional.<br>
+                        O problema é no frontend React - vamos corrigir!
+                    </div>
+                `;
+
+            } catch (err) {
+                html += `<div class="error">💥 ERRO na simulação: ${err.message}</div>`;
+            }
+
+            showResult(html);
+        }
+
+        // Funções que simulam o callsService.ts
+        async function fetchUniqueSdrs() {
+            const { data, error } = await supabase.rpc('get_unique_sdrs');
+            if (error) throw error;
+            
+            return data.map(sdr => ({
+                id: sdr.sdr_email,
+                name: sdr.sdr_name,
+                email: sdr.sdr_email,
+                avatarUrl: sdr.sdr_avatar_url,
+                callCount: sdr.call_count
+            }));
+        }
+
+        async function fetchCalls(filters) {
+            const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                p_limit: filters.limit || 50,
+                p_offset: 0,
+                p_sdr_email: filters.sdr_email,
+                p_status: filters.status,
+                p_start_date: filters.start ? new Date(filters.start).toISOString() : null,
+                p_end_date: filters.end ? new Date(filters.end).toISOString() : null,
+                p_search: null
+            });
+
+            if (error) throw error;
+
+            return {
+                calls: data,
+                totalCount: data[0]?.total_count || 0,
+                hasMore: false
+            };
+        }
+
+        // Auto-executar teste completo
+        window.onload = function() {
+            console.log('🧹 Ambiente limpo carregado');
+            testSystemComplete();
+        };
+    </script>
+</body>
+</html>

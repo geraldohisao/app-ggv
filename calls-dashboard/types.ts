@@ -1,9 +1,11 @@
-export type CallStatus = 'answered' | 'missed' | 'voicemail' | 'processing' | 'analyzed';
+export type CallStatus = 'received' | 'processing' | 'processed' | 'failed' | 'answered' | 'missed' | 'voicemail' | 'analyzed';
 
 export interface SdrUser {
   id: string;
   name: string;
+  email?: string;
   avatarUrl?: string;
+  callCount?: number;
 }
 
 export interface CallItem {
@@ -15,7 +17,19 @@ export interface CallItem {
   created_at?: string; // Alias for date
   durationSec: number;
   status: CallStatus;
+  status_voip?: string; // Status VOIP original
+  status_voip_friendly?: string; // Status VOIP amigável
   score?: number; // 0-100
+  // Campos extras para funcionalidades avançadas
+  audio_url?: string;
+  recording_url?: string; // URL do áudio da gravação
+  transcription?: string;
+  person_name?: string;
+  person_email?: string;
+  to_number?: string; // Número de telefone do contato
+  from_number?: string; // Número de origem
+  call_type?: string; // Tipo de ligação
+  direction?: string; // Direção da ligação
 }
 
 export interface ScorecardCriterion {

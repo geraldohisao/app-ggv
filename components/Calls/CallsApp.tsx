@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import CallsDashboardPage from './pages/DashboardPage';
-import CallsListPage from './pages/CallsPage';
-import CallDetailPage from './pages/CallDetailPage';
-import CallAnalyzePage from './pages/CallAnalyzePage';
-import ScorecardPage from './pages/ScorecardPage';
-import ScorecardEditPage from './pages/ScorecardEditPage';
-import SdrDetailPage from './pages/SdrDetailPage';
+// IMPORTANTE: Usar os componentes da pasta calls-dashboard que têm dados REAIS
+import CallsDashboardPage from '../../calls-dashboard/pages/DashboardPage';
+import CallsListPage from '../../calls-dashboard/pages/CallsPage';
+import CallDetailPage from '../../calls-dashboard/pages/CallDetailPage';
+import CallAnalyzePage from './pages/CallAnalyzePage'; // Este arquivo não existe em calls-dashboard
+import ScorecardPage from '../../calls-dashboard/pages/ScorecardPage';
+import ScorecardEditPage from '../../calls-dashboard/pages/ScorecardEditPage';
+import SdrDetailPage from '../../calls-dashboard/pages/SdrDetailPage';
 
 type Route =
   | { name: 'dashboard' }

@@ -45,6 +45,30 @@ export async function triggerReativacao(input: ReativacaoPayload): Promise<any> 
       throw new Error('Falha no processamento da resposta do N8N');
     }
     
+    // 💾 SALVAR REGISTRO INICIAL NA TABELA REACTIVATED_LEADS
+    try {
+      const recordId = await saveReactivationRecord({
+        sdr: input.proprietario,
+        filter: input.filtro,
+        status: 'pending',
+        count_leads: 0, // Será atualizado pelo callback
+        cadence: input.cadencia,
+        workflow_id: result.workflowId,
+        execution_id: result.runId,
+        n8n_data: result.n8nResponse || {},
+        error_message: null
+      });
+      
+      if (recordId) {
+        console.log('✅ REACTIVATION - Registro inicial salvo com ID:', recordId);
+        // Adicionar ID do registro ao resultado
+        (result as any).reactivationRecordId = recordId;
+      }
+    } catch (saveError) {
+      console.warn('⚠️ REACTIVATION - Erro ao salvar registro inicial:', saveError);
+      // Não falhar a automação por causa do registro
+    }
+    
     return result;
     
   } catch (error: any) {
@@ -426,5 +450,267 @@ export async function checkWorkflowStatus(workflowId: string) {
   } catch (error) {
     console.warn('⚠️ AUTOMATION - Erro ao consultar N8N:', error);
     return null;
+  }
+}
+
+// ===== NOVA FUNCIONALIDADE: HISTÓRICO DE REATIVAÇÃO =====
+
+export interface ReactivatedLeadHistoryItem {
+  id: number;
+  created_at: string;
+  sdr: string;
+  filter: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  count_leads: number;
+  cadence?: string;
+  workflow_id?: string;
+  execution_id?: string;
+  n8n_data: any;
+  error_message?: string;
+  updated_at: string;
+  total_count?: number; // Para compatibilidade com a função RPC
+}
+
+/**
+ * **Buscar histórico de reativação de leads**
+ * 
+ * Função para consultar o histórico completo de reativações com paginação e filtros.
+ * Retorna dados da tabela `reactivated_leads` com informações de quantidade de leads,
+ * status, SDR, cadência e dados do N8N.
+ */
+export async function getReactivatedLeadsHistory(
+  page: number = 1, 
+  limit: number = 10,
+  sdr?: string,
+  status?: string
+): Promise<{
+  data: ReactivatedLeadHistoryItem[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}> {
+  console.log('📊 REACTIVATION - Buscando histórico de reativação:', { page, limit, sdr, status });
+  
+  try {
+    // 🔍 PRIMEIRO: Testar acesso direto à tabela
+    console.log('🔍 REACTIVATION - Testando acesso direto à tabela...');
+    const { data: directTest, error: directError } = await supabase
+      .from('reactivated_leads')
+      .select('count(*)')
+      .single();
+    
+    console.log('📊 REACTIVATION - Teste direto:', { directTest, directError });
+    
+    // 🔍 SEGUNDO: Usar função RPC do Supabase para buscar histórico
+    console.log('🔍 REACTIVATION - Chamando função RPC...');
+    const { data, error } = await supabase.rpc('get_reactivated_leads_history', {
+      p_page: page,
+      p_limit: limit,
+      p_sdr: sdr || null,
+      p_status: status || null
+    });
+
+    console.log('📊 REACTIVATION - Resposta RPC:', { data, error, dataLength: data?.length });
+
+    if (error) {
+      console.error('❌ REACTIVATION - Erro ao buscar histórico:', error);
+      
+      // 🔍 FALLBACK: Tentar busca direta se RPC falhar
+      console.log('🔄 REACTIVATION - Tentando busca direta como fallback...');
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('reactivated_leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      console.log('📊 REACTIVATION - Fallback:', { fallbackData, fallbackError });
+      
+      if (fallbackError) {
+        throw new Error(`Erro ao buscar histórico: ${error.message}`);
+      }
+      
+      if (!fallbackData || fallbackData.length === 0) {
+        console.log('📊 REACTIVATION - Nenhum registro encontrado (fallback)');
+        return {
+          data: [],
+          pagination: { page, limit, total: 0, pages: 0 }
+        };
+      }
+      
+      // Retornar dados do fallback
+      return {
+        data: fallbackData.map((item: any) => ({
+          id: item.id,
+          created_at: item.created_at,
+          sdr: item.sdr,
+          filter: item.filter,
+          status: item.status,
+          count_leads: item.count_leads || 0,
+          cadence: item.cadence,
+          workflow_id: item.workflow_id,
+          execution_id: item.execution_id,
+          n8n_data: item.n8n_data || {},
+          error_message: item.error_message,
+          updated_at: item.updated_at
+        })),
+        pagination: {
+          page,
+          limit,
+          total: fallbackData.length,
+          pages: 1
+        }
+      };
+    }
+
+    if (!data || data.length === 0) {
+      console.log('📊 REACTIVATION - Nenhum registro encontrado');
+      return {
+        data: [],
+        pagination: { page, limit, total: 0, pages: 0 }
+      };
+    }
+
+    // O primeiro registro contém o total_count
+    const totalCount = data[0]?.total_count || 0;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    console.log('✅ REACTIVATION - Histórico carregado:', {
+      records: data.length,
+      total: totalCount,
+      pages: totalPages
+    });
+
+    return {
+      data: data.map((item: any) => ({
+        id: item.id,
+        created_at: item.created_at,
+        sdr: item.sdr,
+        filter: item.filter,
+        status: item.status,
+        count_leads: item.count_leads || 0,
+        cadence: item.cadence,
+        workflow_id: item.workflow_id,
+        execution_id: item.execution_id,
+        n8n_data: item.n8n_data || {},
+        error_message: item.error_message,
+        updated_at: item.updated_at
+      })),
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        pages: totalPages
+      }
+    };
+
+  } catch (error: any) {
+    console.error('❌ REACTIVATION - Erro ao buscar histórico:', error);
+    return {
+      data: [],
+      pagination: { page, limit, total: 0, pages: 0 }
+    };
+  }
+}
+
+/**
+ * **Salvar registro de reativação**
+ * 
+ * Função para inserir ou atualizar registro na tabela `reactivated_leads`.
+ * Usada tanto na ativação da automação quanto na atualização de status via callback.
+ */
+export async function saveReactivationRecord(data: {
+  sdr: string;
+  filter: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  count_leads?: number;
+  cadence?: string;
+  workflow_id?: string;
+  execution_id?: string;
+  n8n_data?: any;
+  error_message?: string;
+}): Promise<number | null> {
+  console.log('💾 REACTIVATION - Salvando registro:', data);
+  
+  try {
+    // Usar função RPC do Supabase para inserir/atualizar
+    const { data: result, error } = await supabase.rpc('upsert_reactivated_lead', {
+      p_sdr: data.sdr,
+      p_filter: data.filter,
+      p_status: data.status,
+      p_count_leads: data.count_leads || 0,
+      p_cadence: data.cadence || null,
+      p_workflow_id: data.workflow_id || null,
+      p_execution_id: data.execution_id || null,
+      p_n8n_data: data.n8n_data || {},
+      p_error_message: data.error_message || null
+    });
+
+    if (error) {
+      console.error('❌ REACTIVATION - Erro ao salvar registro:', error);
+      throw new Error(`Erro ao salvar registro: ${error.message}`);
+    }
+
+    console.log('✅ REACTIVATION - Registro salvo com ID:', result);
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ REACTIVATION - Erro ao salvar registro:', error);
+    return null;
+  }
+}
+
+/**
+ * **Atualizar status de reativação**
+ * 
+ * Função específica para atualizar o status de uma reativação existente.
+ * Usada principalmente pelos callbacks do N8N.
+ */
+export async function updateReactivationStatus(
+  workflowId: string,
+  status: 'processing' | 'completed' | 'failed',
+  data?: {
+    count_leads?: number;
+    execution_id?: string;
+    n8n_data?: any;
+    error_message?: string;
+  }
+): Promise<boolean> {
+  console.log('🔄 REACTIVATION - Atualizando status:', { workflowId, status, data });
+  
+  try {
+    // Buscar registro existente pelo workflow_id
+    const { data: existing, error: searchError } = await supabase
+      .from('reactivated_leads')
+      .select('*')
+      .eq('workflow_id', workflowId)
+      .single();
+
+    if (searchError || !existing) {
+      console.warn('⚠️ REACTIVATION - Registro não encontrado para workflow:', workflowId);
+      return false;
+    }
+
+    // Atualizar registro
+    const { error: updateError } = await supabase
+      .from('reactivated_leads')
+      .update({
+        status,
+        count_leads: data?.count_leads || existing.count_leads,
+        execution_id: data?.execution_id || existing.execution_id,
+        n8n_data: data?.n8n_data || existing.n8n_data,
+        error_message: data?.error_message || existing.error_message,
+        updated_at: new Date().toISOString()
+      })
+      .eq('workflow_id', workflowId);
+
+    if (updateError) {
+      console.error('❌ REACTIVATION - Erro ao atualizar status:', updateError);
+      return false;
+    }
+
+    console.log('✅ REACTIVATION - Status atualizado com sucesso');
+    return true;
+
+  } catch (error: any) {
+    console.error('❌ REACTIVATION - Erro ao atualizar status:', error);
+    return false;
   }
 }

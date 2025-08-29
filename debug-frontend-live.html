@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Frontend Live</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f3f4f6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1f2937; }
+        .success { color: #10b981; font-weight: bold; }
+        .error { color: #ef4444; font-weight: bold; }
+        .warning { color: #f59e0b; font-weight: bold; }
+        .code {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .table th {
+            background: #f3f4f6;
+            padding: 10px;
+            text-align: left;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .table td {
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Frontend Live - Sistema de Chamadas</h1>
+        
+        <div id="status"></div>
+        
+        <h2>1. Teste Direto da Função RPC</h2>
+        <button onclick="testRPC()">Testar get_calls_with_filters</button>
+        <div id="rpc-result"></div>
+        
+        <h2>2. Simular Frontend (CallsPage)</h2>
+        <button onclick="simulateFrontend()">Simular Componente React</button>
+        <div id="frontend-result"></div>
+        
+        <h2>3. Código para Console</h2>
+        <p>Cole este código no console do navegador na página de chamadas:</p>
+        <div class="code" id="console-code">
+// CÓDIGO PARA COLAR NO CONSOLE DA PÁGINA DE CHAMADAS
+(async () => {
+    console.log('🔍 INICIANDO DEBUG DO FRONTEND...');
+    
+    // 1. Verificar Supabase
+    if (typeof window.supabase === 'undefined') {
+        console.error('❌ Supabase não está definido!');
+        return;
+    }
+    
+    const supabase = window.supabase;
+    console.log('✅ Supabase encontrado');
+    
+    // 2. Testar RPC diretamente
+    console.log('📡 Testando RPC get_calls_with_filters...');
+    const { data: calls, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+        p_limit: 5,
+        p_offset: 0
+    });
+    
+    if (callsError) {
+        console.error('❌ Erro na RPC:', callsError);
+    } else {
+        console.log('✅ RPC funcionou! Dados recebidos:', calls);
+        
+        if (calls && calls.length > 0) {
+            console.log('📊 Primeira chamada:');
+            console.log('  - Empresa:', calls[0].company_name);
+            console.log('  - Pessoa:', calls[0].person_name);
+            console.log('  - SDR:', calls[0].sdr_name);
+            console.log('  - Agent ID:', calls[0].agent_id);
+            console.log('  - Deal ID:', calls[0].deal_id);
+        }
+    }
+    
+    // 3. Verificar componente React
+    console.log('⚛️ Verificando componente React...');
+    const reactRoot = document.querySelector('#root');
+    if (reactRoot && reactRoot._reactRootContainer) {
+        console.log('✅ React root encontrado');
+    } else {
+        console.warn('⚠️ React root não encontrado ou não acessível');
+    }
+    
+    // 4. Verificar localStorage/sessionStorage
+    console.log('💾 Verificando storage...');
+    console.log('LocalStorage keys:', Object.keys(localStorage));
+    console.log('SessionStorage keys:', Object.keys(sessionStorage));
+    
+    // 5. Forçar atualização
+    console.log('🔄 Tentando forçar atualização...');
+    window.location.reload();
+})();
+        </div>
+        
+        <h2>4. Dados Atuais</h2>
+        <div id="current-data"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://mwlekwyxbfbxfxskywgx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3l4YmZieGZ4c2t5d2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTIzMjEsImV4cCI6MjA2NTY4ODMyMX0.rFX9H2pcGLNX7n3vKLYGi72JKwjUw6oG38IZGjO90HE';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        async function testRPC() {
+            const div = document.getElementById('rpc-result');
+            div.innerHTML = '<p>Testando...</p>';
+            
+            try {
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 5,
+                    p_offset: 0
+                });
+                
+                if (error) throw error;
+                
+                let html = '<p class="success">✅ RPC funcionou!</p>';
+                html += '<table class="table">';
+                html += '<tr><th>Deal ID</th><th>Empresa</th><th>Pessoa</th><th>SDR</th><th>Agent ID</th></tr>';
+                
+                data.forEach(call => {
+                    html += `<tr>
+                        <td>${call.deal_id}</td>
+                        <td><strong>${call.company_name}</strong></td>
+                        <td>${call.person_name}</td>
+                        <td>${call.sdr_name}</td>
+                        <td>${call.agent_id}</td>
+                    </tr>`;
+                });
+                
+                html += '</table>';
+                div.innerHTML = html;
+                
+            } catch (error) {
+                div.innerHTML = `<p class="error">❌ Erro: ${error.message}</p>`;
+            }
+        }
+        
+        async function simulateFrontend() {
+            const div = document.getElementById('frontend-result');
+            div.innerHTML = '<p>Simulando...</p>';
+            
+            try {
+                // Simular exatamente o que o frontend faz
+                
+                // 1. Buscar SDRs
+                const { data: sdrs, error: sdrsError } = await supabase.rpc('get_unique_sdrs');
+                
+                if (sdrsError) throw sdrsError;
+                
+                // 2. Buscar Calls
+                const { data: calls, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 50,
+                    p_offset: 0
+                });
+                
+                if (callsError) throw callsError;
+                
+                // 3. Converter para formato do frontend (simulando convertToCallItem)
+                const convertedCalls = calls.map(call => ({
+                    id: call.id,
+                    company: call.company_name,
+                    dealCode: call.deal_id,
+                    sdr: {
+                        id: call.sdr_email || call.sdr_id,
+                        name: call.sdr_name,
+                        email: call.sdr_email,
+                        avatarUrl: call.sdr_avatar_url
+                    },
+                    date: call.created_at,
+                    durationSec: call.duration,
+                    status: call.status,
+                    score: call.score,
+                    person_name: call.person_name,
+                    person_email: call.person_email
+                }));
+                
+                let html = '<p class="success">✅ Simulação completa!</p>';
+                html += `<p>SDRs encontrados: ${sdrs.length}</p>`;
+                html += `<p>Calls encontradas: ${calls.length}</p>`;
+                html += '<h3>Primeiras 3 calls convertidas:</h3>';
+                html += '<div class="code">' + JSON.stringify(convertedCalls.slice(0, 3), null, 2) + '</div>';
+                
+                div.innerHTML = html;
+                
+            } catch (error) {
+                div.innerHTML = `<p class="error">❌ Erro: ${error.message}</p>`;
+            }
+        }
+        
+        // Auto-executar teste inicial
+        window.onload = async () => {
+            const status = document.getElementById('status');
+            status.innerHTML = '<p class="success">✅ Página carregada. Supabase configurado.</p>';
+            
+            // Buscar dados atuais
+            const div = document.getElementById('current-data');
+            try {
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('deal_id, enterprise, person, agent_id, status')
+                    .limit(5)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                let html = '<h3>Últimas 5 calls no banco:</h3>';
+                html += '<table class="table">';
+                html += '<tr><th>Deal ID</th><th>Enterprise</th><th>Person</th><th>Agent ID</th><th>Status</th></tr>';
+                
+                data.forEach(call => {
+                    html += `<tr>
+                        <td>${call.deal_id}</td>
+                        <td><strong>${call.enterprise}</strong></td>
+                        <td>${call.person}</td>
+                        <td>${call.agent_id}</td>
+                        <td>${call.status}</td>
+                    </tr>`;
+                });
+                
+                html += '</table>';
+                div.innerHTML = html;
+                
+            } catch (error) {
+                div.innerHTML = `<p class="error">❌ Erro ao buscar dados: ${error.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>
