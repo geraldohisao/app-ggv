@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { XMarkIcon, CheckCircleIcon } from '../../ui/icons';
 import { FormInput } from '../../ui/Form';
 import { sendEmailViaGmail, forceGmailReauth, checkGmailSetup } from '../../../services/gmailService';
+import { sendEmailReliable } from '../../../services/emailService';
 import { createPublicReport } from '../../../services/supabaseService';
 import { LOGO_URLS } from '../../../config/logos';
 import { CompanyData } from '../../../types';
@@ -142,7 +143,24 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
               </html>`;
             
             console.log('📧 EMAIL - Enviando e-mail para:', email);
-            await sendEmailViaGmail({ to: email, subject, html });
+            
+            // Tentar primeiro o Gmail API, depois usar fallback confiável
+            try {
+                await sendEmailViaGmail({ to: email, subject, html });
+                console.log('✅ EMAIL - Enviado via Gmail API');
+            } catch (gmailError) {
+                console.warn('⚠️ Gmail API falhou, usando fallback confiável:', gmailError);
+                
+                // Usar solução confiável (EmailJS + mailto)
+                await sendEmailReliable({
+                    to: email,
+                    subject,
+                    html,
+                    companyName: companyData.companyName
+                });
+                console.log('✅ EMAIL - Enviado via fallback confiável');
+            }
+            
             setIsSent(true);
             setTimeout(() => onClose(), 2000);
         } catch (err: any) {
