@@ -154,41 +154,63 @@ function buildMime({ to, subject, html, fromName, fromEmail }: { to: string; sub
 // Cache persistente de tokens
 const TOKEN_CACHE_KEY = 'ggv_gmail_token_cache';
 const TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutos de buffer
+const SUPABASE_SESSION_DURATION = 100 * 60 * 60 * 1000; // 100 horas em ms
 
 interface TokenCache {
   access_token: string;
   expires_at: number;
   scope?: string;
   refresh_token?: string;
+  source: 'supabase' | 'oauth' | 'manual';
+  session_id?: string;
 }
 
-function saveTokenToCache(token: string, expiresIn: number = 3600): void {
+function saveTokenToCache(token: string, expiresIn: number = 3600, source: 'supabase' | 'oauth' | 'manual' = 'oauth', sessionId?: string): void {
   try {
     const cache: TokenCache = {
       access_token: token,
       expires_at: Date.now() + (expiresIn * 1000) - TOKEN_EXPIRY_BUFFER,
-      scope: 'gmail.send gmail.compose'
+      scope: 'gmail.send gmail.compose',
+      source,
+      session_id: sessionId
     };
     localStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify(cache));
-    console.log('💾 GMAIL - Token salvo no cache persistente');
+    console.log(`💾 GMAIL - Token salvo no cache (${source}, válido por ${Math.round(expiresIn/3600)}h)`);
   } catch (error) {
     console.warn('⚠️ GMAIL - Erro ao salvar token no cache:', error);
   }
 }
 
-function getTokenFromCache(): string | null {
+async function getTokenFromCache(): Promise<string | null> {
   try {
     const cacheStr = localStorage.getItem(TOKEN_CACHE_KEY);
     if (!cacheStr) return null;
     
     const cache: TokenCache = JSON.parse(cacheStr);
     
-    // Verificar se token ainda é válido
+    // Se o token é do Supabase, verificar se a sessão ainda é válida
+    if (cache.source === 'supabase' && cache.session_id) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || session.user.id !== cache.session_id) {
+          console.log('🔄 GMAIL - Sessão do Supabase mudou, removendo token antigo...');
+          localStorage.removeItem(TOKEN_CACHE_KEY);
+          return null;
+        }
+        // Se sessão é válida, token do Supabase é válido independente do tempo
+        console.log('💾 GMAIL - Token do Supabase válido (baseado na sessão ativa)');
+        return cache.access_token;
+      } catch (error) {
+        console.warn('⚠️ GMAIL - Erro ao verificar sessão do Supabase:', error);
+      }
+    }
+    
+    // Para tokens OAuth temporários, verificar expiração normal
     if (Date.now() < cache.expires_at) {
-      console.log('💾 GMAIL - Token válido encontrado no cache');
+      console.log(`💾 GMAIL - Token ${cache.source} válido encontrado no cache`);
       return cache.access_token;
     } else {
-      console.log('⏰ GMAIL - Token no cache expirou, removendo...');
+      console.log(`⏰ GMAIL - Token ${cache.source} no cache expirou, removendo...`);
       localStorage.removeItem(TOKEN_CACHE_KEY);
       return null;
     }
@@ -221,23 +243,32 @@ async function getAccessToken(): Promise<string> {
   }
   
   // 2) Verificar cache persistente
-  const cachedToken = getTokenFromCache();
+  const cachedToken = await getTokenFromCache();
   if (cachedToken) {
     cachedAccessToken = cachedToken;
     return cachedToken;
   }
   
-  // 3) Tenta reusar token do provedor (Supabase) quando disponível
+  // 3) PRIORIDADE: Token do Supabase (válido enquanto usuário estiver logado - 100h)
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const anySess: any = session as any;
-    const prov = (anySess?.provider_token as string) || (anySess?.provider_access_token as string) || null;
-    if (prov) {
-      console.log('✅ GMAIL - Token do Supabase OAuth encontrado');
-      cachedAccessToken = prov;
-      // Salvar no cache persistente (assumindo 1 hora de validade)
-      saveTokenToCache(prov, 3600);
-      return prov;
+    if (session && session.user) {
+      const anySess: any = session as any;
+      const prov = (anySess?.provider_token as string) || (anySess?.provider_access_token as string) || null;
+      
+      if (prov && session.user.app_metadata?.provider === 'google') {
+        console.log('✅ GMAIL - Token do Supabase OAuth encontrado (válido por 100h)');
+        cachedAccessToken = prov;
+        
+        // Salvar no cache com duração da sessão do Supabase (100h)
+        const sessionDurationHours = 100;
+        const sessionDurationSeconds = sessionDurationHours * 60 * 60;
+        saveTokenToCache(prov, sessionDurationSeconds, 'supabase', session.user.id);
+        
+        return prov;
+      } else if (session.user.app_metadata?.provider !== 'google') {
+        console.log('ℹ️ GMAIL - Usuário não logou com Google, será necessário OAuth separado');
+      }
     }
   } catch (error) {
     console.warn('⚠️ GMAIL - Erro ao obter token do Supabase:', error);
@@ -301,9 +332,9 @@ async function getAccessToken(): Promise<string> {
   }
   
   cachedAccessToken = token;
-  // Salvar token no cache persistente (tokens do Google geralmente duram 1 hora)
-  saveTokenToCache(token, 3600);
-  console.log('✅ GMAIL - Token obtido e salvo no cache');
+  // Salvar token OAuth temporário no cache (1 hora)
+  saveTokenToCache(token, 3600, 'oauth');
+  console.log('✅ GMAIL - Token OAuth temporário obtido e salvo no cache (1h)');
   return token;
 }
 
@@ -332,20 +363,30 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
       const hasPermissions = await testGmailPermissions(token);
       if (!hasPermissions) {
         console.log('⚠️ GMAIL - Token inválido ou permissões insuficientes');
-        // Limpar apenas o cache, não forçar nova autorização ainda
-        cachedAccessToken = null;
-        const cacheToken = getTokenFromCache();
-        if (cacheToken) {
-          console.log('🔄 GMAIL - Tentando token do cache persistente...');
-          // Se há token no cache, tentar uma vez mais
-          retryCount++;
-          continue;
-        } else {
-          console.log('🔄 GMAIL - Limpando cache e tentando reautenticar...');
-          await clearCachedTokens();
-          retryCount++;
-          continue;
+        
+        // Verificar se era um token do Supabase
+        const cacheStr = localStorage.getItem(TOKEN_CACHE_KEY);
+        let wasSupabaseToken = false;
+        if (cacheStr) {
+          try {
+            const cache: TokenCache = JSON.parse(cacheStr);
+            wasSupabaseToken = cache.source === 'supabase';
+          } catch {}
         }
+        
+        // Limpar cache em memória
+        cachedAccessToken = null;
+        
+        if (wasSupabaseToken) {
+          console.log('🔄 GMAIL - Token do Supabase inválido, tentando obter novo...');
+          // Para tokens do Supabase, limpar cache e tentar obter novo token da sessão
+          localStorage.removeItem(TOKEN_CACHE_KEY);
+        } else {
+          console.log('🔄 GMAIL - Token OAuth temporário inválido, tentando reautenticar...');
+        }
+        
+        retryCount++;
+        continue;
       }
       
       // Dados do usuário para From (opcional)
