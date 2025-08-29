@@ -34,15 +34,29 @@ interface ResultsViewProps {
 export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, answers, totalScore, dealId, onRetry }) => {
     const [activeTab, setActiveTab] = useState(REPORT_TABS[0]);
     
-    // FALLBACK: Capturar deal_id diretamente da URL se não vier via props
+    // CORREÇÃO CRÍTICA: SEMPRE priorizar deal_id da URL sobre props/localStorage
     const fallbackDealId = (() => {
-        if (dealId) return dealId;
-        
+        // SEMPRE verificar URL primeiro (fonte mais confiável)
         const urlParams = new URLSearchParams(window.location.search);
         const dealIdFromUrl = urlParams.get('deal_id');
         
-        console.log('🔄 RESULTS - FALLBACK: Capturando deal_id da URL:', dealIdFromUrl);
-        return dealIdFromUrl;
+        console.log('🔄 RESULTS - CORREÇÃO: Priorizando deal_id da URL:', dealIdFromUrl);
+        console.log('🔄 RESULTS - Deal ID das props (pode estar incorreto):', dealId);
+        
+        // Se há deal_id na URL, SEMPRE usá-lo (ignora props/localStorage)
+        if (dealIdFromUrl && dealIdFromUrl.trim() !== '') {
+            console.log('✅ RESULTS - Usando deal_id da URL (fonte confiável):', dealIdFromUrl);
+            return dealIdFromUrl.trim();
+        }
+        
+        // Só usar props como fallback se não houver na URL
+        if (dealId && dealId.trim() !== '') {
+            console.log('⚠️ RESULTS - Usando deal_id das props (fallback):', dealId);
+            return dealId.trim();
+        }
+        
+        console.log('❌ RESULTS - Nenhum deal_id válido encontrado');
+        return null;
     })();
     
     console.log('🎯 RESULTS - Deal ID final usado:', fallbackDealId);
@@ -273,13 +287,26 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     version: DIAGNOSTIC_FIX_VERSION
                 };
 
-                console.log('📤 N8N - Enviando payload completo:', payload);
-                console.log('🔍 N8N - VERIFICAÇÃO FINAL do deal_id no payload:');
-                console.log('  - payload.deal_id:', payload.deal_id);
-                console.log('  - payload.body.deal_id:', payload.body.deal_id);
-                console.log('  - dealId original (prop):', dealId);
-                console.log('  - fallbackDealId (usado):', fallbackDealId);
-                console.log('  - Tipo do fallbackDealId:', typeof fallbackDealId);
+                            console.log('📤 N8N - Enviando payload completo:', payload);
+            console.log('🔍 N8N - VERIFICAÇÃO FINAL do deal_id no payload:');
+            console.log('  - payload.deal_id:', payload.deal_id);
+            console.log('  - payload.body.deal_id:', payload.body.deal_id);
+            console.log('  - dealId original (prop):', dealId);
+            console.log('  - fallbackDealId (usado):', fallbackDealId);
+            console.log('  - Tipo do fallbackDealId:', typeof fallbackDealId);
+            console.log('  - URL atual completa:', window.location.href);
+            console.log('  - Deal ID direto da URL:', new URLSearchParams(window.location.search).get('deal_id'));
+            
+            // VALIDAÇÃO ANTI-ALUCINAÇÃO
+            const urlDealId = new URLSearchParams(window.location.search).get('deal_id');
+            if (urlDealId && payload.deal_id !== urlDealId) {
+                console.error('🚨 INCONSISTÊNCIA CRÍTICA DETECTADA!');
+                console.error('  - Deal ID na URL:', urlDealId);
+                console.error('  - Deal ID no payload:', payload.deal_id);
+                console.error('  - Esta inconsistência pode causar dados incorretos!');
+            } else if (urlDealId) {
+                console.log('✅ VALIDAÇÃO OK - Deal ID do payload confere com a URL');
+            }
 
                 const webhookUrl = 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
                 const response = await fetch(webhookUrl, {

@@ -47,17 +47,23 @@ export const DiagnosticoComercial: React.FC = () => {
     // 💾 FUNÇÕES DE PERSISTÊNCIA
     const saveStateToLocalStorage = () => {
         try {
+            // CORREÇÃO CRÍTICA: SEMPRE usar deal_id da URL atual, não do estado
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentDealIdFromUrl = urlParams.get('deal_id');
+            
             const state: DiagnosticPersistedState = {
                 step,
                 companyData,
                 selectedSegment,
                 answers,
-                dealId: dealId || undefined,
+                dealId: currentDealIdFromUrl || dealId || undefined, // Priorizar URL
                 timestamp: Date.now()
             };
             
             localStorage.setItem(DIAGNOSTIC_STATE_KEY, JSON.stringify(state));
-            console.log('💾 PERSISTÊNCIA - Estado salvo:', state);
+            console.log('💾 PERSISTÊNCIA - Estado salvo com deal_id correto:', state);
+            console.log('💾 PERSISTÊNCIA - Deal ID da URL:', currentDealIdFromUrl);
+            console.log('💾 PERSISTÊNCIA - Deal ID do hook:', dealId);
         } catch (error) {
             console.error('❌ PERSISTÊNCIA - Erro ao salvar estado:', error);
         }
@@ -103,8 +109,22 @@ export const DiagnosticoComercial: React.FC = () => {
         if (savedState && savedState.step !== 'start') {
             console.log('🔄 PERSISTÊNCIA - Restaurando estado salvo...');
             
-            // Só restaurar se não houver deal_id na URL (para não conflitar com links diretos)
+            // CORREÇÃO: Verificar se deal_id mudou na URL
             const urlDealId = new URLSearchParams(window.location.search).get('deal_id');
+            const savedDealId = savedState.dealId;
+            
+            // Se há deal_id na URL E é diferente do salvo, limpar estado
+            if (urlDealId && savedDealId && urlDealId !== savedDealId) {
+                console.log('🔄 PERSISTÊNCIA - Deal ID mudou na URL!');
+                console.log('  - URL atual:', urlDealId);
+                console.log('  - Salvo:', savedDealId);
+                console.log('🗑️ PERSISTÊNCIA - Limpando estado antigo para evitar inconsistência');
+                clearPersistedState();
+                setShouldLoadPersistedState(false);
+                return;
+            }
+            
+            // Só restaurar se não houver deal_id na URL (para não conflitar com links diretos)
             if (!urlDealId) {
                 setStep(savedState.step);
                 setCompanyData(savedState.companyData);
