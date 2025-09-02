@@ -1,7 +1,7 @@
 
 
 import React, { useMemo, useState } from 'react';
-import { OTEProfile, Module } from '../types';
+import { OTEProfile, Module, UserRole } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
 import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION, COORDENADOR_REMUNERATION } from '../constants';
