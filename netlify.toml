@@ -1,7 +1,7 @@
 [build]
   publish = "dist"
-  command = "npm run build"
-  # functions = "netlify/functions"  # Desabilitado temporariamente para debug
+  command = "npm run build:fast"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20.18.0"
@@ -27,6 +27,12 @@
 [[redirects]]
   from = "/api/webhook/n8n-callback"
   to = "/.netlify/functions/n8n-callback"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/diagnostic/test"
+  to = "/.netlify/functions/diagnostic-test"
   status = 200
   force = true
 
