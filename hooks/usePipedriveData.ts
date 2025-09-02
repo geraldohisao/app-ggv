@@ -36,9 +36,13 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
   const [error, setError] = useState<string | null>(null);
   const [dealId, setDealId] = useState<string | null>(null);
 
+  // CORREÇÃO CRÍTICA: Detectar mudanças na URL para re-executar o hook
+  const currentDealIdFromUrl = new URLSearchParams(window.location.search).get('deal_id');
+
   useEffect(() => {
-    console.log('🔍 PIPEDRIVE - Hook inicializado, verificando URL...');
+    console.log('🔍 PIPEDRIVE - Hook executando, verificando URL...');
     console.log('🔍 PIPEDRIVE - Timestamp:', new Date().toISOString());
+    console.log('🔍 PIPEDRIVE - Deal ID da URL (dependência):', currentDealIdFromUrl);
     
     // Capturar deal_id da URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -53,6 +57,13 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
     // CRÍTICO: Só fazer requisição se houver deal_id válido na URL
     if (dealIdFromUrl && dealIdFromUrl.trim() !== '' && dealIdFromUrl.trim() !== 'null' && dealIdFromUrl.trim() !== 'undefined') {
       const cleanDealId = dealIdFromUrl.trim();
+      
+      // Evitar requisição desnecessária se o deal_id não mudou
+      if (dealId === cleanDealId && data) {
+        console.log('🔄 PIPEDRIVE - Deal ID não mudou, mantendo dados existentes:', cleanDealId);
+        return;
+      }
+      
       console.log('✅ PIPEDRIVE - Deal ID VÁLIDO detectado:', cleanDealId);
       console.log('✅ PIPEDRIVE - Iniciando requisição para deal_id:', cleanDealId);
       console.log('✅ PIPEDRIVE - Timestamp da requisição:', new Date().toISOString());
@@ -67,7 +78,7 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
       setError(null);
       setLoading(false);
     }
-  }, []); // Executar apenas uma vez na inicialização
+  }, [currentDealIdFromUrl]); // CORREÇÃO: Dependência do deal_id da URL para re-executar quando mudar
 
   const fetchPipedriveData = async (dealId: string) => {
     // Validação crítica: não fazer requisição sem deal_id

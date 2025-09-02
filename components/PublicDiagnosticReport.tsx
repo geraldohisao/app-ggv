@@ -17,9 +17,8 @@ const PublicDiagnosticReport: React.FC = () => {
   const nextSteps = useMemo(() => (data?.detailedAnalysis?.nextSteps || []).slice(0, 3), [data?.detailedAnalysis]);
 
   // Lazy imports - devem estar sempre no mesmo lugar
-  const CoverTab = React.lazy(() => import('./diagnostico/report/CoverTab').then(m => ({ default: m.CoverTab })));
-  const DashboardTab = React.lazy(() => import('./diagnostico/report/DashboardTab').then(m => ({ default: m.DashboardTab })));
-  const SegmentedAnalysisTab = React.lazy(() => import('./diagnostico/report/SegmentedAnalysisTab').then(m => ({ default: m.SegmentedAnalysisTab })));
+  const UnifiedCoverDashboardTab = React.lazy(() => import('./diagnostico/report/UnifiedCoverDashboardTab').then(m => ({ default: m.UnifiedCoverDashboardTab })));
+  const SalesBottlenecksTab = React.lazy(() => import('./diagnostico/report/SalesBottlenecksTab').then(m => ({ default: m.SalesBottlenecksTab })));
   const TextualDiagnosisTab = React.lazy(() => import('./diagnostico/report/TextualDiagnosisTab').then(m => ({ default: m.TextualDiagnosisTab })));
   const AIAnalysisTab = React.lazy(() => import('./diagnostico/report/AIAnalysisTab').then(m => ({ default: m.AIAnalysisTab })));
 
@@ -244,16 +243,10 @@ const PublicDiagnosticReport: React.FC = () => {
     <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
       <Suspense fallback={<div className="p-6 bg-white rounded-2xl shadow"><LoadingSpinner text="Carregando..." /></div>}>
         <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
-          <CoverTab companyData={companyData} specialistName={undefined} />
+          <UnifiedCoverDashboardTab companyData={companyData} maturity={maturity} totalScore={totalScore} segment={segment} scoresByArea={scoresByArea} specialistName={undefined} />
         </div>
         <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
-          <DashboardTab maturity={maturity} totalScore={totalScore} scoresByArea={scoresByArea} segment={segment} />
-        </div>
-        <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
-          <SegmentedAnalysisTab scoresByArea={scoresByArea} detailedAnalysis={detailedAnalysis} isLoading={false} />
-        </div>
-        <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
-          <TextualDiagnosisTab summaryInsights={summaryInsights} isLoading={false} />
+          <SalesBottlenecksTab scoresByArea={scoresByArea} detailedAnalysis={detailedAnalysis} summaryInsights={summaryInsights} isLoading={false} />
         </div>
         <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
           <AIAnalysisTab detailedAnalysis={detailedAnalysis} isGenerating={false} />

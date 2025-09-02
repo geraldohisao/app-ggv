@@ -1,5 +1,7 @@
 export * from './CoverTab';
 export * from './DashboardTab';
+export * from './UnifiedCoverDashboardTab';
 export * from './SegmentedAnalysisTab';
+export * from './SalesBottlenecksTab';
 export * from './TextualDiagnosisTab';
 export * from './AIAnalysisTab';

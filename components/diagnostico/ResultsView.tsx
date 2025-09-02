@@ -4,7 +4,7 @@ import { getSummaryInsights, getDetailedAIAnalysis } from '../../services/gemini
 import { diagnosticQuestions } from '../../data/diagnosticoQuestions';
 import { ArrowLeftIcon, ArrowRightIcon, EnvelopeIcon, DocumentTextIcon, RefreshIcon, ExclamationTriangleIcon } from '../ui/icons';
 import { EmailModal } from './modals/EmailModal';
-import { CoverTab, DashboardTab, SegmentedAnalysisTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
+import { CoverTab, DashboardTab, UnifiedCoverDashboardTab, SalesBottlenecksTab, TextualDiagnosisTab, AIAnalysisTab } from './report';
 import { getCurrentUserDisplayName, sendDiagnosticToN8n, createPublicReport } from '../../services/supabaseService';
 import { DIAGNOSTIC_FIX_VERSION } from '../../src/buildId';
 
@@ -18,7 +18,7 @@ const DIAGNOSTIC_VALIDATION = {
     REQUIRED_PAYLOAD_FIELDS: ['questionId', 'question', 'answer', 'description', 'score'] as const
 } as const;
 
-const REPORT_TABS = ["Capa", "Dashboard Geral", "Análise Segmentada", "Diagnóstico Textual", "Análise IA"];
+const REPORT_TABS = ["Dashboard", "Pontos de Atenção", "Análise IA"];
 const MAX_SCORE_PER_QUESTION = 10;
 const MAX_SCORE = diagnosticQuestions.length * MAX_SCORE_PER_QUESTION;
 
@@ -430,10 +430,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             )}
 
             <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50 min-h-[60vh]">
-                {activeTab === 'Capa' && <CoverTab companyData={companyData} specialistName={specialistName} />}
-                {activeTab === 'Dashboard Geral' && <DashboardTab maturity={maturity} totalScore={totalScore} scoresByArea={scoresByArea} segment={segment} />}
-                {activeTab === 'Análise Segmentada' && <SegmentedAnalysisTab scoresByArea={scoresByArea} detailedAnalysis={detailedAnalysis} isLoading={isLoadingDetailed} />}
-                {activeTab === 'Diagnóstico Textual' && <TextualDiagnosisTab summaryInsights={summaryInsights} isLoading={isLoadingSummary} />}
+                {activeTab === 'Dashboard' && <UnifiedCoverDashboardTab companyData={companyData} maturity={maturity} totalScore={totalScore} segment={segment} scoresByArea={scoresByArea} specialistName={specialistName} />}
+                {activeTab === 'Pontos de Atenção' && <SalesBottlenecksTab scoresByArea={scoresByArea} detailedAnalysis={detailedAnalysis} summaryInsights={summaryInsights} isLoading={isLoadingDetailed || isLoadingSummary} />}
                 {activeTab === 'Análise IA' && <AIAnalysisTab detailedAnalysis={detailedAnalysis} isGenerating={isLoadingDetailed} />}
             </div>
 

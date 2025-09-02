@@ -2,7 +2,7 @@ import React from 'react';
 import { DetailedAIAnalysis } from '../../../types';
 import { LoadingSpinner, ErrorDisplay } from '../../ui/Feedback';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
-import { CpuChipIcon, CheckCircleIcon, ExclamationTriangleIcon, BoltIcon, LightBulbIcon, FlagIcon, ArrowRightIcon } from '../../ui/icons';
+import { CpuChipIcon, CheckCircleIcon, ExclamationTriangleIcon, BoltIcon, LightBulbIcon, FlagIcon, ArrowRightIcon, BuildingOffice2Icon } from '../../ui/icons';
 import { GGVInteligenciaBrand } from '../../ui/BrandLogos';
 
 interface AIAnalysisTabProps {
@@ -116,7 +116,7 @@ export const AIAnalysisTab: React.FC<AIAnalysisTabProps> = ({ detailedAnalysis, 
                 </ReportCard>
             </div>
 
-            <ReportCard title="Insights do Setor" icon={<LightBulbIcon className="w-5 h-5" />} className="no-break mt-8">
+            <ReportCard title="Insights do Setor" icon={<BuildingOffice2Icon className="w-5 h-5" />} className="no-break mt-8">
                 <MarkdownRenderer text={detailedAnalysis.sectorInsights} />
             </ReportCard>
             <ReportCard title="Roadmap de Maturidade" icon={<FlagIcon className="w-5 h-5" />} className="no-break">

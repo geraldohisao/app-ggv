@@ -149,7 +149,7 @@ export const DiagnosticoComercial: React.FC = () => {
         saveStateToLocalStorage();
     }, [step, companyData, selectedSegment, answers, shouldLoadPersistedState]);
 
-    // Debug do deal_id
+    // Debug do deal_id E limpeza automática quando deal_id mudar
     useEffect(() => {
         console.log('🔍 DIAGNOSTICO - Deal ID atual:', dealId);
         console.log('🔍 DIAGNOSTICO - Tipo do dealId:', typeof dealId);
@@ -162,6 +162,23 @@ export const DiagnosticoComercial: React.FC = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const dealIdFromUrl = urlParams.get('deal_id');
         console.log('🔍 DIAGNOSTICO - Deal ID direto da URL:', dealIdFromUrl);
+        
+        // CORREÇÃO ADICIONAL: Limpar localStorage se deal_id mudou na URL
+        const savedState = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+        if (savedState && dealIdFromUrl) {
+            try {
+                const state = JSON.parse(savedState);
+                if (state.dealId && state.dealId !== dealIdFromUrl) {
+                    console.log('🔄 DIAGNOSTICO - Deal ID mudou na URL, limpando localStorage antigo');
+                    console.log('  - Salvo:', state.dealId);
+                    console.log('  - URL atual:', dealIdFromUrl);
+                    clearPersistedState();
+                }
+            } catch (error) {
+                console.log('🔄 DIAGNOSTICO - Erro ao verificar localStorage, limpando por segurança');
+                clearPersistedState();
+            }
+        }
     }, [dealId, pipedriveData, pipedriveLoading, pipedriveError]);
 
     // Atualizar prefill quando dados do Pipedrive estiverem disponíveis

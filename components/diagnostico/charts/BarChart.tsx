@@ -16,6 +16,19 @@ const AREA_ITEMS: Record<DiagnosticArea, string> = {
     'Prospecção': 'Prospecção ativa',
 };
 
+// Mapeamento das categorias para exibição
+const AREA_CATEGORIES: Record<DiagnosticArea, string> = {
+    'Processos': 'Padronização',
+    'Tecnologia': 'Tecnologia',
+    'Padronização': 'Abordagem',
+    'Pessoas': 'Pessoas',
+    'Gestão': 'Gestão',
+    'Monitoramento': 'Monitoramento',
+    'Desenvolvimento': 'Desenvolvimento',
+    'Relacionamento': 'Relacionamento',
+    'Prospecção': 'Prospecção',
+};
+
 // Ordem correta baseada na sequência das perguntas do diagnóstico
 const QUESTION_ORDER: DiagnosticArea[] = [
     'Processos',        // Pergunta 1: Mapeamento de processos
@@ -43,9 +56,11 @@ export const BarChart: React.FC<BarChartProps> = ({ scoresByArea }) => {
         const topPerformers = BENCHMARK_DATA.topPerformers[area as DiagnosticArea] / 10 * 100;
         const gap = Math.max(0, topPerformers - percentage);
         const itemName = AREA_ITEMS[area as DiagnosticArea] || area;
+        const category = AREA_CATEGORIES[area as DiagnosticArea] || area;
         return { 
             name: area, 
             itemName, 
+            category,
             percentage, 
             marketAvg, 
             topPerformers, 
@@ -87,7 +102,7 @@ export const BarChart: React.FC<BarChartProps> = ({ scoresByArea }) => {
 						<div className="grid grid-cols-12 items-center gap-3 mb-1">
 							<div className="col-span-3 truncate">
 								<div className="text-sm font-medium text-slate-800">{data.itemName}</div>
-								<div className="text-xs text-slate-500">({data.name})</div>
+								<div className="text-xs text-slate-500">({data.category})</div>
 							</div>
 							<div className="col-span-9 text-right text-[11px] font-medium text-slate-600" aria-hidden>
 								{youPercent.toFixed(0)}%
