@@ -39,19 +39,51 @@ interface FormattedInputProps extends Omit<FormInputProps, 'value' | 'onChange' 
 export const FormattedInputField: React.FC<FormattedInputProps> = ({ label, name, value, onChange, formatType, ...props }) => {
     const formatForDisplay = (val: string): string => {
         if (val === null || val === undefined || val === '') return '';
+        
         if (formatType === 'currency') {
-            const num = parseFloat(val);
-            if (isNaN(num)) return '';
-            return 'R$ ' + num.toLocaleString('pt-BR');
+            // Remove any non-numeric characters and format with thousands separator
+            const cleanVal = val.replace(/[^0-9]/g, '');
+            if (cleanVal === '') return '';
+            
+            // Add thousands separator (dots) every 3 digits from right
+            const formatted = cleanVal.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return 'R$ ' + formatted;
         }
+        
         if (formatType === 'percentage') {
-            return val + ' %';
+            // For percentage, allow decimal values
+            const cleanVal = val.replace(/[^0-9.,]/g, '');
+            if (cleanVal === '') return '';
+            
+            // Format with thousands separator if needed
+            const parts = cleanVal.split(/[.,]/);
+            const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            const decimalPart = parts[1] ? ',' + parts[1] : '';
+            
+            return integerPart + decimalPart + '%';
         }
+        
         return val;
     };
 
     const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const rawValue = e.target.value.replace(/[^0-9]/g, '');
+        let rawValue: string;
+        
+        if (formatType === 'currency') {
+            // For currency, only allow digits
+            rawValue = e.target.value.replace(/[^0-9]/g, '');
+        } else if (formatType === 'percentage') {
+            // For percentage, allow digits, comma and dot for decimals
+            rawValue = e.target.value.replace(/[^0-9.,]/g, '');
+            // Ensure only one decimal separator
+            const parts = rawValue.split(/[.,]/);
+            if (parts.length > 2) {
+                rawValue = parts[0] + '.' + parts.slice(1).join('');
+            }
+        } else {
+            rawValue = e.target.value.replace(/[^0-9]/g, '');
+        }
+        
         // Create a synthetic event to pass up, containing only the raw numeric value
         const syntheticEvent = {
             target: {

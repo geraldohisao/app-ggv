@@ -363,3 +363,42 @@ export const CLOSER_REMUNERATION = {
      }
   }
 };
+
+export const COORDENADOR_REMUNERATION = {
+  levels: {
+    'Nível 1': 'level1',
+    'Nível 2': 'level2',
+    'Nível 3': 'level3',
+    'Nível 4': 'level4',
+  },
+  fixedSalary: {
+    level1: 5000.00,  // R$ 5.000,00
+    level2: 7000.00,  // R$ 7.000,00
+    level3: 9000.00,  // R$ 9.000,00
+    level4: 12000.00, // R$ 12.000,00
+  },
+  // Premiação mensal coletiva (% sobre as vendas realizadas)
+  monthlyCollectiveBonus: {
+    tiers: [
+      { threshold: 1.50, label: 'Acima de 150%' },
+      { threshold: 1.30, label: '130% a 149,99%' },
+      { threshold: 1.00, label: '100% a 129,99%' },
+      { threshold: 0.85, label: '85% a 99,99%' },
+      { threshold: 0.75, label: '75% a 84,99%' },
+    ],
+    rates: [0.01, 0.007, 0.005, 0.004, 0.003] // % sobre vendas realizadas (1%, 0,7%, 0,5%, 0,4%, 0,3%)
+  },
+  // Premiação trimestral por eficiência (% VENDA/SQL) - threshold específico por nível
+  quarterlyEfficiencyBonus: {
+    level1: { threshold: 0.175, value: 3000.00 }, // 17,5% = R$ 3.000
+    level2: { threshold: 0.176, value: 4000.00 }, // 17,6% = R$ 4.000  
+    level3: { threshold: 0.2001, value: 5000.00 }, // 20,01% = R$ 5.000
+    level4: { threshold: 0.22, value: 6000.00 }, // 22% = R$ 6.000
+  },
+  // Bônus anual (% do salário fixo proporcional ao tempo na GGV)
+  annualBonus: {
+    // Bônus = salário fixo do nível × (meses de casa ÷ 12)
+    // Ex: Nível 1 (R$ 5.000) × 6 meses = R$ 5.000 × 50% = R$ 2.500
+    basedOnFixedSalary: true, // Indica que é baseado no salário fixo do nível
+  }
+};

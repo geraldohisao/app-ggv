@@ -142,6 +142,7 @@ export type ConversationHistories = {
 export enum OTEProfile {
     SDR = 'SDR',
     Closer = 'Closer',
+    Coordenador = 'Coordenador',
 }
 
 export interface SummaryInsights {

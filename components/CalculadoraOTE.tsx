@@ -4,8 +4,8 @@ import React, { useMemo, useState } from 'react';
 import { OTEProfile, Module } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
-import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION } from '../constants';
-import { useOteCalculator, SdrInputs as SdrInputType, CloserInputs as CloserInputType } from '../hooks/useOteCalculator';
+import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION, COORDENADOR_REMUNERATION } from '../constants';
+import { useOteCalculator, SdrInputs as SdrInputType, CloserInputs as CloserInputType, CoordenadorInputs as CoordenadorInputType } from '../hooks/useOteCalculator';
 import Tooltip from './ui/Tooltip';
 import ProgressBar from './ui/ProgressBar';
 import { QuestionMarkCircleIcon, CalculatorIcon, CheckCircleIcon, XCircleIcon } from './ui/icons';
@@ -28,6 +28,15 @@ const initialCloserInputs: CloserInputType = {
     metaAnualAcumulada: '', vendasRealizadasAno: '', mesesDeCasa: '',
 };
 
+const initialCoordenadorInputs: CoordenadorInputType = {
+    perfil: OTEProfile.Coordenador,
+    nivel: 'Nível 1',
+    metaColetivaVendas: '', vendasRealizadasColetiva: '',
+    sqlsDoTrimestre: '', vendasDoTrimestre: '',
+    metaAnualVendas: '', vendasRealizadasAno: '',
+    mesesDeCasa: '',
+};
+
 const initialCloserBonuses = {
     campaign: { ticketMedio: false, pagamentoVista: false, leadProspeccao: false, entrada50: false },
     product: { pesquisasAcima25k: false, valuationAcima15k: false, treinamentosAcima10k: false, maisDe6Modulos: false }
@@ -35,7 +44,7 @@ const initialCloserBonuses = {
 
 const CalculadoraOTE: React.FC = () => {
     const { user } = useUser();
-    const [inputs, setInputs] = useState<SdrInputType | CloserInputType>(initialSdrInputs);
+    const [inputs, setInputs] = useState<SdrInputType | CloserInputType | CoordenadorInputType>(initialSdrInputs);
     const [closerBonuses, setCloserBonuses] = useState(initialCloserBonuses);
     const [includeQuarterlyBonus, setIncludeQuarterlyBonus] = useState(false);
     const [includeAnnualBonus, setIncludeAnnualBonus] = useState(false);
@@ -44,6 +53,10 @@ const CalculadoraOTE: React.FC = () => {
 
     const allowedProfile: OTEProfile | 'ALL' = useMemo(() => {
         if (!user) return OTEProfile.SDR;
+        
+        // Super Admin e Admin têm acesso a todos os perfis (incluindo Coordenador)
+        if (user.role === UserRole.SuperAdmin || user.role === UserRole.Admin) return 'ALL';
+        
         if (user.email === 'geraldo@grupoggv.com') return 'ALL';
         // ler tabela user_functions para esse usuário (sincronamente não dá; usar mem cache simples)
         // fallback: SDR
@@ -51,7 +64,13 @@ const CalculadoraOTE: React.FC = () => {
     }, [user]);
 
     const handleProfileChange = (newProfile: OTEProfile) => {
-        setInputs(newProfile === OTEProfile.SDR ? initialSdrInputs : initialCloserInputs);
+        if (newProfile === OTEProfile.SDR) {
+            setInputs(initialSdrInputs);
+        } else if (newProfile === OTEProfile.Closer) {
+            setInputs(initialCloserInputs);
+        } else if (newProfile === OTEProfile.Coordenador) {
+            setInputs(initialCoordenadorInputs);
+        }
         setCloserBonuses(initialCloserBonuses);
         setIncludeQuarterlyBonus(false);
         setIncludeAnnualBonus(false);
@@ -105,6 +124,7 @@ const CalculadoraOTE: React.FC = () => {
                                   <SelectField label="Perfil" name="perfil" id="perfil" value={inputs.perfil} onChange={e => handleProfileChange(e.target.value as OTEProfile)}>
                                       <option value={OTEProfile.SDR}>SDR</option>
                                       <option value={OTEProfile.Closer}>Closer</option>
+                                      <option value={OTEProfile.Coordenador}>Coordenador</option>
                                   </SelectField>
                                 ) : (
                                   <div>
@@ -117,16 +137,24 @@ const CalculadoraOTE: React.FC = () => {
                                 </SelectField>
                             </div>
                         </Section>
-                        {(allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.SDR ?
+                        {(allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.SDR ? (
                           <SdrInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as SdrInputType) : { ...(inputs as any), perfil: OTEProfile.SDR }} onChange={handleInputChange} />
-                          : <CloserInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as CloserInputType) : { ...(inputs as any), perfil: OTEProfile.Closer }} onChange={handleInputChange} bonuses={closerBonuses} onBonusChange={handleCloserBonusChange} formatCurrency={formatCurrency} />}
+                        ) : (allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.Coordenador ? (
+                          <CoordenadorInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as CoordenadorInputType) : { ...(inputs as any), perfil: OTEProfile.Coordenador }} onChange={handleInputChange} />
+                        ) : (
+                          <CloserInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as CloserInputType) : { ...(inputs as any), perfil: OTEProfile.Closer }} onChange={handleInputChange} bonuses={closerBonuses} onBonusChange={handleCloserBonusChange} formatCurrency={formatCurrency} />
+                        )}
                     </div>
                     {/* Results Section */}
                     <div className="bg-slate-50 p-6 rounded-2xl shadow-inner-lg space-y-4 border border-slate-200/50 xl:sticky top-6">
                         <Section title="Cálculo OTE" icon={<CalculatorIcon className="w-6 h-6 text-slate-500" />}>
-                            {(allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.SDR ?
+                            {(allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.SDR ? (
                               <SdrResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />
-                              : <CloserResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />}
+                            ) : (allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.Coordenador ? (
+                              <CoordenadorResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />
+                            ) : (
+                              <CloserResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />
+                            )}
                         </Section>
                     </div>
                 </div>
@@ -142,7 +170,7 @@ const SdrInputsComponent: React.FC<{ inputs: any, onChange: any }> = ({ inputs, 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField id="metaIndividualSQLs" label="Meta Individual (SQLs)" name="metaIndividualSQLs" value={inputs.metaIndividualSQLs} onChange={onChange} placeholder="Ex: 12" type="number" />
                 <InputField id="sqlsAceitosPeloCloser" label="SQLs Aceitos pelo Closer" name="sqlsAceitosPeloCloser" value={inputs.sqlsAceitosPeloCloser} onChange={onChange} placeholder="Ex: 10" type="number" />
-                <FormattedInputField id="metaColetivaGlobal" label="% Meta Coletiva Global Atingida" name="metaColetivaGlobal" value={inputs.metaColetivaGlobal} onChange={onChange} placeholder="Ex: 85" formatType="percentage" />
+                <FormattedInputField id="metaColetivaGlobal" label="Meta Coletiva Global Atingida" name="metaColetivaGlobal" value={inputs.metaColetivaGlobal} onChange={onChange} placeholder="Ex: 85,5" formatType="percentage" />
                 <InputField id="mqlsGerados" label="MQLs Gerados no Mês" name="mqlsGerados" value={inputs.mqlsGerados} onChange={onChange} placeholder="Ex: 50" type="number" />
             </div>
         </Section>
@@ -158,6 +186,106 @@ const SdrInputsComponent: React.FC<{ inputs: any, onChange: any }> = ({ inputs, 
     </>
 );
 
+const CoordenadorInputsComponent: React.FC<{ inputs: any, onChange: any }> = ({ inputs, onChange }) => {
+    const nivelKey = COORDENADOR_REMUNERATION.levels[inputs.nivel as keyof typeof COORDENADOR_REMUNERATION.levels] || 'level1';
+    const quarterlyRule = COORDENADOR_REMUNERATION.quarterlyEfficiencyBonus[nivelKey as keyof typeof COORDENADOR_REMUNERATION.quarterlyEfficiencyBonus];
+    const thresholdText = quarterlyRule ? `Sua meta para ${inputs.nivel}: Atingir ${(quarterlyRule.threshold * 100).toFixed(1)}% de eficiência para ganhar R$ ${quarterlyRule.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.` : 'Selecione um nível para ver a meta.';
+
+    return (
+    <>
+        <Section title="Meta Coletiva">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormattedInputField
+                    label="Meta Coletiva de Vendas"
+                    name="metaColetivaVendas"
+                    id="metaColetivaVendas"
+                    value={inputs.metaColetivaVendas}
+                    onChange={onChange}
+                    placeholder="Ex: 500.000"
+                    formatType="currency"
+                />
+                <FormattedInputField
+                    label="Vendas Realizadas (Coletiva)"
+                    name="vendasRealizadasColetiva"
+                    id="vendasRealizadasColetiva"
+                    value={inputs.vendasRealizadasColetiva}
+                    onChange={onChange}
+                    placeholder="Ex: 425.000"
+                    formatType="currency"
+                />
+            </div>
+        </Section>
+        
+        <Section title="Eficiência Trimestral">
+            <div className="bg-slate-50 p-3 rounded-lg text-xs text-slate-600 space-y-1 mb-4">
+                <p className='font-semibold'>{thresholdText}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField
+                    label="SQLs do Trimestre"
+                    name="sqlsDoTrimestre"
+                    id="sqlsDoTrimestre"
+                    value={inputs.sqlsDoTrimestre}
+                    onChange={onChange}
+                    placeholder="Ex: 150"
+                    type="number"
+                    min="0"
+                />
+                <InputField
+                    label="Vendas do Trimestre"
+                    name="vendasDoTrimestre"
+                    id="vendasDoTrimestre"
+                    value={inputs.vendasDoTrimestre}
+                    onChange={onChange}
+                    placeholder="Ex: 30"
+                    type="number"
+                    min="0"
+                />
+            </div>
+        </Section>
+        
+        <Section title="Metas Anuais">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormattedInputField
+                    label="Meta Anual de Vendas"
+                    name="metaAnualVendas"
+                    id="metaAnualVendas"
+                    value={inputs.metaAnualVendas}
+                    onChange={onChange}
+                    placeholder="Ex: 1.000.000"
+                    formatType="currency"
+                />
+                <FormattedInputField
+                    label="Vendas Realizadas no Ano"
+                    name="vendasRealizadasAno"
+                    id="vendasRealizadasAno"
+                    value={inputs.vendasRealizadasAno}
+                    onChange={onChange}
+                    placeholder="Ex: 1.000.000"
+                    formatType="currency"
+                />
+            </div>
+        </Section>
+        
+        <Section title="Tempo na GGV">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField
+                    label="Meses de Casa (máx 12)"
+                    name="mesesDeCasa"
+                    id="mesesDeCasa"
+                    value={inputs.mesesDeCasa}
+                    onChange={onChange}
+                    placeholder="Ex: 12"
+                    type="number"
+                    min="1"
+                    max="12"
+                />
+            </div>
+        </Section>
+    </>
+    );
+};
+
 const CloserInputsComponent: React.FC<{ inputs: any, onChange: any, bonuses: any, onBonusChange: any, formatCurrency: (v: number) => string }> = ({ inputs, onChange, bonuses, onBonusChange, formatCurrency }) => {
     const nivelKey = CLOSER_REMUNERATION.levels[inputs.nivel as keyof typeof CLOSER_REMUNERATION.levels] || 'level1';
     const quarterlyRule = CLOSER_REMUNERATION.quarterlyBonus[nivelKey as keyof typeof CLOSER_REMUNERATION.quarterlyBonus];
@@ -167,9 +295,9 @@ const CloserInputsComponent: React.FC<{ inputs: any, onChange: any, bonuses: any
         <>
             <Section title="Metas Mensais">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormattedInputField id="metaMensalVendas" label="Meta Mensal de Vendas (R$)" name="metaMensalVendas" value={inputs.metaMensalVendas} onChange={onChange} placeholder="Ex: 250.000" formatType="currency" />
-                    <FormattedInputField id="vendasRealizadas" label="Vendas Realizadas (R$)" name="vendasRealizadas" value={inputs.vendasRealizadas} onChange={onChange} placeholder="Ex: 275.000" formatType="currency" />
-                    <FormattedInputField id="metaColetivaGlobalCloser" label="% Meta Coletiva Global" name="metaColetivaGlobal" value={inputs.metaColetivaGlobal} onChange={onChange} placeholder="Ex: 85" formatType="percentage" />
+                    <FormattedInputField id="metaMensalVendas" label="Meta Mensal de Vendas" name="metaMensalVendas" value={inputs.metaMensalVendas} onChange={onChange} placeholder="Ex: 250.000" formatType="currency" />
+                    <FormattedInputField id="vendasRealizadas" label="Vendas Realizadas" name="vendasRealizadas" value={inputs.vendasRealizadas} onChange={onChange} placeholder="Ex: 275.000" formatType="currency" />
+                    <FormattedInputField id="metaColetivaGlobalCloser" label="Meta Coletiva Global" name="metaColetivaGlobal" value={inputs.metaColetivaGlobal} onChange={onChange} placeholder="Ex: 85,5" formatType="percentage" />
                 </div>
             </Section>
             <Section title="Premiação Trimestral">
@@ -184,8 +312,8 @@ const CloserInputsComponent: React.FC<{ inputs: any, onChange: any, bonuses: any
             </Section>
             <Section title="Bônus Anual">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormattedInputField id="metaAnualAcumulada" label="Meta Anual Acumulada (R$)" name="metaAnualAcumulada" value={inputs.metaAnualAcumulada} onChange={onChange} placeholder="Ex: 1.200.000" formatType="currency" />
-                    <FormattedInputField id="vendasRealizadasAno" label="Vendas Realizadas no Ano (R$)" name="vendasRealizadasAno" value={inputs.vendasRealizadasAno} onChange={onChange} placeholder="Ex: 1.000.000" formatType="currency" />
+                    <FormattedInputField id="metaAnualAcumulada" label="Meta Anual Acumulada" name="metaAnualAcumulada" value={inputs.metaAnualAcumulada} onChange={onChange} placeholder="Ex: 1.200.000" formatType="currency" />
+                    <FormattedInputField id="vendasRealizadasAno" label="Vendas Realizadas no Ano" name="vendasRealizadasAno" value={inputs.vendasRealizadasAno} onChange={onChange} placeholder="Ex: 1.000.000" formatType="currency" />
                     <InputField id="mesesDeCasaCloser" label="Meses de GGV no ano" name="mesesDeCasa" value={inputs.mesesDeCasa} onChange={onChange} placeholder="Ex: 12" type="number" max="12" min="1" />
                 </div>
             </Section>
@@ -275,6 +403,53 @@ const CloserResults: React.FC<{ results: any, includeQuarterly: boolean, setIncl
         </div>
         <div className="space-y-3 pt-4">
             <h4 className="font-semibold text-slate-700">Simulação de Cenários (Fixa + Com. Indiv.)</h4>
+            <div className="grid grid-cols-3 gap-3 text-center">
+                <ScenarioBox label="🔻 Baixo (75%)" value={formatCurrency(results.oteBaixo)} color="red" />
+                <ScenarioBox label="🎯 Alvo (100%)" value={formatCurrency(results.oteAlvo)} color="blue" />
+                <ScenarioBox label="🔼 Alto (150%)" value={formatCurrency(results.oteAlto)} color="green" />
+            </div>
+        </div>
+    </div>
+);
+
+const CoordenadorResults: React.FC<{ results: any, includeQuarterly: boolean, setIncludeQuarterly: any, includeAnnual: boolean, setIncludeAnnual: any, formatCurrency: (v: number) => string }> = ({ results, includeQuarterly, setIncludeQuarterly, includeAnnual, setIncludeAnnual, formatCurrency }) => (
+    <div className="space-y-6">
+        <div className="space-y-3">
+            <h4 className="font-semibold text-slate-700">Status das Metas</h4>
+            <ProgressItem label="Meta Coletiva" percentage={results.progressoColetiva} />
+            <ProgressItem label="Eficiência Trimestral" percentage={results.progressoTrimestral} />
+            <ProgressItem label="Meta Anual" percentage={results.progressoAnual} />
+        </div>
+        <div className="bg-purple-50 p-6 rounded-2xl text-center border-2 border-purple-200/50 shadow-inner-lg">
+            <p className="text-sm font-semibold text-purple-800 uppercase tracking-wider">OTE Total Mensal</p>
+            <p className="text-5xl font-extrabold text-purple-700 tracking-tight mt-1">{formatCurrency(results.totalOte)}</p>
+        </div>
+        <div className="space-y-1">
+            <h4 className="font-semibold text-slate-700 text-base mb-2">Detalhamento Variável</h4>
+            <DetailRow label="Salário Fixo" value={formatCurrency(results.salarioFixo)} />
+            <DetailRow label="Premiação Mensal Coletiva" value={formatCurrency(results.premiacaoColetiva)} />
+            {results.metaTrimestralAtingida && <CheckboxRow id="includeQuarterlyCoordenador" label="Premiação Trimestral Eficiência" value={results.bonusTrimestralPotencial} checked={includeQuarterly} onChange={setIncludeQuarterly} formatCurrency={formatCurrency} color="yellow" />}
+            {!results.metaTrimestralAtingida && results.progressoTrimestral > 0 && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                        <strong>Premiação Trimestral:</strong> Para o seu nível, é necessário atingir o threshold específico de eficiência (VENDA/SQL).
+                        Atual: {results.progressoTrimestral.toFixed(1)}%
+                    </p>
+                </div>
+            )}
+            {results.metaAnualAtingida && <CheckboxRow id="includeAnnualCoordenador" label="Bônus Anual (Meta 100% + Tempo GGV)" value={results.bonusAnualPotencial} checked={includeAnnual} onChange={setIncludeAnnual} formatCurrency={formatCurrency} color="blue" />}
+            {!results.metaAnualAtingida && results.progressoAnual > 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                        <strong>Bônus Anual:</strong> Necessário atingir 100% da meta anual para liberar o bônus.
+                        Atual: {results.progressoAnual.toFixed(1)}%
+                    </p>
+                </div>
+            )}
+            <DetailRow label="Total OTE Calculado" value={formatCurrency(results.totalOte)} isTotal />
+        </div>
+        <div className="space-y-3 pt-4">
+            <h4 className="font-semibold text-slate-700">Simulação de Cenários (Fixo + Premiação Coletiva)</h4>
             <div className="grid grid-cols-3 gap-3 text-center">
                 <ScenarioBox label="🔻 Baixo (75%)" value={formatCurrency(results.oteBaixo)} color="red" />
                 <ScenarioBox label="🎯 Alvo (100%)" value={formatCurrency(results.oteAlvo)} color="blue" />
