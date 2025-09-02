@@ -55,7 +55,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             return dealId.trim();
         }
         
-        console.log('❌ RESULTS - Nenhum deal_id válido encontrado');
+        // ÚLTIMO RECURSO: Tentar extrair de localStorage ou outras fontes
+        try {
+            const savedState = localStorage.getItem('ggv_diagnostic_state');
+            if (savedState) {
+                const parsed = JSON.parse(savedState);
+                if (parsed.dealId && parsed.dealId.trim() !== '') {
+                    console.log('🔄 RESULTS - Deal ID encontrado no localStorage:', parsed.dealId);
+                    return parsed.dealId.trim();
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ RESULTS - Erro ao verificar localStorage:', e);
+        }
+        
+        console.log('❌ RESULTS - Nenhum deal_id válido encontrado em nenhuma fonte');
         return null;
     })();
     
@@ -202,7 +216,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         summaryInsights,
                         detailedAnalysis,
                         scoresByArea: scoresByArea,
-                        dealId: fallbackDealId || null
+                        ...(fallbackDealId && { dealId: fallbackDealId })
                     };
                     
                     console.log('💾 N8N - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
@@ -216,7 +230,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
                 // Payload completo para N8N (inclui score + análise IA se disponível)
                 const payload = {
-                    deal_id: fallbackDealId || null, // Usar fallback deal_id
+                    ...(fallbackDealId && { deal_id: fallbackDealId }), // Só incluir se houver deal_id
                     timestamp: new Date().toISOString(),
                     action: 'ai_analysis_completed',
                     
@@ -225,7 +239,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             maturityPercentage: Math.round((totalScore / 90) * 100)
                         },
                         resultUrl: publicReportUrl,
-                        deal_id: fallbackDealId || null, // Usar fallback deal_id
+                        ...(fallbackDealId && { deal_id: fallbackDealId }), // Só incluir se houver deal_id
                         
                         // Incluir análise IA se disponível
                         ...(hasAI && {

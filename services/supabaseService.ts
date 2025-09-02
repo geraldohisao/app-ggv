@@ -1353,7 +1353,7 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
       recipient_email: recipientEmail || null,
       created_by: user?.id || null,
       expires_at: expiresAt || null,
-      deal_id: dealId || null, // Adicionar deal_id para mapeamento
+      ...(dealId && { deal_id: dealId }), // Só incluir deal_id se houver
     } as any;
     
     console.log('📊 CREATE_PUBLIC_REPORT - Criando relatório público:', { 
