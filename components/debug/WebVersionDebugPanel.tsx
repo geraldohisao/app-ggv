@@ -336,7 +336,16 @@ const WebVersionDebugPanel: React.FC = () => {
   const testDiagnosticPost = async () => {
     try {
       addLog('info', 'Test', 'Testando POST diagnóstico...');
-      const response = await fetch('/.netlify/functions/diag-ggv-register?deal_id=56934', {
+      
+      // Detectar ambiente
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const endpoint = isLocal 
+        ? '/api/webhook/diag-ggv-register?deal_id=56934'  // Usa proxy do Vite
+        : '/.netlify/functions/diag-ggv-register?deal_id=56934';  // Usa função Netlify
+      
+      addLog('debug', 'Test', `Ambiente: ${isLocal ? 'Local' : 'Produção'}, Endpoint: ${endpoint}`);
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -350,7 +359,12 @@ const WebVersionDebugPanel: React.FC = () => {
           }
         })
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 100)}`);
+      }
+      
       addLog('info', 'Test', 'POST Diagnóstico: ✅ Funcionando');
       setTestResults(prev => prev + '\n✅ POST Diagnostic: OK');
     } catch (error) {

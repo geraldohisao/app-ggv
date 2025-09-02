@@ -27,7 +27,7 @@ async function fetchCallVolumeData(days: number = 14, startDate?: string, endDat
     // Se temos datas específicas, usar elas
     let query = supabase
       .from('calls')
-      .select('created_at, status')
+      .select('created_at, status_voip')
       .order('created_at', { ascending: true });
 
     if (startDate && endDate) {
@@ -58,7 +58,11 @@ async function fetchCallVolumeData(days: number = 14, startDate?: string, endDat
 
     data?.forEach((call: any) => {
       const date = new Date(call.created_at).toISOString().split('T')[0];
-      const isAnswered = call.status !== 'missed';
+      
+      // Classificação baseada no status_voip:
+      // - Atendidas: apenas 'normal_clearing'
+      // - Não atendidas: 'no_answer', 'originator_cancel', 'number_changed', etc.
+      const isAnswered = call.status_voip === 'normal_clearing';
       
       if (!groupedData.has(date)) {
         groupedData.set(date, { answered: 0, missed: 0 });
@@ -204,7 +208,7 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
         y: event.clientY - 10,
         content: `${formatDate(point.date)}
 Atendidas: ${point.answered}
-Perdidas: ${point.missed}
+Não Atendidas: ${point.missed}
 Total: ${point.answered + point.missed}`
       });
     } else {
@@ -326,7 +330,7 @@ Total: ${point.answered + point.missed}`
             <circle cx="0" cy="0" r="4" fill="#10b981" />
             <text x="10" y="4" fontSize="12" fill="#374151">Atendidas</text>
             <circle cx="80" cy="0" r="4" fill="#ef4444" />
-            <text x="90" y="4" fontSize="12" fill="#374151">Perdidas</text>
+            <text x="90" y="4" fontSize="12" fill="#374151">Não Atendidas</text>
           </g>
         </svg>
 

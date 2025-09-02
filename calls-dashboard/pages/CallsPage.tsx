@@ -63,6 +63,10 @@ export default function CallsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50); // 50 itens por página
 
   // Carregar SDRs únicos
   useEffect(() => {
@@ -77,6 +81,11 @@ export default function CallsPage() {
     loadSdrs();
   }, []);
 
+  // Resetar página quando filtros mudarem
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sdr, status, type, start, end]);
+
   // Carregar calls com filtros
   useEffect(() => {
     const loadCalls = async () => {
@@ -90,7 +99,8 @@ export default function CallsPage() {
           call_type: type || undefined,
           start: start || undefined,
           end: end || undefined,
-          limit: 100
+          limit: itemsPerPage,
+          offset: (currentPage - 1) * itemsPerPage
         });
 
         const callItems = response.calls.map(convertToCallItem);
@@ -105,7 +115,7 @@ export default function CallsPage() {
     };
 
     loadCalls();
-  }, [sdr, status, type, start, end]);
+  }, [sdr, status, type, start, end, currentPage, itemsPerPage]);
 
   // Carregar etapas disponíveis
   useEffect(() => {
@@ -336,6 +346,7 @@ export default function CallsPage() {
               setType('');
               setStart('');
               setEnd('');
+              setCurrentPage(1); // Resetar para primeira página
             }}
             className="border border-slate-300 rounded px-3 py-2 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600"
           >
@@ -390,7 +401,6 @@ export default function CallsPage() {
                     </td>
                     <td className="p-4">
                       <div className="text-sm text-slate-700">{call.sdr.name}</div>
-                      <div className="text-xs text-slate-500">{call.sdr.email}</div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
@@ -469,6 +479,80 @@ export default function CallsPage() {
           </>
         )}
       </div>
+
+      {/* Paginação */}
+      {totalCount > itemsPerPage && (
+        <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="text-sm text-slate-600">
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalCount)} de {totalCount} chamadas
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ⏮️ Primeira
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ⬅️ Anterior
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, Math.ceil(totalCount / itemsPerPage)) }, (_, i) => {
+                const totalPages = Math.ceil(totalCount / itemsPerPage);
+                let pageNumber;
+                
+                if (totalPages <= 5) {
+                  pageNumber = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNumber = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNumber = totalPages - 4 + i;
+                } else {
+                  pageNumber = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`px-3 py-1 text-sm border rounded ${
+                      currentPage === pageNumber
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalCount / itemsPerPage), prev + 1))}
+              disabled={currentPage >= Math.ceil(totalCount / itemsPerPage)}
+              className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Próxima ➡️
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage(Math.ceil(totalCount / itemsPerPage))}
+              disabled={currentPage >= Math.ceil(totalCount / itemsPerPage)}
+              className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Última ⏭️
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal para editar etapa */}
       {editingEtapa && (

@@ -61,6 +61,9 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
     }
 
     const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin;
+    const canSeeFeedback = user.role === UserRole.SuperAdmin || 
+                          user.user_function === 'Closer' || 
+                          user.user_function === 'Gestor';
 
     return (
         <div className="relative inline-flex">
@@ -89,12 +92,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                     </div>
                     
                     <ul className="py-1">
-                        <MenuItem 
-                            icon={<FlagIcon className="w-5 h-5"/>} 
-                            text="Feedback de Oportunidade" 
-                            isActive={activeModule === Module.OpportunityFeedback}
-                            onClick={() => handleSelectModule(Module.OpportunityFeedback)}
-                        />
+                        {canSeeFeedback && (
+                            <MenuItem 
+                                icon={<FlagIcon className="w-5 h-5"/>} 
+                                text="Feedback de Oportunidade" 
+                                isActive={activeModule === Module.OpportunityFeedback}
+                                onClick={() => handleSelectModule(Module.OpportunityFeedback)}
+                            />
+                        )}
                         {canSeeSettings && (
                             <>
                                 <MenuItem 

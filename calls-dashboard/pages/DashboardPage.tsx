@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
         const { data, error } = await supabase
           .from('calls')
-          .select('status, duration')
+          .select('status_voip, duration')
           .gte('created_at', daysAgo.toISOString());
 
         if (error) {
@@ -59,16 +59,18 @@ export default function DashboardPage() {
 
         const calls = data || [];
         const totalCalls = calls.length;
-        const answered = calls.filter(c => 
-          !['missed', 'failed'].includes(c.status?.toLowerCase())
-        ).length;
+        
+        // Apenas 'normal_clearing' conta como atendida
+        const answeredCalls = calls.filter(c => c.status_voip === 'normal_clearing');
+        const answered = answeredCalls.length;
         const answeredRate = totalCalls ? Math.round((answered / totalCalls) * 100) : 0;
         
-        const validDurations = calls
+        // Duração média APENAS das chamadas atendidas (normal_clearing)
+        const answeredDurations = answeredCalls
           .filter(c => c.duration && c.duration > 0)
           .map(c => c.duration);
-        const avgDuration = validDurations.length > 0 
-          ? validDurations.reduce((a, b) => a + b, 0) / validDurations.length 
+        const avgDuration = answeredDurations.length > 0 
+          ? answeredDurations.reduce((a, b) => a + b, 0) / answeredDurations.length 
           : 0;
 
         setMetrics({
