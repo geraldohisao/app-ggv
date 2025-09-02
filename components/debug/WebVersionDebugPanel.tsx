@@ -265,16 +265,34 @@ const WebVersionDebugPanel: React.FC = () => {
   const testFeedbackPost = async () => {
     try {
       addLog('info', 'Test', 'Testando POST feedback...');
-      const response = await fetch('/.netlify/functions/feedback', {
+      
+      // Detectar ambiente
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const endpoint = isLocal 
+        ? '/api/feedback'  // Usa proxy do Vite (se disponível)
+        : '/.netlify/functions/feedback';  // Usa função Netlify
+      
+      addLog('debug', 'Test', `Ambiente: ${isLocal ? 'Local' : 'Produção'}, Endpoint: ${endpoint}`);
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: 'Teste do painel debug',
-          user: user?.name || 'Teste',
-          timestamp: new Date().toISOString()
+          type: 'Teste',
+          description: 'Teste do painel debug',
+          context: {
+            user: user || {},
+            url: window.location.href,
+            timestamp: new Date().toISOString()
+          }
         })
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 100)}`);
+      }
+      
       addLog('info', 'Test', 'POST Feedback: ✅ Funcionando');
       setTestResults(prev => prev + '\n✅ POST Feedback: OK');
     } catch (error) {
@@ -286,10 +304,29 @@ const WebVersionDebugPanel: React.FC = () => {
   const testDiagnosticGet = async () => {
     try {
       addLog('info', 'Test', 'Testando GET diagnóstico...');
-      const response = await fetch('/api/diagnostic/test');
+      
+      // Detectar ambiente
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const endpoint = isLocal 
+        ? '/api/diagnostic/test'  // Usa proxy do Vite
+        : '/.netlify/functions/diagnostic-test';  // Usa função Netlify
+      
+      addLog('debug', 'Test', `Ambiente: ${isLocal ? 'Local' : 'Produção'}, Endpoint: ${endpoint}`);
+      
+      const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      // Verificar se a resposta é JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Resposta não é JSON. Content-Type: ${contentType}, Conteúdo: ${text.slice(0, 100)}...`);
+      }
+      
+      const data = await response.json();
       addLog('info', 'Test', 'GET Diagnóstico: ✅ Funcionando');
       setTestResults(prev => prev + '\n✅ GET Diagnostic: OK');
+      console.log('📊 Diagnostic Test Response:', data);
     } catch (error) {
       addLog('error', 'Test', `GET Diagnóstico: ❌ ${error.message}`);
       setTestResults(prev => prev + `\n❌ GET Diagnostic: ${error.message}`);
@@ -299,12 +336,18 @@ const WebVersionDebugPanel: React.FC = () => {
   const testDiagnosticPost = async () => {
     try {
       addLog('info', 'Test', 'Testando POST diagnóstico...');
-      const response = await fetch('/api/diagnostic', {
+      const response = await fetch('/.netlify/functions/diag-ggv-register?deal_id=56934', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dealId: '12345',
-          responses: [{ questionId: 1, answer: 'Sim', score: 10 }]
+          deal_id: '56934',
+          action: 'diagnostic_test',
+          body: {
+            diagnosticAnswers: [
+              { questionId: 1, question: 'Teste', answer: 'Sim', description: 'Teste', score: 10 }
+            ],
+            results: { totalScore: 10, maturityPercentage: '11%' }
+          }
         })
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -319,15 +362,34 @@ const WebVersionDebugPanel: React.FC = () => {
   const testGoogleChatAlert = async () => {
     try {
       addLog('info', 'Test', 'Testando Google Chat...');
-      const response = await fetch('/.netlify/functions/alert', {
+      
+      // Detectar ambiente
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const endpoint = isLocal 
+        ? '/api/alert'  // Usa proxy do Vite (se disponível)
+        : '/.netlify/functions/alert';  // Usa função Netlify
+      
+      addLog('debug', 'Test', `Ambiente: ${isLocal ? 'Local' : 'Produção'}, Endpoint: ${endpoint}`);
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          title: 'Teste Google Chat',
           message: `🧪 TESTE GOOGLE CHAT\n\nUsuário: ${user?.name || 'Teste'}\nTimestamp: ${new Date().toLocaleString()}`,
-          source: 'DebugPanel-Test'
+          context: {
+            user: user || {},
+            url: window.location.href,
+            source: 'DebugPanel-Test'
+          }
         })
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 100)}`);
+      }
+      
       addLog('info', 'Test', 'Google Chat: ✅ Funcionando');
       setTestResults(prev => prev + '\n✅ Google Chat: OK');
     } catch (error) {

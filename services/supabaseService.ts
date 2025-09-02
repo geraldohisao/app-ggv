@@ -391,8 +391,8 @@ export async function sendDiagnosticToPipedrive(
             return 'Não';
         };
         
-        // Calcular porcentagem de maturidade
-        const maturityPercentage = Math.round((totalScore / 100) * 100);
+        // Calcular porcentagem de maturidade (9 perguntas * 10 pontos = 90 pontos máximos)
+        const maturityPercentage = Math.round((totalScore / 90) * 100);
         
         // Preparar payload com todos os dados do diagnóstico
         const payload = {
@@ -407,24 +407,23 @@ export async function sendDiagnosticToPipedrive(
                 salesChannels: companyData.salesChannels,
             },
             
-            // Respostas do diagnóstico (10 perguntas) - formato textual
+            // Respostas do diagnóstico (9 perguntas) - formato textual
             diagnosticAnswers: {
-                maturidade: getAnswerText(answers[1] || 0),
-                mapeamento_processos: getAnswerText(answers[2] || 0),
-                crm: getAnswerText(answers[3] || 0),
-                script_comercial: getAnswerText(answers[4] || 0),
-                teste_perfil_comportamental: getAnswerText(answers[5] || 0),
-                plano_metas_comissionamento: getAnswerText(answers[6] || 0),
-                indicadores_comerciais: getAnswerText(answers[7] || 0),
-                treinamentos_periodicos: getAnswerText(answers[8] || 0),
-                acao_pos_venda: getAnswerText(answers[9] || 0),
-                prospeccao_ativa: getAnswerText(answers[10] || 0),
+                mapeamento_processos: getAnswerText(answers[1] || 0),
+                crm: getAnswerText(answers[2] || 0),
+                script_comercial: getAnswerText(answers[3] || 0),
+                teste_perfil_comportamental: getAnswerText(answers[4] || 0),
+                plano_metas_comissionamento: getAnswerText(answers[5] || 0),
+                indicadores_comerciais: getAnswerText(answers[6] || 0),
+                treinamentos_periodicos: getAnswerText(answers[7] || 0),
+                acao_pos_venda: getAnswerText(answers[8] || 0),
+                prospeccao_ativa: getAnswerText(answers[9] || 0),
             },
             
             // Resultados calculados
             results: {
                 totalScore: totalScore,
-                maxPossibleScore: 100, // 10 perguntas * 10 pontos cada
+                maxPossibleScore: 90, // 9 perguntas * 10 pontos cada
                 maturityPercentage: `${maturityPercentage}%`, // Porcentagem como string
                 maturityLevel: maturityPercentage >= 70 ? 'Alta' : maturityPercentage >= 40 ? 'Média' : 'Baixa',
             },
