@@ -58,6 +58,7 @@ export interface CallsFilters {
   end?: string;
   limit?: number;
   offset?: number;
+  sortBy?: string;
 }
 
 export interface CallsResponse {
@@ -110,7 +111,8 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       start,
       end,
       limit = 50,
-      offset = 0
+      offset = 0,
+      sortBy = 'created_at'
     } = filters;
 
     // Converter datas para timestamp se fornecidas
@@ -125,6 +127,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       p_end_date: endTimestamp,
       p_limit: limit,
       p_offset: offset
+      // Remover p_sort_by por enquanto - ordenação será no frontend
     });
 
     if (error) {

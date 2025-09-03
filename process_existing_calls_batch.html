@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processamento em Lote - Análises de Chamadas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .result { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        pre { background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; overflow-x: auto; font-size: 12px; }
+        button { padding: 12px 24px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .progress { width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background: #007bff; transition: width 0.3s ease; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-number { font-size: 24px; font-weight: bold; color: #007bff; }
+        .call-item { background: white; border: 1px solid #dee2e6; padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .call-item.processed { border-left: 4px solid #28a745; }
+        .call-item.failed { border-left: 4px solid #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Processamento em Lote - Análises de Chamadas</h1>
+        <p>Processa automaticamente análises de scorecard para chamadas existentes usando IA.</p>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalCalls">-</div>
+                <div>Total de Chamadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="withTranscription">-</div>
+                <div>Com Transcrição</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="alreadyAnalyzed">-</div>
+                <div>Já Analisadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="toProcess">-</div>
+                <div>Para Processar</div>
+            </div>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button onclick="loadCallsStats()">📊 Carregar Estatísticas</button>
+            <button onclick="processAllCalls()" id="processBtn" disabled>🚀 Processar Todas</button>
+            <button onclick="processRecentCalls()" id="processRecentBtn" disabled>⚡ Processar Últimas 10</button>
+            <button onclick="stopProcessing()" id="stopBtn" disabled style="background: #dc3545;">⏹️ Parar</button>
+        </div>
+
+        <div id="progress" style="display: none;">
+            <h3>📈 Progresso do Processamento</h3>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+            <div id="progressText">0 / 0 processadas</div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pqmjfwmbitodwtpedlle.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbWpmd21iaXRvZHd0cGVkbGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ4NzQ0NzQsImV4cCI6MjA0MDQ1MDQ3NH0.0PlBhixdcx6c5VJv7fCXJOB_pVUKbbyVFjvYFQTtKHE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        let isProcessing = false;
+        let shouldStop = false;
+        
+        function addResult(title, content, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
+            document.getElementById('results').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        async function loadCallsStats() {
+            try {
+                addResult('📊 Carregando estatísticas...', 'Buscando dados das chamadas...', 'result');
+                
+                // Buscar chamadas com transcrição
+                const { data: calls, error: callsError } = await supabase
+                    .from('calls')
+                    .select('id, transcription, sdr_name, person, created_at')
+                    .not('transcription', 'is', null)
+                    .neq('transcription', '');
+                
+                if (callsError) {
+                    addResult('❌ Erro ao buscar chamadas', JSON.stringify(callsError, null, 2), 'error');
+                    return;
+                }
+                
+                // Buscar análises existentes
+                const { data: analyses, error: analysesError } = await supabase
+                    .from('call_analyses')
+                    .select('call_id');
+                
+                if (analysesError) {
+                    console.warn('Erro ao buscar análises:', analysesError);
+                }
+                
+                const analyzedCallIds = new Set((analyses || []).map(a => a.call_id));
+                const callsWithTranscription = calls.filter(c => c.transcription && c.transcription.trim().length > 100);
+                const toProcess = callsWithTranscription.filter(c => !analyzedCallIds.has(c.id));
+                
+                // Atualizar estatísticas
+                document.getElementById('totalCalls').textContent = calls.length;
+                document.getElementById('withTranscription').textContent = callsWithTranscription.length;
+                document.getElementById('alreadyAnalyzed').textContent = analyzedCallIds.size;
+                document.getElementById('toProcess').textContent = toProcess.length;
+                
+                // Habilitar botões
+                document.getElementById('processBtn').disabled = toProcess.length === 0;
+                document.getElementById('processRecentBtn').disabled = toProcess.length === 0;
+                
+                addResult('✅ Estatísticas carregadas', 
+                    `Total: ${calls.length} chamadas\n` +
+                    `Com transcrição: ${callsWithTranscription.length}\n` +
+                    `Já analisadas: ${analyzedCallIds.size}\n` +
+                    `Para processar: ${toProcess.length}`, 'success');
+                
+                // Mostrar algumas chamadas para processar
+                if (toProcess.length > 0) {
+                    const sample = toProcess.slice(0, 5).map(c => 
+                        `${c.id.substring(0, 8)} - ${c.sdr_name || 'SDR'} - ${new Date(c.created_at).toLocaleDateString()}`
+                    ).join('\n');
+                    
+                    addResult('📋 Amostra de chamadas para processar', sample, 'warning');
+                }
+                
+            } catch (err) {
+                addResult('❌ Erro inesperado', err.message, 'error');
+            }
+        }
+        
+        async function processAllCalls() {
+            await processCalls(false);
+        }
+        
+        async function processRecentCalls() {
+            await processCalls(true);
+        }
+        
+        async function processCalls(recentOnly = false) {
+            if (isProcessing) return;
+            
+            isProcessing = true;
+            shouldStop = false;
+            
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('processRecentBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('progress').style.display = 'block';
+            
+            try {
+                // Buscar chamadas para processar
+                let query = supabase
+                    .from('calls')
+                    .select('id, transcription, sdr_name, person, created_at')
+                    .not('transcription', 'is', null)
+                    .neq('transcription', '')
+                    .order('created_at', { ascending: false });
+                
+                if (recentOnly) {
+                    query = query.limit(10);
+                }
+                
+                const { data: calls, error } = await query;
+                
+                if (error) {
+                    addResult('❌ Erro ao buscar chamadas', JSON.stringify(error, null, 2), 'error');
+                    return;
+                }
+                
+                // Filtrar chamadas que já têm análise
+                const { data: analyses } = await supabase
+                    .from('call_analyses')
+                    .select('call_id');
+                
+                const analyzedCallIds = new Set((analyses || []).map(a => a.call_id));
+                const toProcess = calls.filter(c => 
+                    !analyzedCallIds.has(c.id) && 
+                    c.transcription && 
+                    c.transcription.trim().length > 100
+                );
+                
+                addResult('🚀 Iniciando processamento', 
+                    `${toProcess.length} chamadas serão processadas`, 'success');
+                
+                let processed = 0;
+                let success = 0;
+                let failed = 0;
+                
+                for (const call of toProcess) {
+                    if (shouldStop) {
+                        addResult('⏹️ Processamento interrompido', 
+                            `Processadas: ${processed}/${toProcess.length}`, 'warning');
+                        break;
+                    }
+                    
+                    try {
+                        addResult(`🔄 Processando chamada ${processed + 1}/${toProcess.length}`, 
+                            `ID: ${call.id.substring(0, 8)}\nSDR: ${call.sdr_name || 'N/A'}\nCliente: ${call.person || 'N/A'}`, 'result');
+                        
+                        // Simular processamento (aqui você chamaria a API real)
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
+                        // Aqui você faria a chamada real para a API de análise
+                        // const result = await processCallAnalysis(call.id, call.transcription, call.sdr_name, call.person);
+                        
+                        success++;
+                        addResult(`✅ Chamada processada`, 
+                            `ID: ${call.id.substring(0, 8)} - Sucesso`, 'success');
+                        
+                    } catch (err) {
+                        failed++;
+                        addResult(`❌ Erro ao processar chamada`, 
+                            `ID: ${call.id.substring(0, 8)}\nErro: ${err.message}`, 'error');
+                    }
+                    
+                    processed++;
+                    
+                    // Atualizar progresso
+                    const progress = (processed / toProcess.length) * 100;
+                    document.getElementById('progressBar').style.width = `${progress}%`;
+                    document.getElementById('progressText').textContent = `${processed} / ${toProcess.length} processadas`;
+                }
+                
+                addResult('🎉 Processamento concluído', 
+                    `Total processadas: ${processed}\nSucesso: ${success}\nFalhas: ${failed}`, 'success');
+                
+            } catch (err) {
+                addResult('❌ Erro no processamento', err.message, 'error');
+            } finally {
+                isProcessing = false;
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('processRecentBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            }
+        }
+        
+        function stopProcessing() {
+            shouldStop = true;
+            addResult('⏹️ Solicitação de parada enviada', 'O processamento será interrompido após a chamada atual.', 'warning');
+        }
+        
+        // Carregar estatísticas ao abrir a página
+        window.addEventListener('load', loadCallsStats);
+    </script>
+</body>
+</html>

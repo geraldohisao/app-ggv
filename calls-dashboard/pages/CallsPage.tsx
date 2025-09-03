@@ -56,6 +56,7 @@ export default function CallsPage() {
   const [editingEtapa, setEditingEtapa] = useState<string | null>(null);
   const [newEtapa, setNewEtapa] = useState('');
   const [availableEtapas, setAvailableEtapas] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState('created_at'); // Novo estado para ordenação
   
   // Estados para dados reais
   const [calls, setCalls] = useState<CallItem[]>([]);
@@ -81,17 +82,24 @@ export default function CallsPage() {
     loadSdrs();
   }, []);
 
-  // Resetar página quando filtros mudarem
+  // Resetar página e limpar dados quando filtros mudarem
   useEffect(() => {
     setCurrentPage(1);
-  }, [sdr, status, type, start, end]);
+    setCalls([]); // Limpar dados antigos
+    setTotalCount(0);
+  }, [sdr, status, type, start, end, sortBy]);
 
-  // Carregar calls com filtros
+  // Carregar calls com filtros (com debounce)
   useEffect(() => {
-    const loadCalls = async () => {
+    const timeoutId = setTimeout(() => {
+      const loadCalls = async () => {
       try {
         setLoading(true);
         setError(null);
+        
+        console.log('🔍 Carregando calls com filtros:', {
+          sdr, status, type, start, end, sortBy, currentPage
+        });
         
         const response = await fetchCalls({
           sdr_email: sdr || undefined,
@@ -99,9 +107,12 @@ export default function CallsPage() {
           call_type: type || undefined,
           start: start || undefined,
           end: end || undefined,
-          limit: itemsPerPage,
-          offset: (currentPage - 1) * itemsPerPage
+          limit: sortBy === 'duration' ? 1000 : itemsPerPage, // Buscar mais dados quando ordenar por duração
+          offset: sortBy === 'duration' ? 0 : (currentPage - 1) * itemsPerPage, // Reset offset para ordenação por duração
+          sortBy: sortBy
         });
+
+        console.log('✅ Calls carregadas:', response.calls.length, 'Max duration:', Math.max(...response.calls.map(c => c.duration || 0)));
 
         const callItems = response.calls.map(convertToCallItem);
         setCalls(callItems);
@@ -114,8 +125,11 @@ export default function CallsPage() {
       }
     };
 
-    loadCalls();
-  }, [sdr, status, type, start, end, currentPage, itemsPerPage]);
+      loadCalls();
+    }, 300); // Delay de 300ms para evitar múltiplas chamadas
+
+    return () => clearTimeout(timeoutId);
+  }, [sdr, status, type, start, end, currentPage, itemsPerPage, sortBy]); // Adicionar sortBy às dependências
 
   // Carregar etapas disponíveis
   useEffect(() => {
@@ -226,8 +240,24 @@ export default function CallsPage() {
       );
     }
     
+    // Aplicar ordenação local se necessário (fallback)
+    switch (sortBy) {
+      case 'duration':
+        result = result.sort((a, b) => b.durationSec - a.durationSec);
+        break;
+      case 'score':
+        result = result.sort((a, b) => (b.score || 0) - (a.score || 0));
+        break;
+      case 'company':
+        result = result.sort((a, b) => a.company.localeCompare(b.company));
+        break;
+      default: // created_at
+        result = result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        break;
+    }
+    
     return result;
-  }, [calls, query, minDuration, maxDuration, minScore, searchTerm]);
+  }, [calls, query, minDuration, maxDuration, minScore, searchTerm, sortBy]);
 
   return (
     <div className="p-6 space-y-6">
@@ -302,13 +332,23 @@ export default function CallsPage() {
         </div>
         
         {/* Segunda linha - Filtros avançados */}
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-200">
+        <div className="grid grid-cols-1 lg:grid-cols-7 gap-3 pt-2 border-t border-slate-200">
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm"
             placeholder="Buscar por nome, empresa..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          <select 
+            className="border border-slate-300 rounded px-3 py-2 text-sm" 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="created_at">📅 Mais Recentes</option>
+            <option value="duration">⏱️ Maior Duração</option>
+            <option value="score">⭐ Maior Nota</option>
+            <option value="company">🏢 Empresa A-Z</option>
+          </select>
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm"
             type="number"
@@ -346,14 +386,60 @@ export default function CallsPage() {
               setType('');
               setStart('');
               setEnd('');
+              setSortBy('created_at'); // Resetar ordenação
               setCurrentPage(1); // Resetar para primeira página
             }}
             className="border border-slate-300 rounded px-3 py-2 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600"
           >
             🗑️ Limpar Filtros
           </button>
+          <button
+            onClick={() => {
+              console.log('🔄 Forçando reload das calls...');
+              setCalls([]);
+              setTotalCount(0);
+              setLoading(true);
+              // Forçar reload dos dados sem recarregar a página
+              const forceReload = async () => {
+                try {
+                  const response = await fetchCalls({
+                    sdr_email: sdr || undefined,
+                    status: status || undefined,
+                    call_type: type || undefined,
+                    start: start || undefined,
+                    end: end || undefined,
+                    limit: sortBy === 'duration' ? 1000 : itemsPerPage,
+                    offset: sortBy === 'duration' ? 0 : (currentPage - 1) * itemsPerPage,
+                    sortBy: sortBy
+                  });
+                  const callItems = response.calls.map(convertToCallItem);
+                  setCalls(callItems);
+                  setTotalCount(response.totalCount);
+                  console.log('✅ Reload forçado concluído:', callItems.length, 'calls');
+                } catch (err) {
+                  console.error('❌ Erro no reload forçado:', err);
+                  setError('Erro ao recarregar chamadas');
+                } finally {
+                  setLoading(false);
+                }
+              };
+              forceReload();
+            }}
+            className="border border-blue-300 rounded px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-600"
+          >
+            🔄 Recarregar
+          </button>
           <div className="flex items-center text-xs text-slate-500">
             <span>📊 {filtered.length} de {calls.length} chamadas</span>
+            {loading && (
+              <span className="ml-2 text-orange-600">🔄 Carregando...</span>
+            )}
+            {!loading && sortBy === 'duration' && (
+              <span className="ml-2 text-green-600">⏱️ Ordenado por duração</span>
+            )}
+            {!loading && sortBy === 'score' && (
+              <span className="ml-2 text-purple-600">⭐ Ordenado por nota</span>
+            )}
           </div>
         </div>
       </div>
@@ -431,7 +517,9 @@ export default function CallsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <span>{secondsToHuman(call.durationSec)}</span>
+                        <span className={`font-medium ${call.durationSec > 300 ? 'text-green-600' : call.durationSec > 60 ? 'text-yellow-600' : 'text-slate-600'}`}>
+                          {secondsToHuman(call.durationSec)}
+                        </span>
                         {call.recording_url && call.durationSec && call.durationSec > 180 && (
                           <MiniAudioPlayer 
                             audioUrl={call.recording_url}
@@ -439,6 +527,19 @@ export default function CallsPage() {
                             callId={call.id}
                           />
                         )}
+                        {/* Indicadores de mídia */}
+                        <div className="flex gap-1">
+                          {call.transcription && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded" title="Tem transcrição">
+                              📝
+                            </span>
+                          )}
+                          {call.recording_url && (
+                            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded" title="Tem áudio">
+                              🎵
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="p-4">

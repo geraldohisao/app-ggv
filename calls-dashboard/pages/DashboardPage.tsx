@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
+import SdrAverageScoreChart from '../components/SdrAverageScoreChart';
 import { supabase } from '../../services/supabaseClient';
 
 interface DashboardMetrics {
@@ -194,11 +195,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-             {/* Gráficos */}
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         <CallVolumeChart selectedPeriod={selectedPeriod} />
-         <SdrScoreChart selectedPeriod={selectedPeriod} />
-       </div>
+      {/* Gráfico de Volume - Largura completa */}
+      <div className="w-full">
+        <CallVolumeChart selectedPeriod={selectedPeriod} />
+      </div>
+
+      {/* Rankings - Duas colunas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SdrScoreChart selectedPeriod={selectedPeriod} />
+        <SdrAverageScoreChart selectedPeriod={selectedPeriod} />
+      </div>
     </div>
   );
 }

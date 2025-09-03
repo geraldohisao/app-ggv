@@ -202,14 +202,34 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
     
     if (index >= 0 && index < data.length) {
       const point = data[index];
+      const total = point.answered + point.missed;
+      const answeredRate = total > 0 ? Math.round((point.answered / total) * 100) : 0;
+      
+      // Calcular posição do tooltip para não sair da tela
+      const tooltipWidth = 200;
+      const tooltipHeight = 120;
+      let tooltipX = event.clientX + 15;
+      let tooltipY = event.clientY - 10;
+      
+      // Ajustar se sair da direita da tela
+      if (tooltipX + tooltipWidth > window.innerWidth) {
+        tooltipX = event.clientX - tooltipWidth - 15;
+      }
+      
+      // Ajustar se sair do topo da tela
+      if (tooltipY - tooltipHeight < 0) {
+        tooltipY = event.clientY + 20;
+      }
+      
       setTooltip({
         visible: true,
-        x: event.clientX,
-        y: event.clientY - 10,
+        x: tooltipX,
+        y: tooltipY,
         content: `${formatDate(point.date)}
-Atendidas: ${point.answered}
-Não Atendidas: ${point.missed}
-Total: ${point.answered + point.missed}`
+📞 Total: ${total} chamadas
+✅ Atendidas: ${point.answered} (${answeredRate}%)
+❌ Não Atendidas: ${point.missed}
+📊 Taxa de Atendimento: ${answeredRate}%`
       });
     } else {
       setTooltip(prev => ({ ...prev, visible: false }));
@@ -231,10 +251,10 @@ Total: ${point.answered + point.missed}`
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
         <h3 className="font-semibold text-slate-800">Volume de Chamadas por Dia</h3>
-        <p className="text-sm text-slate-500">Clique em um ponto para filtrar por data</p>
+        <p className="text-sm text-slate-500">Clique em um ponto para filtrar por data • Passe o mouse para ver detalhes</p>
       </div>
       
-      <div className="relative w-full overflow-x-auto">
+      <div className="relative w-full overflow-visible">
         <svg
           width={width}
           height={height}
@@ -304,22 +324,38 @@ Total: ${point.answered + point.missed}`
               strokeLinejoin="round"
             />
 
-            {/* Data points */}
+            {/* Data points com hover melhorado */}
             {data.map((d, i) => (
               <g key={i}>
+                {/* Área invisível maior para facilitar hover */}
+                <circle
+                  cx={xScale(i)}
+                  cy={yScale(Math.max(d.answered, d.missed))}
+                  r="15"
+                  fill="transparent"
+                  className="cursor-pointer"
+                />
+                
+                {/* Ponto das atendidas */}
                 <circle
                   cx={xScale(i)}
                   cy={yScale(d.answered)}
-                  r="4"
+                  r="5"
                   fill="#10b981"
-                  className="hover:r-6 transition-all duration-200"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  className="hover:r-7 transition-all duration-200 cursor-pointer drop-shadow-sm"
                 />
+                
+                {/* Ponto das não atendidas */}
                 <circle
                   cx={xScale(i)}
                   cy={yScale(d.missed)}
-                  r="4"
+                  r="5"
                   fill="#ef4444"
-                  className="hover:r-6 transition-all duration-200"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  className="hover:r-7 transition-all duration-200 cursor-pointer drop-shadow-sm"
                 />
               </g>
             ))}
@@ -334,17 +370,30 @@ Total: ${point.answered + point.missed}`
           </g>
         </svg>
 
-        {/* Tooltip */}
+        {/* Tooltip melhorado */}
         {tooltip.visible && (
           <div
-            className="absolute bg-slate-800 text-white p-2 rounded text-xs pointer-events-none z-10"
+            className="fixed bg-slate-900 text-white p-3 rounded-lg shadow-xl border border-slate-700 pointer-events-none z-50 max-w-xs"
             style={{
-              left: tooltip.x + 10,
-              top: tooltip.y - 10,
+              left: tooltip.x,
+              top: tooltip.y,
               transform: 'translateY(-100%)'
             }}
           >
-            <pre className="whitespace-pre-line">{tooltip.content}</pre>
+            <div className="text-sm font-medium mb-1 text-slate-100">
+              {tooltip.content.split('\n')[0]}
+            </div>
+            <div className="space-y-1 text-xs">
+              {tooltip.content.split('\n').slice(1).map((line, i) => (
+                <div key={i} className="flex items-center gap-1 text-slate-200">
+                  {line}
+                </div>
+              ))}
+            </div>
+            {/* Seta do tooltip */}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2">
+              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900"></div>
+            </div>
           </div>
         )}
       </div>

@@ -3,6 +3,8 @@ import { DATE_FORMATTER, TIME_FORMATTER, secondsToHuman } from '../constants';
 import { fetchCallDetail, convertToCallItem } from '../services/callsService';
 import { CallItem } from '../types';
 import AiAssistant from '../components/AiAssistant';
+import ScorecardAnalysis from '../components/ScorecardAnalysis';
+// import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
 
 interface CallDetailPageProps {
   callId: string;
@@ -151,15 +153,21 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           {/* Transcrição */}
           {call.transcription && (
             <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <div className="mb-3 font-medium text-slate-800">Transcrição</div>
-              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 whitespace-pre-wrap">
+              <div className="mb-3 font-medium text-slate-800">📝 Transcrição da Chamada</div>
+              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
                 {call.transcription}
+              </div>
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-lg">
+                  <strong>🎤 Separação de Falantes:</strong> Funcionalidade será implementada em breve com IA avançada!
+                </div>
               </div>
             </div>
           )}
         </div>
 
         <div className="space-y-4">
+          <ScorecardAnalysis call={call} />
           <AiAssistant call={call} />
         </div>
       </div>

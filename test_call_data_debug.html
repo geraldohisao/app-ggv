@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Dados da Chamada</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        pre { background: #fff; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Dados da Chamada Específica</h1>
+    <p>Investigando inconsistências na chamada: <code>5091c852-7fce-4cbd-ac11-790da156a214</code></p>
+    
+    <button onclick="debugCallData()">🔍 Verificar Dados da Chamada</button>
+    <button onclick="debugAudioUrl()">🎵 Analisar URL do Áudio</button>
+    <button onclick="debugTranscription()">📝 Verificar Transcrição</button>
+    
+    <div id="results"></div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pqmjfwmbitodwtpedlle.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbWpmd21iaXRvZHd0cGVkbGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ4NzQ0NzQsImV4cCI6MjA0MDQ1MDQ3NH0.0PlBhixdcx6c5VJv7fCXJOB_pVUKbbyVFjvYFQTtKHE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        const callId = '5091c852-7fce-4cbd-ac11-790da156a214';
+        
+        function addResult(title, content, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<h3>${title}</h3><pre>${content}</pre>`;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        async function debugCallData() {
+            try {
+                addResult('🔄 Buscando dados da chamada...', 'Executando query...', 'result');
+                
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .eq('id', callId)
+                    .single();
+                
+                if (error) {
+                    addResult('❌ Erro ao buscar dados', JSON.stringify(error, null, 2), 'error');
+                    return;
+                }
+                
+                if (!data) {
+                    addResult('⚠️ Chamada não encontrada', 'Nenhum resultado retornado', 'error');
+                    return;
+                }
+                
+                // Analisar dados importantes
+                const analysis = {
+                    id: data.id,
+                    duration: data.duration,
+                    created_at: data.created_at,
+                    status: data.status,
+                    status_voip: data.status_voip,
+                    recording_url: data.recording_url,
+                    audio_url: data.audio_url,
+                    transcription_length: data.transcription ? data.transcription.length : 0,
+                    transcription_preview: data.transcription ? data.transcription.substring(0, 200) + '...' : 'Sem transcrição',
+                    person: data.person,
+                    enterprise: data.enterprise,
+                    sdr_name: data.sdr_name,
+                    deal_id: data.deal_id
+                };
+                
+                addResult('✅ Dados da Chamada', JSON.stringify(analysis, null, 2), 'success');
+                
+                // Verificar inconsistências
+                const issues = [];
+                if (data.duration && data.duration > 900) { // > 15 min
+                    issues.push(`Duração muito alta: ${data.duration} segundos (${Math.round(data.duration/60)} min)`);
+                }
+                if (data.recording_url && data.recording_url.includes('duration')) {
+                    issues.push('URL do áudio contém informação de duração');
+                }
+                if (!data.transcription) {
+                    issues.push('Sem transcrição disponível');
+                }
+                
+                if (issues.length > 0) {
+                    addResult('⚠️ Possíveis Problemas Identificados', issues.join('\n'), 'error');
+                } else {
+                    addResult('✅ Nenhum problema óbvio identificado', 'Dados parecem consistentes', 'success');
+                }
+                
+            } catch (err) {
+                addResult('❌ Erro inesperado', err.message, 'error');
+            }
+        }
+        
+        async function debugAudioUrl() {
+            try {
+                const { data } = await supabase
+                    .from('calls')
+                    .select('recording_url, audio_url, duration')
+                    .eq('id', callId)
+                    .single();
+                
+                if (!data) {
+                    addResult('❌ Chamada não encontrada', '', 'error');
+                    return;
+                }
+                
+                const audioAnalysis = {
+                    recording_url: data.recording_url,
+                    audio_url: data.audio_url,
+                    duration_from_db: data.duration,
+                    url_analysis: {
+                        has_recording_url: !!data.recording_url,
+                        has_audio_url: !!data.audio_url,
+                        recording_url_length: data.recording_url ? data.recording_url.length : 0,
+                        contains_duration_info: data.recording_url ? data.recording_url.includes('duration') : false
+                    }
+                };
+                
+                addResult('🎵 Análise do Áudio', JSON.stringify(audioAnalysis, null, 2), 'success');
+                
+                // Tentar fazer uma requisição HEAD para o áudio (se possível)
+                if (data.recording_url) {
+                    try {
+                        const response = await fetch(data.recording_url, { method: 'HEAD' });
+                        const headers = {};
+                        for (let [key, value] of response.headers.entries()) {
+                            headers[key] = value;
+                        }
+                        addResult('🌐 Headers do Áudio', JSON.stringify(headers, null, 2), 'success');
+                    } catch (fetchError) {
+                        addResult('⚠️ Não foi possível acessar o áudio', fetchError.message, 'error');
+                    }
+                }
+                
+            } catch (err) {
+                addResult('❌ Erro ao analisar áudio', err.message, 'error');
+            }
+        }
+        
+        async function debugTranscription() {
+            try {
+                const { data } = await supabase
+                    .from('calls')
+                    .select('transcription, duration, sdr_name, person')
+                    .eq('id', callId)
+                    .single();
+                
+                if (!data) {
+                    addResult('❌ Chamada não encontrada', '', 'error');
+                    return;
+                }
+                
+                const transcriptionAnalysis = {
+                    has_transcription: !!data.transcription,
+                    transcription_length: data.transcription ? data.transcription.length : 0,
+                    sdr_name: data.sdr_name,
+                    person_name: data.person,
+                    duration: data.duration,
+                    transcription_preview: data.transcription ? data.transcription.substring(0, 500) : 'Sem transcrição'
+                };
+                
+                addResult('📝 Análise da Transcrição', JSON.stringify(transcriptionAnalysis, null, 2), 'success');
+                
+                if (data.transcription) {
+                    // Análise básica do conteúdo
+                    const words = data.transcription.split(/\s+/).length;
+                    const estimatedMinutes = words / 150; // ~150 palavras por minuto
+                    const actualMinutes = data.duration / 60;
+                    
+                    const contentAnalysis = {
+                        word_count: words,
+                        estimated_duration_minutes: Math.round(estimatedMinutes * 10) / 10,
+                        actual_duration_minutes: Math.round(actualMinutes * 10) / 10,
+                        discrepancy: Math.abs(estimatedMinutes - actualMinutes) > 5 ? 'ALTA' : 'BAIXA'
+                    };
+                    
+                    addResult('📊 Análise de Conteúdo', JSON.stringify(contentAnalysis, null, 2), 
+                        contentAnalysis.discrepancy === 'ALTA' ? 'error' : 'success');
+                }
+                
+            } catch (err) {
+                addResult('❌ Erro ao analisar transcrição', err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
