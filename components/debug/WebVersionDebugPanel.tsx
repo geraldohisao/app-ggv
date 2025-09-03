@@ -33,9 +33,14 @@ const WebVersionDebugPanel: React.FC = () => {
   const [globalLogFilter, setGlobalLogFilter] = useState<'all' | 'errors' | 'warnings' | 'info'>('all');
 
   // Verificar se é super admin (mais permissivo para desenvolvimento)
+  // Permite debug em produção via variável de ambiente REACT_APP_ENABLE_DEBUG_PANEL=true
+  const isDebugEnabled = process.env.REACT_APP_ENABLE_DEBUG_PANEL === 'true';
   const isSuperAdmin = user?.role === 'SuperAdmin' || 
                        user?.role === 'Admin' || 
-                       (process.env.NODE_ENV === 'development' && user !== null);
+                       user?.role === 'Closer' ||
+                       user?.role === 'SDR' ||
+                       (process.env.NODE_ENV === 'development' && user !== null) ||
+                       (isDebugEnabled && user !== null);
 
   const addLog = (level: 'info' | 'warn' | 'error' | 'debug', source: string, message: string, userId?: string, userName?: string, userEmail?: string) => {
     const newLog = {
