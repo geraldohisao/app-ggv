@@ -1,0 +1,108 @@
+-- Corrigir APENAS a função SQL para usar duration_formated
+-- Não mexer no frontend, apenas no backend
+
+-- 1. Remover função atual
+DROP FUNCTION IF EXISTS get_calls_with_filters(text,text,text,text,text,integer,integer,integer,integer,text);
+
+-- 2. Recriar função simples que retorna duration_formated convertido como duration
+CREATE OR REPLACE FUNCTION get_calls_with_filters(
+  p_sdr_email TEXT DEFAULT NULL,
+  p_status TEXT DEFAULT NULL,
+  p_call_type TEXT DEFAULT NULL,
+  p_start_date TEXT DEFAULT NULL,
+  p_end_date TEXT DEFAULT NULL,
+  p_limit INTEGER DEFAULT 50,
+  p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+  id UUID,
+  provider_call_id TEXT,
+  from_number TEXT,
+  to_number TEXT,
+  agent_id TEXT,
+  status TEXT,
+  status_voip TEXT,
+  duration INTEGER, -- Convertido de duration_formated
+  duration_formated TEXT,
+  call_type TEXT,
+  direction TEXT,
+  recording_url TEXT,
+  audio_bucket TEXT,
+  audio_path TEXT,
+  transcription TEXT,
+  transcript_status TEXT,
+  ai_status TEXT,
+  sdr_name TEXT,
+  sdr_email TEXT,
+  enterprise TEXT,
+  person TEXT,
+  deal_id TEXT,
+  person_name TEXT,
+  person_email TEXT,
+  company_name TEXT,
+  insights JSONB,
+  scorecard JSONB,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    c.id,
+    c.provider_call_id,
+    c.from_number,
+    c.to_number,
+    c.agent_id,
+    c.status,
+    c.status_voip,
+    -- Converter duration_formated (HH:MM:SS) para segundos
+    CASE 
+      WHEN c.duration_formated IS NOT NULL AND c.duration_formated != '00:00:00' THEN
+        EXTRACT(EPOCH FROM c.duration_formated::TIME)::INTEGER
+      ELSE c.duration
+    END as duration,
+    c.duration_formated,
+    c.call_type,
+    c.direction,
+    c.recording_url,
+    c.audio_bucket,
+    c.audio_path,
+    c.transcription,
+    c.transcript_status,
+    c.ai_status,
+    c.sdr_name,
+    c.sdr_email,
+    c.enterprise,
+    c.person,
+    c.deal_id,
+    c.person_name,
+    c.person_email,
+    c.company_name,
+    c.insights,
+    c.scorecard,
+    c.created_at
+  FROM calls c
+  WHERE 
+    (p_sdr_email IS NULL OR c.sdr_email = p_sdr_email)
+    AND (p_status IS NULL OR c.status_voip = p_status)
+    AND (p_call_type IS NULL OR c.call_type = p_call_type)
+    AND (p_start_date IS NULL OR c.created_at >= p_start_date::TIMESTAMPTZ)
+    AND (p_end_date IS NULL OR c.created_at <= p_end_date::TIMESTAMPTZ)
+  ORDER BY c.created_at DESC
+  LIMIT p_limit
+  OFFSET p_offset;
+END;
+$$;
+
+-- 3. Testar função
+SELECT 'Testando função simplificada...' as status;
+
+SELECT 
+  COUNT(*) as total,
+  MAX(duration) as max_duration_convertida,
+  COUNT(CASE WHEN duration > 60 THEN 1 END) as calls_over_60s
+FROM get_calls_with_filters(NULL, NULL, NULL, NULL, NULL, 100, 0);
+
+SELECT 'Função corrigida - duration agora vem de duration_formated!' as resultado;

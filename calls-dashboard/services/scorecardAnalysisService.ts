@@ -51,17 +51,23 @@ export interface ScorecardAnalysisResult {
   confidence: number; // 0-1
 }
 
-// Função para obter chave da API Gemini
+// Função para obter chave da API Gemini (DB -> env -> local)
 const getGeminiApiKey = async (): Promise<string | null> => {
-  // Fallback para configuração local
+  try {
+    // 1) Banco (app_settings.gemini_api_key)
+    const { getAppSetting } = await import('../../services/supabaseService');
+    const dbKey = await getAppSetting('gemini_api_key');
+    if (typeof dbKey === 'string' && dbKey.trim()) return dbKey.trim();
+  } catch {}
+
+  // 2) Variáveis de ambiente do bundle
+  const envKey = process.env.VITE_GEMINI_API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
+  if (envKey) return envKey as string;
+
+  // 3) Config local (fallback de desenvolvimento)
   const local: any = (globalThis as any).APP_CONFIG_LOCAL;
-  if (local && typeof local.GEMINI_API_KEY === 'string') return local.GEMINI_API_KEY;
-  
-  // Fallback para variáveis de ambiente
-  const envKey = process.env.VITE_GEMINI_API_KEY || 
-                 (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
-  if (envKey) return envKey;
-  
+  if (local && typeof local.GEMINI_API_KEY === 'string') return local.GEMINI_API_KEY as string;
+
   return null;
 };
 
@@ -103,6 +109,52 @@ async function callGeminiAPI(prompt: string): Promise<string> {
   }
 
   return data.candidates[0].content.parts[0].text;
+}
+
+// Tentar extrair e reparar JSON retornado pelo modelo
+function extractJson(text: string): any {
+  const tryParse = (s: string): any => {
+    try { return JSON.parse(s); } catch { return null; }
+  };
+
+  // 1) Bloco ```json ... ```
+  const fenced = text.match(/```json\s*([\s\S]*?)\s*```/i) || text.match(/```\s*([\s\S]*?)\s*```/i);
+  if (fenced && fenced[1]) {
+    const parsed = tryParse(fenced[1].trim());
+    if (parsed) return parsed;
+  }
+
+  // 2) Encontrar primeiro objeto JSON equilibrado
+  const start = text.indexOf('{');
+  if (start !== -1) {
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          const candidate = text.slice(start, i + 1);
+          const parsed = tryParse(candidate);
+          if (parsed) return parsed;
+          // 2b) Reparos simples: remover vírgulas finais
+          const repaired = candidate
+            .replace(/,\s*([}\]])/g, '$1')
+            .replace(/\t/g, ' ');
+          const parsedRepaired = tryParse(repaired);
+          if (parsedRepaired) return parsedRepaired;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3) Tentativa final: remover linhas de comentário acidentais
+  const noComments = text.replace(/^\s*\/\/.*$/gm, '');
+  const parsedNoComments = tryParse(noComments);
+  if (parsedNoComments) return parsedNoComments;
+
+  throw new Error('Não foi possível extrair JSON da resposta do Gemini');
 }
 
 // Buscar scorecard ativo
@@ -229,21 +281,7 @@ export async function analyzeScorecardWithAI(
   
   try {
     const response = await callGeminiAPI(prompt);
-    
-    // Extrair JSON da resposta
-    let jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || response.match(/```\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        jsonMatch[0] = jsonMatch[1];
-      }
-    }
-
-    if (!jsonMatch) {
-      throw new Error('Não foi possível extrair JSON da resposta do Gemini');
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = extractJson(response);
     
     // Processar resultado
     const criteriaAnalysis: CriterionAnalysis[] = criteria.map(criterion => {

@@ -16,6 +16,7 @@ export interface CallItem {
   date: string; // ISO
   created_at?: string; // Alias for date
   durationSec: number;
+  duration_formated?: string;
   status: CallStatus;
   status_voip?: string; // Status VOIP original
   status_voip_friendly?: string; // Status VOIP amigável

@@ -7,6 +7,18 @@ import { CallItem, SdrUser } from '../types';
 import { downloadCSV, downloadExcel, downloadSummaryReport } from '../utils/exportUtils';
 import MiniAudioPlayer from '../components/MiniAudioPlayer';
 import { AudioQualityDashboard } from '../components/AudioStatusIndicator';
+import { processCallAnalysis, getCallAnalysisFromDatabase } from '../services/callAnalysisBackendService';
+import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
+
+// Função para verificar se URL de áudio é válida
+function hasValidAudio(recording_url?: string): boolean {
+  if (!recording_url) return false;
+  
+  return recording_url.includes('ggv-chatwoot.nyc3.cdn.digitaloceanspaces.com') ||
+         recording_url.includes('listener.api4com.com') ||
+         recording_url.includes('.mp3') ||
+         recording_url.includes('.wav');
+}
 
 // Função para formatar número de telefone brasileiro
 function formatPhoneNumber(phone: string | null | undefined): string {
@@ -147,6 +159,36 @@ export default function CallsPage() {
     loadAvailableEtapas();
   }, []);
 
+  // Auto-gerar nota para chamadas > 3min sem score visível
+  useEffect(() => {
+    const run = async () => {
+      const pageStart = (currentPage - 1) * itemsPerPage;
+      const pageEnd = currentPage * itemsPerPage;
+      const visible = calls.slice(pageStart, pageEnd);
+      for (const c of visible) {
+        if (typeof c.score === 'number' || getRealDuration(c) < 180) continue;
+        try {
+          const existing = await getCallAnalysisFromDatabase(c.id);
+          if (existing && typeof existing.final_grade === 'number') {
+            const score100 = Math.round(existing.final_grade * 10);
+            setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score100 } : pc));
+            continue;
+          }
+          if (c.transcription && c.transcription.length > 50) {
+            const res = await processCallAnalysis(c.id, c.transcription, c.sdr.name, c.person_name);
+            if (res && typeof res.final_grade === 'number') {
+              const score100 = Math.round(res.final_grade * 10);
+              setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score100 } : pc));
+            }
+          }
+        } catch (e) {
+          console.warn('Auto-score falhou', c.id, e);
+        }
+      }
+    };
+    if (calls.length > 0) run();
+  }, [calls, currentPage, itemsPerPage]);
+
   const editCallEtapa = async () => {
     if (!editingEtapa) return;
     
@@ -168,7 +210,10 @@ export default function CallsPage() {
             status,
             call_type: type,
             start: start,
-            end: end
+            end: end,
+            limit: itemsPerPage,
+            offset: (currentPage - 1) * itemsPerPage,
+            sortBy: sortBy
           });
           const callItems = response.calls.map(convertToCallItem);
           setCalls(callItems);
@@ -206,19 +251,19 @@ export default function CallsPage() {
       );
     }
     
-    // Filtro por duração mínima (em segundos)
+    // Filtro por duração mínima (em segundos) - usando duração real
     if (minDuration.trim()) {
       const minDurationSec = parseInt(minDuration);
       if (!isNaN(minDurationSec)) {
-        result = result.filter((c) => c.durationSec >= minDurationSec);
+        result = result.filter((c) => getRealDuration(c) >= minDurationSec);
       }
     }
     
-    // Filtro por duração máxima (em segundos)
+    // Filtro por duração máxima (em segundos) - usando duração real
     if (maxDuration.trim()) {
       const maxDurationSec = parseInt(maxDuration);
       if (!isNaN(maxDurationSec)) {
-        result = result.filter((c) => c.durationSec <= maxDurationSec);
+        result = result.filter((c) => getRealDuration(c) <= maxDurationSec);
       }
     }
     
@@ -244,7 +289,7 @@ export default function CallsPage() {
     // Aplicar ordenação local se necessário (fallback)
     switch (sortBy) {
       case 'duration':
-        result = result.sort((a, b) => b.durationSec - a.durationSec);
+        result = result.sort((a, b) => getRealDuration(b) - getRealDuration(a));
         break;
       case 'score':
         result = result.sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -523,13 +568,13 @@ export default function CallsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <span className={`font-medium ${call.durationSec > 300 ? 'text-green-600' : call.durationSec > 60 ? 'text-yellow-600' : 'text-slate-600'}`}>
-                          {secondsToHuman(call.durationSec)}
+                        <span className={`font-medium ${getRealDuration(call) > 300 ? 'text-green-600' : getRealDuration(call) > 60 ? 'text-yellow-600' : 'text-slate-600'}`}>
+                          {formatDurationDisplay(call)}
                         </span>
-                        {call.recording_url && call.durationSec && call.durationSec > 180 && (
+                        {hasValidAudio(call.recording_url) && getRealDuration(call) > 180 && (
                           <MiniAudioPlayer 
                             audioUrl={call.recording_url}
-                            duration={call.durationSec}
+                            duration={getRealDuration(call)}
                             callId={call.id}
                           />
                         )}
@@ -540,7 +585,7 @@ export default function CallsPage() {
                               📝
                             </span>
                           )}
-                          {call.recording_url && (
+                          {hasValidAudio(call.recording_url) && (
                             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded" title="Tem áudio">
                               🎵
                             </span>

@@ -26,6 +26,7 @@ export interface CallWithDetails {
   status_voip?: string; // Status VOIP original
   status_voip_friendly?: string; // Status VOIP amigável
   duration: number;
+  duration_formated?: string;
   call_type: string;
   direction: string;
   recording_url: string;
@@ -59,6 +60,8 @@ export interface CallsFilters {
   limit?: number;
   offset?: number;
   sortBy?: string;
+  min_duration?: number;
+  max_duration?: number;
 }
 
 export interface CallsResponse {
@@ -112,7 +115,9 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       end,
       limit = 50,
       offset = 0,
-      sortBy = 'created_at'
+      sortBy = 'created_at',
+      min_duration,
+      max_duration
     } = filters;
 
     // Converter datas para timestamp se fornecidas
@@ -120,14 +125,13 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     const endTimestamp = end ? new Date(end).toISOString() : null;
 
     const { data, error } = await supabase.rpc('get_calls_with_filters', {
-      p_sdr: sdr_email,
+      p_sdr_email: sdr_email,
       p_status: status,
-      p_type: call_type,
+      p_call_type: call_type,
       p_start_date: startTimestamp,
       p_end_date: endTimestamp,
       p_limit: limit,
       p_offset: offset
-      // Remover p_sort_by por enquanto - ordenação será no frontend
     });
 
     if (error) {
@@ -230,20 +234,39 @@ export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
 /**
  * Converte CallWithDetails para CallItem (compatibilidade)
  */
-export function convertToCallItem(call: CallWithDetails): CallItem {
+export function convertToCallItem(call: any): CallItem {
+  // Converter duration_formated para segundos
+  let durationInSeconds = call.duration || 0;
+  
+  if (call.duration_formated && call.duration_formated !== '00:00:00') {
+    try {
+      const parts = call.duration_formated.split(':');
+      const hours = parseInt(parts[0]) || 0;
+      const minutes = parseInt(parts[1]) || 0;
+      const seconds = parseInt(parts[2]) || 0;
+      durationInSeconds = hours * 3600 + minutes * 60 + seconds;
+      
+      console.log(`🕐 Convertendo duração: ${call.duration_formated} → ${durationInSeconds}s`);
+    } catch (error) {
+      console.warn('Erro ao converter duration_formated:', call.duration_formated);
+    }
+  }
+
   return {
     id: call.id,
-    company: call.company_name,
-    dealCode: call.deal_id || `CALL-${call.id.slice(0, 8)}`,
+    company: call.enterprise || call.company_name || 'Empresa não informada',
+    person: call.person || call.person_name || 'Contato não identificado',
+    dealCode: call.deal_id || 'N/A',
     sdr: {
-      id: call.sdr_email || call.sdr_id,
-      name: call.sdr_name,
-      email: call.sdr_email,
-      avatarUrl: call.sdr_avatar_url || `https://i.pravatar.cc/64?u=${call.sdr_email}`
+      id: call.agent_id || call.sdr_id,
+      name: call.agent_id || call.sdr_name || 'SDR não identificado',
+      email: call.sdr_email || '',
+      avatarUrl: `https://i.pravatar.cc/64?u=${call.agent_id || call.sdr_id || 'default'}`
     },
     date: call.created_at,
     created_at: call.created_at,
-    durationSec: call.duration,
+    durationSec: durationInSeconds,
+    duration_formated: call.duration_formated,
     status: call.status as any,
     status_voip: call.status_voip,
     status_voip_friendly: call.status_voip_friendly,
@@ -252,7 +275,7 @@ export function convertToCallItem(call: CallWithDetails): CallItem {
     audio_url: call.audio_url,
     recording_url: call.recording_url,
     transcription: call.transcription,
-    person_name: call.person_name,
+    person_name: call.person || call.person_name,
     person_email: call.person_email,
     to_number: call.to_number,
     from_number: call.from_number,

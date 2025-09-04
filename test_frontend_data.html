@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Frontend - Dados de Chamadas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .result { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        pre { background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; overflow-x: auto; font-size: 12px; }
+        button { padding: 12px 24px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-number { font-size: 24px; font-weight: bold; color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Teste Frontend - Dados de Chamadas</h1>
+        <p>Verificar se os dados da tabela calls estão chegando corretamente no frontend</p>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalTable">-</div>
+                <div>Total na Tabela</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalFunction">-</div>
+                <div>Total via Função</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="withAgentId">-</div>
+                <div>Com Agent ID</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="withAudio">-</div>
+                <div>Com Áudio</div>
+            </div>
+        </div>
+
+        <button onclick="testDirectTable()">📊 Testar Tabela Direta</button>
+        <button onclick="testRpcFunction()">⚙️ Testar Função RPC</button>
+        <button onclick="testFrontendService()">🎯 Testar Serviço Frontend</button>
+        <button onclick="compareData()">🔍 Comparar Dados</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pqmjfwmbitodwtpedlle.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbWpmd21iaXRvZHd0cGVkbGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ4NzQ0NzQsImV4cCI6MjA0MDQ1MDQ3NH0.0PlBhixdcx6c5VJv7fCXJOB_pVUKbbyVFjvYFQTtKHE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        function addResult(title, content, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
+            document.getElementById('results').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        async function testDirectTable() {
+            try {
+                addResult('📊 Testando acesso direto à tabela...', 'Executando query...', 'result');
+                
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('id, enterprise, person, agent_id, duration_formated, call_type, recording_url, transcription, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (error) {
+                    addResult('❌ Erro ao acessar tabela direta', JSON.stringify(error, null, 2), 'error');
+                    return;
+                }
+                
+                document.getElementById('totalTable').textContent = data.length;
+                
+                const analysis = {
+                    total: data.length,
+                    with_enterprise: data.filter(d => d.enterprise).length,
+                    with_person: data.filter(d => d.person).length,
+                    with_agent_id: data.filter(d => d.agent_id).length,
+                    with_audio: data.filter(d => d.recording_url).length,
+                    with_transcription: data.filter(d => d.transcription).length,
+                    sample_data: data.slice(0, 3).map(d => ({
+                        id: d.id.substring(0, 8),
+                        enterprise: d.enterprise,
+                        person: d.person,
+                        agent_id: d.agent_id,
+                        duration_formated: d.duration_formated,
+                        call_type: d.call_type
+                    }))
+                };
+                
+                addResult('✅ Acesso direto à tabela', JSON.stringify(analysis, null, 2), 'success');
+                
+            } catch (err) {
+                addResult('❌ Erro inesperado', err.message, 'error');
+            }
+        }
+        
+        async function testRpcFunction() {
+            try {
+                addResult('⚙️ Testando função RPC...', 'Chamando get_calls_with_filters...', 'result');
+                
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_call_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: 10,
+                    p_offset: 0
+                });
+                
+                if (error) {
+                    addResult('❌ Erro na função RPC', JSON.stringify(error, null, 2), 'error');
+                    return;
+                }
+                
+                document.getElementById('totalFunction').textContent = data.length;
+                document.getElementById('withAgentId').textContent = data.filter(d => d.agent_id).length;
+                document.getElementById('withAudio').textContent = data.filter(d => d.recording_url).length;
+                
+                const analysis = {
+                    total: data.length,
+                    with_enterprise: data.filter(d => d.enterprise).length,
+                    with_person: data.filter(d => d.person).length,
+                    with_agent_id: data.filter(d => d.agent_id).length,
+                    with_audio: data.filter(d => d.recording_url).length,
+                    max_duration: Math.max(...data.map(d => d.duration || 0)),
+                    sample_data: data.slice(0, 3).map(d => ({
+                        id: d.id.substring(0, 8),
+                        enterprise: d.enterprise,
+                        person: d.person,
+                        agent_id: d.agent_id,
+                        duration: d.duration,
+                        duration_formated: d.duration_formated
+                    }))
+                };
+                
+                addResult('✅ Função RPC funcionando', JSON.stringify(analysis, null, 2), 'success');
+                
+            } catch (err) {
+                addResult('❌ Erro inesperado na RPC', err.message, 'error');
+            }
+        }
+        
+        async function testFrontendService() {
+            try {
+                addResult('🎯 Testando serviço do frontend...', 'Simulando chamada do frontend...', 'result');
+                
+                // Simular a mesma chamada que o frontend faz
+                const response = await fetch('/api/calls', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'fetch',
+                        filters: {
+                            limit: 10,
+                            offset: 0
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    addResult('⚠️ Frontend service não disponível', 'Testando diretamente via Supabase...', 'result');
+                    return await testRpcFunction();
+                }
+                
+                const data = await response.json();
+                addResult('✅ Serviço frontend funcionando', JSON.stringify(data, null, 2), 'success');
+                
+            } catch (err) {
+                addResult('⚠️ Erro no serviço frontend', 'Fallback para RPC direta: ' + err.message, 'result');
+                await testRpcFunction();
+            }
+        }
+        
+        async function compareData() {
+            try {
+                addResult('🔍 Comparando dados...', 'Executando comparação...', 'result');
+                
+                // Dados diretos da tabela
+                const { data: tableData } = await supabase
+                    .from('calls')
+                    .select('id, enterprise, person, agent_id, duration_formated')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                
+                // Dados via função RPC
+                const { data: functionData } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 20,
+                    p_offset: 0
+                });
+                
+                const comparison = {
+                    table_count: tableData?.length || 0,
+                    function_count: functionData?.length || 0,
+                    difference: (tableData?.length || 0) - (functionData?.length || 0),
+                    table_sample: tableData?.slice(0, 3).map(d => d.id.substring(0, 8)) || [],
+                    function_sample: functionData?.slice(0, 3).map(d => d.id.substring(0, 8)) || []
+                };
+                
+                if (comparison.difference === 0) {
+                    addResult('✅ Dados consistentes', JSON.stringify(comparison, null, 2), 'success');
+                } else {
+                    addResult('❌ Inconsistência detectada', JSON.stringify(comparison, null, 2), 'error');
+                }
+                
+            } catch (err) {
+                addResult('❌ Erro na comparação', err.message, 'error');
+            }
+        }
+        
+        // Auto-executar testes ao carregar
+        window.addEventListener('load', async () => {
+            await testDirectTable();
+            await new Promise(r => setTimeout(r, 1000));
+            await testRpcFunction();
+        });
+    </script>
+</body>
+</html>

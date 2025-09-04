@@ -12,12 +12,19 @@ export default function AudioStatusIndicator({ call }: AudioStatusIndicatorProps
   // Determinar se deveria ter áudio baseado na duração
   const shouldHaveAudio = call.durationSec > 60; // Chamadas > 1 minuto deveriam ter áudio
   const hasAudioUrl = !!(call.recording_url);
+  const hasValidAudioUrl = hasAudioUrl && (
+    call.recording_url?.includes('ggv-chatwoot.nyc3.cdn.digitaloceanspaces.com') ||
+    call.recording_url?.includes('listener.api4com.com') ||
+    call.recording_url?.includes('.mp3') ||
+    call.recording_url?.includes('.wav')
+  );
   const hasTranscription = !!(call.transcription && call.transcription.length > 50);
 
   // Diferentes cenários de problemas
-  const audioMissing = shouldHaveAudio && !hasAudioUrl;
-  const inconsistentData = hasTranscription && !hasAudioUrl && call.durationSec > 180; // Transcrição sem áudio em chamada longa
+  const audioMissing = shouldHaveAudio && !hasValidAudioUrl;
+  const inconsistentData = hasTranscription && !hasValidAudioUrl && call.durationSec > 180; // Transcrição sem áudio em chamada longa
   const shortCallWithTranscription = call.durationSec < 60 && hasTranscription; // Suspeito: transcrição em chamada muito curta
+  const hasUrlButInvalid = hasAudioUrl && !hasValidAudioUrl; // URL existe mas não parece válida
 
   const handleRecoveryAttempt = async () => {
     setIsRecovering(true);
@@ -41,7 +48,7 @@ export default function AudioStatusIndicator({ call }: AudioStatusIndicatorProps
   };
 
   // Não mostrar nada se os dados estão consistentes
-  if (!audioMissing && !inconsistentData && !shortCallWithTranscription) {
+  if (!audioMissing && !inconsistentData && !shortCallWithTranscription && !hasUrlButInvalid) {
     return null;
   }
 
@@ -118,6 +125,24 @@ export default function AudioStatusIndicator({ call }: AudioStatusIndicatorProps
           </div>
         </div>
       )}
+
+      {/* URL de Áudio Inválida */}
+      {hasUrlButInvalid && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <span className="text-red-600">🔗</span>
+            <div>
+              <div className="font-medium text-red-800">URL de Áudio Inválida</div>
+              <div className="text-sm text-red-700">
+                URL presente mas não parece ser um arquivo de áudio válido
+              </div>
+              <div className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-1 rounded">
+                {call.recording_url?.substring(0, 80)}...
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -135,8 +160,27 @@ export function useAudioQualityStats() {
   const calculateStats = async (calls: CallItem[]) => {
     const totalCalls = calls.length;
     const callsWithExpectedAudio = calls.filter(c => c.durationSec > 60).length;
-    const callsWithActualAudio = calls.filter(c => c.recording_url).length;
-    const missingAudioCount = calls.filter(c => c.durationSec > 60 && !c.recording_url).length;
+    
+    // Verificar áudio válido com novos padrões
+    const callsWithActualAudio = calls.filter(c => 
+      c.recording_url && (
+        c.recording_url.includes('ggv-chatwoot.nyc3.cdn.digitaloceanspaces.com') ||
+        c.recording_url.includes('listener.api4com.com') ||
+        c.recording_url.includes('.mp3') ||
+        c.recording_url.includes('.wav')
+      )
+    ).length;
+    
+    const missingAudioCount = calls.filter(c => 
+      c.durationSec > 60 && !(
+        c.recording_url && (
+          c.recording_url.includes('ggv-chatwoot.nyc3.cdn.digitaloceanspaces.com') ||
+          c.recording_url.includes('listener.api4com.com') ||
+          c.recording_url.includes('.mp3') ||
+          c.recording_url.includes('.wav')
+        )
+      )
+    ).length;
     
     const qualityPercentage = callsWithExpectedAudio > 0 
       ? Math.round(((callsWithExpectedAudio - missingAudioCount) / callsWithExpectedAudio) * 100)

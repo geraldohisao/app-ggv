@@ -5,7 +5,20 @@ import { CallItem } from '../types';
 import AiAssistant from '../components/AiAssistant';
 import ScorecardAnalysis from '../components/ScorecardAnalysis';
 import AudioStatusIndicator from '../components/AudioStatusIndicator';
+import ParsedTranscription from '../components/ParsedTranscription';
+import { formatCallType, getCallTypeColor } from '../utils/callTypeUtils';
+import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
 // import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
+
+// Função para verificar se URL de áudio é válida
+function hasValidAudio(recording_url?: string): boolean {
+  if (!recording_url) return false;
+  
+  return recording_url.includes('ggv-chatwoot.nyc3.cdn.digitaloceanspaces.com') ||
+         recording_url.includes('listener.api4com.com') ||
+         recording_url.includes('.mp3') ||
+         recording_url.includes('.wav');
+}
 
 interface CallDetailPageProps {
   callId: string;
@@ -91,7 +104,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                 <div className="text-xs text-slate-500">
                   {DATE_FORMATTER.format(new Date(call.date))} • {TIME_FORMATTER.format(new Date(call.date))}
                 </div>
-                {call.sdr.email && (
+                {call.sdr.email && call.sdr.email !== call.sdr.name && (
                   <div className="text-xs text-slate-400">{call.sdr.email}</div>
                 )}
               </div>
@@ -99,7 +112,9 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
             <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
               <div>
                 <div className="text-slate-500">Duração</div>
-                <div className="font-semibold">{secondsToHuman(call.durationSec)}</div>
+                <div className="font-semibold">
+                  {formatDurationDisplay(call)}
+                </div>
               </div>
               <div>
                 <div className="text-slate-500">Status</div>
@@ -120,7 +135,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
               </div>
               <div>
                 <div className="text-slate-500">Áudio</div>
-                <div className="font-semibold">{call.audio_url ? '✅' : '❌'}</div>
+                <div className="font-semibold">{hasValidAudio(call.recording_url) ? '✅' : '❌'}</div>
               </div>
             </div>
           </div>
@@ -128,17 +143,17 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           {/* Player de Áudio */}
           <div className="bg-white rounded-lg border border-slate-200 p-4">
             <div className="mb-3 font-medium text-slate-800">Áudio da Chamada</div>
-            {call.audio_url ? (
+            {hasValidAudio(call.recording_url) ? (
               <div className="space-y-2">
                 <audio controls className="w-full" preload="metadata">
-                  <source src={call.audio_url} type="audio/mpeg" />
-                  <source src={call.audio_url} type="audio/wav" />
-                  <source src={call.audio_url} type="audio/ogg" />
+                  <source src={call.recording_url} type="audio/mpeg" />
+                  <source src={call.recording_url} type="audio/wav" />
+                  <source src={call.recording_url} type="audio/ogg" />
                   Seu navegador não suporta o elemento de áudio.
                 </audio>
                 <div className="text-xs text-slate-500">
-                  URL: <a href={call.audio_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                    {call.audio_url.length > 60 ? call.audio_url.substring(0, 60) + '...' : call.audio_url}
+                  URL: <a href={call.recording_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    {call.recording_url && call.recording_url.length > 60 ? call.recording_url.substring(0, 60) + '...' : call.recording_url}
                   </a>
                 </div>
               </div>
@@ -155,14 +170,11 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           {call.transcription && (
             <div className="bg-white rounded-lg border border-slate-200 p-4">
               <div className="mb-3 font-medium text-slate-800">📝 Transcrição da Chamada</div>
-              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                {call.transcription}
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-200">
-                <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-lg">
-                  <strong>🎤 Separação de Falantes:</strong> Funcionalidade será implementada em breve com IA avançada!
-                </div>
-              </div>
+              <ParsedTranscription 
+                transcription={call.transcription || ''} 
+                sdrName={call.sdr.name || 'SDR'} 
+                clientName={call.person_name || 'Cliente'} 
+              />
             </div>
           )}
         </div>

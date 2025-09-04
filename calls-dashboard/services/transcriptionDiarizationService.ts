@@ -3,17 +3,17 @@
  * Separa automaticamente quem fala o quê nas transcrições usando Gemini AI
  */
 
-// Função para obter a chave da API Gemini
+// Função para obter a chave da API Gemini (DB -> env -> local)
 const getGeminiApiKey = async (): Promise<string | null> => {
-  // Fallback para configuração local
+  try {
+    const { getAppSetting } = await import('../../services/supabaseService');
+    const dbKey = await getAppSetting('gemini_api_key');
+    if (typeof dbKey === 'string' && dbKey.trim()) return dbKey.trim();
+  } catch {}
+  const envKey = process.env.VITE_GEMINI_API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
+  if (envKey) return envKey as string;
   const local: any = (globalThis as any).APP_CONFIG_LOCAL;
-  if (local && typeof local.GEMINI_API_KEY === 'string') return local.GEMINI_API_KEY;
-  
-  // Fallback para variáveis de ambiente
-  const envKey = process.env.VITE_GEMINI_API_KEY || 
-                 (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
-  if (envKey) return envKey;
-  
+  if (local && typeof local.GEMINI_API_KEY === 'string') return local.GEMINI_API_KEY as string;
   return null;
 };
 

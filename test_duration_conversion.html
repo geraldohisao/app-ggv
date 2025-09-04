@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Conversão de Duração</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        pre { background: #fff; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Conversão de Duração</h1>
+    <p>Investigar por que duração não está sendo convertida corretamente</p>
+    
+    <button onclick="testSpecificCall()">🎯 Testar Chamada Específica</button>
+    <button onclick="testConversionLogic()">⚙️ Testar Lógica de Conversão</button>
+    <button onclick="testBackendData()">📊 Testar Dados do Backend</button>
+    
+    <div id="results"></div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pqmjfwmbitodwtpedlle.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbWpmd21iaXRvZHd0cGVkbGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ4NzQ0NzQsImV4cCI6MjA0MDQ1MDQ3NH0.0PlBhixdcx6c5VJv7fCXJOB_pVUKbbyVFjvYFQTtKHE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        const callId = '99e0cf47-ed7a-4c3f-ae9a-439c73d7e179'; // ID da chamada que está com problema
+        
+        function addResult(title, content, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<h3>${title}</h3><pre>${content}</pre>`;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        async function testSpecificCall() {
+            try {
+                addResult('🎯 Buscando chamada específica...', 'ID: ' + callId, 'result');
+                
+                // Buscar diretamente da tabela
+                const { data: tableData, error: tableError } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .eq('id', callId)
+                    .single();
+                
+                if (tableError) {
+                    addResult('❌ Erro ao buscar da tabela', JSON.stringify(tableError, null, 2), 'error');
+                    return;
+                }
+                
+                // Buscar via função RPC
+                const { data: functionData, error: functionError } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr_email: null,
+                    p_status: null,
+                    p_call_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: 100,
+                    p_offset: 0
+                });
+                
+                if (functionError) {
+                    addResult('❌ Erro na função RPC', JSON.stringify(functionError, null, 2), 'error');
+                    return;
+                }
+                
+                const callFromFunction = functionData.find(c => c.id === callId);
+                
+                const comparison = {
+                    table_data: {
+                        duration: tableData.duration,
+                        duration_formated: tableData.duration_formated,
+                        enterprise: tableData.enterprise,
+                        person: tableData.person,
+                        agent_id: tableData.agent_id,
+                        sdr_name: tableData.sdr_name
+                    },
+                    function_data: callFromFunction ? {
+                        duration: callFromFunction.duration,
+                        duration_formated: callFromFunction.duration_formated,
+                        enterprise: callFromFunction.enterprise,
+                        person: callFromFunction.person,
+                        agent_id: callFromFunction.agent_id,
+                        sdr_name: callFromFunction.sdr_name
+                    } : 'CHAMADA NÃO ENCONTRADA NA FUNÇÃO!'
+                };
+                
+                addResult('📊 Comparação Tabela vs Função', JSON.stringify(comparison, null, 2), 'success');
+                
+            } catch (err) {
+                addResult('❌ Erro inesperado', err.message, 'error');
+            }
+        }
+        
+        async function testConversionLogic() {
+            const testCases = [
+                '00:03:20', // 3 min 20s = 200s
+                '00:00:04', // 4s
+                '00:05:30', // 5 min 30s = 330s
+                '00:00:00', // 0s
+                '01:02:15'  // 1h 2min 15s = 3735s
+            ];
+            
+            const results = testCases.map(duration_formated => {
+                if (!duration_formated) return { input: duration_formated, output: 0 };
+                
+                const parts = duration_formated.split(':');
+                const hours = parseInt(parts[0]) || 0;
+                const minutes = parseInt(parts[1]) || 0;
+                const seconds = parseInt(parts[2]) || 0;
+                const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                
+                return {
+                    input: duration_formated,
+                    output: totalSeconds,
+                    formatted: `${Math.floor(totalSeconds/60)}m ${totalSeconds%60}s`
+                };
+            });
+            
+            addResult('🧮 Teste de Conversão', JSON.stringify(results, null, 2), 'success');
+        }
+        
+        async function testBackendData() {
+            try {
+                addResult('📊 Testando dados do backend...', 'Buscando via RPC...', 'result');
+                
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_limit: 5,
+                    p_offset: 0
+                });
+                
+                if (error) {
+                    addResult('❌ Erro na RPC', JSON.stringify(error, null, 2), 'error');
+                    return;
+                }
+                
+                const analysis = data.map(call => ({
+                    id: call.id.substring(0, 8),
+                    duration_from_backend: call.duration,
+                    duration_formated_from_backend: call.duration_formated,
+                    enterprise: call.enterprise,
+                    person: call.person,
+                    agent_id: call.agent_id,
+                    converted_manually: call.duration_formated ? 
+                        call.duration_formated.split(':').reduce((acc, time, i) => 
+                            acc + parseInt(time) * [3600, 60, 1][i], 0
+                        ) : 'N/A'
+                }));
+                
+                addResult('📊 Dados do Backend', JSON.stringify(analysis, null, 2), 'success');
+                
+            } catch (err) {
+                addResult('❌ Erro no backend', err.message, 'error');
+            }
+        }
+        
+        // Auto-executar ao carregar
+        window.addEventListener('load', testSpecificCall);
+    </script>
+</body>
+</html>

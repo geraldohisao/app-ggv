@@ -46,6 +46,21 @@ export default function ScorecardAnalysis({ call }: ScorecardAnalysisProps) {
       return;
     }
 
+    // Calcular duração real para análise
+    let realDuration = call.durationSec;
+    if (call.duration_formated && call.duration_formated !== '00:00:00') {
+      const parts = call.duration_formated.split(':');
+      const hours = parseInt(parts[0]) || 0;
+      const minutes = parseInt(parts[1]) || 0;
+      const seconds = parseInt(parts[2]) || 0;
+      realDuration = hours * 3600 + minutes * 60 + seconds;
+    }
+
+    if (realDuration < 60) {
+      setError('Chamada muito curta para análise (mínimo 1 minuto)');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

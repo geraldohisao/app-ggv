@@ -73,16 +73,53 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
         return;
       }
 
-      // Carregar critérios
-      const { data: criteriaData, error: criteriaError } = await supabase.rpc('get_scorecard_criteria', {
-        scorecard_id_param: scorecardId
-      });
-      
+      // Carregar critérios (com fallbacks para diferentes assinaturas)
+      let criteriaData: any[] | null = null;
+      let criteriaError: any = null;
+
+      try {
+        const resp1 = await supabase.rpc('get_scorecard_criteria', { scorecard_id_param: scorecardId });
+        if (!resp1.error && Array.isArray(resp1.data)) {
+          criteriaData = resp1.data;
+        } else {
+          criteriaError = resp1.error;
+        }
+      } catch (e) {
+        criteriaError = e;
+      }
+
+      // Tentar assinatura alternativa p_scorecard_id
+      if (!criteriaData || criteriaData.length === 0) {
+        try {
+          const resp2 = await supabase.rpc('get_scorecard_criteria', { p_scorecard_id: scorecardId });
+          if (!resp2.error && Array.isArray(resp2.data)) {
+            criteriaData = resp2.data;
+            criteriaError = null;
+          }
+        } catch (e) {
+          criteriaError = e;
+        }
+      }
+
+      // Fallback final: consulta direta na tabela
+      if (!criteriaData || criteriaData.length === 0) {
+        try {
+          const { data } = await supabase
+            .from('scorecard_criteria')
+            .select('id, name, description, weight, max_score, order_index')
+            .eq('scorecard_id', scorecardId)
+            .order('order_index', { ascending: true });
+          criteriaData = data || [];
+          criteriaError = null;
+        } catch (e) {
+          criteriaError = e;
+        }
+      }
+
       if (criteriaError) {
         console.error('Erro ao carregar critérios:', criteriaError);
-      } else {
-        setCriteria(criteriaData || []);
       }
+      setCriteria(criteriaData || []);
     } catch (err) {
       console.error('Erro inesperado:', err);
       setError('Erro inesperado ao carregar scorecard');
