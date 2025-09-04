@@ -212,7 +212,7 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
   // 🎯 SEMPRE renderizar indicador (pequeno ícone no canto)
   if (!isVisible) {
     return (
-      <div className="fixed top-4 right-4 z-[9999]">
+      <div className="fixed bottom-20 right-4 z-[9999]">
         {/* Indicador de status sempre visível */}
         <div className="flex flex-col items-end gap-2">
           {/* Status do sistema */}
@@ -241,7 +241,7 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
 
   // 🎛️ PAINEL PRINCIPAL
   return (
-    <div className="fixed inset-y-0 left-0 w-[450px] bg-white shadow-2xl border-r-4 border-blue-600 flex flex-col z-[9999]">
+    <div className="fixed inset-y-0 right-0 w-[450px] bg-white shadow-2xl border-l-4 border-blue-600 flex flex-col z-[9999]">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3">
         <div className="flex items-center justify-between">
