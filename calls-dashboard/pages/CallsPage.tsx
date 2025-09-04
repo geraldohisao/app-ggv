@@ -6,6 +6,7 @@ import { supabase } from '../../services/supabaseClient';
 import { CallItem, SdrUser } from '../types';
 import { downloadCSV, downloadExcel, downloadSummaryReport } from '../utils/exportUtils';
 import MiniAudioPlayer from '../components/MiniAudioPlayer';
+import { AudioQualityDashboard } from '../components/AudioStatusIndicator';
 
 // Função para formatar número de telefone brasileiro
 function formatPhoneNumber(phone: string | null | undefined): string {
@@ -163,11 +164,11 @@ export default function CallsPage() {
         try {
           setLoading(true);
           const response = await fetchCalls({
-            sdr,
+            sdr_email: sdr,
             status,
-            type,
-            startDate: start,
-            endDate: end
+            call_type: type,
+            start: start,
+            end: end
           });
           const callItems = response.calls.map(convertToCallItem);
           setCalls(callItems);
@@ -261,6 +262,11 @@ export default function CallsPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Dashboard de Qualidade */}
+      {calls.length > 0 && (
+        <AudioQualityDashboard calls={calls} />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-800">Chamadas</h2>

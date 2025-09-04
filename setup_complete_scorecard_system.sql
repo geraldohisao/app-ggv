@@ -120,7 +120,7 @@ CREATE OR REPLACE FUNCTION get_scorecard_criteria(scorecard_id_param UUID)
 RETURNS TABLE (
   id UUID,
   scorecard_id UUID,
-  name TEXT,
+  name VARCHAR(255),
   description TEXT,
   weight INTEGER,
   max_score INTEGER,
@@ -149,9 +149,9 @@ $$;
 CREATE OR REPLACE FUNCTION get_active_scorecard()
 RETURNS TABLE (
   id UUID,
-  name TEXT,
+  name VARCHAR(255),
   description TEXT,
-  conversation_type TEXT,
+  conversation_type VARCHAR(50),
   active BOOLEAN,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
@@ -260,7 +260,7 @@ RETURNS TABLE (
   analysis_id UUID,
   call_id UUID,
   scorecard_id UUID,
-  scorecard_name TEXT,
+  scorecard_name VARCHAR(255),
   overall_score INTEGER,
   max_possible_score INTEGER,
   final_grade DECIMAL(3,1),

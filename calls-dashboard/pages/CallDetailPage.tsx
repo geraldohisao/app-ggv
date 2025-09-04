@@ -4,6 +4,7 @@ import { fetchCallDetail, convertToCallItem } from '../services/callsService';
 import { CallItem } from '../types';
 import AiAssistant from '../components/AiAssistant';
 import ScorecardAnalysis from '../components/ScorecardAnalysis';
+import AudioStatusIndicator from '../components/AudioStatusIndicator';
 // import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
 
 interface CallDetailPageProps {
@@ -167,6 +168,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
         </div>
 
         <div className="space-y-4">
+          <AudioStatusIndicator call={call} />
           <ScorecardAnalysis call={call} />
           <AiAssistant call={call} />
         </div>

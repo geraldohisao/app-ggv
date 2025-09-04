@@ -44,7 +44,7 @@ const ConnectionStatus: React.FC = () => {
                         }
                     } else {
                         setStatus('success');
-                        setStatusText('✅ Conectado ao Supabase');
+                        setStatusText('✅ Conectado ao Banco de Dados');
                     }
                 }
             } catch (error: any) {
