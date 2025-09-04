@@ -336,10 +336,7 @@ const ReactivacaoHistoryPage: React.FC = () => {
                                   <dt className="text-sm text-gray-500">Cadência:</dt>
                                   <dd className="text-sm text-gray-900">{record.cadence || 'N/A'}</dd>
                                 </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-sm text-gray-500">Workflow ID:</dt>
-                                  <dd className="text-sm text-gray-900 font-mono">{record.workflow_id || 'N/A'}</dd>
-                                </div>
+
                                 <div className="flex justify-between">
                                   <dt className="text-sm text-gray-500">Execution ID:</dt>
                                   <dd className="text-sm text-gray-900 font-mono">{record.execution_id || 'N/A'}</dd>

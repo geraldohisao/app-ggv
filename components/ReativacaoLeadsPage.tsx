@@ -162,15 +162,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     }
   };
 
-  const handleClear = () => {
-    setFormData({
-      filtro: "Lista de reativação - Topo de funil",
-      proprietario: "Andressa",
-      cadencia: "Reativação - Sem Retorno",
-      numero_negocio: 20,
-    });
-    setResult(null);
-  };
+
 
   const handleInputChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -456,13 +448,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     }
     
     try {
-      const workflowId = item.n8nResponse && item.n8nResponse.workflowId ? item.n8nResponse.workflowId : null;
-      if (!workflowId) {
-        alert('Workflow ID não encontrado');
-        return;
-      }
-      
-      const response = await fetch(`/automation/complete/${workflowId}`, {
+      const response = await fetch(`/automation/complete/${item.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -592,25 +578,29 @@ const ReativacaoLeadsPage: React.FC = () => {
 
           {/* Result Alert */}
           {result && (
-            <div className={`p-4 rounded-lg border ${
+            <div className={`p-6 rounded-2xl border-2 ${
               result.success 
-                ? 'bg-green-50 border-green-200 text-green-700' 
-                : 'bg-red-50 border-red-200 text-red-700'
+                ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-800 shadow-lg' 
+                : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-200 text-red-800 shadow-lg'
             }`}>
-              <div className="flex items-center gap-3">
+              <div className="flex items-start gap-4">
                 {result.success ? (
-                  <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                  <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircleIcon className="w-6 h-6 text-green-600" />
+                  </div>
                 ) : (
-                  <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
+                  <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+                  </div>
                 )}
-                <div>
-                  <p className="font-medium">{result.message}</p>
+                <div className="flex-1">
+                  <p className="text-lg font-semibold mb-2">{result.message}</p>
                   {result.data && (
-                    <details className="mt-2">
-                      <summary className="text-xs cursor-pointer hover:underline">
-                        Ver detalhes técnicos
+                    <details className="mt-3">
+                      <summary className="text-sm text-slate-600 cursor-pointer hover:text-slate-800 font-medium bg-slate-100 px-3 py-2 rounded-lg inline-block hover:bg-slate-200 transition-colors">
+                        🔍 Ver detalhes técnicos
                       </summary>
-                      <pre className="text-xs mt-2 bg-black/5 p-2 rounded overflow-auto">
+                      <pre className="text-xs mt-3 bg-slate-100 p-4 rounded-lg overflow-auto border border-slate-200">
                         {JSON.stringify(result.data, null, 2)}
                       </pre>
                     </details>
@@ -620,43 +610,55 @@ const ReativacaoLeadsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          {/* Action Button */}
+          <div className="pt-6">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-2 bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold px-8 py-4 rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none"
             >
               {isSubmitting ? (
-                <LoadingSpinner />
+                <>
+                  <LoadingSpinner />
+                  <span className="text-lg">Processando automação...</span>
+                </>
               ) : (
-                <BoltIcon className="w-5 h-5" />
+                <>
+                  <BoltIcon className="w-6 h-6" />
+                  <span className="text-lg">🚀 Ativar Automação</span>
+                </>
               )}
-              {isSubmitting ? 'Ativando...' : 'Ativar Automação'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleClear}
-              disabled={isSubmitting}
-              className="flex items-center gap-2 bg-slate-100 text-slate-700 font-semibold px-6 py-3 rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <TrashIcon className="w-5 h-5" />
-              Limpar
             </button>
           </div>
         </form>
       </div>
 
       {/* Info Panel */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">Informações</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Esta funcionalidade envia dados para o webhook do N8N em produção</li>
-          <li>• Os logs são registrados no Debug Panel (AUTOMATION)</li>
-          <li>• Apenas administradores têm acesso a esta funcionalidade</li>
-          <li>• Em modo teste, a automação é simulada sem envio real</li>
-        </ul>
+      <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 text-xl">ℹ️</span>
+          </div>
+          <h3 className="text-lg font-semibold text-blue-900">Informações Importantes</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="flex items-start gap-2">
+            <span className="text-blue-500 mt-1">•</span>
+            <span className="text-sm text-blue-800">Envia dados para o webhook do N8N em produção</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-blue-500 mt-1">•</span>
+            <span className="text-sm text-blue-800">Logs registrados no Debug Panel (AUTOMATION)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-blue-500 mt-1">•</span>
+            <span className="text-sm text-blue-800">Acesso restrito a administradores</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-blue-500 mt-1">•</span>
+            <span className="text-sm text-blue-800">Modo teste simula sem envio real</span>
+          </div>
+        </div>
       </div>
 
       {/* Histórico de Automações */}
@@ -747,10 +749,7 @@ const ReativacaoLeadsPage: React.FC = () => {
                         <span className="text-slate-500">Cadência:</span>
                         <span className="ml-2 text-slate-900">{item.cadence || 'N/A'}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-500">Workflow ID:</span>
-                        <span className="ml-2 text-slate-900 font-mono text-xs">{item.workflow_id || 'N/A'}</span>
-                      </div>
+
                     </div>
 
                     {item.error_message && (
