@@ -11,28 +11,27 @@ interface DebugLog {
 }
 
 /**
- * 🛡️ PAINEL DEBUG SEMPRE VISÍVEL
+ * 🛡️ PAINEL DEBUG SEMPRE VISÍVEL - SUPER ADMIN APENAS
  * 
  * Características:
- * - SEMPRE renderiza (não depende de permissões)
- * - Ativação por URL (?debug=true)
- * - Senha master para bypass
+ * - SEMPRE renderiza indicador visual
+ * - Acesso RESTRITO para Super Admin apenas
+ * - Ativação por URL (?debug=true) se autorizado
  * - Logs persistentes no localStorage
  * - Atalhos de teclado múltiplos
  * - Interface compacta e eficiente
+ * - Feedback visual de permissões
  */
 export const AlwaysVisibleDebugPanel: React.FC = () => {
   const { user } = useUser();
   const [isVisible, setIsVisible] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [logs, setLogs] = useState<DebugLog[]>([]);
   const [filter, setFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // 🔐 SENHA MASTER para bypass (pode ser alterada)
-  const MASTER_PASSWORD = 'ggv2024debug';
+  // 🔐 Verificar se é Super Admin
+  const isSuperAdmin = user?.role === 'SuperAdmin';
+  const hasDebugAccess = isSuperAdmin || (process.env.NODE_ENV === 'development' && user !== null);
 
   // 📊 Adicionar log com persistência
   const addLog = (level: DebugLog['level'], source: string, message: string, data?: any) => {
@@ -73,27 +72,29 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
     }
   }, []);
 
-  // 🎯 Verificar ativação por URL
+  // 🎯 Verificar ativação por URL (apenas para Super Admin)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const debugParam = urlParams.get('debug');
     const adminParam = urlParams.get('admin');
     
-    if (debugParam === 'true' || adminParam === 'true') {
+    if ((debugParam === 'true' || adminParam === 'true') && hasDebugAccess) {
       setIsVisible(true);
-      setIsAuthenticated(true);
       addLog('success', 'System', 'Debug ativado via URL');
     }
 
-    // Verificar se usuário tem permissões
-    if (user?.role === 'SuperAdmin' || user?.role === 'Admin') {
-      setIsAuthenticated(true);
-      addLog('info', 'Auth', `Acesso autorizado: ${user.role}`);
+    // Log de acesso
+    if (hasDebugAccess) {
+      addLog('info', 'Auth', `Acesso autorizado: ${user?.role || 'Development'}`);
+    } else if (user) {
+      addLog('warn', 'Auth', `Acesso negado: ${user.role} (apenas Super Admin)`);
     }
-  }, [user]);
+  }, [user, hasDebugAccess]);
 
-  // ⌨️ Atalhos de teclado múltiplos
+  // ⌨️ Atalhos de teclado múltiplos (apenas para Super Admin)
   useEffect(() => {
+    if (!hasDebugAccess) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+Shift+D (principal)
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
@@ -127,7 +128,7 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [hasDebugAccess]);
 
   // 🎯 Capturar erros globais
   useEffect(() => {
@@ -172,16 +173,13 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
     };
   }, []);
 
-  // 🔐 Verificar senha master
-  const checkPassword = () => {
-    if (passwordInput === MASTER_PASSWORD) {
-      setIsAuthenticated(true);
-      setShowPasswordPrompt(false);
-      setPasswordInput('');
-      addLog('success', 'Auth', 'Acesso autorizado via senha master');
+  // 🔐 Verificar acesso (removido sistema de senha)
+  const checkAccess = () => {
+    if (hasDebugAccess) {
+      setIsVisible(true);
+      addLog('success', 'Auth', 'Acesso autorizado');
     } else {
-      addLog('warn', 'Auth', 'Senha incorreta');
-      setPasswordInput('');
+      addLog('warn', 'Auth', 'Acesso negado - apenas Super Admin');
     }
   };
 
@@ -217,61 +215,26 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
       <div className="fixed bottom-4 right-4 z-[9999]">
         {/* Indicador de status sempre visível */}
         <div className="flex flex-col items-end gap-2">
-          {/* Status do sistema */}
-          <div className="bg-black bg-opacity-80 text-white px-2 py-1 rounded text-xs">
-            🛡️ {user ? 'Online' : 'Offline'} | {logs.filter(l => l.level === 'error').length} erros
-          </div>
-          
-          {/* Botão principal */}
-          <button
-            onClick={() => {
-              if (isAuthenticated) {
-                setIsVisible(true);
-              } else {
-                setShowPasswordPrompt(true);
-              }
-            }}
-            className="w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center text-xl border-2 border-white"
-            title="Debug Panel (Ctrl+Shift+D)"
-          >
-            🛡️
-          </button>
+                  {/* Status do sistema */}
+        <div className="bg-black bg-opacity-80 text-white px-2 py-1 rounded text-xs">
+          🛡️ {user ? 'Online' : 'Offline'} | {logs.filter(l => l.level === 'error').length} erros
+          {hasDebugAccess && <span className="ml-1 text-green-400">| Super Admin</span>}
         </div>
-
-        {/* Prompt de senha */}
-        {showPasswordPrompt && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
-            <div className="bg-white p-6 rounded-lg shadow-xl">
-              <h3 className="text-lg font-bold mb-4">🔐 Acesso Debug</h3>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && checkPassword()}
-                placeholder="Senha master..."
-                className="w-full px-3 py-2 border rounded mb-4"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={checkPassword}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Entrar
-                </button>
-                <button
-                  onClick={() => {
-                    setShowPasswordPrompt(false);
-                    setPasswordInput('');
-                  }}
-                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        
+        {/* Botão principal */}
+        <button
+          onClick={checkAccess}
+          className={`w-14 h-14 ${
+            hasDebugAccess 
+              ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-xl transform hover:scale-110' 
+              : 'bg-gray-500 cursor-not-allowed'
+          } text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center text-xl border-2 border-white`}
+          title={hasDebugAccess ? "Debug Panel (Ctrl+Shift+D)" : "Acesso restrito - Super Admin apenas"}
+          disabled={!hasDebugAccess}
+        >
+          {hasDebugAccess ? '🛡️' : '🔒'}
+        </button>
+      </div>
       </div>
     );
   }
@@ -329,7 +292,9 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
 
         {/* Informações do usuário */}
         <div className="text-xs text-gray-600">
-          👤 {user?.name || 'Não logado'} | 🎯 {user?.role || 'N/A'} | ⏰ {new Date().toLocaleTimeString()}
+          👤 {user?.name || 'Não logado'} | 🎯 {user?.role || 'N/A'} 
+          {hasDebugAccess && <span className="text-green-600 font-semibold"> ✓ Autorizado</span>}
+          | ⏰ {new Date().toLocaleTimeString()}
         </div>
       </div>
 
