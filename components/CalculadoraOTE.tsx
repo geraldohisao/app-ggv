@@ -358,7 +358,7 @@ const SdrResults: React.FC<{ results: any, includeQuarterly: boolean, setInclude
         </div>
         <div className="space-y-1">
             <h4 className="font-semibold text-slate-700 text-base mb-2">Detalhamento Variável</h4>
-            <DetailRow label="Salário Fixo" value={formatCurrency(results.salarioFixo)} />
+            <DetailRow label="Fixo" value={formatCurrency(results.salarioFixo)} />
             <DetailRow label="Comissão Individual" value={formatCurrency(results.comissaoIndividual)} />
             <DetailRow label="Bônus Coletivo" value={formatCurrency(results.metaColetiva)} />
             <DetailRow label="Prêmio Performance" value={formatCurrency(results.premioPerformance)} />
@@ -392,7 +392,7 @@ const CloserResults: React.FC<{ results: any, includeQuarterly: boolean, setIncl
         </div>
         <div className="space-y-1">
             <h4 className="font-semibold text-slate-700 text-base mb-2">Detalhamento Variável</h4>
-            <DetailRow label="Salário Fixo" value={formatCurrency(results.salarioFixo)} />
+            <DetailRow label="Fixo" value={formatCurrency(results.salarioFixo)} />
             <DetailRow label="Comissão Individual" value={formatCurrency(results.comissaoIndividualFixa)} />
             <DetailRow label="Premiação Individual / Meta" value={formatCurrency(results.premiacaoIndividualMeta)} />
             <DetailRow label="Premiação Coletiva" value={formatCurrency(results.premiacaoColetiva)} />
@@ -427,7 +427,7 @@ const CoordenadorResults: React.FC<{ results: any, includeQuarterly: boolean, se
         </div>
         <div className="space-y-1">
             <h4 className="font-semibold text-slate-700 text-base mb-2">Detalhamento Variável</h4>
-            <DetailRow label="Salário Fixo" value={formatCurrency(results.salarioFixo)} />
+            <DetailRow label="Fixo" value={formatCurrency(results.salarioFixo)} />
             <DetailRow label="Premiação Mensal Coletiva" value={formatCurrency(results.premiacaoColetiva)} />
             {results.metaTrimestralAtingida && <CheckboxRow id="includeQuarterlyCoordenador" label="Premiação Trimestral Eficiência" value={results.bonusTrimestralPotencial} checked={includeQuarterly} onChange={setIncludeQuarterly} formatCurrency={formatCurrency} color="yellow" />}
             {!results.metaTrimestralAtingida && results.progressoTrimestral > 0 && (
