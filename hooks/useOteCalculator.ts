@@ -95,6 +95,9 @@ export const useOteCalculator = (
 
             const salarioFixo = CLOSER_REMUNERATION.fixedSalary[nivelKey as keyof typeof CLOSER_REMUNERATION.fixedSalary];
             
+            // Comissão Individual fixa de 0.75% sobre vendas (independente da meta)
+            const comissaoIndividualFixa = vendasRealizadas * CLOSER_REMUNERATION.fixedIndividualCommission.rate;
+            
             const progressoMensal = metaMensalVendas > 0 ? (vendasRealizadas / metaMensalVendas) : 0;
             
             const getTieredRate = (achievement: number, tiers: {threshold: number, rate: number}[]) => {
@@ -106,8 +109,9 @@ export const useOteCalculator = (
                 return 0;
             };
 
-            const comissaoRate = getTieredRate(progressoMensal, CLOSER_REMUNERATION.individualCommission.tiers);
-            const comissaoIndividualMeta = vendasRealizadas * comissaoRate;
+            // Premiação Individual / Meta (baseada no atingimento da meta)
+            const premiacaoRate = getTieredRate(progressoMensal, CLOSER_REMUNERATION.individualCommission.tiers);
+            const premiacaoIndividualMeta = vendasRealizadas * premiacaoRate;
 
             const premiacaoColetiva = getTieredValue(
                 metaColetivaGlobalPerc,
@@ -144,17 +148,18 @@ export const useOteCalculator = (
                 return acc;
             }, 0);
 
-            const totalOte = salarioFixo + comissaoIndividualMeta + premiacaoColetiva + premiacaoTrimestral + bonusCampanha + bonusProduto + bonusAnual;
+            const totalOte = salarioFixo + comissaoIndividualFixa + premiacaoIndividualMeta + premiacaoColetiva + premiacaoTrimestral + bonusCampanha + bonusProduto + bonusAnual;
 
             const calculateScenarioOTE = (achievement: number) => {
                  const scenarioVendas = metaMensalVendas * achievement;
+                 const scenarioFixedCommission = scenarioVendas * CLOSER_REMUNERATION.fixedIndividualCommission.rate;
                  const scenarioRate = getTieredRate(achievement, CLOSER_REMUNERATION.individualCommission.tiers);
-                 const scenarioCommission = scenarioVendas * scenarioRate;
-                 return salarioFixo + scenarioCommission;
+                 const scenarioVariableCommission = scenarioVendas * scenarioRate;
+                 return salarioFixo + scenarioFixedCommission + scenarioVariableCommission;
             };
 
             return {
-                salarioFixo, comissaoIndividualMeta, premiacaoColetiva, premiacaoTrimestral, bonusCampanha, bonusProduto, bonusAnual, totalOte,
+                salarioFixo, comissaoIndividualFixa, premiacaoIndividualMeta, premiacaoColetiva, premiacaoTrimestral, bonusCampanha, bonusProduto, bonusAnual, totalOte,
                 progressoMensal: progressoMensal * 100,
                 progressoTrimestral: conversaoTrimestral * 100,
                 progressoColetiva: metaColetivaGlobalPerc * 100,

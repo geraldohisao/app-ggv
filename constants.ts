@@ -307,6 +307,11 @@ export const CLOSER_REMUNERATION = {
     level3: 5000.00,
     level4: 6000.00,
   },
+  // Comissão Individual fixa de 0.75% sobre todas as vendas (independente da meta)
+  fixedIndividualCommission: {
+    rate: 0.0075, // 0.75% sobre vendas realizadas
+  },
+  // Premiação Individual / Meta (antiga "Comissão individual / meta")
   individualCommission: {
     // Tiers are min thresholds for sales goal %. The commission rate is applied to total sales.
     tiers: [

@@ -393,7 +393,8 @@ const CloserResults: React.FC<{ results: any, includeQuarterly: boolean, setIncl
         <div className="space-y-1">
             <h4 className="font-semibold text-slate-700 text-base mb-2">Detalhamento Variável</h4>
             <DetailRow label="Salário Fixo" value={formatCurrency(results.salarioFixo)} />
-            <DetailRow label="Comissão Individual / Meta" value={formatCurrency(results.comissaoIndividualMeta)} />
+            <DetailRow label="Comissão Individual" value={formatCurrency(results.comissaoIndividualFixa)} />
+            <DetailRow label="Premiação Individual / Meta" value={formatCurrency(results.premiacaoIndividualMeta)} />
             <DetailRow label="Premiação Coletiva" value={formatCurrency(results.premiacaoColetiva)} />
             {results.metaTrimestralAtingida && <CheckboxRow id="includeQuarterlyCloser" label="Premiação Trimestral" value={results.bonusTrimestralPotencial} checked={includeQuarterly} onChange={setIncludeQuarterly} formatCurrency={formatCurrency} color="yellow" />}
             <DetailRow label="Bônus Campanha" value={formatCurrency(results.bonusCampanha)} />
@@ -402,7 +403,7 @@ const CloserResults: React.FC<{ results: any, includeQuarterly: boolean, setIncl
             <DetailRow label="Total OTE Calculado" value={formatCurrency(results.totalOte)} isTotal />
         </div>
         <div className="space-y-3 pt-4">
-            <h4 className="font-semibold text-slate-700">Simulação de Cenários (Fixa + Com. Indiv.)</h4>
+            <h4 className="font-semibold text-slate-700">Simulação de Cenários (Fixo + Comissões)</h4>
             <div className="grid grid-cols-3 gap-3 text-center">
                 <ScenarioBox label="🔻 Baixo (75%)" value={formatCurrency(results.oteBaixo)} color="red" />
                 <ScenarioBox label="🎯 Alvo (100%)" value={formatCurrency(results.oteAlvo)} color="blue" />
