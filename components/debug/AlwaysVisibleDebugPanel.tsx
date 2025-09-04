@@ -212,36 +212,36 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
   // 🎯 SEMPRE renderizar indicador (pequeno ícone no canto)
   if (!isVisible) {
     return (
-      <div className="fixed bottom-4 right-4 z-[9999]">
+      <div className="fixed top-4 right-4 z-[9999]">
         {/* Indicador de status sempre visível */}
         <div className="flex flex-col items-end gap-2">
-                  {/* Status do sistema */}
-        <div className="bg-black bg-opacity-80 text-white px-2 py-1 rounded text-xs">
-          🛡️ {user ? 'Online' : 'Offline'} | {logs.filter(l => l.level === 'error').length} erros
-          {hasDebugAccess && <span className="ml-1 text-green-400">| Super Admin</span>}
+          {/* Status do sistema */}
+          <div className="bg-black bg-opacity-90 text-white px-3 py-2 rounded-lg text-xs shadow-lg backdrop-blur-sm">
+            🛡️ {user ? 'Online' : 'Offline'} | {logs.filter(l => l.level === 'error').length} erros
+            {hasDebugAccess && <span className="ml-1 text-green-400">| Super Admin</span>}
+          </div>
+          
+          {/* Botão principal */}
+          <button
+            onClick={checkAccess}
+            className={`w-12 h-12 ${
+              hasDebugAccess 
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-xl transform hover:scale-110' 
+                : 'bg-gray-500 cursor-not-allowed'
+            } text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center text-lg border-2 border-white`}
+            title={hasDebugAccess ? "Debug Panel (Ctrl+Shift+D)" : "Acesso restrito - Super Admin apenas"}
+            disabled={!hasDebugAccess}
+          >
+            {hasDebugAccess ? '🛡️' : '🔒'}
+          </button>
         </div>
-        
-        {/* Botão principal */}
-        <button
-          onClick={checkAccess}
-          className={`w-14 h-14 ${
-            hasDebugAccess 
-              ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-xl transform hover:scale-110' 
-              : 'bg-gray-500 cursor-not-allowed'
-          } text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center text-xl border-2 border-white`}
-          title={hasDebugAccess ? "Debug Panel (Ctrl+Shift+D)" : "Acesso restrito - Super Admin apenas"}
-          disabled={!hasDebugAccess}
-        >
-          {hasDebugAccess ? '🛡️' : '🔒'}
-        </button>
-      </div>
       </div>
     );
   }
 
   // 🎛️ PAINEL PRINCIPAL
   return (
-    <div className="fixed inset-y-0 right-0 w-[450px] bg-white shadow-2xl border-l-4 border-blue-600 flex flex-col z-[9999]">
+    <div className="fixed inset-y-0 left-0 w-[450px] bg-white shadow-2xl border-r-4 border-blue-600 flex flex-col z-[9999]">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3">
         <div className="flex items-center justify-between">
