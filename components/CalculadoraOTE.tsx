@@ -323,7 +323,7 @@ const CloserInputsComponent: React.FC<{ inputs: any, onChange: any, bonuses: any
                         <h4 className='font-semibold text-sm mb-2 text-slate-700'>Bônus de Campanha</h4>
                         <div className='space-y-2'>
                             {Object.keys(CLOSER_REMUNERATION.campaignBonus).map((key) => (
-                                <BonusCheckbox key={key} id={`campaign-${key}`} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} checked={bonuses.campaign[key]} onChange={() => onBonusChange('campaign', key)} />
+                                <BonusCheckbox key={key} id={`campaign-${key}`} label={CLOSER_REMUNERATION.campaignBonusLabels[key as keyof typeof CLOSER_REMUNERATION.campaignBonusLabels]} checked={bonuses.campaign[key]} onChange={() => onBonusChange('campaign', key)} />
                             ))}
                         </div>
                     </div>
@@ -331,7 +331,7 @@ const CloserInputsComponent: React.FC<{ inputs: any, onChange: any, bonuses: any
                         <h4 className='font-semibold text-sm mb-2 text-slate-700'>Bônus de Produto</h4>
                         <div className='space-y-2'>
                             {Object.keys(CLOSER_REMUNERATION.productBonus).map((key) => (
-                                <BonusCheckbox key={key} id={`product-${key}`} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} checked={bonuses.product[key]} onChange={() => onBonusChange('product', key)} />
+                                <BonusCheckbox key={key} id={`product-${key}`} label={CLOSER_REMUNERATION.productBonusLabels[key as keyof typeof CLOSER_REMUNERATION.productBonusLabels]} checked={bonuses.product[key]} onChange={() => onBonusChange('product', key)} />
                             ))}
                         </div>
                     </div>

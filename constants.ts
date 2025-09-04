@@ -352,11 +352,25 @@ export const CLOSER_REMUNERATION = {
     leadProspeccao: { level1: 500, level2: 750, level3: 1000, level4: 1250 },
     entrada50: { level1: 500, level2: 750, level3: 1000, level4: 1250 },
   },
+  // Labels personalizados para os bônus
+  campaignBonusLabels: {
+    ticketMedio: 'Ticket médio acima de 70k',
+    pagamentoVista: 'Pagamento à vista',
+    leadProspeccao: 'Lead de prospecção',
+    entrada50: '50% de entrada',
+  },
   productBonus: {
     pesquisasAcima25k: { level1: 250, level2: 500, level3: 750, level4: 1000 },
     valuationAcima15k: { level1: 250, level2: 500, level3: 750, level4: 1000 },
     treinamentosAcima10k: { level1: 250, level2: 500, level3: 750, level4: 1000 },
     maisDe6Modulos: { level1: 250, level2: 500, level3: 750, level4: 1000 },
+  },
+  // Labels personalizados para os bônus de produto
+  productBonusLabels: {
+    pesquisasAcima25k: 'Pesquisas acima de 25k',
+    valuationAcima15k: 'Valuation acima de 15k',
+    treinamentosAcima10k: 'Treinamentos acima de 10k',
+    maisDe6Modulos: 'Mais de 6 modular no mês',
   },
   annualBonus: {
       // Assuming it's the same value as the fixed salary, similar to SDR
