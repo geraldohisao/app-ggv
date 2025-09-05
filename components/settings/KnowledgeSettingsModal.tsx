@@ -179,32 +179,38 @@ export const KnowledgeSettingsModal: React.FC<{ onClose: () => void }> = ({ onCl
 
                 // Tentativas com diferentes workers (corrige mismatch de versão)
                 const candidateWorkers = [
-                    `https://esm.sh/pdfjs-dist@${(pdfjsLib as any).version}/build/pdf.worker.min.mjs`,
                     `https://unpkg.com/pdfjs-dist@${(pdfjsLib as any).version}/build/pdf.worker.min.js`,
                     `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`,
+                    `https://esm.sh/pdfjs-dist@${(pdfjsLib as any).version}/build/pdf.worker.min.mjs`,
                     '', // fallback sem worker
                 ];
 
-                let lastErr: any = null;
+                let allErrors: string[] = [];
+                let success = false;
+                
                 for (const w of candidateWorkers) {
                     try {
+                        console.log(`🔄 Tentando PDF worker: ${w || 'sem worker'}`);
                         pdfjsLib.GlobalWorkerOptions.workerSrc = w as any;
                         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        
+                        console.log(`✅ PDF worker funcionou: ${w || 'sem worker'}`);
                         for (let i = 1; i <= pdf.numPages; i++) {
                             const page = await pdf.getPage(i);
                             const textContent = await page.getTextContent();
                             content += (textContent.items as any[]).map(item => ('str' in item ? (item as any).str : '')).join(' ') + '\n';
                         }
-                        lastErr = null;
+                        success = true;
                         break; // sucesso
                     } catch (e: any) {
-                        console.warn('PDF worker falhou, tentando próximo...', w, e?.message);
-                        lastErr = e;
+                        const errorMsg = `Worker ${w || 'sem worker'}: ${e?.message || 'Erro desconhecido'}`;
+                        console.warn('❌ PDF worker falhou:', errorMsg);
+                        allErrors.push(errorMsg);
                     }
                 }
 
-                if (lastErr) {
-                    throw new Error(`Falha ao processar PDF: ${lastErr.message}`);
+                if (!success) {
+                    throw new Error(`Falha ao processar PDF com todos os workers:\n${allErrors.join('\n')}`);
                 }
             } else if (file.type === 'text/plain') {
                 content = await file.text();
