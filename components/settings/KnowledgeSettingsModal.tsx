@@ -10,8 +10,11 @@ import { DocumentTextIcon, PlusIcon, BookOpenIcon, TrashIcon } from '../ui/icons
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '../../services/supabaseClient';
 
-// Ajuste automático do worker para a mesma versão da lib instalada
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@${(pdfjsLib as any).version || '5.4.54'}/build/pdf.worker.min.mjs`;
+// Importa o worker usando Vite's ?url para resolver problemas de CSP
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+// Configura o worker com caminho local seguro
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export const KnowledgeSettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { user } = useUser();
@@ -176,42 +179,17 @@ export const KnowledgeSettingsModal: React.FC<{ onClose: () => void }> = ({ onCl
             let content = '';
             if (file.type === 'application/pdf') {
                 const arrayBuffer = await file.arrayBuffer();
-
-                // Tentativas com diferentes workers (corrige mismatch de versão)
-                const candidateWorkers = [
-                    `https://unpkg.com/pdfjs-dist@${(pdfjsLib as any).version}/build/pdf.worker.min.js`,
-                    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`,
-                    `https://esm.sh/pdfjs-dist@${(pdfjsLib as any).version}/build/pdf.worker.min.mjs`,
-                    '', // fallback sem worker
-                ];
-
-                let allErrors: string[] = [];
-                let success = false;
                 
-                for (const w of candidateWorkers) {
-                    try {
-                        console.log(`🔄 Tentando PDF worker: ${w || 'sem worker'}`);
-                        pdfjsLib.GlobalWorkerOptions.workerSrc = w as any;
-                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                        
-                        console.log(`✅ PDF worker funcionou: ${w || 'sem worker'}`);
-                        for (let i = 1; i <= pdf.numPages; i++) {
-                            const page = await pdf.getPage(i);
-                            const textContent = await page.getTextContent();
-                            content += (textContent.items as any[]).map(item => ('str' in item ? (item as any).str : '')).join(' ') + '\n';
-                        }
-                        success = true;
-                        break; // sucesso
-                    } catch (e: any) {
-                        const errorMsg = `Worker ${w || 'sem worker'}: ${e?.message || 'Erro desconhecido'}`;
-                        console.warn('❌ PDF worker falhou:', errorMsg);
-                        allErrors.push(errorMsg);
-                    }
+                console.log('🔄 Processando PDF com worker local...');
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                console.log(`✅ PDF carregado com sucesso: ${pdf.numPages} páginas`);
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    content += (textContent.items as any[]).map(item => ('str' in item ? (item as any).str : '')).join(' ') + '\n';
                 }
-
-                if (!success) {
-                    throw new Error(`Falha ao processar PDF com todos os workers:\n${allErrors.join('\n')}`);
-                }
+                console.log(`✅ Texto extraído: ${content.length} caracteres`);
             } else if (file.type === 'text/plain') {
                 content = await file.text();
             } else {
