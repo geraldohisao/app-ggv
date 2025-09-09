@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { GGVInteligenciaBrand } from '../ui/BrandLogos';
-import { LightBulbIcon, CheckCircleIcon } from '../ui/icons';
+import { CheckCircleIcon } from '../ui/icons';
 import { diagnosticQuestions, type DiagnosticQuestion, type QuestionOption } from '../../data/diagnosticoQuestions.ts';
 import { Answers } from '../../types';
 
@@ -22,14 +22,16 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ answers, t
 
     const handleAnswerAndScroll = (questionId: number, score: number) => {
         onSelectAnswer(questionId, score);
-        const questionIndex = diagnosticQuestions.findIndex(q => q.id === questionId);
-        if (questionIndex < diagnosticQuestions.length - 1) {
-            setTimeout(() => {
-                questionRefs.current[questionIndex + 1]?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center',
-                });
-            }, 300);
+    };
+    const scrollToNextUnanswered = () => {
+        const unansweredQuestions = diagnosticQuestions.filter(q => !(q.id in answers));
+        if (unansweredQuestions.length > 0) {
+            const nextQuestion = unansweredQuestions[0];
+            const questionIndex = diagnosticQuestions.findIndex(q => q.id === nextQuestion.id);
+            questionRefs.current[questionIndex]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
         }
     };
 
@@ -39,12 +41,22 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ answers, t
                 <div className="text-center mb-4">
                     <GGVInteligenciaBrand className="w-48 mx-auto mb-4" />
                     <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Diagnóstico Comercial</h1>
-                    <p className="text-slate-500 mt-2">Responda às perguntas abaixo para avaliar a maturidade comercial da sua empresa.</p>
+                    <p className="text-slate-500 mt-2">Responda em qualquer ordem - sem pressa! 🎯</p>
                 </div>
                 <div className="px-1 py-4">
                     <div className="flex justify-between items-center mb-2 text-sm font-semibold">
-                        <span className="text-slate-600">Pergunta {Math.min(Object.keys(answers).length + 1, diagnosticQuestions.length)} de {diagnosticQuestions.length}</span>
-                        <span className="text-blue-800">Pontuação: {totalScore}/{MAX_SCORE}</span>
+                        <span className="text-slate-600">✅ {Object.keys(answers).length} de {diagnosticQuestions.length} respondidas</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-800">Pontuação: {totalScore}/{MAX_SCORE}</span>
+                            {!allAnswered && (
+                                <button
+                                    onClick={scrollToNextUnanswered}
+                                    className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded-full transition-colors text-xs font-medium"
+                                >
+                                    📍 Próxima
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-2.5">
                         <div className="bg-blue-800 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
@@ -59,16 +71,25 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ answers, t
             )}
 
             <div className="space-y-5">
-                {diagnosticQuestions.map((q, index) => (
-                    <div ref={el => { if (el) questionRefs.current[index] = el; }} key={q.id} style={{ scrollMarginTop: '120px' }}>
-                        <QuestionCard
-                            question={q}
-                            questionNumber={index + 1}
-                            selectedScore={answers[q.id] as number}
-                            onSelectAnswer={(score) => handleAnswerAndScroll(q.id, score)}
-                        />
-                    </div>
-                ))}
+                {diagnosticQuestions.map((q, index) => {
+                    const isAnswered = q.id in answers;
+                    return (
+                        <div 
+                            ref={el => { if (el) questionRefs.current[index] = el; }} 
+                            key={q.id} 
+                            style={{ scrollMarginTop: '120px' }}
+                            className={`transition-all duration-300 ${!isAnswered ? 'ring-2 ring-blue-200 ring-opacity-50' : ''}`}
+                        >
+                            <QuestionCard
+                                question={q}
+                                questionNumber={index + 1}
+                                selectedScore={answers[q.id] as number}
+                                onSelectAnswer={(score) => handleAnswerAndScroll(q.id, score)}
+                                isAnswered={isAnswered}
+                            />
+                        </div>
+                    );
+                })}
             </div>
 
             <div className="flex justify-center pt-4">
@@ -89,7 +110,8 @@ const QuestionCard: React.FC<{
     questionNumber: number;
     selectedScore?: number;
     onSelectAnswer: (score: number) => void;
-}> = ({ question, questionNumber, selectedScore, onSelectAnswer }) => {
+    isAnswered?: boolean;
+}> = ({ question, questionNumber, selectedScore, onSelectAnswer, isAnswered = false }) => {
 
     const highlightText = (text: string, highlight: string) => {
         if (!highlight) return text;
@@ -108,9 +130,19 @@ const QuestionCard: React.FC<{
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200/80 transition-shadow hover:shadow-xl">
+        <div className={`bg-white p-6 rounded-2xl shadow-lg border transition-all duration-300 hover:shadow-xl ${
+            isAnswered 
+                ? 'border-green-200 bg-green-50/30' 
+                : 'border-slate-200/80 border-l-4 border-l-blue-400'
+        }`}>
             <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-start gap-3">
-                <span className="flex-shrink-0 h-7 w-7 bg-blue-900 text-white rounded-full flex items-center justify-center font-bold text-sm mt-0.5">{questionNumber}</span>
+                <span className={`flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center font-bold text-sm mt-0.5 ${
+                    isAnswered 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-blue-900 text-white'
+                }`}>
+                    {isAnswered ? '✓' : questionNumber}
+                </span>
                 <span>{highlightText(question.text, question.highlight)}</span>
             </h3>
             <div className="space-y-3">
@@ -122,13 +154,6 @@ const QuestionCard: React.FC<{
                         onClick={() => onSelectAnswer(option.score)}
                     />
                 ))}
-            </div>
-            <div className="mt-6 bg-slate-100/70 p-4 rounded-lg flex items-start gap-3">
-                <LightBulbIcon className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div>
-                    <h4 className="font-bold text-slate-700 text-sm">Por que isso importa:</h4>
-                    <p className="text-slate-600 text-sm">{question.importance}</p>
-                </div>
             </div>
         </div>
     );
