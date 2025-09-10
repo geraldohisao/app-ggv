@@ -1,8 +1,8 @@
 [build]
   publish = "dist"
-  command = "npm ci && npm run build:fast"
+  command = "./build-netlify.sh"
   functions = "netlify/functions"
-  # Force rebuild - diagnostic improvements v3
+  # Force rebuild - diagnostic improvements v4
 
 [build.environment]
   NODE_VERSION = "20.18.0"
