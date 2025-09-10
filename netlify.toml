@@ -2,6 +2,7 @@
   publish = "dist"
   command = "npm run build:fast"
   functions = "netlify/functions"
+  # Force rebuild - diagnostic improvements
 
 [build.environment]
   NODE_VERSION = "20.18.0"
