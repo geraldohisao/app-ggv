@@ -31,17 +31,30 @@ async function fetchCallVolumeData(days: number = 14, startDate?: string, endDat
       .order('created_at', { ascending: true });
 
     if (startDate && endDate) {
+      // Para data específica, filtrar do início ao fim do dia
+      const startDateTime = startDate + 'T00:00:00';
+      const endDateTime = endDate + 'T23:59:59';
+      
+      console.log('📅 Filtrando por data específica:', { startDateTime, endDateTime });
+      
       query = query
-        .gte('created_at', startDate)
-        .lte('created_at', endDate + 'T23:59:59');
+        .gte('created_at', startDateTime)
+        .lte('created_at', endDateTime);
     } else {
       // Usar período padrão
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - days);
+      const endDateObj = new Date();
+      const startDateObj = new Date();
+      startDateObj.setDate(endDateObj.getDate() - days);
+      
+      console.log('📊 Filtrando por período:', { 
+        days, 
+        start: startDateObj.toISOString(), 
+        end: endDateObj.toISOString() 
+      });
+      
       query = query
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('created_at', startDateObj.toISOString())
+        .lte('created_at', endDateObj.toISOString());
     }
 
     const { data, error } = await query;
@@ -52,12 +65,44 @@ async function fetchCallVolumeData(days: number = 14, startDate?: string, endDat
     }
 
     console.log('✅ Dados de chamadas carregados:', data?.length || 0);
+    
+    // Debug: mostrar alguns dados para verificação
+    if (data && data.length > 0) {
+      console.log('🔍 Primeiros dados:', data.slice(0, 5));
+      console.log('🔍 Últimos dados:', data.slice(-5));
+      console.log('🔍 Status únicos encontrados:', [...new Set(data.map((d: any) => d.status_voip))]);
+      
+      // Verificar se há dados de outras datas "vazando"
+      const uniqueDates = [...new Set(data.map((d: any) => new Date(d.created_at).toISOString().split('T')[0]))];
+      console.log('🔍 Datas únicas encontradas:', uniqueDates);
+      
+      // Se estamos filtrando por data específica, verificar se só tem essa data
+      if (startDate && endDate && startDate === endDate) {
+        const wrongDateData = data.filter((d: any) => {
+          const dateStr = new Date(d.created_at).toISOString().split('T')[0];
+          return dateStr !== startDate;
+        });
+        
+        if (wrongDateData.length > 0) {
+          console.error('🚨 PROBLEMA: Encontrados dados de outras datas quando deveria ser apenas', startDate);
+          console.error('🚨 Dados incorretos:', wrongDateData.slice(0, 3));
+        } else {
+          console.log('✅ CORRETO: Todos os dados são da data', startDate);
+        }
+      }
+    }
 
     // Agrupar por data
     const groupedData = new Map<string, { answered: number; missed: number }>();
 
     data?.forEach((call: any) => {
       const date = new Date(call.created_at).toISOString().split('T')[0];
+      
+      // FILTRO ADICIONAL: Se estamos no modo data específica, ignorar dados de outras datas
+      if (startDate && endDate && startDate === endDate && date !== startDate) {
+        console.warn('⚠️ Ignorando dado de data incorreta:', date, 'esperado:', startDate);
+        return; // Pular este registro
+      }
       
       // Classificação baseada no status_voip:
       // - Atendidas: apenas 'normal_clearing'
@@ -76,8 +121,11 @@ async function fetchCallVolumeData(days: number = 14, startDate?: string, endDat
       }
     });
 
+    // Debug: mostrar dados agrupados
+    console.log('📊 Dados agrupados por data:', Object.fromEntries(groupedData));
+
     // Converter para array e ordenar por data
-    const result: CallData[] = Array.from(groupedData.entries())
+    let result: CallData[] = Array.from(groupedData.entries())
       .map(([date, counts]) => ({
         date,
         answered: counts.answered,
@@ -85,7 +133,23 @@ async function fetchCallVolumeData(days: number = 14, startDate?: string, endDat
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    console.log('📊 Dados processados:', result);
+    // FILTRO FINAL: Se estamos no modo data específica, garantir que só retornamos aquela data
+    if (startDate && endDate && startDate === endDate) {
+      result = result.filter(item => item.date === startDate);
+      console.log('🎯 FILTRO FINAL aplicado - apenas data', startDate, '- resultado:', result);
+      
+      // Se não encontrou dados para a data específica, retornar dados zerados
+      if (result.length === 0) {
+        result = [{
+          date: startDate,
+          answered: 0,
+          missed: 0
+        }];
+        console.log('📭 Nenhum dado encontrado para', startDate, '- retornando dados zerados');
+      }
+    }
+
+    console.log('📊 Dados processados FINAL:', result);
     return result;
 
   } catch (error) {
@@ -99,6 +163,14 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
   const [data, setData] = useState<CallData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Debug: verificar parâmetros recebidos
+  console.log('📊 CallVolumeChart recebeu parâmetros:', { 
+    selectedPeriod, 
+    startDate, 
+    endDate,
+    isSpecificDate: !!(startDate && endDate && startDate === endDate)
+  });
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -247,11 +319,22 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
     }
   };
 
+  // Determinar título baseado nos filtros
+  const isSpecificDate = startDate && endDate && startDate === endDate;
+  const chartTitle = isSpecificDate 
+    ? `Volume de Chamadas - ${new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
+    : `Volume de Chamadas - Últimos ${selectedPeriod} dia${selectedPeriod > 1 ? 's' : ''}`;
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
-        <h3 className="font-semibold text-slate-800">Volume de Chamadas por Dia</h3>
-        <p className="text-sm text-slate-500">Clique em um ponto para filtrar por data • Passe o mouse para ver detalhes</p>
+        <h3 className="font-semibold text-slate-800">{chartTitle}</h3>
+        <p className="text-sm text-slate-500">
+          {isSpecificDate 
+            ? 'Dados específicos desta data' 
+            : 'Clique em um ponto para filtrar por data • Passe o mouse para ver detalhes'
+          }
+        </p>
       </div>
       
       <div className="relative w-full overflow-visible">

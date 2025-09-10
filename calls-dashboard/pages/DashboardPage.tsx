@@ -23,8 +23,10 @@ export default function DashboardPage() {
     error: null
   });
   
-  // Estado compartilhado para período
+  // Estados para filtros unificados
   const [selectedPeriod, setSelectedPeriod] = useState(14); // Padrão: 14 dias
+  const [specificDate, setSpecificDate] = useState(''); // Data específica
+  const [filterMode, setFilterMode] = useState<'period' | 'date'>('period'); // Modo de filtro
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -35,16 +37,33 @@ export default function DashboardPage() {
       }
 
       try {
-        console.log('🔍 Buscando métricas do dashboard...');
+        console.log('🔍 Buscando métricas do dashboard...', { filterMode, specificDate, selectedPeriod });
         
-        // Usar período selecionado
-        const daysAgo = new Date();
-        daysAgo.setDate(daysAgo.getDate() - selectedPeriod);
-
-        const { data, error } = await supabase
+        let query = supabase
           .from('calls')
-          .select('status_voip, duration')
-          .gte('created_at', daysAgo.toISOString());
+          .select('status_voip, duration, created_at');
+
+        // Aplicar filtro baseado no modo selecionado
+        if (filterMode === 'date' && specificDate) {
+          // Filtrar por data específica (00:00:00 até 23:59:59)
+          const startOfDay = new Date(specificDate + 'T00:00:00');
+          const endOfDay = new Date(specificDate + 'T23:59:59');
+          
+          query = query
+            .gte('created_at', startOfDay.toISOString())
+            .lte('created_at', endOfDay.toISOString());
+            
+          console.log('📅 Filtrando por data específica:', specificDate);
+        } else {
+          // Usar período (comportamento original)
+          const daysAgo = new Date();
+          daysAgo.setDate(daysAgo.getDate() - selectedPeriod);
+          
+          query = query.gte('created_at', daysAgo.toISOString());
+          console.log('📊 Filtrando por período:', selectedPeriod, 'dias');
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error('❌ Erro ao buscar métricas:', error);
@@ -94,7 +113,7 @@ export default function DashboardPage() {
     };
 
     fetchMetrics();
-  }, [selectedPeriod]); // Re-executar quando período mudar
+  }, [selectedPeriod, specificDate, filterMode]); // Re-executar quando filtros mudarem
 
   if (metrics.loading) {
     return (
@@ -119,18 +138,99 @@ export default function DashboardPage() {
           <p className="text-sm text-slate-600">Métricas e visão geral do desempenho da equipe.</p>
         </div>
         
-        {/* Filtro de período unificado */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-600">Período:</span>
-          <select 
-            value={selectedPeriod} 
-            onChange={(e) => setSelectedPeriod(Number(e.target.value))}
-            className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
-          >
-            <option value={7}>Últimos 7 dias</option>
-            <option value={14}>Últimos 14 dias</option>
-            <option value={30}>Últimos 30 dias</option>
-          </select>
+        {/* Filtros unificados */}
+        <div className="flex items-center gap-4">
+          {/* Seletor de modo de filtro */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Filtro:</span>
+            <select 
+              value={filterMode} 
+              onChange={(e) => {
+                const mode = e.target.value as 'period' | 'date';
+                setFilterMode(mode);
+                // Se mudou para data específica, definir hoje como padrão
+                if (mode === 'date' && !specificDate) {
+                  setSpecificDate(new Date().toISOString().split('T')[0]);
+                }
+              }}
+              className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
+            >
+              <option value="period">📊 Por Período</option>
+              <option value="date">📅 Data Específica</option>
+            </select>
+          </div>
+
+          {/* Filtro por período */}
+          {filterMode === 'period' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Período:</span>
+              <select 
+                value={selectedPeriod} 
+                onChange={(e) => setSelectedPeriod(Number(e.target.value))}
+                className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
+              >
+                <option value={1}>Hoje</option>
+                <option value={7}>Últimos 7 dias</option>
+                <option value={14}>Últimos 14 dias</option>
+                <option value={30}>Últimos 30 dias</option>
+              </select>
+            </div>
+          )}
+
+          {/* Filtro por data específica */}
+          {filterMode === 'date' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Data:</span>
+              <input
+                type="date"
+                value={specificDate}
+                onChange={(e) => setSpecificDate(e.target.value)}
+                className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
+              />
+              <button
+                onClick={() => setSpecificDate(new Date().toISOString().split('T')[0])}
+                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                title="Definir hoje"
+              >
+                Hoje
+              </button>
+              <button
+                onClick={() => setSpecificDate('2025-09-08')}
+                className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                title="Ver dados do dia 08/09"
+              >
+                08/09
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Indicador do filtro ativo */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-blue-800">
+              {filterMode === 'date' ? '📅 Filtro Ativo:' : '📊 Período Ativo:'}
+            </span>
+            <span className="text-sm text-blue-700">
+              {filterMode === 'date' && specificDate 
+                ? new Date(specificDate + 'T00:00:00').toLocaleDateString('pt-BR', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })
+                : `Últimos ${selectedPeriod} dia${selectedPeriod > 1 ? 's' : ''}`
+              }
+            </span>
+          </div>
+          <div className="text-xs text-blue-600">
+            {filterMode === 'date' 
+              ? 'Mostrando dados apenas desta data específica' 
+              : 'Mostrando dados do período selecionado'
+            }
+          </div>
         </div>
       </div>
 
@@ -197,7 +297,20 @@ export default function DashboardPage() {
 
       {/* Gráfico de Volume - Largura completa */}
       <div className="w-full">
-        <CallVolumeChart selectedPeriod={selectedPeriod} />
+        <CallVolumeChart 
+          selectedPeriod={filterMode === 'period' ? selectedPeriod : 1}
+          startDate={filterMode === 'date' && specificDate ? specificDate : undefined}
+          endDate={filterMode === 'date' && specificDate ? specificDate : undefined}
+        />
+        
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-2 p-2 bg-gray-100 text-xs text-gray-600 rounded">
+            <strong>Debug:</strong> filterMode={filterMode}, specificDate={specificDate}, 
+            startDate={filterMode === 'date' && specificDate ? specificDate : 'undefined'}, 
+            endDate={filterMode === 'date' && specificDate ? specificDate : 'undefined'}
+          </div>
+        )}
       </div>
 
       {/* Rankings - Duas colunas */}

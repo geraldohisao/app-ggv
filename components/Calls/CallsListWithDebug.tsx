@@ -7,6 +7,8 @@ interface Call {
   company: string;
   duration: number;
   status: string;
+  status_voip: string;
+  status_voip_friendly: string;
   created_at: string;
   total_count: number;
 }
@@ -271,7 +273,7 @@ export default function CallsListWithDebug() {
                   <div>
                     <h3 className="font-medium text-gray-900">{call.company}</h3>
                     <p className="text-sm text-gray-500">
-                      Duração: {call.duration}s | Status: {call.status}
+                      Duração: {call.duration}s | Status: {call.status_voip_friendly || call.status_voip || call.status}
                     </p>
                     <p className="text-xs text-gray-400">
                       {new Date(call.created_at).toLocaleString()}
@@ -279,7 +281,7 @@ export default function CallsListWithDebug() {
                   </div>
                   
                   <div className="flex gap-2">
-                    {call.status !== 'processed' && (
+                    {call.status_voip_friendly !== 'Atendida' && (
                       <button
                         onClick={() => processCall(call.id)}
                         className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"

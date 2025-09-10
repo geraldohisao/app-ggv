@@ -35,17 +35,21 @@ async function fetchSdrRankingData(days: number = 30): Promise<SdrRankingData[]>
     }
 
     console.log('✅ Dados de SDRs carregados:', data?.length || 0);
+    console.log('🔍 DADOS BRUTOS RECEBIDOS:', data);
 
     // Converter para o formato esperado e ordenar por volume
     const result: SdrRankingData[] = (data || [])
-      .map((row: any) => ({
-        sdr_id: row.sdr_id,
-        sdr_name: row.sdr_name,
-        total_calls: Number(row.total_calls),
-        answered_calls: Number(row.answered_calls),
-        avg_duration: Number(row.avg_duration) || 0,
-        avg_score: Number(row.avg_score) || 0
-      }))
+      .map((row: any) => {
+        console.log('📊 PROCESSANDO ROW:', row);
+        return {
+          sdr_id: row.sdr_id,
+          sdr_name: row.sdr_name,
+          total_calls: Number(row.total_calls),
+          answered_calls: Number(row.answered_calls),
+          avg_duration: Number(row.avg_duration) || 0,
+          avg_score: Number(row.avg_score) || 0
+        };
+      })
       .sort((a, b) => b.total_calls - a.total_calls) // Ordenar por volume decrescente
       .slice(0, 10); // Top 10
 
@@ -166,8 +170,7 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
                 
                 <div className="flex justify-between text-xs text-slate-500 mt-1">
                   <span>Taxa: {sdr.total_calls > 0 ? Math.round((sdr.answered_calls / sdr.total_calls) * 100) : 0}%</span>
-                  <span>Duração: {Math.round(sdr.avg_duration / 60)}m</span>
-                  <span>Nota: {sdr.avg_score > 0 ? Math.round(sdr.avg_score) : 'N/A'}</span>
+                  <span>Duração: {sdr.avg_duration > 0 ? Math.round(sdr.avg_duration / 60) + 'm' : '0m'}</span>
                 </div>
               </div>
             </div>

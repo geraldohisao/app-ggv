@@ -1,5 +1,6 @@
 import { supabase } from '../../services/supabaseClient';
 import { CallItem, SdrUser } from '../types';
+import { managedRequest } from '../utils/connectionManager';
 
 export interface DashboardMetrics {
   total_calls: number;
@@ -101,11 +102,41 @@ export async function fetchDashboardMetrics(days: number = 14): Promise<Dashboar
 }
 
 /**
+ * Mapeia status VOIP para status amigável
+ */
+function mapStatusVoip(statusVoip: string): string {
+  switch (statusVoip) {
+    case 'normal_clearing':
+      return 'Atendida';
+    case 'no_answer':
+      return 'Não atendida';
+    case 'originator_cancel':
+      return 'Cancelada pela SDR';
+    case 'number_changed':
+      return 'Número mudou';
+    case 'recovery_on_timer_expire':
+      return 'Tempo esgotado';
+    case 'unallocated_number':
+      return 'Número inválido';
+    default:
+      return statusVoip || 'Status desconhecido';
+  }
+}
+
+/**
  * Busca calls com filtros e paginação
  */
 export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsResponse> {
-  try {
-    console.log('🔍 CALLS SERVICE - Buscando calls com filtros:', filters);
+  // Criar chave única para a requisição baseada nos filtros
+  const requestKey = `fetchCalls-${JSON.stringify(filters)}`;
+  
+  return managedRequest(requestKey, async () => {
+    try {
+      console.log('🔍 CALLS SERVICE - Buscando calls com filtros:', filters);
+
+      // Timeout para evitar requests longos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
 
     const {
       sdr_email,
@@ -113,7 +144,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       call_type,
       start,
       end,
-      limit = 50,
+      limit = 500,
       offset = 0,
       sortBy = 'created_at',
       min_duration,
@@ -124,18 +155,53 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     const startTimestamp = start ? new Date(start).toISOString() : null;
     const endTimestamp = end ? new Date(end).toISOString() : null;
 
-    const { data, error } = await supabase.rpc('get_calls_with_filters', {
-      p_sdr_email: sdr_email,
-      p_status: status,
-      p_call_type: call_type,
-      p_start_date: startTimestamp,
-      p_end_date: endTimestamp,
-      p_limit: limit,
-      p_offset: offset
-    });
+    // Construir query com filtros aplicados
+    let query = supabase
+      .from('calls')
+      .select('*');
+
+    // Aplicar filtros
+    if (sdr_email) {
+      query = query.ilike('agent_id', `%${sdr_email}%`);
+    }
+
+    if (status) {
+      query = query.eq('status_voip', status);
+    }
+
+    if (call_type) {
+      query = query.eq('call_type', call_type);
+    }
+
+    if (startTimestamp) {
+      query = query.gte('created_at', startTimestamp);
+    }
+
+    if (endTimestamp) {
+      query = query.lte('created_at', endTimestamp);
+    }
+
+    if (min_duration) {
+      query = query.gte('duration', parseInt(min_duration));
+    }
+
+    if (max_duration) {
+      query = query.lte('duration', parseInt(max_duration));
+    }
+
+    // Aplicar ordenação e paginação com controle de timeout
+    const { data, error } = await query
+      .range(offset, offset + limit - 1)
+      .order('created_at', { ascending: false })
+      .abortSignal(controller.signal);
+
+    clearTimeout(timeoutId);
 
     if (error) {
       console.error('❌ CALLS SERVICE - Erro ao buscar calls:', error);
+      if (error.name === 'AbortError') {
+        throw new Error('Timeout: A busca demorou muito para responder. Tente filtros mais específicos.');
+      }
       throw error;
     }
 
@@ -148,21 +214,78 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       };
     }
 
-    const totalCount = data[0]?.total_count || 0;
-    const hasMore = offset + limit < totalCount;
+    // Contar total de registros com os mesmos filtros
+    let countQuery = supabase
+      .from('calls')
+      .select('*', { count: 'exact', head: true });
+
+    // Aplicar os mesmos filtros para contagem
+    if (sdr_email) {
+      countQuery = countQuery.ilike('agent_id', `%${sdr_email}%`);
+    }
+
+    if (status) {
+      countQuery = countQuery.eq('status_voip', status);
+    }
+
+    if (call_type) {
+      countQuery = countQuery.eq('call_type', call_type);
+    }
+
+    if (startTimestamp) {
+      countQuery = countQuery.gte('created_at', startTimestamp);
+    }
+
+    if (endTimestamp) {
+      countQuery = countQuery.lte('created_at', endTimestamp);
+    }
+
+    if (min_duration) {
+      countQuery = countQuery.gte('duration', parseInt(min_duration));
+    }
+
+    if (max_duration) {
+      countQuery = countQuery.lte('duration', parseInt(max_duration));
+    }
+
+    // Timeout separado para contagem
+    const countController = new AbortController();
+    const countTimeoutId = setTimeout(() => countController.abort(), 5000); // 5 segundos para contagem
+
+    const { count: totalCount } = await countQuery.abortSignal(countController.signal);
+    clearTimeout(countTimeoutId);
+
+    const hasMore = offset + limit < (totalCount || 0);
+
+    // Mapear status_voip para status_voip_friendly no frontend
+    const callsWithFriendlyStatus = data.map(call => ({
+      ...call,
+      status_voip_friendly: mapStatusVoip(call.status_voip),
+      total_count: totalCount || 0
+    }));
 
     console.log(`✅ CALLS SERVICE - ${data.length} calls encontradas (${totalCount} total)`);
 
     return {
-      calls: data,
-      totalCount,
+      calls: callsWithFriendlyStatus,
+      totalCount: totalCount || 0,
       hasMore
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('💥 CALLS SERVICE - Erro inesperado:', error);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout: A busca foi cancelada por demorar muito. Tente filtros mais específicos.');
+    }
+    
+    if (error.message?.includes('AbortError')) {
+      throw new Error('Conexão interrompida. Verifique sua internet e tente novamente.');
+    }
+    
     throw error;
   }
+  });
 }
 
 /**
@@ -285,7 +408,7 @@ export function convertToCallItem(call: any): CallItem {
 }
 
 /**
- * Extrai score do scorecard JSONB
+ * Extrai score do scorecard JSONB (escala 0-10)
  */
 function extractScoreFromScorecard(scorecard: any): number | undefined {
   if (!scorecard) return undefined;

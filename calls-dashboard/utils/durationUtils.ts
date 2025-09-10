@@ -28,10 +28,16 @@ export function parseFormattedDuration(duration_formated: string): number {
 
 // Função para obter duração real de uma chamada
 export function getRealDuration(call: any): number {
-  if (call.duration_formated) {
+  // Prioridade: durationSec > duration_formated > duration
+  if (call.durationSec && call.durationSec > 0) {
+    return call.durationSec;
+  }
+  
+  if (call.duration_formated && call.duration_formated !== '00:00:00') {
     return parseFormattedDuration(call.duration_formated);
   }
-  return call.durationSec || call.duration || 0;
+  
+  return call.duration || 0;
 }
 
 // Função para formatar duração para exibição

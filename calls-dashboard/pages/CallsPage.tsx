@@ -9,6 +9,7 @@ import MiniAudioPlayer from '../components/MiniAudioPlayer';
 import { AudioQualityDashboard } from '../components/AudioStatusIndicator';
 import { processCallAnalysis, getCallAnalysisFromDatabase } from '../services/callAnalysisBackendService';
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
+import BatchAnalysisPanel from '../components/BatchAnalysisPanel';
 
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
@@ -102,11 +103,21 @@ export default function CallsPage() {
     setTotalCount(0);
   }, [sdr, status, type, start, end, sortBy]);
 
-  // Carregar calls com filtros (com debounce)
+  // Controle de requisições para evitar loops
+  const [isRequestInProgress, setIsRequestInProgress] = useState(false);
+
+  // Carregar calls com filtros (com debounce mais agressivo)
   useEffect(() => {
+    // Se já há uma requisição em andamento, cancelar
+    if (isRequestInProgress) {
+      console.log('⏸️ Requisição já em andamento, pulando...');
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
       const loadCalls = async () => {
       try {
+        setIsRequestInProgress(true);
         setLoading(true);
         setError(null);
         
@@ -120,8 +131,8 @@ export default function CallsPage() {
           call_type: type || undefined,
           start: start || undefined,
           end: end || undefined,
-          limit: sortBy === 'duration' ? 1000 : itemsPerPage, // Buscar mais dados quando ordenar por duração
-          offset: sortBy === 'duration' ? 0 : (currentPage - 1) * itemsPerPage, // Reset offset para ordenação por duração
+          limit: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 1000 : itemsPerPage, // Buscar mais dados quando ordenar por duração ou filtrar por duração
+          offset: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 0 : (currentPage - 1) * itemsPerPage, // Reset offset para ordenação/filtro por duração
           sortBy: sortBy
         });
 
@@ -130,18 +141,29 @@ export default function CallsPage() {
         const callItems = response.calls.map(convertToCallItem);
         setCalls(callItems);
         setTotalCount(response.totalCount);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao carregar calls:', err);
-        setError('Erro ao carregar chamadas. Tente novamente.');
+        
+        if (err.message?.includes('Timeout')) {
+          setError('⏱️ Busca demorou muito. Tente usar filtros mais específicos (SDR, data, etc.).');
+        } else if (err.message?.includes('AbortError') || err.message?.includes('aborted')) {
+          setError('🔌 Conexão interrompida. Verifique sua internet e tente novamente.');
+        } else {
+          setError('❌ Erro ao carregar chamadas. Tente novamente em alguns segundos.');
+        }
       } finally {
         setLoading(false);
+        setIsRequestInProgress(false);
       }
     };
 
       loadCalls();
-    }, 300); // Delay de 300ms para evitar múltiplas chamadas
+    }, 1000); // Delay AUMENTADO para 1000ms para evitar múltiplas chamadas
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      setIsRequestInProgress(false); // Limpar flag ao desmontar
+    };
   }, [sdr, status, type, start, end, currentPage, itemsPerPage, sortBy]); // Adicionar sortBy às dependências
 
   // Carregar etapas disponíveis
@@ -170,15 +192,15 @@ export default function CallsPage() {
         try {
           const existing = await getCallAnalysisFromDatabase(c.id);
           if (existing && typeof existing.final_grade === 'number') {
-            const score100 = Math.round(existing.final_grade * 10);
-            setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score100 } : pc));
+            const score10 = existing.final_grade; // Manter escala 0-10
+            setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
             continue;
           }
           if (c.transcription && c.transcription.length > 50) {
             const res = await processCallAnalysis(c.id, c.transcription, c.sdr.name, c.person_name);
             if (res && typeof res.final_grade === 'number') {
-              const score100 = Math.round(res.final_grade * 10);
-              setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score100 } : pc));
+              const score10 = res.final_grade; // Manter escala 0-10
+              setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
             }
           }
         } catch (e) {
@@ -307,10 +329,9 @@ export default function CallsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Dashboard de Qualidade */}
-      {calls.length > 0 && (
-        <AudioQualityDashboard calls={calls} />
-      )}
+      {/* Painel de Análise IA em Lote */}
+      <BatchAnalysisPanel />
+
 
       <div className="flex items-center justify-between">
         <div>
@@ -318,6 +339,11 @@ export default function CallsPage() {
           <p className="text-sm text-slate-600">
             Visualize, filtre e analise as ligações dos seus SDRs. 
             {totalCount > 0 && <span className="font-medium"> ({totalCount} chamadas encontradas)</span>}
+            {start && end && start === end && (
+              <span className="ml-2 inline-flex items-center px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                📅 Filtrado por: {new Date(start + 'T00:00:00').toLocaleDateString('pt-BR')}
+              </span>
+            )}
           </p>
         </div>
         
@@ -356,7 +382,7 @@ export default function CallsPage() {
 
       <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
         {/* Primeira linha - Filtros principais */}
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-7 gap-3">
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm col-span-2"
             placeholder="Empresa ou Deal ID..."
@@ -378,8 +404,30 @@ export default function CallsPage() {
             <option value="processed">Processada</option>
             <option value="failed">Falhou</option>
           </select>
-          <input className="border border-slate-300 rounded px-3 py-2 text-sm" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-          <input className="border border-slate-300 rounded px-3 py-2 text-sm" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+          <input 
+            className="border border-slate-300 rounded px-3 py-2 text-sm" 
+            type="date" 
+            value={start} 
+            onChange={(e) => setStart(e.target.value)}
+            placeholder="Data início"
+          />
+          <input 
+            className="border border-slate-300 rounded px-3 py-2 text-sm" 
+            type="date" 
+            value={end} 
+            onChange={(e) => setEnd(e.target.value)}
+            placeholder="Data fim"
+          />
+          <button
+            onClick={() => {
+              setStart('2025-09-08');
+              setEnd('2025-09-08');
+            }}
+            className="text-xs px-3 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300"
+            title="Filtrar apenas o dia 08/09"
+          >
+            📅 08/09
+          </button>
         </div>
         
         {/* Segunda linha - Filtros avançados */}
@@ -459,8 +507,8 @@ export default function CallsPage() {
                     call_type: type || undefined,
                     start: start || undefined,
                     end: end || undefined,
-                    limit: sortBy === 'duration' ? 1000 : itemsPerPage,
-                    offset: sortBy === 'duration' ? 0 : (currentPage - 1) * itemsPerPage,
+                    limit: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 1000 : itemsPerPage,
+                    offset: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 0 : (currentPage - 1) * itemsPerPage,
                     sortBy: sortBy
                   });
                   const callItems = response.calls.map(convertToCallItem);
@@ -490,6 +538,9 @@ export default function CallsPage() {
             )}
             {!loading && sortBy === 'score' && (
               <span className="ml-2 text-purple-600">⭐ Ordenado por nota</span>
+            )}
+            {!loading && (minDuration.trim() || maxDuration.trim()) && (
+              <span className="ml-2 text-blue-600">🔍 Filtrado por duração</span>
             )}
           </div>
         </div>
@@ -525,7 +576,12 @@ export default function CallsPage() {
               </thead>
               <tbody>
                 {filtered.map((call) => (
-                  <tr key={call.id} className="border-b hover:bg-slate-50 transition-colors">
+                  <tr 
+                    key={call.id} 
+                    className="border-b hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => window.location.hash = `/calls/${call.id}`}
+                    title="Clique para ver detalhes da chamada"
+                  >
                     <td className="p-4">
                       <div className="font-medium text-slate-800">{call.company}</div>
                       <div className="text-xs text-slate-500">{call.dealCode}</div>
@@ -608,7 +664,15 @@ export default function CallsPage() {
                       <div className="flex items-center gap-2">
                         <div>
                           {typeof call.score === 'number' ? (
-                            <span className={`${call.score >= 85 ? 'text-emerald-600' : call.score >= 70 ? 'text-amber-600' : 'text-rose-600'}`}>{call.score}</span>
+                            <span 
+                              className={`inline-flex px-2 py-1 rounded-md text-sm font-medium ${
+                                call.score >= 8.0 ? 'bg-green-100 text-green-800' : 
+                                call.score >= 7.0 ? 'bg-yellow-100 text-yellow-800' : 
+                                'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {call.score.toFixed(1)}
+                            </span>
                           ) : (
                             <span className="text-slate-400">N/A</span>
                           )}
@@ -617,7 +681,6 @@ export default function CallsPage() {
                       </div>
                     </td>
                     <td className="p-4 text-right">
-                      <a href={`#/calls/${call.id}`} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Ver Detalhes</a>
                     </td>
                   </tr>
                 ))}

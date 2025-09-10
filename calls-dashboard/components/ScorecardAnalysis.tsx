@@ -12,9 +12,10 @@ import {
 
 interface ScorecardAnalysisProps {
   call: CallItem;
+  onAnalysisComplete?: (analysis: ScorecardAnalysisResult) => void;
 }
 
-export default function ScorecardAnalysis({ call }: ScorecardAnalysisProps) {
+export default function ScorecardAnalysis({ call, onAnalysisComplete }: ScorecardAnalysisProps) {
   const [analysis, setAnalysis] = useState<ScorecardAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,8 @@ export default function ScorecardAnalysis({ call }: ScorecardAnalysisProps) {
           setAnalysis(existing);
           setHasExisting(true);
           console.log('✅ Análise carregada do banco:', existing.final_grade);
+          // Notificar componente pai
+          onAnalysisComplete?.(existing);
         }
       } catch (err) {
         console.warn('⚠️ Erro ao verificar análise existente:', err);
@@ -80,6 +83,8 @@ export default function ScorecardAnalysis({ call }: ScorecardAnalysisProps) {
         setAnalysis(result);
         setHasExisting(true);
         console.log('✅ Análise processada e salva:', result.final_grade);
+        // Notificar componente pai
+        onAnalysisComplete?.(result);
       } else {
         throw new Error('Falha no processamento da análise');
       }

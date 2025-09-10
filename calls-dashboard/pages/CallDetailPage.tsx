@@ -8,6 +8,8 @@ import AudioStatusIndicator from '../components/AudioStatusIndicator';
 import ParsedTranscription from '../components/ParsedTranscription';
 import { formatCallType, getCallTypeColor } from '../utils/callTypeUtils';
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
+import { getCallAnalysisFromDatabase, processCallAnalysis } from '../services/callAnalysisBackendService';
+import { supabase } from '../../services/supabaseClient';
 // import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
 
 // Função para verificar se URL de áudio é válida
@@ -28,6 +30,8 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   const [call, setCall] = useState<CallItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [aiNote, setAiNote] = useState<string>('N/A');
+  const [aiScore, setAiScore] = useState<number | null>(null);
 
   useEffect(() => {
     const loadCallDetail = async () => {
@@ -39,7 +43,11 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
         
         const callDetail = await fetchCallDetail(callId);
         if (callDetail) {
-          setCall(convertToCallItem(callDetail));
+          const callItem = convertToCallItem(callDetail);
+          setCall(callItem);
+          
+          // Carregar análise IA existente (sem processamento automático)
+          await loadExistingAIAnalysis(callItem);
         } else {
           setError('Chamada não encontrada.');
         }
@@ -53,6 +61,48 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
 
     loadCallDetail();
   }, [callId]);
+
+  const loadExistingAIAnalysis = async (callItem: CallItem) => {
+    try {
+      // Apenas carregar análise existente (sem processamento automático)
+      const existingAnalysis = await getCallAnalysisFromDatabase(callItem.id);
+      
+      if (existingAnalysis) {
+        // Análise já existe, usar dados salvos
+        setAiNote(existingAnalysis.final_grade.toFixed(1));
+        setAiScore(existingAnalysis.final_grade);
+        console.log('✅ Análise carregada do banco:', existingAnalysis.final_grade);
+        
+        // Atualizar score na tabela calls se necessário
+        await updateCallScore(callItem.id, existingAnalysis.final_grade);
+      } else {
+        // Se não tem análise, manter N/A (usuário pode clicar em "Analisar com IA")
+        console.log('ℹ️ Nenhuma análise encontrada para esta chamada');
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Erro ao carregar análise IA:', error);
+      // Manter N/A em caso de erro
+    }
+  };
+
+  const updateCallScore = async (callId: string, score: number) => {
+    try {
+      const { error } = await supabase
+        .from('calls')
+        .update({ 
+          scorecard: { final_score: score }, // Escala 0-10
+          ai_status: 'completed'
+        })
+        .eq('id', callId);
+        
+      if (error) {
+        console.warn('⚠️ Erro ao atualizar score na tabela calls:', error);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao atualizar score:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -131,7 +181,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
               </div>
               <div>
                 <div className="text-slate-500">Nota</div>
-                <div className="font-semibold">{typeof call.score === 'number' ? call.score : 'N/A'}</div>
+                <div className="font-semibold">{aiNote}</div>
               </div>
               <div>
                 <div className="text-slate-500">Áudio</div>
@@ -181,7 +231,14 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
 
         <div className="space-y-4">
           <AudioStatusIndicator call={call} />
-          <ScorecardAnalysis call={call} />
+          <ScorecardAnalysis 
+            call={call} 
+            onAnalysisComplete={(analysis) => {
+              setAiNote(analysis.final_grade.toFixed(1));
+              setAiScore(analysis.final_grade);
+              updateCallScore(call.id, analysis.final_grade);
+            }}
+          />
           <AiAssistant call={call} />
         </div>
       </div>

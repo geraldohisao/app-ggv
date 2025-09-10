@@ -8,6 +8,8 @@ interface Call {
   to_number: string;
   agent_id: string;
   status: string;
+  status_voip: string;
+  status_voip_friendly: string;
   duration: number;
   created_at: string;
   total_count: number;
@@ -21,7 +23,7 @@ export default function CallsList() {
     typeof import.meta !== 'undefined' &&
     (import.meta as any).env &&
     typeof (import.meta as any).env.VITE_CALLS_UNDER_DEV !== 'undefined'
-  ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : true; // default seguro: true
+  ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : false; // ATIVADO: false = produção
 
   useEffect(() => {
     if (IS_UNDER_DEVELOPMENT) {
@@ -38,7 +40,7 @@ export default function CallsList() {
 
         // Usar a função SQL criada no Supabase
         const { data: callsData, error: callsError } = await supabase
-          .rpc('get_calls', { p_limit: 50, p_offset: 0 });
+          .rpc('get_calls', { p_limit: 500, p_offset: 0 });
 
         if (callsError) {
           throw new Error(`Erro ao buscar calls: ${callsError.message}`);
@@ -115,12 +117,13 @@ export default function CallsList() {
                       <td className="p-4">{call.agent_id || '-'}</td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          call.status === 'processed' ? 'bg-green-100 text-green-800' :
-                          call.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                          call.status === 'failed' ? 'bg-red-100 text-red-800' :
+                          call.status_voip_friendly === 'Atendida' ? 'bg-green-100 text-green-800' :
+                          call.status_voip_friendly === 'Não atendida' ? 'bg-red-100 text-red-800' :
+                          call.status_voip_friendly === 'Cancelada pela SDR' ? 'bg-yellow-100 text-yellow-800' :
+                          call.status_voip_friendly === 'Número mudou' ? 'bg-orange-100 text-orange-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {call.status}
+                          {call.status_voip_friendly || call.status_voip || call.status}
                         </span>
                       </td>
                       <td className="p-4">
