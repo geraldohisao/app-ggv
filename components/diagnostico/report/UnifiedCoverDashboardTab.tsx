@@ -29,7 +29,7 @@ export const UnifiedCoverDashboardTab: React.FC<UnifiedCoverDashboardTabProps> =
     const getMaturityStatus = (percentage: number): string => {
         if (percentage >= 70) return 'Estruturado';
         if (percentage >= 40) return 'Em Desenvolvimento';
-        return 'Incipiente';
+        return 'Crítico';
     };
 
     const maturityStatus = getMaturityStatus(maturityPercentage);
