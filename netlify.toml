@@ -18,6 +18,14 @@
 [context.production]
   domain = "app.grupoggv.com"
 
+# Headers para forçar cache bust
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
+
 # Redirects para APIs e webhooks - DEVEM FICAR ANTES DO SPA
 [[redirects]]
   from = "/api/webhook/diag-ggv-register"
