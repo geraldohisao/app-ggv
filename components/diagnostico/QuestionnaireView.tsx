@@ -41,7 +41,7 @@ export const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ answers, t
                 <div className="text-center mb-4">
                     <GGVInteligenciaBrand className="w-48 mx-auto mb-4" />
                     <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Diagnóstico Comercial</h1>
-                    <p className="text-slate-500 mt-2">Responda em qualquer ordem - sem pressa! 🎯</p>
+                    <p className="text-slate-500 mt-2">Responda em qualquer ordem - sem pressa! 🎯 v2.1</p>
                 </div>
                 <div className="px-1 py-4">
                     <div className="flex justify-between items-center mb-2 text-sm font-semibold">
