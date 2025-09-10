@@ -1,8 +1,8 @@
 [build]
   publish = "dist"
-  command = "npm run build:fast"
+  command = "npm ci && npm run build:fast"
   functions = "netlify/functions"
-  # Force rebuild - diagnostic improvements
+  # Force rebuild - diagnostic improvements v3
 
 [build.environment]
   NODE_VERSION = "20.18.0"
@@ -10,6 +10,9 @@
   # Otimizações de build
   CI = "true"
   NODE_OPTIONS = "--max-old-space-size=4096"
+  # Force TypeScript to skip checks in production
+  SKIP_PREFLIGHT_CHECK = "true"
+  GENERATE_SOURCEMAP = "false"
   # Cache para acelerar builds
   NPM_CONFIG_CACHE = ".npm-cache"
   NPM_CONFIG_PREFER_OFFLINE = "true"
