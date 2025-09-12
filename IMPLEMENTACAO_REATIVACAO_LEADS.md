@@ -68,7 +68,6 @@ N8N_TIMEOUT_MS=15000
 ### Proprietário (SDR)
 - "Andressa"
 - "Camila Ataliba"
-- "Isabel Pestilho"
 - "Lô-Ruama Oliveira"
 - "Mariana"
 - "William Martins"

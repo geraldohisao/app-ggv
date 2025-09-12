@@ -9,7 +9,6 @@ export const reativacaoSchema = z.object({
   proprietario: z.enum([
     "Andressa",
     "Camila Ataliba",
-    "Isabel Pestilho",
     "Lô-Ruama Oliveira",
     "Mariana",
     "William Martins",
