@@ -71,6 +71,7 @@ N8N_TIMEOUT_MS=15000
 - "Isabel Pestilho"
 - "Lô-Ruama Oliveira"
 - "Mariana"
+- "William Martins"
 
 ### Cadência
 - "Reativação - Sem Retorno" (padrão)

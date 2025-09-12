@@ -12,6 +12,7 @@ export const reativacaoSchema = z.object({
     "Isabel Pestilho",
     "Lô-Ruama Oliveira",
     "Mariana",
+    "William Martins",
   ]),
   cadencia: z.enum([
     "Reativação - Sem Retorno",

@@ -539,6 +539,7 @@ const ReativacaoLeadsPage: React.FC = () => {
               <option value="Isabel Pestilho">Isabel Pestilho</option>
               <option value="Lô-Ruama Oliveira">Lô-Ruama Oliveira</option>
               <option value="Mariana">Mariana</option>
+              <option value="William Martins">William Martins</option>
             </FormSelect>
 
           <FormSelect
