@@ -17,7 +17,11 @@ export default function MiniAudioPlayer({ audioUrl, duration, callId }: MiniAudi
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const togglePlay = async () => {
+  const togglePlay = async (e: React.MouseEvent) => {
+    // Parar propagação do evento para não abrir detalhes da chamada
+    e.stopPropagation();
+    e.preventDefault();
+    
     if (!audioRef.current) return;
 
     try {
@@ -45,7 +49,14 @@ export default function MiniAudioPlayer({ audioUrl, duration, callId }: MiniAudi
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div 
+      className="flex items-center gap-1"
+      onClick={(e) => {
+        // Parar propagação em todo o container do mini player
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+    >
       <audio
         ref={audioRef}
         src={audioUrl}

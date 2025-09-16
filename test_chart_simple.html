@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Simples - Gráfico de Chamadas</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+    </style>
+</head>
+<body>
+    <h1>Teste Direto - Dados do Dia 08/09</h1>
+    <div id="results">Carregando...</div>
+
+    <script type="module">
+        // Simular exatamente a mesma lógica do gráfico
+        const supabaseUrl = 'https://lqpgfygqidzqxjxmhjkm.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGdmeWdxaWR6cXhqeG1oamttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU5OTc5NzYsImV4cCI6MjA0MTU3Mzk3Nn0.Gg_29rvEyJlGJfqWvUkRmUgwDCjqCiGXHe2RqfQWFU8';
+        
+        const resultsDiv = document.getElementById('results');
+
+        async function testDirectQuery() {
+            try {
+                resultsDiv.innerHTML = '<div class="debug">Iniciando teste...</div>';
+
+                // Importar Supabase
+                const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2');
+                const supabase = createClient(supabaseUrl, supabaseKey);
+
+                // Testar query exata do gráfico para 08/09
+                const startDate = '2025-09-08';
+                const endDate = '2025-09-08';
+                const startDateTime = startDate + 'T00:00:00';
+                const endDateTime = endDate + 'T23:59:59';
+
+                console.log('🎯 Testando query para:', { startDateTime, endDateTime });
+
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('created_at, status_voip')
+                    .gte('created_at', startDateTime)
+                    .lte('created_at', endDateTime)
+                    .order('created_at', { ascending: true });
+
+                if (error) {
+                    throw error;
+                }
+
+                console.log('✅ Dados recebidos:', data);
+
+                // Processar dados exatamente como o gráfico
+                const groupedData = new Map();
+                
+                data?.forEach((call) => {
+                    const date = new Date(call.created_at).toISOString().split('T')[0];
+                    const isAnswered = call.status_voip === 'normal_clearing';
+                    
+                    if (!groupedData.has(date)) {
+                        groupedData.set(date, { answered: 0, missed: 0 });
+                    }
+                    
+                    const current = groupedData.get(date);
+                    if (isAnswered) {
+                        current.answered++;
+                    } else {
+                        current.missed++;
+                    }
+                });
+
+                // Mostrar resultados
+                let html = `<div class="success">✅ Teste concluído com sucesso!</div>`;
+                html += `<div class="debug"><strong>Total de registros encontrados:</strong> ${data?.length || 0}</div>`;
+
+                if (data && data.length > 0) {
+                    // Status únicos
+                    const statusCount = {};
+                    data.forEach(call => {
+                        const status = call.status_voip || 'null';
+                        statusCount[status] = (statusCount[status] || 0) + 1;
+                    });
+
+                    html += '<div class="debug"><strong>Por Status VOIP:</strong><ul>';
+                    Object.entries(statusCount).forEach(([status, count]) => {
+                        html += `<li>${status}: ${count}</li>`;
+                    });
+                    html += '</ul></div>';
+
+                    // Dados agrupados
+                    html += '<div class="debug"><strong>Dados Agrupados (resultado final):</strong><ul>';
+                    groupedData.forEach((counts, date) => {
+                        const total = counts.answered + counts.missed;
+                        const rate = total > 0 ? Math.round((counts.answered / total) * 100) : 0;
+                        html += `<li><strong>${date}:</strong> Total=${total}, Atendidas=${counts.answered}, Não Atendidas=${counts.missed}, Taxa=${rate}%</li>`;
+                    });
+                    html += '</ul></div>';
+
+                    // Primeiros registros
+                    html += '<div class="debug"><strong>Primeiros 5 registros:</strong><pre>';
+                    html += JSON.stringify(data.slice(0, 5), null, 2);
+                    html += '</pre></div>';
+
+                    // Verificação de datas
+                    const uniqueDates = [...new Set(data.map(d => new Date(d.created_at).toISOString().split('T')[0]))];
+                    html += `<div class="debug"><strong>Datas únicas encontradas:</strong> ${uniqueDates.join(', ')}</div>`;
+
+                    if (uniqueDates.length === 1 && uniqueDates[0] === startDate) {
+                        html += '<div class="success">✅ CORRETO: Apenas dados do dia 08/09 encontrados!</div>';
+                    } else {
+                        html += '<div class="error">❌ PROBLEMA: Dados de outras datas encontrados!</div>';
+                    }
+                } else {
+                    html += '<div class="error">❌ Nenhum dado encontrado para 08/09/2025</div>';
+                }
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        }
+
+        // Executar teste
+        testDirectQuery();
+    </script>
+</body>
+</html>
+

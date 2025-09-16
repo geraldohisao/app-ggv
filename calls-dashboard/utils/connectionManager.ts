@@ -46,7 +46,7 @@ class ConnectionManager {
       console.log(`✅ Requisição concluída: ${key}`);
       return result;
     } catch (error) {
-      console.error(`❌ Erro na requisição ${key}:`, error);
+      console.error(`❌ Erro na requisição ${key}:`, JSON.stringify(error, null, 2));
       throw error;
     } finally {
       this.requestCount--;

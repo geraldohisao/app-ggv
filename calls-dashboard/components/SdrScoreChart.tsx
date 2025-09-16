@@ -25,9 +25,10 @@ async function fetchSdrRankingData(days: number = 30): Promise<SdrRankingData[]>
   try {
     console.log('🔍 Buscando dados de ranking dos SDRs:', { days });
 
-    // Usar a função SQL otimizada
+    // USAR SEMPRE A FUNÇÃO ORIGINAL SEM FILTRO DE PERÍODO (mostrar todas as ligações)
+    console.log('📊 Usando função get_sdr_metrics para TODAS as ligações (sem filtro de período)...');
     const { data, error } = await supabase
-      .rpc('get_sdr_metrics', { p_days: days });
+      .rpc('get_sdr_metrics', { p_days: 99999 }); // Usar um valor muito alto para pegar todas
 
     if (error) {
       console.error('❌ Erro ao buscar dados de SDRs:', error);

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 ANÁLISE COMPLETA - Filtro de Duração</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+        .info { background: #e6f3ff; color: #0066cc; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { margin: 5px; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 ANÁLISE COMPLETA - Problema do Filtro de Duração</h1>
+    
+    <div>
+        <button onclick="runCompleteAnalysis()">🚀 EXECUTAR ANÁLISE COMPLETA</button>
+        <button onclick="clearResults()">🗑️ Limpar</button>
+    </div>
+    
+    <div id="results">Clique em "EXECUTAR ANÁLISE COMPLETA" para começar...</div>
+
+    <script type="module">
+        const supabaseUrl = 'https://lqpgfygqidzqxjxmhjkm.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGdmeWdxaWR6cXhqeG1oamttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU5OTc5NzYsImV4cCI6MjA0MTU3Mzk3Nn0.Gg_29rvEyJlGJfqWvUkRmUgwDCjqCiGXHe2RqfQWFU8';
+        
+        const resultsDiv = document.getElementById('results');
+        let supabase;
+
+        // Inicializar Supabase
+        const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2');
+        supabase = createClient(supabaseUrl, supabaseKey);
+
+        window.clearResults = function() {
+            resultsDiv.innerHTML = 'Resultados limpos. Clique em "EXECUTAR ANÁLISE COMPLETA" para começar...';
+        };
+
+        window.runCompleteAnalysis = async function() {
+            let html = '<div class="info"><h2>🔍 INICIANDO ANÁLISE COMPLETA...</h2></div>';
+            resultsDiv.innerHTML = html;
+
+            try {
+                // ETAPA 1: Verificar se a tabela calls existe e sua estrutura
+                html += '<div class="info"><h3>📊 ETAPA 1: Verificar Estrutura da Tabela</h3></div>';
+                
+                try {
+                    const { data: tableInfo, error: tableError } = await supabase
+                        .from('calls')
+                        .select('*')
+                        .limit(1);
+
+                    if (tableError) {
+                        html += `<div class="error">❌ ERRO ao acessar tabela calls: ${tableError.message}</div>`;
+                        resultsDiv.innerHTML = html;
+                        return;
+                    }
+
+                    if (tableInfo && tableInfo.length > 0) {
+                        const columns = Object.keys(tableInfo[0]);
+                        html += '<div class="success">✅ Tabela calls acessível</div>';
+                        html += `<div class="debug"><strong>Colunas encontradas:</strong> ${columns.join(', ')}</div>`;
+                        
+                        if (columns.includes('duration')) {
+                            html += '<div class="success">✅ Campo "duration" existe</div>';
+                        } else {
+                            html += '<div class="error">❌ Campo "duration" NÃO EXISTE!</div>';
+                            resultsDiv.innerHTML = html;
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    html += `<div class="error">❌ ERRO na verificação da tabela: ${e.message}</div>`;
+                    resultsDiv.innerHTML = html;
+                    return;
+                }
+
+                // ETAPA 2: Verificar dados de duração no banco
+                html += '<div class="info"><h3>📊 ETAPA 2: Analisar Dados de Duração</h3></div>';
+                
+                const { data: allDurations, error: durError } = await supabase
+                    .from('calls')
+                    .select('id, duration, created_at')
+                    .not('duration', 'is', null)
+                    .order('duration', { ascending: false })
+                    .limit(50);
+
+                if (durError) {
+                    html += `<div class="error">❌ ERRO ao buscar durações: ${durError.message}</div>`;
+                } else if (!allDurations || allDurations.length === 0) {
+                    html += '<div class="error">❌ NENHUMA chamada com duração encontrada no banco!</div>';
+                } else {
+                    const durations = allDurations.map(c => c.duration);
+                    const maxDur = Math.max(...durations);
+                    const minDur = Math.min(...durations);
+                    const avgDur = durations.reduce((a, b) => a + b, 0) / durations.length;
+                    
+                    html += `<div class="success">✅ ${allDurations.length} chamadas com duração encontradas</div>`;
+                    html += `<div class="debug">
+                        <strong>Estatísticas:</strong><br>
+                        • Menor duração: ${minDur}s<br>
+                        • Maior duração: ${maxDur}s<br>
+                        • Duração média: ${Math.round(avgDur)}s<br>
+                        • Chamadas ≥ 60s: ${durations.filter(d => d >= 60).length}<br>
+                        • Chamadas ≥ 100s: ${durations.filter(d => d >= 100).length}<br>
+                        • Chamadas ≥ 200s: ${durations.filter(d => d >= 200).length}
+                    </div>`;
+
+                    // Mostrar top 10 durações
+                    html += '<div class="debug"><strong>Top 10 durações:</strong><br>';
+                    allDurations.slice(0, 10).forEach((call, i) => {
+                        html += `${i+1}. ${call.duration}s (ID: ${call.id})<br>`;
+                    });
+                    html += '</div>';
+                }
+
+                // ETAPA 3: Testar query exata com filtro ≥ 100s
+                html += '<div class="info"><h3>🎯 ETAPA 3: Testar Query com Filtro ≥ 100s</h3></div>';
+                
+                const { data: filtered100, error: filter100Error } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .gte('duration', 100);
+
+                if (filter100Error) {
+                    html += `<div class="error">❌ ERRO na query gte(duration, 100): ${filter100Error.message}</div>`;
+                } else {
+                    html += `<div class="success">✅ Query gte(duration, 100) executada: ${filtered100?.length || 0} resultados</div>`;
+                    
+                    if (filtered100 && filtered100.length > 0) {
+                        html += '<div class="debug"><strong>Primeiras 5 chamadas ≥ 100s:</strong><br>';
+                        filtered100.slice(0, 5).forEach(call => {
+                            html += `• ID: ${call.id}, Duração: ${call.duration}s, Tipo: ${typeof call.duration}<br>`;
+                        });
+                        html += '</div>';
+                    }
+                }
+
+                // ETAPA 4: Testar query com paginação (simular frontend)
+                html += '<div class="info"><h3>📋 ETAPA 4: Simular Query do Frontend (com paginação)</h3></div>';
+                
+                const { data: paginatedData, error: pagError } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .gte('duration', 100)
+                    .range(0, 49)
+                    .order('duration', { ascending: false });
+
+                if (pagError) {
+                    html += `<div class="error">❌ ERRO na query paginada: ${pagError.message}</div>`;
+                } else {
+                    html += `<div class="success">✅ Query paginada executada: ${paginatedData?.length || 0} resultados</div>`;
+                }
+
+                // ETAPA 5: Verificar políticas RLS
+                html += '<div class="info"><h3>🔒 ETAPA 5: Verificar Políticas de Segurança (RLS)</h3></div>';
+                
+                try {
+                    // Tentar query sem filtros para ver se RLS está bloqueando
+                    const { data: noFilterData, error: noFilterError } = await supabase
+                        .from('calls')
+                        .select('id, duration')
+                        .limit(5);
+
+                    if (noFilterError) {
+                        html += `<div class="warning">⚠️ Possível problema de RLS: ${noFilterError.message}</div>`;
+                    } else {
+                        html += `<div class="success">✅ RLS OK - ${noFilterData?.length || 0} registros acessíveis sem filtros</div>`;
+                    }
+                } catch (e) {
+                    html += `<div class="warning">⚠️ Erro ao testar RLS: ${e.message}</div>`;
+                }
+
+                // ETAPA 6: Testar diferentes tipos de filtro
+                html += '<div class="info"><h3>🔢 ETAPA 6: Testar Diferentes Tipos de Filtro</h3></div>';
+                
+                const testValues = [
+                    { value: 100, type: 'number' },
+                    { value: '100', type: 'string' },
+                    { value: parseInt('100'), type: 'parseInt' }
+                ];
+
+                for (const test of testValues) {
+                    try {
+                        const { data: testData, error: testError } = await supabase
+                            .from('calls')
+                            .select('id, duration')
+                            .gte('duration', test.value)
+                            .limit(3);
+
+                        if (testError) {
+                            html += `<div class="error">❌ Filtro ${test.type} (${test.value}): ${testError.message}</div>`;
+                        } else {
+                            html += `<div class="debug">• Filtro ${test.type} (${test.value}): ${testData?.length || 0} resultados</div>`;
+                        }
+                    } catch (e) {
+                        html += `<div class="error">❌ Erro no teste ${test.type}: ${e.message}</div>`;
+                    }
+                }
+
+                // ETAPA 7: Verificar se há problema com ordenação
+                html += '<div class="info"><h3>📊 ETAPA 7: Testar Diferentes Ordenações</h3></div>';
+                
+                const orderTests = [
+                    { field: 'duration', ascending: false, name: 'duration DESC' },
+                    { field: 'created_at', ascending: false, name: 'created_at DESC' },
+                    { field: 'id', ascending: true, name: 'id ASC' }
+                ];
+
+                for (const orderTest of orderTests) {
+                    try {
+                        const { data: orderData, error: orderError } = await supabase
+                            .from('calls')
+                            .select('id, duration, created_at')
+                            .gte('duration', 100)
+                            .order(orderTest.field, { ascending: orderTest.ascending })
+                            .limit(3);
+
+                        if (orderError) {
+                            html += `<div class="error">❌ Ordenação ${orderTest.name}: ${orderError.message}</div>`;
+                        } else {
+                            html += `<div class="debug">• Ordenação ${orderTest.name}: ${orderData?.length || 0} resultados</div>`;
+                        }
+                    } catch (e) {
+                        html += `<div class="error">❌ Erro na ordenação ${orderTest.name}: ${e.message}</div>`;
+                    }
+                }
+
+                // ETAPA 8: Conclusão e diagnóstico
+                html += '<div class="info"><h3>🎯 ETAPA 8: DIAGNÓSTICO FINAL</h3></div>';
+                
+                if (filtered100 && filtered100.length > 0) {
+                    html += '<div class="success">✅ FILTRO ESTÁ FUNCIONANDO - Problema pode estar no frontend ou na passagem de parâmetros</div>';
+                    html += '<div class="warning">⚠️ Verifique os logs do console na aplicação para ver se os parâmetros estão chegando corretamente no backend</div>';
+                } else {
+                    html += '<div class="error">❌ FILTRO NÃO ESTÁ FUNCIONANDO - Problema no banco de dados ou configuração do Supabase</div>';
+                }
+
+                html += '<div class="info"><h4>🔍 Próximos Passos Recomendados:</h4>';
+                html += '<ol>';
+                html += '<li>Verificar logs do console na aplicação</li>';
+                html += '<li>Verificar se os parâmetros estão sendo enviados corretamente do frontend</li>';
+                html += '<li>Verificar se há conflitos com outros filtros</li>';
+                html += '<li>Testar query diretamente no SQL Editor do Supabase</li>';
+                html += '</ol></div>';
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro na análise:', error);
+                resultsDiv.innerHTML = html + `<div class="error">❌ ERRO GERAL: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>

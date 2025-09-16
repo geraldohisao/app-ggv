@@ -32,3 +32,4 @@ GRANT EXECUTE ON FUNCTION public.get_scorecard_criteria(UUID) TO anon, authentic
 -- SELECT * FROM public.get_scorecard_criteria('00000000-0000-0000-0000-000000000000'::uuid) LIMIT 1;
 
 
+A

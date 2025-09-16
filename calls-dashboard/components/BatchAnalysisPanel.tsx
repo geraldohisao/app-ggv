@@ -82,7 +82,7 @@ export default function BatchAnalysisPanel() {
       </div>
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <div className="text-center">
           <div className="text-2xl font-bold text-slate-800">{stats.totalCalls}</div>
           <div className="text-xs text-slate-600">Total Chamadas</div>
@@ -102,6 +102,10 @@ export default function BatchAnalysisPanel() {
         <div className="text-center">
           <div className="text-2xl font-bold text-purple-600">{stats.callsAnalyzed}</div>
           <div className="text-xs text-slate-600">Já Analisadas</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-indigo-600">{stats.callsWithScore}</div>
+          <div className="text-xs text-slate-600">Com Nota</div>
         </div>
       </div>
 

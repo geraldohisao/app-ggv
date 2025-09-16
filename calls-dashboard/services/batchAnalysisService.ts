@@ -203,6 +203,7 @@ export async function getAnalysisStats(): Promise<{
   callsWithTranscription: number;
   callsNeedingAnalysis: number;
   callsAnalyzed: number;
+  callsWithScore: number;
 }> {
   try {
     // Total de chamadas
@@ -253,12 +254,38 @@ export async function getAnalysisStats(): Promise<{
       .select('*', { count: 'exact', head: true })
       .eq('ai_status', 'completed');
 
+    // Chamadas com notas (score) - usar MESMA lógica do frontend
+    const { data: callsForScore } = await supabase
+      .from('calls')
+      .select(`
+        id,
+        scorecard,
+        call_analysis!left(final_grade)
+      `);
+    
+    const callsWithScore = (callsForScore || []).filter(call => {
+      // Mesma lógica do convertToCallItem
+      const hasScorecard = call.scorecard && 
+                          call.scorecard !== 'null' &&
+                          (call.scorecard.final_score !== undefined || 
+                           call.scorecard.total_score !== undefined || 
+                           call.scorecard.score !== undefined);
+      
+      const hasAnalysis = call.call_analysis && 
+                         Array.isArray(call.call_analysis) && 
+                         call.call_analysis.length > 0 && 
+                         call.call_analysis[0]?.final_grade !== undefined;
+      
+      return hasScorecard || hasAnalysis;
+    }).length;
+
     console.log('📊 STATS DEBUG:', {
       totalCalls: totalCalls || 0,
       callsOver3Min: callsOver3Min || 0,
       callsWithTranscription: callsWithTranscription || 0,
       callsNeedingAnalysis: callsNeedingAnalysis || 0,
-      callsAnalyzed: callsAnalyzed || 0
+      callsAnalyzed: callsAnalyzed || 0,
+      callsWithScore: callsWithScore || 0
     });
 
     return {
@@ -266,7 +293,8 @@ export async function getAnalysisStats(): Promise<{
       callsOver3Min: callsOver3Min || 0,
       callsWithTranscription: callsWithTranscription || 0,
       callsNeedingAnalysis: callsNeedingAnalysis || 0,
-      callsAnalyzed: callsAnalyzed || 0
+      callsAnalyzed: callsAnalyzed || 0,
+      callsWithScore: callsWithScore || 0
     };
 
   } catch (error) {

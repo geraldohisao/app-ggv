@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Filtro Score Mínimo</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .success { border-color: #28a745; background-color: #d4edda; }
+        .error { border-color: #dc3545; background-color: #f8d7da; }
+        .info { border-color: #17a2b8; background-color: #d1ecf1; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .score-high { background-color: #d4edda; }
+        .score-medium { background-color: #fff3cd; }
+        .score-low { background-color: #f8d7da; }
+        
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-controls input, .filter-controls button {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .filter-controls button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        .filter-controls button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste do Filtro de Score Mínimo</h1>
+        <p>Este teste verifica se o filtro de score mínimo está funcionando corretamente com paginação.</p>
+        
+        <div class="filter-controls">
+            <label>Score Mínimo:</label>
+            <input type="number" id="minScore" value="7" min="0" max="10" step="0.1">
+            <label>Limite:</label>
+            <input type="number" id="limit" value="10" min="1" max="100">
+            <label>Página:</label>
+            <input type="number" id="page" value="1" min="1">
+            <button onclick="testFilter()">🔍 Testar Filtro</button>
+            <button onclick="testWithoutFilter()">📋 Sem Filtro</button>
+            <button onclick="compareResults()">⚖️ Comparar</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://xrqvdnzxrjtnvqxowmkz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhycXZkbnp4cmp0bnZxeG93bWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQ4NzQyNjMsImV4cCI6MjA0MDQ1MDI2M30.FaZt0eVTkJkGR8KfRhKUgHiGTW6i1WCFoFDnILXCHoA';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function addResult(title, content, className = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${className}`;
+            resultDiv.innerHTML = `<h3>${title}</h3><div>${content}</div>`;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function formatScore(score) {
+            if (score === null || score === undefined) return 'N/A';
+            const numScore = parseFloat(score);
+            if (numScore >= 8) return `<span class="score-high">${numScore.toFixed(1)}</span>`;
+            if (numScore >= 6) return `<span class="score-medium">${numScore.toFixed(1)}</span>`;
+            return `<span class="score-low">${numScore.toFixed(1)}</span>`;
+        }
+
+        function createTable(data) {
+            if (!data || data.length === 0) {
+                return '<p>Nenhum resultado encontrado.</p>';
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Empresa</th>
+                            <th>SDR</th>
+                            <th>Score</th>
+                            <th>Duração</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(call => {
+                html += `
+                    <tr>
+                        <td>${call.id.substring(0, 8)}...</td>
+                        <td>${call.company_name || 'N/A'}</td>
+                        <td>${call.sdr_name || 'N/A'}</td>
+                        <td>${formatScore(call.score)}</td>
+                        <td>${call.duration || 0}s</td>
+                        <td>${new Date(call.created_at).toLocaleDateString('pt-BR')}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        async function testFilter() {
+            clearResults();
+            const minScore = parseFloat(document.getElementById('minScore').value);
+            const limit = parseInt(document.getElementById('limit').value);
+            const page = parseInt(document.getElementById('page').value);
+            const offset = (page - 1) * limit;
+
+            addResult('🔄 Testando...', 'Executando teste do filtro de score mínimo...', 'info');
+
+            try {
+                console.log('🎯 Testando filtro com:', { minScore, limit, offset });
+
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr: null,
+                    p_status: null,
+                    p_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: limit,
+                    p_offset: offset,
+                    p_sort_by: 'score',
+                    p_min_duration: null,
+                    p_max_duration: null,
+                    p_min_score: minScore
+                });
+
+                if (error) {
+                    console.error('❌ Erro:', error);
+                    addResult('❌ Erro na Função', `Erro: ${error.message}`, 'error');
+                    return;
+                }
+
+                console.log('✅ Dados recebidos:', data);
+
+                const totalCount = data.length > 0 ? data[0].total_count : 0;
+                const validScores = data.filter(call => call.score !== null && call.score !== undefined);
+                const invalidScores = data.filter(call => call.score < minScore);
+
+                addResult(
+                    `✅ Filtro Score ≥ ${minScore}`,
+                    `
+                        <p><strong>Total encontrado:</strong> ${data.length} chamadas (de ${totalCount} total com filtro)</p>
+                        <p><strong>Com score:</strong> ${validScores.length} chamadas</p>
+                        <p><strong>Scores inválidos (< ${minScore}):</strong> ${invalidScores.length} chamadas</p>
+                        <p><strong>Página:</strong> ${page} (offset: ${offset})</p>
+                        ${invalidScores.length > 0 ? `<p style="color: red;"><strong>⚠️ ATENÇÃO:</strong> Encontradas ${invalidScores.length} chamadas com score abaixo do mínimo!</p>` : '<p style="color: green;"><strong>✅ SUCESSO:</strong> Todas as chamadas respeitam o score mínimo!</p>'}
+                        ${createTable(data)}
+                    `,
+                    invalidScores.length > 0 ? 'error' : 'success'
+                );
+
+            } catch (err) {
+                console.error('💥 Erro inesperado:', err);
+                addResult('💥 Erro Inesperado', `Erro: ${err.message}`, 'error');
+            }
+        }
+
+        async function testWithoutFilter() {
+            clearResults();
+            const limit = parseInt(document.getElementById('limit').value);
+            const page = parseInt(document.getElementById('page').value);
+            const offset = (page - 1) * limit;
+
+            addResult('🔄 Testando...', 'Executando teste sem filtro de score...', 'info');
+
+            try {
+                const { data, error } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr: null,
+                    p_status: null,
+                    p_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: limit,
+                    p_offset: offset,
+                    p_sort_by: 'score',
+                    p_min_duration: null,
+                    p_max_duration: null,
+                    p_min_score: null
+                });
+
+                if (error) {
+                    addResult('❌ Erro na Função', `Erro: ${error.message}`, 'error');
+                    return;
+                }
+
+                const totalCount = data.length > 0 ? data[0].total_count : 0;
+                const withScore = data.filter(call => call.score !== null && call.score !== undefined);
+                const withoutScore = data.filter(call => call.score === null || call.score === undefined);
+
+                addResult(
+                    '📋 Sem Filtro de Score',
+                    `
+                        <p><strong>Total encontrado:</strong> ${data.length} chamadas (de ${totalCount} total)</p>
+                        <p><strong>Com score:</strong> ${withScore.length} chamadas</p>
+                        <p><strong>Sem score:</strong> ${withoutScore.length} chamadas</p>
+                        <p><strong>Página:</strong> ${page} (offset: ${offset})</p>
+                        ${createTable(data)}
+                    `,
+                    'info'
+                );
+
+            } catch (err) {
+                addResult('💥 Erro Inesperado', `Erro: ${err.message}`, 'error');
+            }
+        }
+
+        async function compareResults() {
+            clearResults();
+            const minScore = parseFloat(document.getElementById('minScore').value);
+            const limit = 20; // Usar limite maior para comparação
+
+            addResult('🔄 Comparando...', 'Executando comparação entre resultados com e sem filtro...', 'info');
+
+            try {
+                // Teste com filtro
+                const { data: withFilter, error: errorWith } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr: null,
+                    p_status: null,
+                    p_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: limit,
+                    p_offset: 0,
+                    p_sort_by: 'score',
+                    p_min_duration: null,
+                    p_max_duration: null,
+                    p_min_score: minScore
+                });
+
+                // Teste sem filtro
+                const { data: withoutFilter, error: errorWithout } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr: null,
+                    p_status: null,
+                    p_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: limit,
+                    p_offset: 0,
+                    p_sort_by: 'score',
+                    p_min_duration: null,
+                    p_max_duration: null,
+                    p_min_score: null
+                });
+
+                if (errorWith || errorWithout) {
+                    addResult('❌ Erro na Comparação', `Erro: ${(errorWith || errorWithout).message}`, 'error');
+                    return;
+                }
+
+                const totalWithFilter = withFilter.length > 0 ? withFilter[0].total_count : 0;
+                const totalWithoutFilter = withoutFilter.length > 0 ? withoutFilter[0].total_count : 0;
+
+                const filteredOut = totalWithoutFilter - totalWithFilter;
+                const percentageFiltered = totalWithoutFilter > 0 ? ((filteredOut / totalWithoutFilter) * 100).toFixed(1) : 0;
+
+                addResult(
+                    '⚖️ Comparação de Resultados',
+                    `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <h4>Com Filtro (Score ≥ ${minScore})</h4>
+                                <p><strong>Total:</strong> ${totalWithFilter} chamadas</p>
+                                <p><strong>Retornadas:</strong> ${withFilter.length} chamadas</p>
+                                ${createTable(withFilter.slice(0, 10))}
+                            </div>
+                            <div>
+                                <h4>Sem Filtro</h4>
+                                <p><strong>Total:</strong> ${totalWithoutFilter} chamadas</p>
+                                <p><strong>Retornadas:</strong> ${withoutFilter.length} chamadas</p>
+                                ${createTable(withoutFilter.slice(0, 10))}
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 4px;">
+                            <h4>📊 Resumo da Filtragem</h4>
+                            <p><strong>Chamadas filtradas:</strong> ${filteredOut} (${percentageFiltered}% do total)</p>
+                            <p><strong>Eficácia do filtro:</strong> ${filteredOut > 0 ? '✅ Funcionando' : '❌ Não está filtrando'}</p>
+                        </div>
+                    `,
+                    filteredOut > 0 ? 'success' : 'error'
+                );
+
+            } catch (err) {
+                addResult('💥 Erro Inesperado', `Erro: ${err.message}`, 'error');
+            }
+        }
+
+        // Teste inicial
+        window.onload = function() {
+            addResult('🏁 Teste de Filtro Score Mínimo', 'Sistema carregado! Use os controles acima para testar o filtro.', 'info');
+        };
+    </script>
+</body>
+</html>
+
+

@@ -1345,20 +1345,34 @@ export async function createPublicReport(report: any, recipientEmail?: string, e
   try {
     // Usar token seguro se fornecido, senão gerar um novo
     const token = secureToken || generatePublicToken(24);
-    const { data: { user } } = await supabase.auth.getUser();
+    
+    // ✅ CORREÇÃO CRÍTICA: Tornar autenticação OPCIONAL para não causar logout
+    let userId: string | null = null;
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (!error && user) {
+        userId = user.id;
+        console.log('👤 CREATE_PUBLIC_REPORT - Usuário autenticado:', user.email);
+      } else {
+        console.log('🔓 CREATE_PUBLIC_REPORT - Sem autenticação (modo anônimo)');
+      }
+    } catch (authError) {
+      console.warn('⚠️ CREATE_PUBLIC_REPORT - Erro de autenticação (ignorando):', authError);
+      // Continuar sem autenticação para não quebrar o fluxo
+    }
     
     const payload = {
       token,
       report,
       recipient_email: recipientEmail || null,
-      created_by: user?.id || null,
+      created_by: userId,
       expires_at: expiresAt || null,
       ...(dealId && { deal_id: dealId }), // Só incluir deal_id se houver
     } as any;
     
     console.log('📊 CREATE_PUBLIC_REPORT - Criando relatório público:', { 
       token, 
-      user_id: user?.id, 
+      user_id: userId, 
       using_deal_id: !!dealId 
     });
     

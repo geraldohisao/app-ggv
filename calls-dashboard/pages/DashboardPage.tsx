@@ -1,325 +1,390 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabaseClient';
 import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
 import SdrAverageScoreChart from '../components/SdrAverageScoreChart';
-import { supabase } from '../../services/supabaseClient';
 
-interface DashboardMetrics {
-  totalCalls: number;
-  answered: number;
-  answeredRate: number;
-  avgDuration: number;
-  loading: boolean;
-  error: string | null;
-}
-
-export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<DashboardMetrics>({
-    totalCalls: 0,
-    answered: 0,
-    answeredRate: 0,
-    avgDuration: 0,
+const DashboardPage = () => {
+  const [dashboardData, setDashboardData] = useState({
+    // Métricas principais
+    totalCalls: -1, // Valor diferente para detectar se atualizou
+    answeredCalls: -1,
+    answeredRate: -1,
+    avgDuration: -1,
+    
+    // Dados brutos para gráficos
+    allCalls: [],
+    sdrMetrics: [],
+    volumeData: [],
+    
     loading: true,
     error: null
   });
-  
-  // Estados para filtros unificados
-  const [selectedPeriod, setSelectedPeriod] = useState(14); // Padrão: 14 dias
-  const [specificDate, setSpecificDate] = useState(''); // Data específica
-  const [filterMode, setFilterMode] = useState<'period' | 'date'>('period'); // Modo de filtro
+
+  const [selectedPeriod, setSelectedPeriod] = useState(14);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+
+  // LOG IMEDIATO PARA TESTE
+  console.log('🔥🔥🔥 DASHBOARD REFATORADO COMPLETO - NOVA ARQUITETURA!');
+
+  // Função para converter HH:MM:SS para segundos
+  const timeToSeconds = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    const parts = timeStr.split(':');
+    if (parts.length !== 3) return 0;
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    const seconds = parseInt(parts[2]) || 0;
+    return hours * 3600 + minutes * 60 + seconds;
+  };
+
+  // Função para formatar segundos em MM:SS
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  // Tipos auxiliares
+  type SdrStats = {
+    sdr_name: string;
+    total_calls: number;
+    answered_calls: number;
+    total_duration: number;
+    avg_duration: number;
+  };
+  type VolumeByDate = Record<string, { total: number; answered: number }>;
+
+  // Processar dados para gráficos
+  const processDataForCharts = (calls: any[]) => {
+    console.log('📊 Processando dados para gráficos...');
+    
+    // Agrupar por data para volume chart
+    const volumeByDate: VolumeByDate = {};
+    const sdrStats: Record<string, SdrStats> = {};
+    
+    calls.forEach(call => {
+      // Volume por data
+      const date = call.created_at ? call.created_at.split('T')[0] : 'unknown';
+      if (!volumeByDate[date]) volumeByDate[date] = { total: 0, answered: 0 };
+      volumeByDate[date].total++;
+      if (call.status_voip === 'normal_clearing') {
+        volumeByDate[date].answered++;
+      }
+      
+      // Stats por SDR
+      const sdrName = call.sdr_name || 'Desconhecido';
+      if (!sdrStats[sdrName]) sdrStats[sdrName] = {
+        sdr_name: sdrName,
+        total_calls: 0,
+        answered_calls: 0,
+        total_duration: 0,
+        avg_duration: 0
+      };
+      
+      sdrStats[sdrName].total_calls++;
+      if (call.status_voip === 'normal_clearing') {
+        sdrStats[sdrName].answered_calls++;
+        
+        // Calcular duração
+        const duration = call.duration_formated ? 
+          timeToSeconds(call.duration_formated) : 
+          (call.duration || 0);
+        
+        if (duration > 0) {
+          sdrStats[sdrName].total_duration += duration;
+        }
+      }
+    });
+    
+    // Calcular média de duração por SDR
+    (Object.values(sdrStats) as SdrStats[]).forEach((sdr) => {
+      if (sdr.answered_calls > 0) {
+        sdr.avg_duration = Math.round(sdr.total_duration / sdr.answered_calls);
+      }
+    });
+    
+    // Converter para arrays
+    const volumeData = Object.entries(volumeByDate).map(([date, data]) => ({
+      date,
+      total: data.total,
+      answered: data.answered
+    })).sort((a, b) => a.date.localeCompare(b.date));
+    
+    const sdrMetrics = (Object.values(sdrStats) as SdrStats[]).sort((a, b) => b.total_calls - a.total_calls);
+    
+    console.log('📊 Volume data processado:', volumeData.length, 'dias');
+    console.log('📊 SDR metrics processado:', sdrMetrics.length, 'SDRs');
+    
+    return { volumeData, sdrMetrics };
+  };
 
   useEffect(() => {
-    const fetchMetrics = async () => {
+    console.log('🎯🎯🎯 useEffect EXECUTADO - VERSÃO FORÇADA!');
+    console.log('🔍 selectedPeriod:', selectedPeriod);
+    
+    const fetchAllData = async () => {
+      console.log('🚀 BUSCANDO TODOS OS DADOS - UMA CONSULTA ÚNICA!');
+      
       if (!supabase) {
-        console.log('⚠️ Supabase não inicializado');
-        setMetrics(prev => ({ ...prev, loading: false }));
+        console.log('❌ Supabase não inicializado');
+        setDashboardData(prev => ({ ...prev, loading: false, error: 'Supabase não inicializado' }));
         return;
       }
 
       try {
-        console.log('🔍 Buscando métricas do dashboard...', { filterMode, specificDate, selectedPeriod });
+        setDashboardData(prev => ({ ...prev, loading: true, error: null }));
+
+        console.log('📊 Buscando contagens via RPC (com filtro de período)...');
+
+        // Calcular intervalo de datas baseado no período selecionado
+        const endDate = new Date();
+        const startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - (selectedPeriod - 1));
         
-        let query = supabase
-          .from('calls')
-          .select('status_voip, duration, created_at');
-
-        // Aplicar filtro baseado no modo selecionado
-        if (filterMode === 'date' && specificDate) {
-          // Filtrar por data específica (00:00:00 até 23:59:59)
-          const startOfDay = new Date(specificDate + 'T00:00:00');
-          const endOfDay = new Date(specificDate + 'T23:59:59');
-          
-          query = query
-            .gte('created_at', startOfDay.toISOString())
-            .lte('created_at', endOfDay.toISOString());
-            
-          console.log('📅 Filtrando por data específica:', specificDate);
-        } else {
-          // Usar período (comportamento original)
-          const daysAgo = new Date();
-          daysAgo.setDate(daysAgo.getDate() - selectedPeriod);
-          
-          query = query.gte('created_at', daysAgo.toISOString());
-          console.log('📊 Filtrando por período:', selectedPeriod, 'dias');
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-          console.error('❌ Erro ao buscar métricas:', error);
-          setMetrics(prev => ({ 
-            ...prev, 
-            loading: false, 
-            error: error.message 
-          }));
-          return;
-        }
-
-        console.log('✅ Dados de métricas carregados:', data?.length || 0);
-
-        const calls = data || [];
-        const totalCalls = calls.length;
+        const startISO = startDate.toISOString();
+        const endISO = endDate.toISOString();
         
-        // Apenas 'normal_clearing' conta como atendida
-        const answeredCalls = calls.filter(c => c.status_voip === 'normal_clearing');
-        const answered = answeredCalls.length;
-        const answeredRate = totalCalls ? Math.round((answered / totalCalls) * 100) : 0;
-        
-        // Duração média APENAS das chamadas atendidas (normal_clearing)
-        const answeredDurations = answeredCalls
-          .filter(c => c.duration && c.duration > 0)
-          .map(c => c.duration);
-        const avgDuration = answeredDurations.length > 0 
-          ? answeredDurations.reduce((a, b) => a + b, 0) / answeredDurations.length 
+        console.log('📅 Período filtrado:', { startISO, endISO, selectedPeriod });
+
+        // Buscar métricas via RPC get_dashboard_metrics (alinha com lista)
+        const daysParam = selectedPeriod;
+        const { data: metricsData, error: metricsErr } = await supabase
+          .rpc('get_dashboard_metrics', { p_days: daysParam });
+        if (metricsErr) throw metricsErr;
+
+        const metrics = Array.isArray(metricsData) ? metricsData[0] : metricsData;
+        const totalCount = Number(metrics?.total_calls || 0);
+        const answeredCount = Number(metrics?.answered_calls || 0);
+
+        console.log('✅ Contagens:', { totalCount, answeredCount });
+
+        // Duração média vinda da própria função quando disponível
+        const avgDurationFromRpc = Number(metrics?.avg_duration || 0);
+
+        // Calcular taxa
+        const answeredRate = totalCount && totalCount > 0
+          ? Math.round(((answeredCount || 0) / totalCount) * 100)
           : 0;
 
-        setMetrics({
-          totalCalls,
-          answered,
+        // Calcular média de duração
+        let avgDuration = Math.round(avgDurationFromRpc || 0);
+
+        // Atualizar estado (deixar gráficos para componentes próprios)
+        setDashboardData(prev => ({
+          ...prev,
+          totalCalls: totalCount || 0,
+          answeredCalls: answeredCount || 0,
           answeredRate,
           avgDuration,
           loading: false,
           error: null
+        }));
+        
+        // Atualizar timestamp da última atualização
+        setLastUpdate(new Date());
+
+        console.log('✅ Métricas finais:', {
+          totalCalls: totalCount,
+          answeredCalls: answeredCount,
+          answeredRate,
+          avgDuration: formatDuration(avgDuration)
         });
 
-      } catch (err: any) {
-        console.error('❌ Erro geral ao buscar métricas:', err);
-        setMetrics(prev => ({ 
+      } catch (error) {
+        console.error('❌ Erro ao buscar dados:', error);
+        setDashboardData(prev => ({ 
           ...prev, 
           loading: false, 
-          error: err?.message || 'Erro ao carregar métricas' 
+          error: error.message || 'Erro desconhecido'
         }));
       }
     };
 
-    fetchMetrics();
-  }, [selectedPeriod, specificDate, filterMode]); // Re-executar quando filtros mudarem
+    fetchAllData();
+  }, [selectedPeriod]);
 
-  if (metrics.loading) {
+  // Sistema de atualização automática
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const interval = setInterval(async () => {
+      console.log('🔄 Atualização automática disparada');
+      
+      try {
+        if (!supabase) return;
+
+        // Buscar total via RPC para comparar
+        const { data: metricsData, error: metricsErr } = await supabase
+          .rpc('get_dashboard_metrics', { p_days: selectedPeriod });
+        if (metricsErr) throw metricsErr;
+        const metrics = Array.isArray(metricsData) ? metricsData[0] : metricsData;
+        const newTotalCount = Number(metrics?.total_calls || 0);
+        
+        // Se houver mudança na contagem, recarregar dados
+        if (newTotalCount !== dashboardData.totalCalls) {
+          console.log('📊 Novos dados detectados! Recarregando...', newTotalCount, 'vs', dashboardData.totalCalls);
+          window.location.reload();
+        } else {
+          // Apenas atualizar timestamp se não houver mudanças
+          setLastUpdate(new Date());
+          console.log('✅ Nenhum dado novo. Última verificação:', new Date().toLocaleTimeString());
+        }
+      } catch (error) {
+        console.error('❌ Erro na atualização automática:', error);
+        setLastUpdate(new Date());
+      }
+    }, 15000); // Verificar a cada 15 segundos
+    
+    return () => clearInterval(interval);
+  }, [autoRefresh, selectedPeriod, dashboardData.totalCalls]);
+
+  if (dashboardData.loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">Dashboard</h2>
-          <p className="text-sm text-slate-600">Métricas e visão geral do desempenho da equipe.</p>
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+          <div style={{ fontSize: '18px' }}>🔄 Carregando dados do dashboard...</div>
         </div>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-500">Carregando dashboard...</div>
+      </div>
+    );
+  }
+
+  if (dashboardData.error) {
+    return (
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+          <div style={{ fontSize: '18px', color: 'red' }}>❌ Erro: {dashboardData.error}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header com filtro de período */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">Dashboard</h2>
-          <p className="text-sm text-slate-600">Métricas e visão geral do desempenho da equipe.</p>
-        </div>
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Dashboard - Dados Diretos 🚀
+        </h1>
+        <p style={{ color: '#666', marginBottom: '16px' }}>
+          Métricas dos últimos {selectedPeriod} dias (Total: {dashboardData.totalCalls} chamadas)
+        </p>
         
-        {/* Filtros unificados */}
-        <div className="flex items-center gap-4">
-          {/* Seletor de modo de filtro */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-600">Filtro:</span>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ marginRight: '8px', fontSize: '14px', color: '#666' }}>Período:</label>
             <select 
-              value={filterMode} 
-              onChange={(e) => {
-                const mode = e.target.value as 'period' | 'date';
-                setFilterMode(mode);
-                // Se mudou para data específica, definir hoje como padrão
-                if (mode === 'date' && !specificDate) {
-                  setSpecificDate(new Date().toISOString().split('T')[0]);
-                }
-              }}
-              className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
+              value={selectedPeriod} 
+              onChange={(e) => setSelectedPeriod(parseInt(e.target.value))}
+              style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
             >
-              <option value="period">📊 Por Período</option>
-              <option value="date">📅 Data Específica</option>
+              <option value="1">Hoje</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="14">Últimos 14 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="90">Últimos 90 dias</option>
             </select>
           </div>
-
-          {/* Filtro por período */}
-          {filterMode === 'period' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Período:</span>
-              <select 
-                value={selectedPeriod} 
-                onChange={(e) => setSelectedPeriod(Number(e.target.value))}
-                className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
-              >
-                <option value={1}>Hoje</option>
-                <option value={7}>Últimos 7 dias</option>
-                <option value={14}>Últimos 14 dias</option>
-                <option value={30}>Últimos 30 dias</option>
-              </select>
-            </div>
-          )}
-
-          {/* Filtro por data específica */}
-          {filterMode === 'date' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Data:</span>
-              <input
-                type="date"
-                value={specificDate}
-                onChange={(e) => setSpecificDate(e.target.value)}
-                className="text-sm border border-slate-300 rounded px-3 py-1 bg-white"
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ fontSize: '14px', color: '#666' }}>
+              <input 
+                type="checkbox" 
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                style={{ marginRight: '4px' }}
               />
-              <button
-                onClick={() => setSpecificDate(new Date().toISOString().split('T')[0])}
-                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                title="Definir hoje"
-              >
-                Hoje
-              </button>
-              <button
-                onClick={() => setSpecificDate('2025-09-08')}
-                className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
-                title="Ver dados do dia 08/09"
-              >
-                08/09
-              </button>
-            </div>
-          )}
+              Atualização automática (15s)
+            </label>
+          </div>
+          
+          <div style={{ fontSize: '12px', color: '#888' }}>
+            🕐 Última atualização: {lastUpdate.toLocaleTimeString()}
+          </div>
+          
+          <button 
+            onClick={() => window.location.reload()}
+            style={{ 
+              padding: '8px 16px', 
+              border: '1px solid #3b82f6', 
+              borderRadius: '4px', 
+              backgroundColor: '#3b82f6', 
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🔄 Atualizar Agora
+          </button>
         </div>
       </div>
 
-      {/* Indicador do filtro ativo */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-blue-800">
-              {filterMode === 'date' ? '📅 Filtro Ativo:' : '📊 Período Ativo:'}
-            </span>
-            <span className="text-sm text-blue-700">
-              {filterMode === 'date' && specificDate 
-                ? new Date(specificDate + 'T00:00:00').toLocaleDateString('pt-BR', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })
-                : `Últimos ${selectedPeriod} dia${selectedPeriod > 1 ? 's' : ''}`
-              }
-            </span>
+      {/* Cards de Métricas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
+            📞 Total de Chamadas
           </div>
-          <div className="text-xs text-blue-600">
-            {filterMode === 'date' 
-              ? 'Mostrando dados apenas desta data específica' 
-              : 'Mostrando dados do período selecionado'
-            }
-          </div>
-        </div>
-      </div>
-
-      {/* Métricas principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Total de Chamadas</p>
-              <p className="text-2xl font-semibold text-slate-800">{metrics.totalCalls}</p>
-            </div>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-            </div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#1f2937' }}>
+            {dashboardData.totalCalls}
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Chamadas Atendidas</p>
-              <p className="text-2xl font-semibold text-slate-800">{metrics.answered}</p>
-            </div>
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
+            ✅ Chamadas Atendidas
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>
+            {dashboardData.answeredCalls}
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Taxa de Atendimento</p>
-              <p className="text-2xl font-semibold text-slate-800">{metrics.answeredRate}%</p>
-            </div>
-            <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
+            📈 Taxa de Atendimento
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>
+            {dashboardData.answeredRate}%
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Duração Média</p>
-              <p className="text-2xl font-semibold text-slate-800">
-                {Math.round(metrics.avgDuration / 60)}m {Math.round(metrics.avgDuration % 60)}s
-              </p>
-            </div>
-            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
+            ⏱️ Duração Média
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#8b5cf6' }}>
+            {formatDuration(dashboardData.avgDuration)}
           </div>
         </div>
       </div>
 
-      {/* Gráfico de Volume - Largura completa */}
-      <div className="w-full">
+      {/* Informações de Debug */}
+      <div style={{ 
+        backgroundColor: '#f3f4f6', 
+        padding: '12px', 
+        borderRadius: '6px', 
+        marginBottom: '24px',
+        fontSize: '12px',
+        color: '#6b7280'
+      }}>
+        🔍 Debug: {dashboardData.volumeData.length} dias de dados | {dashboardData.sdrMetrics.length} SDRs | 
+        Última atualização: {new Date().toLocaleTimeString()}
+      </div>
+
+      {/* Gráfico de volume - largura total */}
+      <div style={{ marginBottom: '24px' }}>
         <CallVolumeChart 
-          selectedPeriod={filterMode === 'period' ? selectedPeriod : 1}
-          startDate={filterMode === 'date' && specificDate ? specificDate : undefined}
-          endDate={filterMode === 'date' && specificDate ? specificDate : undefined}
+          selectedPeriod={selectedPeriod} 
         />
-        
-        {/* Debug info */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-2 p-2 bg-gray-100 text-xs text-gray-600 rounded">
-            <strong>Debug:</strong> filterMode={filterMode}, specificDate={specificDate}, 
-            startDate={filterMode === 'date' && specificDate ? specificDate : 'undefined'}, 
-            endDate={filterMode === 'date' && specificDate ? specificDate : 'undefined'}
-          </div>
-        )}
       </div>
 
-      {/* Rankings - Duas colunas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Rankings lado a lado */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '24px' }}>
         <SdrScoreChart selectedPeriod={selectedPeriod} />
         <SdrAverageScoreChart selectedPeriod={selectedPeriod} />
       </div>
     </div>
   );
-}
+};
 
-
+export default DashboardPage;

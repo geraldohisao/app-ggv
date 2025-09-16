@@ -4,9 +4,10 @@ import { supabase } from '../../services/supabaseClient';
 interface SdrScoreRankingData {
   sdr_id: string;
   sdr_name: string;
-  total_calls: number;
+  total_calls: number;        // total de ligações
+  noted_calls: number;        // ligações com nota (análise)
   answered_calls: number;
-  avg_score: number;
+  avg_score: number;          // média apenas das que têm nota
   answered_rate: number;
 }
 
@@ -24,31 +25,48 @@ async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRank
   try {
     console.log('🔍 Buscando dados de ranking por nota média:', { days });
 
-    // Usar a mesma função SQL mas ordenar por nota
-    const { data, error } = await supabase
-      .rpc('get_sdr_metrics', { p_days: days });
+    // Buscar duas fontes em paralelo: totais e com notas
+    const [{ data: totals, error: totalsErr }, { data: withNotes, error: notesErr }] = await Promise.all([
+      supabase.rpc('get_sdr_metrics', { p_days: 99999 }),
+      supabase.rpc('get_sdr_metrics_with_analysis', { p_days: 99999 })
+    ]);
 
-    if (error) {
-      console.error('❌ Erro ao buscar dados de SDRs por nota:', error);
+    if (totalsErr) {
+      console.error('❌ Erro ao buscar totais dos SDRs:', totalsErr);
+      return [];
+    }
+    if (notesErr) {
+      console.error('❌ Erro ao buscar SDRs com notas:', notesErr);
       return [];
     }
 
-    console.log('✅ Dados de SDRs por nota carregados:', data?.length || 0);
+    const totalsById = new Map<string, any>();
+    (totals || []).forEach((row: any) => {
+      totalsById.set(row.sdr_id, row);
+    });
 
-    // Converter para o formato esperado e ordenar por nota média
-    const result: SdrScoreRankingData[] = (data || [])
-      .map((row: any) => ({
-        sdr_id: row.sdr_id,
-        sdr_name: row.sdr_name,
-        total_calls: Number(row.total_calls),
-        answered_calls: Number(row.answered_calls),
-        avg_score: Number(row.avg_score) || 0,
-        answered_rate: Number(row.total_calls) > 0 ? 
-          Math.round((Number(row.answered_calls) / Number(row.total_calls)) * 100) : 0
-      }))
-      .filter(sdr => sdr.avg_score > 0) // Apenas SDRs com nota
-      .sort((a, b) => b.avg_score - a.avg_score) // Ordenar por nota decrescente
-      .slice(0, 10); // Top 10
+    // Montar resultado apenas para SDRs que têm notas
+    const result: SdrScoreRankingData[] = (withNotes || [])
+      .map((row: any) => {
+        const cleanName = (row.sdr_name || '').replace(/^Usuário\s+/i, '').trim();
+        const totalsRow = totalsById.get(row.sdr_id) || {};
+        const totalCalls = Number(totalsRow.total_calls) || 0;
+        const notedCalls = Number(row.total_calls) || 0; // na função with_analysis total_calls == com nota
+        const answeredCalls = Number(totalsRow.answered_calls) || 0;
+        const answeredRate = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0;
+        return {
+          sdr_id: row.sdr_id,
+          sdr_name: cleanName,
+          total_calls: totalCalls,
+          noted_calls: notedCalls,
+          answered_calls: answeredCalls,
+          avg_score: Number(row.avg_score) || 0,
+          answered_rate: answeredRate
+        } as SdrScoreRankingData;
+      })
+      .filter(sdr => sdr.noted_calls > 0)
+      .sort((a, b) => b.avg_score - a.avg_score)
+      .slice(0, 10);
 
     console.log('📊 Ranking por nota processado:', result);
     return result;
@@ -128,7 +146,7 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
         <h3 className="font-semibold text-slate-800">⭐ Ranking por Nota Média</h3>
-        <p className="text-xs text-slate-500">Baseado em scorecards das chamadas</p>
+        <p className="text-xs text-slate-500">Somente ligações com nota • Exibe Total vs Com Nota</p>
       </div>
       
       <div className="space-y-3">
@@ -167,7 +185,7 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
                 
                 <div className="flex justify-between text-xs text-slate-500 mt-1">
                   <span>Taxa: {sdr.answered_rate}%</span>
-                  <span>{sdr.total_calls} chamadas</span>
+                  <span>{sdr.total_calls} totais • {sdr.noted_calls} com nota</span>
                   <span>
                     {sdr.avg_score >= 85 ? '🟢 Excelente' :
                      sdr.avg_score >= 70 ? '🟡 Bom' : '🔴 Precisa melhorar'}

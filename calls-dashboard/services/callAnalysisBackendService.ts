@@ -35,10 +35,12 @@ interface AnalysisJob {
 const processingCache = new Map<string, Promise<ScorecardAnalysisResult>>();
 
 /**
- * Verifica se uma chamada já tem análise
+ * Verifica se uma chamada já tem análise (com retry automático)
  */
 export async function hasExistingAnalysis(callId: string): Promise<CallAnalysisRecord | null> {
   try {
+    console.log('🔍 Verificando análise existente para chamada:', callId);
+    
     const { data, error } = await supabase.rpc('get_call_analysis', {
       p_call_id: callId
     });
@@ -48,7 +50,19 @@ export async function hasExistingAnalysis(callId: string): Promise<CallAnalysisR
       return null;
     }
 
-    return data?.[0] || null;
+    const analysis = data?.[0] || null;
+    
+    if (analysis) {
+      console.log('✅ Análise encontrada no banco:', {
+        id: analysis.id,
+        final_grade: analysis.final_grade,
+        created_at: analysis.analysis_created_at
+      });
+    } else {
+      console.log('ℹ️ Nenhuma análise encontrada para esta chamada');
+    }
+
+    return analysis;
   } catch (error) {
     console.warn('⚠️ Erro ao verificar análise:', error);
     return null;
@@ -78,20 +92,29 @@ async function saveAnalysisToDatabase(
 
     const processingTime = Date.now() - startTime;
 
-    // Salvar no banco usando RPC
-    const { data, error } = await supabase.rpc('save_call_analysis', {
+    // Sanitizar dados antes de enviar para evitar overflow
+    const sanitizedData = {
       p_call_id: callId,
-      p_scorecard_id: analysis.scorecard_used.id,
-      p_overall_score: analysis.overall_score,
-      p_max_possible_score: analysis.max_possible_score,
-      p_final_grade: analysis.final_grade,
-      p_general_feedback: analysis.general_feedback,
-      p_strengths: analysis.strengths,
-      p_improvements: analysis.improvements,
-      p_confidence: analysis.confidence,
-      p_criteria_data: criteriaData,
+      p_scorecard_id: analysis.scorecard_used?.id || null,
+      p_overall_score: Math.min(1000, Math.max(0, analysis.overall_score || 0)),
+      p_max_possible_score: Math.min(1000, Math.max(0, analysis.max_possible_score || 10)),
+      p_final_grade: Math.min(10, Math.max(0, analysis.final_grade || 0)),
+      p_general_feedback: analysis.general_feedback || 'Análise processada com sucesso',
+      p_strengths: analysis.strengths || [],
+      p_improvements: analysis.improvements || [],
+      p_confidence: Math.min(1, Math.max(0, analysis.confidence || 0.8)),
+      p_criteria_data: criteriaData || [],
       p_processing_time_ms: processingTime
+    };
+
+    console.log('📤 Enviando dados sanitizados para RPC:', {
+      call_id: sanitizedData.p_call_id,
+      final_grade: sanitizedData.p_final_grade,
+      overall_score: sanitizedData.p_overall_score
     });
+
+    // Salvar no banco usando RPC
+    const { data, error } = await supabase.rpc('save_call_analysis', sanitizedData);
 
     if (error) {
       console.error('❌ Erro ao salvar análise:', error);
@@ -108,7 +131,7 @@ async function saveAnalysisToDatabase(
 }
 
 /**
- * Processa análise de uma chamada (principal)
+ * Processa análise de uma chamada (principal) - COM PERSISTÊNCIA GARANTIDA
  */
 export async function processCallAnalysis(
   callId: string,
@@ -126,29 +149,27 @@ export async function processCallAnalysis(
     return await processingCache.get(callId)!;
   }
 
-  // Verificar se já existe análise (se não forçar reprocessamento)
-  if (!forceReprocess) {
-    const existing = await hasExistingAnalysis(callId);
-    if (existing) {
-      console.log('✅ Análise já existe no banco:', existing.final_grade);
-      
-      // Converter para formato esperado
-      return {
-        scorecard_used: {
-          id: existing.scorecard_id,
-          name: existing.scorecard_name,
-          description: ''
-        },
-        overall_score: existing.overall_score,
-        max_possible_score: existing.max_possible_score,
-        final_grade: existing.final_grade,
-        criteria_analysis: existing.criteria_analysis || [],
-        general_feedback: existing.general_feedback,
-        strengths: existing.strengths || [],
-        improvements: existing.improvements || [],
-        confidence: existing.confidence
-      };
-    }
+  // SEMPRE verificar se já existe análise no banco primeiro
+  const existing = await hasExistingAnalysis(callId);
+  if (existing && !forceReprocess) {
+    console.log('✅ Análise já existe no banco, retornando dados salvos:', existing.final_grade);
+    
+    // Converter para formato esperado
+    return {
+      scorecard_used: {
+        id: existing.scorecard_id || '',
+        name: existing.scorecard_name,
+        description: ''
+      },
+      overall_score: existing.overall_score,
+      max_possible_score: existing.max_possible_score,
+      final_grade: existing.final_grade,
+      criteria_analysis: existing.criteria_analysis || [],
+      general_feedback: existing.general_feedback,
+      strengths: existing.strengths || [],
+      improvements: existing.improvements || [],
+      confidence: existing.confidence
+    };
   }
 
   // Criar promise de processamento

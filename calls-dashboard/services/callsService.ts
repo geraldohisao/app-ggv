@@ -63,6 +63,7 @@ export interface CallsFilters {
   sortBy?: string;
   min_duration?: number;
   max_duration?: number;
+  min_score?: number;
 }
 
 export interface CallsResponse {
@@ -78,9 +79,22 @@ export async function fetchDashboardMetrics(days: number = 14): Promise<Dashboar
   try {
     console.log('🔍 CALLS SERVICE - Buscando métricas do dashboard');
 
-    const { data, error } = await supabase.rpc('get_dashboard_metrics', {
-      p_days: days
-    });
+    // Tentar função com análise primeiro, senão fallback para básica
+    let data, error;
+    try {
+      const result = await supabase.rpc('get_dashboard_metrics_with_analysis', {
+        p_days: days
+      });
+      data = result.data;
+      error = result.error;
+    } catch (err) {
+      console.log('⚠️ Função with_analysis não encontrada, usando básica...');
+      const result = await supabase.rpc('get_dashboard_metrics', {
+        p_days: days
+      });
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('❌ CALLS SERVICE - Erro ao buscar métricas:', error);
@@ -113,18 +127,18 @@ function mapStatusVoip(statusVoip: string): string {
     case 'originator_cancel':
       return 'Cancelada pela SDR';
     case 'number_changed':
-      return 'Número mudou';
+      return 'Numero mudou';
     case 'recovery_on_timer_expire':
       return 'Tempo esgotado';
     case 'unallocated_number':
-      return 'Número inválido';
+      return 'Número não encontrado';
     default:
       return statusVoip || 'Status desconhecido';
   }
 }
 
 /**
- * Busca calls com filtros e paginação
+ * Busca calls com filtros e paginação (implementação restaurada com duration_formatted)
  */
 export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsResponse> {
   // Criar chave única para a requisição baseada nos filtros
@@ -132,7 +146,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
   
   return managedRequest(requestKey, async () => {
     try {
-      console.log('🔍 CALLS SERVICE - Buscando calls com filtros:', filters);
+      console.log('🔍 CALLS SERVICE - Buscando calls com filtros (implementação restaurada):', filters);
 
       // Timeout para evitar requests longos
       const controller = new AbortController();
@@ -148,19 +162,37 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       offset = 0,
       sortBy = 'created_at',
       min_duration,
-      max_duration
+      max_duration,
+      min_score
     } = filters;
 
     // Converter datas para timestamp se fornecidas
-    const startTimestamp = start ? new Date(start).toISOString() : null;
-    const endTimestamp = end ? new Date(end).toISOString() : null;
+    const startTimestamp = start ? new Date(start + 'T00:00:00').toISOString() : null;
+    const endTimestamp = end ? new Date(end + 'T23:59:59').toISOString() : null;
+    
+    console.log('🔍 CALLS SERVICE - TODOS OS FILTROS RECEBIDOS:', {
+      sdr_email,
+      status,
+      call_type,
+      start,
+      end,
+      min_duration,
+      max_duration,
+      limit,
+      offset,
+      sortBy
+    });
 
-    // Construir query com filtros aplicados
+    // Construir query com filtros aplicados (VERSÃO SIMPLES QUE FUNCIONAVA)
     let query = supabase
       .from('calls')
-      .select('*');
+      .select(`
+        *,
+        scorecard,
+        call_analysis!left(final_grade)
+      `);
 
-    // Aplicar filtros
+    // Aplicar filtros (versão original que funcionava)
     if (sdr_email) {
       query = query.ilike('agent_id', `%${sdr_email}%`);
     }
@@ -175,38 +207,98 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
 
     if (startTimestamp) {
       query = query.gte('created_at', startTimestamp);
+      console.log('🔍 CALLS SERVICE - Filtro início aplicado:', startTimestamp);
     }
 
     if (endTimestamp) {
       query = query.lte('created_at', endTimestamp);
+      console.log('🔍 CALLS SERVICE - Filtro fim aplicado:', endTimestamp);
     }
 
+    // IMPORTANTE: Não filtrar por duração no banco, pois a duração real pode vir de duration_formated
+    // O filtro de duração será aplicado no frontend usando getRealDuration()
     if (min_duration) {
-      query = query.gte('duration', parseInt(min_duration));
+      console.log('🔍 CALLS SERVICE - Filtro de duração será aplicado no frontend usando getRealDuration():', min_duration);
+    }
+    if (max_duration) {
+      console.log('🔍 CALLS SERVICE - Filtro de duração máxima será aplicado no frontend:', max_duration);
     }
 
-    if (max_duration) {
-      query = query.lte('duration', parseInt(max_duration));
+    // Determinar ordenação baseada no sortBy
+    let orderField = 'created_at';
+    let orderAscending = false;
+    
+    // Para filtros de score, buscar TODAS as chamadas para ordenação global
+    const isScoreFilter = sortBy === 'score' || sortBy === 'score_asc';
+    const effectiveLimit = isScoreFilter ? 10000 : limit; // Buscar todas para score
+    const effectiveOffset = isScoreFilter ? 0 : offset; // Sempre do início para score
+    
+    switch (sortBy) {
+      case 'duration':
+        orderField = 'duration';
+        orderAscending = false; // Maior duração primeiro
+        break;
+      case 'score':
+      case 'with_score':
+        // Para score, ordenar no frontend após buscar os dados (pois score pode vir de múltiplas fontes)
+        orderField = 'created_at';
+        orderAscending = false;
+        break;
+      case 'company':
+        orderField = 'enterprise';
+        orderAscending = true; // A-Z
+        break;
+      default: // created_at
+        orderField = 'created_at';
+        orderAscending = false; // Mais recente primeiro
+        break;
     }
+
+    console.log('🔍 CALLS SERVICE - Ordenação escolhida:', {
+      sortBy,
+      orderField,
+      orderAscending,
+      motivo: sortBy === 'score' ? 'Score será ordenado no frontend' : `Ordenação por ${sortBy}`
+    });
 
     // Aplicar ordenação e paginação com controle de timeout
     const { data, error } = await query
-      .range(offset, offset + limit - 1)
-      .order('created_at', { ascending: false })
+      .range(effectiveOffset, effectiveOffset + effectiveLimit - 1)
+      .order(orderField, { ascending: orderAscending })
       .abortSignal(controller.signal);
 
     clearTimeout(timeoutId);
 
     if (error) {
-      console.error('❌ CALLS SERVICE - Erro ao buscar calls:', error);
+      console.error('❌ CALLS SERVICE - Erro ao buscar calls:', JSON.stringify(error, null, 2));
       if (error.name === 'AbortError') {
         throw new Error('Timeout: A busca demorou muito para responder. Tente filtros mais específicos.');
       }
       throw error;
     }
 
+    console.log('📊 CALLS SERVICE - Query executada, resultado:', {
+      totalRetornado: data?.length || 0,
+      filtrosAplicados: {
+        sdr_email: !!sdr_email,
+        status: !!status,
+        call_type: !!call_type,
+        start: !!start,
+        end: !!end,
+        min_duration: !!min_duration,
+        max_duration: !!max_duration
+      }
+    });
+
+    // Debug específico para duração
+    if (min_duration && data && data.length > 0) {
+      console.log('🔍 CALLS SERVICE - Durações encontradas:', 
+        data.slice(0, 5).map(call => ({ id: call.id, duration: call.duration }))
+      );
+    }
+
     if (!data || data.length === 0) {
-      console.log('📭 CALLS SERVICE - Nenhuma call encontrada');
+      console.log('📭 CALLS SERVICE - Nenhuma call encontrada com os filtros aplicados');
       return {
         calls: [],
         totalCount: 0,
@@ -214,7 +306,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       };
     }
 
-    // Contar total de registros com os mesmos filtros
+    // Contar total de registros com os mesmos filtros (VERSÃO SIMPLES)
     let countQuery = supabase
       .from('calls')
       .select('*', { count: 'exact', head: true });
@@ -240,13 +332,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       countQuery = countQuery.lte('created_at', endTimestamp);
     }
 
-    if (min_duration) {
-      countQuery = countQuery.gte('duration', parseInt(min_duration));
-    }
-
-    if (max_duration) {
-      countQuery = countQuery.lte('duration', parseInt(max_duration));
-    }
+    // Não aplicar filtros de duração na contagem - será feito no frontend
 
     // Timeout separado para contagem
     const countController = new AbortController();
@@ -255,16 +341,122 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     const { count: totalCount } = await countQuery.abortSignal(countController.signal);
     clearTimeout(countTimeoutId);
 
+    console.log('📊 CALLS SERVICE - Contagem concluída:', {
+      totalCount,
+      dataLength: data?.length || 0,
+      offset,
+      limit,
+      discrepancia: (totalCount || 0) !== (data?.length || 0),
+      ordenacao_usada: orderField
+    });
+
     const hasMore = offset + limit < (totalCount || 0);
 
-    // Mapear status_voip para status_voip_friendly no frontend
-    const callsWithFriendlyStatus = data.map(call => ({
-      ...call,
-      status_voip_friendly: mapStatusVoip(call.status_voip),
-      total_count: totalCount || 0
-    }));
+    // Aplicar filtro de score mínimo no frontend (após buscar todos os dados)
+    let filteredData = data;
+    if (min_score && isScoreFilter) {
+      const threshold = min_score > 10 ? min_score / 10 : min_score; // normalizar 0–100 → 0–10
+      console.log('🔍 Aplicando filtro de score mínimo:', { min_score, threshold });
+      filteredData = data.filter(call => {
+        const finalScore = (() => {
+          // Mesmo cálculo do convertToCallItem
+          if (call.scorecard) {
+            const sc = call.scorecard;
+            if (typeof sc.final_score === 'number') return sc.final_score;
+            if (typeof sc.total_score === 'number') return sc.total_score;
+            if (typeof sc.score === 'number') return sc.score;
+          }
+          if (call.call_analysis && Array.isArray(call.call_analysis) && call.call_analysis.length > 0) {
+            const analysis = call.call_analysis[0];
+            if (typeof analysis?.final_grade === 'number') return analysis.final_grade;
+          }
+          if (call.call_analysis && !Array.isArray(call.call_analysis)) {
+            if (typeof call.call_analysis.final_grade === 'number') return call.call_analysis.final_grade;
+          }
+          return undefined;
+        })();
+        return typeof finalScore === 'number' && finalScore >= threshold;
+      });
+      console.log('🔍 Após filtro de score:', filteredData.length, 'chamadas restantes');
+    }
 
-    console.log(`✅ CALLS SERVICE - ${data.length} calls encontradas (${totalCount} total)`);
+    // Mapear status_voip para status_voip_friendly no frontend e adicionar duration_formatted
+    const callsWithFriendlyStatus = filteredData.map(call => {
+      // Calcular duration_formatted aqui no frontend
+      let durationFormatted = '00:00:00';
+      if (call.duration && call.duration > 0) {
+        const hours = Math.floor(call.duration / 3600);
+        const minutes = Math.floor((call.duration % 3600) / 60);
+        const seconds = call.duration % 60;
+        
+        if (hours > 0) {
+          durationFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        } else {
+          durationFormatted = `00:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+      }
+      
+      return {
+        ...call,
+        status_voip_friendly: mapStatusVoip(call.status_voip),
+        duration_formatted: durationFormatted,
+        total_count: totalCount || 0
+      };
+    });
+
+    console.log(`✅ CALLS SERVICE - ${filteredData.length} calls encontradas (${totalCount} total) com duration_formatted calculado`);
+
+    // Se for filtro de score, buscar páginas adicionais além do limite do PostgREST (ex.: 1000)
+    if (isScoreFilter && (totalCount || 0) > filteredData.length) {
+      const fetchSize = 1000; // tamanho por página para paginação interna
+      let fetched = filteredData.length;
+      console.log('🔁 Buscando páginas adicionais para ordenação global por nota...', { totalCount, alreadyFetched: fetched });
+
+      while (fetched < (totalCount || 0)) {
+        const start = fetched;
+        const end = Math.min(fetched + fetchSize - 1, (totalCount || 1) - 1);
+
+        let pageQuery = supabase
+          .from('calls')
+          .select(`
+            *,
+            scorecard,
+            call_analysis!left(final_grade)
+          `);
+
+        if (sdr_email) {
+          pageQuery = pageQuery.ilike('agent_id', `%${sdr_email}%`);
+        }
+        if (status) {
+          pageQuery = pageQuery.eq('status_voip', status);
+        }
+        if (call_type) {
+          pageQuery = pageQuery.eq('call_type', call_type);
+        }
+        if (startTimestamp) {
+          pageQuery = pageQuery.gte('created_at', startTimestamp);
+        }
+        if (endTimestamp) {
+          pageQuery = pageQuery.lte('created_at', endTimestamp);
+        }
+
+        const { data: more, error: moreErr } = await pageQuery
+          .range(start, end)
+          .order(orderField, { ascending: orderAscending });
+
+        if (moreErr) {
+          console.error('❌ CALLS SERVICE - Erro ao buscar página adicional:', moreErr);
+          break;
+        }
+        if (more && more.length > 0) {
+          filteredData.push(...more);
+          fetched += more.length;
+          console.log('🔁 Página adicional carregada:', { fetched, lastBatch: more.length });
+        } else {
+          break;
+        }
+      }
+    }
 
     return {
       calls: callsWithFriendlyStatus,
@@ -273,7 +465,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     };
 
   } catch (error: any) {
-    console.error('💥 CALLS SERVICE - Erro inesperado:', error);
+    console.error('💥 CALLS SERVICE - Erro inesperado:', JSON.stringify(error, null, 2));
     
     if (error.name === 'AbortError') {
       throw new Error('Timeout: A busca foi cancelada por demorar muito. Tente filtros mais específicos.');
@@ -295,25 +487,46 @@ export async function fetchCallDetail(callId: string): Promise<CallWithDetails |
   try {
     console.log('🔍 CALLS SERVICE - Buscando detalhes da call:', callId);
 
-    const { data, error } = await supabase.rpc('get_call_details', {
-      p_call_id: callId
-    });
+    // Buscar diretamente da tabela calls (mais confiável)
+    const { data, error } = await supabase
+      .from('calls')
+      .select(`
+        *,
+        scorecard,
+        call_analysis!left(final_grade)
+      `)
+      .eq('id', callId)
+      .single();
 
     if (error) {
-      console.error('❌ CALLS SERVICE - Erro ao buscar detalhes da call:', error);
+      console.error('❌ CALLS SERVICE - Erro ao buscar detalhes da call:', JSON.stringify(error, null, 2));
       throw error;
     }
 
-    if (!data || data.length === 0) {
+    if (!data) {
       console.log('📭 CALLS SERVICE - Call não encontrada');
       return null;
     }
 
+    // Mapear para o formato esperado
+    const callDetail: CallWithDetails = {
+      ...data,
+      status_voip_friendly: mapStatusVoip(data.status_voip),
+      company_name: data.insights?.company || data.insights?.enterprise || 'Empresa não informada',
+      person_name: data.insights?.person || data.insights?.person_name || 'Pessoa não informada',
+      person_email: data.insights?.person_email || '',
+      sdr_id: data.agent_id,
+      sdr_name: data.agent_id,
+      sdr_email: data.agent_id,
+      sdr_avatar_url: `https://i.pravatar.cc/64?u=${data.agent_id}`,
+      audio_url: data.recording_url || ''
+    };
+
     console.log('✅ CALLS SERVICE - Detalhes da call encontrados');
-    return data[0];
+    return callDetail;
 
   } catch (error) {
-    console.error('💥 CALLS SERVICE - Erro inesperado ao buscar detalhes:', error);
+    console.error('💥 CALLS SERVICE - Erro inesperado ao buscar detalhes:', JSON.stringify(error, null, 2));
     throw error;
   }
 }
@@ -325,7 +538,10 @@ export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
   try {
     console.log('🔍 CALLS SERVICE - Buscando SDRs únicos');
 
+    // Buscar SDRs do Supabase
     const { data, error } = await supabase.rpc('get_unique_sdrs');
+    
+    console.log('🔍 CALLS SERVICE - Resultado get_unique_sdrs:', { data, error });
 
     if (error) {
       console.error('❌ CALLS SERVICE - Erro ao buscar SDRs:', error);
@@ -337,15 +553,18 @@ export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
       return [];
     }
 
-    const sdrs: SdrUser[] = data.map((sdr: any) => ({
-      id: sdr.sdr_email,
-      name: sdr.sdr_name,
-      email: sdr.sdr_email,
-      avatarUrl: sdr.sdr_avatar_url || `https://i.pravatar.cc/64?u=${sdr.sdr_email}`,
-      callCount: sdr.call_count
-    }));
+    const sdrs: SdrUser[] = data.map((sdr: any) => {
+      console.log('🔍 CALLS SERVICE - Mapeando SDR:', sdr);
+      return {
+        id: sdr.sdr_email,
+        name: sdr.sdr_name,
+        email: sdr.sdr_email,
+        avatarUrl: sdr.sdr_avatar_url || `https://i.pravatar.cc/64?u=${sdr.sdr_email}`,
+        callCount: sdr.call_count
+      };
+    });
 
-    console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs encontrados`);
+    console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs mapeados:`, sdrs);
     return sdrs;
 
   } catch (error) {
@@ -369,16 +588,52 @@ export function convertToCallItem(call: any): CallItem {
       const seconds = parseInt(parts[2]) || 0;
       durationInSeconds = hours * 3600 + minutes * 60 + seconds;
       
-      console.log(`🕐 Convertendo duração: ${call.duration_formated} → ${durationInSeconds}s`);
+      // Debug removido para evitar poluição no console
     } catch (error) {
       console.warn('Erro ao converter duration_formated:', call.duration_formated);
     }
   }
 
+  // Helper para converter qualquer valor em número válido (0-10)
+  const toScoreNumber = (value: any): number | undefined => {
+    if (value === null || value === undefined) return undefined;
+    const n = typeof value === 'number' ? value : parseFloat(value);
+    if (!Number.isFinite(n)) return undefined;
+    // Aceitar 0-10 (ou 0-100 e normalizar, se necessário)
+    if (n >= 0 && n <= 10) return n;
+    if (n > 10 && n <= 100) return Math.round((n / 10) * 10) / 10; // normalizar 0-100 para 0-10
+    return undefined;
+  };
+
+  // Priorizar scorecard > call_analysis (não há coluna score na tabela calls)
+  const finalScore = (() => {
+    // Primeiro: scorecard JSONB
+    if (call.scorecard) {
+      const sc = call.scorecard;
+      const fromFinal = toScoreNumber(sc.final_score);
+      if (fromFinal !== undefined) return fromFinal;
+      const fromTotal = toScoreNumber(sc.total_score);
+      if (fromTotal !== undefined) return fromTotal;
+      const fromScore = toScoreNumber(sc.score);
+      if (fromScore !== undefined) return fromScore;
+    }
+    // Segundo: call_analysis join (array)
+    if (call.call_analysis && Array.isArray(call.call_analysis) && call.call_analysis.length > 0) {
+      const analysis = call.call_analysis[0]; // Primeiro resultado
+      const fromCA = toScoreNumber(analysis?.final_grade);
+      if (fromCA !== undefined) return fromCA;
+    }
+    // Terceiro: call_analysis como objeto direto
+    if (call.call_analysis && !Array.isArray(call.call_analysis)) {
+      const fromCAObj = toScoreNumber(call.call_analysis.final_grade);
+      if (fromCAObj !== undefined) return fromCAObj;
+    }
+    return undefined;
+  })();
+
   return {
     id: call.id,
     company: call.enterprise || call.company_name || 'Empresa não informada',
-    person: call.person || call.person_name || 'Contato não identificado',
     dealCode: call.deal_id || 'N/A',
     sdr: {
       id: call.agent_id || call.sdr_id,
@@ -393,7 +648,7 @@ export function convertToCallItem(call: any): CallItem {
     status: call.status as any,
     status_voip: call.status_voip,
     status_voip_friendly: call.status_voip_friendly,
-    score: call.score || (call.scorecard ? extractScoreFromScorecard(call.scorecard) : undefined),
+    score: finalScore,
     // Campos extras para detalhes
     audio_url: call.audio_url,
     recording_url: call.recording_url,

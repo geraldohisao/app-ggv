@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Calls Status VOIP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste Status VOIP das Chamadas</h1>
+    <button onclick="testCalls()">Testar get_calls</button>
+    <div id="result"></div>
+
+    <script>
+        // Configure com as credenciais do seu Supabase
+        const supabaseUrl = 'https://your-project-url.supabase.co'
+        const supabaseKey = 'your-anon-key'
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey)
+
+        async function testCalls() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testando...</p>';
+            
+            try {
+                // Testar função get_calls
+                const { data: calls, error } = await supabase
+                    .rpc('get_calls', { p_limit: 5, p_offset: 0 });
+                
+                if (error) {
+                    resultDiv.innerHTML = `<p style="color: red">Erro: ${error.message}</p>`;
+                    return;
+                }
+                
+                console.log('📞 Calls retornadas:', calls);
+                
+                let html = '<h2>Resultados:</h2>';
+                html += '<table border="1"><tr><th>ID</th><th>Status VOIP</th><th>Status Amigável</th><th>Duration</th></tr>';
+                
+                calls.forEach(call => {
+                    html += `<tr>
+                        <td>${call.id.substring(0, 8)}...</td>
+                        <td>${call.status_voip}</td>
+                        <td><strong>${call.status_voip_friendly}</strong></td>
+                        <td>${call.duration}s</td>
+                    </tr>`;
+                });
+                
+                html += '</table>';
+                resultDiv.innerHTML = html;
+                
+            } catch (err) {
+                resultDiv.innerHTML = `<p style="color: red">Erro: ${err.message}</p>`;
+                console.error('Erro:', err);
+            }
+        }
+    </script>
+</body>
+</html>

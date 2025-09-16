@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste - Query Supabase Duration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+        .info { background: #e6f3ff; color: #0066cc; }
+        button { margin: 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Direto - Query Supabase Duration</h1>
+    
+    <div>
+        <button onclick="testDuration(60)">Testar >= 60s</button>
+        <button onclick="testDuration(61)">Testar >= 61s</button>
+        <button onclick="testDuration(30)">Testar >= 30s</button>
+        <button onclick="testDuration(90)">Testar >= 90s</button>
+        <button onclick="testAllDurations()">Ver Todas Durações</button>
+    </div>
+    
+    <div id="results">Clique em um botão para testar...</div>
+
+    <script type="module">
+        const supabaseUrl = 'https://lqpgfygqidzqxjxmhjkm.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGdmeWdxaWR6cXhqeG1oamttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU5OTc5NzYsImV4cCI6MjA0MTU3Mzk3Nn0.Gg_29rvEyJlGJfqWvUkRmUgwDCjqCiGXHe2RqfQWFU8';
+        
+        const resultsDiv = document.getElementById('results');
+        let supabase;
+
+        // Inicializar Supabase
+        const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2');
+        supabase = createClient(supabaseUrl, supabaseKey);
+
+        window.testDuration = async function(minDuration) {
+            try {
+                resultsDiv.innerHTML = `<div class="debug">Testando duration >= ${minDuration}...</div>`;
+
+                console.log(`🔍 Testando query: duration >= ${minDuration}`);
+
+                // Query exata que deveria ser usada
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('id, duration, created_at, agent_id, status_voip')
+                    .gte('duration', minDuration)
+                    .order('duration', { ascending: false })
+                    .limit(10);
+
+                if (error) {
+                    throw error;
+                }
+
+                let html = `<div class="info"><h3>Resultado para duration >= ${minDuration}</h3></div>`;
+                html += `<div class="success">✅ Encontradas: ${data?.length || 0} chamadas</div>`;
+
+                if (data && data.length > 0) {
+                    html += '<div class="debug"><table border="1" style="border-collapse: collapse; width: 100%;">';
+                    html += '<tr><th>ID</th><th>Duração</th><th>Data</th><th>Agent ID</th><th>Status</th></tr>';
+                    
+                    data.forEach(call => {
+                        html += `<tr>
+                            <td>${call.id}</td>
+                            <td><strong>${call.duration}s</strong></td>
+                            <td>${new Date(call.created_at).toLocaleString('pt-BR')}</td>
+                            <td>${call.agent_id || 'N/A'}</td>
+                            <td>${call.status_voip || 'N/A'}</td>
+                        </tr>`;
+                    });
+                    html += '</table></div>';
+
+                    // Estatísticas
+                    const durations = data.map(c => c.duration);
+                    const maxDur = Math.max(...durations);
+                    const minDur = Math.min(...durations);
+                    const avgDur = durations.reduce((a, b) => a + b, 0) / durations.length;
+
+                    html += `<div class="info">
+                        <strong>Estatísticas:</strong><br>
+                        • Menor duração encontrada: ${minDur}s<br>
+                        • Maior duração encontrada: ${maxDur}s<br>
+                        • Duração média: ${Math.round(avgDur)}s<br>
+                        • Total de chamadas: ${data.length}
+                    </div>`;
+                } else {
+                    html += '<div class="error">❌ Nenhuma chamada encontrada com essa duração</div>';
+                }
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        };
+
+        window.testAllDurations = async function() {
+            try {
+                resultsDiv.innerHTML = '<div class="debug">Buscando todas as durações...</div>';
+
+                const { data, error } = await supabase
+                    .from('calls')
+                    .select('duration')
+                    .not('duration', 'is', null)
+                    .gte('duration', 1)
+                    .order('duration', { ascending: false })
+                    .limit(100);
+
+                if (error) throw error;
+
+                let html = '<div class="info"><h3>Todas as Durações (Top 100)</h3></div>';
+                
+                if (data && data.length > 0) {
+                    const durations = data.map(c => c.duration);
+                    const uniqueDurations = [...new Set(durations)].sort((a, b) => b - a);
+                    
+                    html += `<div class="success">✅ Total de chamadas com duração: ${data.length}</div>`;
+                    html += `<div class="debug"><strong>Durações únicas encontradas (Top 20):</strong><br>`;
+                    
+                    uniqueDurations.slice(0, 20).forEach((duration, i) => {
+                        const count = durations.filter(d => d === duration).length;
+                        html += `${i + 1}. ${duration}s (${count} chamadas)<br>`;
+                    });
+                    html += '</div>';
+
+                    // Estatísticas por faixa
+                    const ranges = [
+                        { min: 60, max: 120, label: '60-120s (1-2min)' },
+                        { min: 120, max: 300, label: '120-300s (2-5min)' },
+                        { min: 300, max: 600, label: '300-600s (5-10min)' },
+                        { min: 600, max: 1200, label: '600-1200s (10-20min)' },
+                        { min: 1200, max: Infinity, label: '>1200s (>20min)' }
+                    ];
+
+                    html += '<div class="info"><strong>Distribuição por faixas:</strong><br>';
+                    ranges.forEach(range => {
+                        const count = durations.filter(d => d >= range.min && d < range.max).length;
+                        html += `• ${range.label}: ${count} chamadas<br>`;
+                    });
+                    html += '</div>';
+
+                } else {
+                    html += '<div class="error">❌ Nenhuma chamada com duração encontrada</div>';
+                }
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>
+

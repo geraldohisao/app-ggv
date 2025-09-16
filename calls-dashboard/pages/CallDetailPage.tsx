@@ -64,25 +64,34 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
 
   const loadExistingAIAnalysis = async (callItem: CallItem) => {
     try {
-      // Apenas carregar análise existente (sem processamento automático)
+      console.log('🔍 Carregando análise IA persistida para:', callItem.id);
+      
+      // SEMPRE tentar carregar análise do banco (PERSISTÊNCIA GARANTIDA)
       const existingAnalysis = await getCallAnalysisFromDatabase(callItem.id);
       
       if (existingAnalysis) {
-        // Análise já existe, usar dados salvos
+        // Análise encontrada no banco - usar dados persistidos
         setAiNote(existingAnalysis.final_grade.toFixed(1));
         setAiScore(existingAnalysis.final_grade);
-        console.log('✅ Análise carregada do banco:', existingAnalysis.final_grade);
+        console.log('✅ Análise IA carregada do banco (PERSISTIDA):', {
+          final_grade: existingAnalysis.final_grade,
+          scorecard: existingAnalysis.scorecard_used?.name,
+          created_at: existingAnalysis.analysis_created_at
+        });
         
-        // Atualizar score na tabela calls se necessário
+        // Garantir que o score está atualizado na tabela calls
         await updateCallScore(callItem.id, existingAnalysis.final_grade);
       } else {
-        // Se não tem análise, manter N/A (usuário pode clicar em "Analisar com IA")
-        console.log('ℹ️ Nenhuma análise encontrada para esta chamada');
+        // Nenhuma análise persistida encontrada
+        console.log('ℹ️ Nenhuma análise persistida encontrada para:', callItem.id);
+        setAiNote('N/A');
+        setAiScore(null);
       }
       
     } catch (error) {
-      console.warn('⚠️ Erro ao carregar análise IA:', error);
-      // Manter N/A em caso de erro
+      console.error('❌ Erro ao carregar análise IA:', error);
+      setAiNote('N/A');
+      setAiScore(null);
     }
   };
 

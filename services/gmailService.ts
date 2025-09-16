@@ -253,11 +253,23 @@ async function getAccessToken(): Promise<string> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session && session.user) {
+      console.log('🔍 GMAIL - Verificando sessão do Supabase:', {
+        provider: session.user.app_metadata?.provider,
+        hasProviderToken: !!(session as any).provider_token,
+        hasProviderAccessToken: !!(session as any).provider_access_token,
+        hasAccessToken: !!(session as any).access_token
+      });
+      
       const anySess: any = session as any;
-      const prov = (anySess?.provider_token as string) || (anySess?.provider_access_token as string) || null;
+      // Tentar múltiplos campos onde o token pode estar
+      const prov = (anySess?.provider_token as string) || 
+                   (anySess?.provider_access_token as string) || 
+                   (session?.access_token as string) ||
+                   null;
       
       if (prov && session.user.app_metadata?.provider === 'google') {
         console.log('✅ GMAIL - Token do Supabase OAuth encontrado (válido por 100h)');
+        console.log('🔑 GMAIL - Tipo de token encontrado:', prov.substring(0, 20) + '...');
         cachedAccessToken = prov;
         
         // Salvar no cache com duração da sessão do Supabase (100h)
@@ -268,6 +280,9 @@ async function getAccessToken(): Promise<string> {
         return prov;
       } else if (session.user.app_metadata?.provider !== 'google') {
         console.log('ℹ️ GMAIL - Usuário não logou com Google, será necessário OAuth separado');
+      } else if (session.user.app_metadata?.provider === 'google' && !prov) {
+        console.log('⚠️ GMAIL - Login com Google detectado, mas token não encontrado na sessão');
+        console.log('📋 GMAIL - Campos da sessão disponíveis:', Object.keys(session));
       }
     }
   } catch (error) {

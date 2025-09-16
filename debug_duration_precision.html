@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug - Precisão de Duração</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+        .info { background: #e6f3ff; color: #0066cc; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Precisão do Filtro de Duração</h1>
+    <div id="results">Carregando...</div>
+
+    <script type="module">
+        const supabaseUrl = 'https://lqpgfygqidzqxjxmhjkm.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGdmeWdxaWR6cXhqeG1oamttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU5OTc5NzYsImV4cCI6MjA0MTU3Mzk3Nn0.Gg_29rvEyJlGJfqWvUkRmUgwDCjqCiGXHe2RqfQWFU8';
+        
+        const resultsDiv = document.getElementById('results');
+
+        async function debugDurationPrecision() {
+            try {
+                resultsDiv.innerHTML = '<div class="debug">Investigando precisão do filtro de duração...</div>';
+
+                const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2');
+                const supabase = createClient(supabaseUrl, supabaseKey);
+
+                let html = '';
+
+                // Teste 1: Buscar chamadas com duração próxima a 60 segundos
+                html += '<div class="info"><h3>🎯 Teste 1: Chamadas próximas a 60 segundos</h3></div>';
+                
+                const { data: nearSixty, error: nearSixtyError } = await supabase
+                    .from('calls')
+                    .select('id, duration, created_at')
+                    .gte('duration', 55)
+                    .lte('duration', 65)
+                    .order('duration', { ascending: true });
+
+                if (nearSixtyError) throw nearSixtyError;
+
+                if (nearSixty && nearSixty.length > 0) {
+                    html += `<div class="success">✅ Encontradas ${nearSixty.length} chamadas entre 55-65 segundos:</div>`;
+                    html += '<table><tr><th>ID</th><th>Duração (segundos)</th><th>Tipo</th><th>Data</th></tr>';
+                    nearSixty.forEach(call => {
+                        html += `<tr>
+                            <td>${call.id}</td>
+                            <td>${call.duration} (${typeof call.duration})</td>
+                            <td>${call.duration === 60 ? '🎯 EXATO' : call.duration > 60 ? '⬆️ MAIOR' : '⬇️ MENOR'}</td>
+                            <td>${new Date(call.created_at).toLocaleString('pt-BR')}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                } else {
+                    html += '<div class="error">❌ Nenhuma chamada encontrada entre 55-65 segundos</div>';
+                }
+
+                // Teste 2: Testar filtros específicos
+                html += '<div class="info"><h3>🔍 Teste 2: Filtros Específicos</h3></div>';
+                
+                const testValues = [58, 59, 60, 61, 62];
+                for (const testValue of testValues) {
+                    const { data: testData, error: testError } = await supabase
+                        .from('calls')
+                        .select('id, duration')
+                        .gte('duration', testValue)
+                        .limit(3);
+
+                    if (!testError && testData) {
+                        const count = testData.length;
+                        const examples = testData.slice(0, 2).map(c => c.duration).join(', ');
+                        html += `<div class="debug">
+                            <strong>duration >= ${testValue}:</strong> ${count > 0 ? count + ' encontradas' : 'Nenhuma'} 
+                            ${examples ? `(ex: ${examples})` : ''}
+                        </div>`;
+                    }
+                }
+
+                // Teste 3: Verificar se há problema com números decimais
+                html += '<div class="info"><h3>🔢 Teste 3: Verificar Decimais</h3></div>';
+                
+                const { data: sampleData, error: sampleError } = await supabase
+                    .from('calls')
+                    .select('id, duration')
+                    .not('duration', 'is', null)
+                    .gte('duration', 50)
+                    .lte('duration', 70)
+                    .order('duration', { ascending: true })
+                    .limit(10);
+
+                if (!sampleError && sampleData) {
+                    html += '<div class="debug"><strong>Amostras de duração (50-70s):</strong><ul>';
+                    sampleData.forEach(call => {
+                        const isInteger = Number.isInteger(call.duration);
+                        html += `<li>ID: ${call.id}, Duração: ${call.duration} (${typeof call.duration}, ${isInteger ? 'inteiro' : 'decimal'})</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+
+                // Teste 4: Testar query exata que está sendo usada
+                html += '<div class="info"><h3>⚡ Teste 4: Query Exata (duration >= 61)</h3></div>';
+                
+                const { data: exact61, error: exact61Error } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .gte('duration', 61)
+                    .limit(5);
+
+                if (!exact61Error) {
+                    html += `<div class="debug">
+                        <strong>Resultado duration >= 61:</strong> ${exact61?.length || 0} chamadas encontradas
+                    </div>`;
+                    
+                    if (exact61 && exact61.length > 0) {
+                        html += '<div class="success">✅ Chamadas encontradas com duration >= 61:</div>';
+                        html += '<table><tr><th>ID</th><th>Duração</th><th>Agent ID</th><th>Status</th></tr>';
+                        exact61.forEach(call => {
+                            html += `<tr>
+                                <td>${call.id}</td>
+                                <td>${call.duration}s</td>
+                                <td>${call.agent_id || 'N/A'}</td>
+                                <td>${call.status_voip || 'N/A'}</td>
+                            </tr>`;
+                        });
+                        html += '</table>';
+                    } else {
+                        html += '<div class="error">❌ PROBLEMA: Nenhuma chamada com duration >= 61 encontrada</div>';
+                        
+                        // Se não encontrou >= 61, vamos ver o que há >= 60
+                        const { data: exact60 } = await supabase
+                            .from('calls')
+                            .select('id, duration')
+                            .gte('duration', 60)
+                            .limit(10);
+                            
+                        if (exact60 && exact60.length > 0) {
+                            html += '<div class="info">Mas encontrou com duration >= 60:</div>';
+                            html += '<ul>';
+                            exact60.forEach(call => {
+                                html += `<li>ID: ${call.id}, Duração: ${call.duration}s</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                    }
+                }
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        }
+
+        debugDurationPrecision();
+    </script>
+</body>
+</html>
+

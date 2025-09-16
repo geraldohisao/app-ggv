@@ -21,27 +21,38 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
   const [error, setError] = useState<string | null>(null);
   const [hasExisting, setHasExisting] = useState<boolean>(false);
 
-  // Verificar se já existe análise ao carregar
+  // SEMPRE verificar se já existe análise ao carregar (PERSISTÊNCIA GARANTIDA)
   React.useEffect(() => {
     const checkExistingAnalysis = async () => {
       try {
+        console.log('🔄 Verificando análise existente para chamada:', call.id);
+        
         const existing = await getCallAnalysisFromDatabase(call.id);
         if (existing) {
           setAnalysis(existing);
           setHasExisting(true);
-          console.log('✅ Análise carregada do banco:', existing.final_grade);
-          // Notificar componente pai
+          console.log('✅ Análise carregada do banco (PERSISTIDA):', {
+            final_grade: existing.final_grade,
+            scorecard: existing.scorecard_used?.name
+          });
+          
+          // Notificar componente pai SEMPRE
           onAnalysisComplete?.(existing);
+        } else {
+          console.log('ℹ️ Nenhuma análise persistida encontrada para:', call.id);
+          setAnalysis(null);
+          setHasExisting(false);
         }
       } catch (err) {
         console.warn('⚠️ Erro ao verificar análise existente:', err);
+        setAnalysis(null);
+        setHasExisting(false);
       }
     };
 
-    if (call.transcription?.trim()) {
-      checkExistingAnalysis();
-    }
-  }, [call.id, call.transcription]);
+    // SEMPRE verificar, mesmo sem transcrição (pode ter análise salva)
+    checkExistingAnalysis();
+  }, [call.id, onAnalysisComplete]); // Remover dependência de transcription
 
   const handleAnalyze = async () => {
     if (!call.transcription?.trim()) {

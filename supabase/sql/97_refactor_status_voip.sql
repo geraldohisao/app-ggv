@@ -38,7 +38,7 @@ AS $$
         WHEN status_code = 'no_answer' THEN 'Não atendida'
         WHEN status_code = 'originator_cancel' THEN 'Cancelada pela SDR'
         WHEN status_code = 'normal_clearing' THEN 'Atendida'
-        WHEN status_code = 'number_changed' THEN 'Número mudou'
+        WHEN status_code = 'number_changed' THEN 'Numero mudou'
         WHEN status_code IS NULL THEN 'Status desconhecido'
         ELSE INITCAP(REPLACE(status_code, '_', ' '))  -- Fallback para outros valores
     END;

@@ -87,10 +87,12 @@ export default function CallsPage() {
   useEffect(() => {
     const loadSdrs = async () => {
       try {
+        console.log('🔍 CALLS PAGE - Carregando SDRs únicos...');
         const uniqueSdrs = await fetchUniqueSdrs();
+        console.log('✅ CALLS PAGE - SDRs carregados:', uniqueSdrs);
         setSdrs(uniqueSdrs);
       } catch (err) {
-        console.error('Erro ao carregar SDRs:', err);
+        console.error('❌ CALLS PAGE - Erro ao carregar SDRs:', JSON.stringify(err, null, 2));
       }
     };
     loadSdrs();
@@ -101,7 +103,7 @@ export default function CallsPage() {
     setCurrentPage(1);
     setCalls([]); // Limpar dados antigos
     setTotalCount(0);
-  }, [sdr, status, type, start, end, sortBy]);
+  }, [sdr, status, type, start, end, minDuration, maxDuration, minScore, sortBy]);
 
   // Controle de requisições para evitar loops
   const [isRequestInProgress, setIsRequestInProgress] = useState(false);
@@ -121,8 +123,23 @@ export default function CallsPage() {
         setLoading(true);
         setError(null);
         
-        console.log('🔍 Carregando calls com filtros:', {
-          sdr, status, type, start, end, sortBy, currentPage
+        console.log('🔍 CALLS PAGE - Carregando calls com filtros:', {
+          sdr, 
+          status, 
+          type, 
+          start, 
+          end, 
+          minDuration, 
+          maxDuration, 
+          sortBy, 
+          currentPage
+        });
+
+        console.log('🔍 CALLS PAGE - Valores convertidos que serão enviados:', {
+          min_duration: minDuration ? parseInt(minDuration) : undefined,
+          max_duration: maxDuration ? parseInt(maxDuration) : undefined,
+          min_duration_type: typeof (minDuration ? parseInt(minDuration) : undefined),
+          max_duration_type: typeof (maxDuration ? parseInt(maxDuration) : undefined)
         });
         
         const response = await fetchCalls({
@@ -131,8 +148,11 @@ export default function CallsPage() {
           call_type: type || undefined,
           start: start || undefined,
           end: end || undefined,
-          limit: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 1000 : itemsPerPage, // Buscar mais dados quando ordenar por duração ou filtrar por duração
-          offset: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 0 : (currentPage - 1) * itemsPerPage, // Reset offset para ordenação/filtro por duração
+          min_duration: minDuration ? parseInt(minDuration) : undefined,
+          max_duration: maxDuration ? parseInt(maxDuration) : undefined,
+          min_score: minScore ? parseFloat(minScore) : undefined,
+          limit: itemsPerPage,
+          offset: (currentPage - 1) * itemsPerPage,
           sortBy: sortBy
         });
 
@@ -142,7 +162,7 @@ export default function CallsPage() {
         setCalls(callItems);
         setTotalCount(response.totalCount);
       } catch (err: any) {
-        console.error('Erro ao carregar calls:', err);
+        console.error('Erro ao carregar calls:', JSON.stringify(err, null, 2));
         
         if (err.message?.includes('Timeout')) {
           setError('⏱️ Busca demorou muito. Tente usar filtros mais específicos (SDR, data, etc.).');
@@ -164,7 +184,7 @@ export default function CallsPage() {
       clearTimeout(timeoutId);
       setIsRequestInProgress(false); // Limpar flag ao desmontar
     };
-  }, [sdr, status, type, start, end, currentPage, itemsPerPage, sortBy]); // Adicionar sortBy às dependências
+  }, [sdr, status, type, start, end, minDuration, maxDuration, minScore, currentPage, itemsPerPage, sortBy]); // Adicionar todos os filtros às dependências
 
   // Carregar etapas disponíveis
   useEffect(() => {
@@ -228,11 +248,13 @@ export default function CallsPage() {
         try {
           setLoading(true);
           const response = await fetchCalls({
-            sdr_email: sdr,
-            status,
-            call_type: type,
-            start: start,
-            end: end,
+            sdr_email: sdr || undefined,
+            status: status || undefined,
+            call_type: type || undefined,
+            start: start || undefined,
+            end: end || undefined,
+            min_duration: minDuration ? parseInt(minDuration) : undefined,
+            max_duration: maxDuration ? parseInt(maxDuration) : undefined,
             limit: itemsPerPage,
             offset: (currentPage - 1) * itemsPerPage,
             sortBy: sortBy
@@ -260,6 +282,10 @@ export default function CallsPage() {
     }
   };
 
+  // Constante para paginação
+  const ITEMS_PER_PAGE = 50;
+  const isScoreSort = sortBy === 'score' || sortBy === 'score_asc';
+  
   // Filtros locais combinados
   const filtered = useMemo(() => {
     let result = calls;
@@ -289,13 +315,7 @@ export default function CallsPage() {
       }
     }
     
-    // Filtro por score mínimo
-    if (minScore.trim()) {
-      const minScoreNum = parseInt(minScore);
-      if (!isNaN(minScoreNum)) {
-        result = result.filter((c) => c.score && c.score >= minScoreNum);
-      }
-    }
+    // Filtro por score mínimo agora é feito no backend via get_calls_with_filters
     
     // Filtro por termo de busca (nome da empresa, pessoa, etc.)
     if (searchTerm.trim()) {
@@ -313,9 +333,22 @@ export default function CallsPage() {
       case 'duration':
         result = result.sort((a, b) => getRealDuration(b) - getRealDuration(a));
         break;
-      case 'score':
-        result = result.sort((a, b) => (b.score || 0) - (a.score || 0));
+      case 'score': {
+        const withScore = result
+          .filter(c => typeof c.score === 'number')
+          .sort((a, b) => (b.score || 0) - (a.score || 0));
+        const withoutScore = result.filter(c => typeof c.score !== 'number');
+        result = [...withScore, ...withoutScore];
         break;
+      }
+      case 'score_asc': {
+        const withScore = result
+          .filter(c => typeof c.score === 'number')
+          .sort((a, b) => (a.score || 0) - (b.score || 0));
+        const withoutScore = result.filter(c => typeof c.score !== 'number');
+        result = [...withScore, ...withoutScore];
+        break;
+      }
       case 'company':
         result = result.sort((a, b) => a.company.localeCompare(b.company));
         break;
@@ -326,6 +359,13 @@ export default function CallsPage() {
     
     return result;
   }, [calls, query, minDuration, maxDuration, minScore, searchTerm, sortBy]);
+
+  // Paginação: se ordenando por score, fazemos a paginação no cliente sobre a lista completa globalmente ranqueada
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = currentPage * itemsPerPage;
+  const paginatedCalls = isScoreSort ? filtered.slice(startIndex, endIndex) : filtered;
+
+  const totalItems = isScoreSort ? filtered.length : totalCount;
 
   return (
     <div className="p-6 space-y-6">
@@ -338,7 +378,17 @@ export default function CallsPage() {
           <h2 className="text-xl font-semibold text-slate-800">Chamadas</h2>
           <p className="text-sm text-slate-600">
             Visualize, filtre e analise as ligações dos seus SDRs. 
-            {totalCount > 0 && <span className="font-medium"> ({totalCount} chamadas encontradas)</span>}
+            {totalCount > 0 && (
+              <span className="font-medium">
+                {" "}({totalCount} chamadas encontradas
+                {(minDuration || maxDuration) && (
+                  <span className="text-blue-600">
+                    {" "}• Duração: {minDuration && `≥${minDuration}s`}{minDuration && maxDuration && " e "}{maxDuration && `≤${maxDuration}s`}
+                  </span>
+                )}
+                )
+              </span>
+            )}
             {start && end && start === end && (
               <span className="ml-2 inline-flex items-center px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                 📅 Filtrado por: {new Date(start + 'T00:00:00').toLocaleDateString('pt-BR')}
@@ -382,7 +432,7 @@ export default function CallsPage() {
 
       <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
         {/* Primeira linha - Filtros principais */}
-        <div className="grid grid-cols-1 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm col-span-2"
             placeholder="Empresa ou Deal ID..."
@@ -398,11 +448,13 @@ export default function CallsPage() {
             ))}
           </select>
           <select className="border border-slate-300 rounded px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Status</option>
-            <option value="received">Recebida</option>
-            <option value="processing">Processando</option>
-            <option value="processed">Processada</option>
-            <option value="failed">Falhou</option>
+            <option value="">Todos os Status</option>
+            <option value="normal_clearing">Atendida</option>
+            <option value="no_answer">Não atendida</option>
+            <option value="originator_cancel">Cancelada pela SDR</option>
+            <option value="number_changed">Numero mudou</option>
+            <option value="recovery_on_timer_expire">Tempo esgotado</option>
+            <option value="unallocated_number">Número não encontrado</option>
           </select>
           <input 
             className="border border-slate-300 rounded px-3 py-2 text-sm" 
@@ -418,16 +470,6 @@ export default function CallsPage() {
             onChange={(e) => setEnd(e.target.value)}
             placeholder="Data fim"
           />
-          <button
-            onClick={() => {
-              setStart('2025-09-08');
-              setEnd('2025-09-08');
-            }}
-            className="text-xs px-3 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300"
-            title="Filtrar apenas o dia 08/09"
-          >
-            📅 08/09
-          </button>
         </div>
         
         {/* Segunda linha - Filtros avançados */}
@@ -446,6 +488,7 @@ export default function CallsPage() {
             <option value="created_at">📅 Mais Recentes</option>
             <option value="duration">⏱️ Maior Duração</option>
             <option value="score">⭐ Maior Nota</option>
+            <option value="score_asc">⬇️ Menor Nota</option>
             <option value="company">🏢 Empresa A-Z</option>
           </select>
           <input
@@ -455,6 +498,7 @@ export default function CallsPage() {
             value={minDuration}
             onChange={(e) => setMinDuration(e.target.value)}
             min="0"
+            title="Duração mínima em segundos"
           />
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm"
@@ -463,6 +507,7 @@ export default function CallsPage() {
             value={maxDuration}
             onChange={(e) => setMaxDuration(e.target.value)}
             min="0"
+            title="Duração máxima em segundos"
           />
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm"
@@ -507,6 +552,8 @@ export default function CallsPage() {
                     call_type: type || undefined,
                     start: start || undefined,
                     end: end || undefined,
+                    min_duration: minDuration ? parseInt(minDuration) : undefined,
+                    max_duration: maxDuration ? parseInt(maxDuration) : undefined,
                     limit: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 1000 : itemsPerPage,
                     offset: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 0 : (currentPage - 1) * itemsPerPage,
                     sortBy: sortBy
@@ -528,19 +575,38 @@ export default function CallsPage() {
           >
             🔄 Recarregar
           </button>
-          <div className="flex items-center text-xs text-slate-500">
-            <span>📊 {filtered.length} de {calls.length} chamadas</span>
+          <div className="flex items-center text-xs text-slate-500 flex-wrap gap-2">
+            <span>
+              📊 {isScoreSort ? filtered.length : calls.length} de {totalItems} chamadas
+            </span>
             {loading && (
-              <span className="ml-2 text-orange-600">🔄 Carregando...</span>
+              <span className="text-orange-600">🔄 Carregando...</span>
             )}
             {!loading && sortBy === 'duration' && (
-              <span className="ml-2 text-green-600">⏱️ Ordenado por duração</span>
+              <span className="text-green-600 bg-green-50 px-2 py-1 rounded">⏱️ Ordenado por duração</span>
             )}
             {!loading && sortBy === 'score' && (
-              <span className="ml-2 text-purple-600">⭐ Ordenado por nota</span>
+              <span className="text-purple-600 bg-purple-50 px-2 py-1 rounded">⭐ Ordenado por nota</span>
+            )}
+            {!loading && sortBy === 'score_asc' && (
+              <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded">⬇️ Ordenado por menor nota</span>
             )}
             {!loading && (minDuration.trim() || maxDuration.trim()) && (
-              <span className="ml-2 text-blue-600">🔍 Filtrado por duração</span>
+              <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
+                🔍 Duração: {minDuration && `≥${minDuration}s`}{minDuration && maxDuration && " • "}{maxDuration && `≤${maxDuration}s`}
+                <button
+                  onClick={() => {setMinDuration(''); setMaxDuration('');}}
+                  className="text-blue-400 hover:text-blue-600 ml-1"
+                  title="Limpar filtros de duração"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {!loading && totalCount > 0 && (minDuration.trim() || maxDuration.trim()) && (
+              <span className="text-green-600 text-xs">
+                ✅ {filtered.length} resultado{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+              </span>
             )}
           </div>
         </div>
@@ -575,7 +641,7 @@ export default function CallsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((call) => (
+                {paginatedCalls.map((call) => (
                   <tr 
                     key={call.id} 
                     className="border-b hover:bg-slate-50 transition-colors cursor-pointer"
@@ -609,7 +675,11 @@ export default function CallsPage() {
                            call.call_type || '❓ Indefinida'}
                         </span>
                         <button
-                          onClick={() => setEditingEtapa(call.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setEditingEtapa(call.id);
+                          }}
                           className="text-slate-400 hover:text-slate-600 transition-colors"
                           title="Editar etapa"
                         >
@@ -654,7 +724,7 @@ export default function CallsPage() {
                         call.status_voip_friendly === 'Atendida' ? 'bg-green-100 text-green-800' :
                         call.status_voip_friendly === 'Não atendida' ? 'bg-red-100 text-red-800' :
                         call.status_voip_friendly === 'Cancelada pela SDR' ? 'bg-yellow-100 text-yellow-800' :
-                        call.status_voip_friendly === 'Número mudou' ? 'bg-orange-100 text-orange-800' :
+                        call.status_voip_friendly === 'Numero mudou' ? 'bg-orange-100 text-orange-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
                         {call.status_voip_friendly || call.status}
@@ -688,7 +758,25 @@ export default function CallsPage() {
             </table>
             {filtered.length === 0 && !loading && (
               <div className="text-center py-10 text-slate-500">
-                {calls.length === 0 ? 'Nenhuma chamada encontrada.' : 'Nenhuma chamada encontrada com os filtros atuais.'}
+                <p className="text-lg mb-3">🔍 Nenhuma chamada encontrada</p>
+                {(minDuration.trim() || maxDuration.trim()) && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800 max-w-md mx-auto">
+                    <div className="font-medium mb-2">💡 Filtros de duração ativos</div>
+                    <div className="text-sm space-y-1">
+                      {minDuration && <div>• <strong>Duração mínima:</strong> {minDuration} segundos</div>}
+                      {maxDuration && <div>• <strong>Duração máxima:</strong> {maxDuration} segundos</div>}
+                      <div>• Tente ajustar os valores ou remover os filtros</div>
+                    </div>
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {setMinDuration(''); setMaxDuration('');}}
+                        className="px-3 py-1 bg-slate-100 text-slate-700 rounded text-sm hover:bg-slate-200"
+                      >
+                        Limpar filtros de duração
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -696,10 +784,13 @@ export default function CallsPage() {
       </div>
 
       {/* Paginação */}
-      {totalCount > itemsPerPage && (
+      {(totalItems || 0) > itemsPerPage && (
         <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center justify-between">
           <div className="text-sm text-slate-600">
-            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalCount)} de {totalCount} chamadas
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalItems)} de {totalItems} chamadas
+            {minScore && (
+              <span className="ml-2 text-blue-600">• Score ≥ {minScore}</span>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
@@ -720,16 +811,16 @@ export default function CallsPage() {
             </button>
             
             <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, Math.ceil(totalCount / itemsPerPage)) }, (_, i) => {
-                const totalPages = Math.ceil(totalCount / itemsPerPage);
+              {Array.from({ length: Math.min(5, Math.ceil(totalItems / itemsPerPage)) }, (_, i) => {
+                const maxPages = Math.ceil(totalItems / itemsPerPage);
                 let pageNumber;
                 
-                if (totalPages <= 5) {
+                if (maxPages <= 5) {
                   pageNumber = i + 1;
                 } else if (currentPage <= 3) {
                   pageNumber = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNumber = totalPages - 4 + i;
+                } else if (currentPage >= maxPages - 2) {
+                  pageNumber = maxPages - 4 + i;
                 } else {
                   pageNumber = currentPage - 2 + i;
                 }
@@ -751,16 +842,16 @@ export default function CallsPage() {
             </div>
             
             <button
-              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalCount / itemsPerPage), prev + 1))}
-              disabled={currentPage >= Math.ceil(totalCount / itemsPerPage)}
+              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalItems / itemsPerPage), prev + 1))}
+              disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
               className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Próxima ➡️
             </button>
             
             <button
-              onClick={() => setCurrentPage(Math.ceil(totalCount / itemsPerPage))}
-              disabled={currentPage >= Math.ceil(totalCount / itemsPerPage)}
+              onClick={() => setCurrentPage(Math.ceil(totalItems / itemsPerPage))}
+              disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
               className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Última ⏭️

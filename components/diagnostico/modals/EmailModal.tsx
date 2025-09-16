@@ -41,6 +41,9 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             setError("Por favor, insira um e-mail válido.");
             return;
         }
+        
+        console.log('📧 EMAIL_MODAL - Iniciando envio de e-mail...');
+        
         try {
             setLoading(true);
             
@@ -50,6 +53,8 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             
             let publicUrl = baseUrl;
             if (reportData) {
+                console.log('📧 EMAIL_MODAL - Criando relatório público...');
+                
                 // Gerar token seguro para o email
                 const generateSecureToken = (dealId: string) => {
                     const timestamp = Date.now();
@@ -67,9 +72,16 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                     return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
                 };
                 
-                const secureToken = dealId ? generateSecureToken(dealId) : undefined;
-                const { token } = await createPublicReport(reportData, email, undefined, dealId, secureToken);
-                publicUrl = `${baseUrl}/r/${token}`;
+                try {
+                    const secureToken = dealId ? generateSecureToken(dealId) : undefined;
+                    const { token } = await createPublicReport(reportData, email, undefined, dealId, secureToken);
+                    publicUrl = `${baseUrl}/r/${token}`;
+                    console.log('✅ EMAIL_MODAL - Relatório público criado:', token);
+                } catch (reportError) {
+                    console.warn('⚠️ EMAIL_MODAL - Erro ao criar relatório público (usando URL base):', reportError);
+                    // Continuar com URL base se falhar
+                    publicUrl = baseUrl;
+                }
             }
             
             console.log('📧 EMAIL - URL do relatório:', publicUrl);
@@ -141,12 +153,13 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
               </body>
               </html>`;
             
-            console.log('📧 EMAIL - Enviando e-mail para:', email);
+            console.log('📧 EMAIL_MODAL - Enviando e-mail para:', email);
             await sendEmailViaGmail({ to: email, subject, html });
+            console.log('✅ EMAIL_MODAL - E-mail enviado com sucesso!');
             setIsSent(true);
             setTimeout(() => onClose(), 2000);
         } catch (err: any) {
-            console.error('❌ EMAIL - Erro ao enviar:', err);
+            console.error('❌ EMAIL_MODAL - Erro ao enviar:', err);
             
             // Tratar erros específicos do Gmail com mensagens mais claras
             if (err?.message?.includes('insufficient authentication scopes') || err?.message?.includes('insufficient permissions')) {
@@ -165,6 +178,8 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                 setError('🛡️ Política de segurança bloqueou o Google. Recarregue a página e tente novamente.');
             } else if (err?.message?.includes('script-src') || err?.message?.includes('violates')) {
                 setError('🔒 Erro de segurança detectado. Recarregue a página completamente (Ctrl+F5).');
+            } else if (err?.message?.includes('Supabase') || err?.message?.includes('auth')) {
+                setError('⚠️ Problema de sessão detectado. Recarregue a página (F5) e tente novamente.');
             } else {
                 setError(`❌ ${err?.message || 'Falha ao enviar e-mail pelo Gmail. Tente novamente.'}`);
             }

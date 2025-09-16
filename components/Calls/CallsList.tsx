@@ -120,7 +120,7 @@ export default function CallsList() {
                           call.status_voip_friendly === 'Atendida' ? 'bg-green-100 text-green-800' :
                           call.status_voip_friendly === 'Não atendida' ? 'bg-red-100 text-red-800' :
                           call.status_voip_friendly === 'Cancelada pela SDR' ? 'bg-yellow-100 text-yellow-800' :
-                          call.status_voip_friendly === 'Número mudou' ? 'bg-orange-100 text-orange-800' :
+                          call.status_voip_friendly === 'Numero mudou' ? 'bg-orange-100 text-orange-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {call.status_voip_friendly || call.status_voip || call.status}

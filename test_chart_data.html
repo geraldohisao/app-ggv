@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Chart Data - 08/09</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste de Dados do Gráfico - Dia 08/09</h1>
+    <div id="results"></div>
+
+    <script>
+        // Configurar Supabase (usar as mesmas credenciais do projeto)
+        const supabaseUrl = 'https://lqpgfygqidzqxjxmhjkm.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGdmeWdxaWR6cXhqeG1oamttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU5OTc5NzYsImV4cCI6MjA0MTU3Mzk3Nn0.Gg_29rvEyJlGJfqWvUkRmUgwDCjqCiGXHe2RqfQWFU8'
+        
+        const { createClient } = supabase
+        const supabaseClient = createClient(supabaseUrl, supabaseKey)
+
+        async function testChartData() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Carregando dados...</p>';
+
+            try {
+                // Teste 1: Buscar dados do dia 08/09 exatamente como o gráfico faz
+                console.log('🔍 Testando dados do dia 08/09...');
+                
+                const startDate = '2025-09-08';
+                const endDate = '2025-09-08';
+                const startDateTime = startDate + 'T00:00:00';
+                const endDateTime = endDate + 'T23:59:59';
+                
+                console.log('📅 Intervalo:', { startDateTime, endDateTime });
+                
+                const { data, error } = await supabaseClient
+                    .from('calls')
+                    .select('created_at, status_voip')
+                    .gte('created_at', startDateTime)
+                    .lte('created_at', endDateTime)
+                    .order('created_at', { ascending: true });
+
+                if (error) {
+                    throw error;
+                }
+
+                console.log('✅ Dados carregados:', data?.length || 0);
+                console.log('📊 Dados:', data);
+
+                // Agrupar por data (mesmo código do gráfico)
+                const groupedData = new Map();
+                
+                data?.forEach((call) => {
+                    const date = new Date(call.created_at).toISOString().split('T')[0];
+                    const isAnswered = call.status_voip === 'normal_clearing';
+                    
+                    if (!groupedData.has(date)) {
+                        groupedData.set(date, { answered: 0, missed: 0 });
+                    }
+                    
+                    const current = groupedData.get(date);
+                    if (isAnswered) {
+                        current.answered++;
+                    } else {
+                        current.missed++;
+                    }
+                });
+
+                console.log('📈 Dados agrupados:', Object.fromEntries(groupedData));
+
+                // Mostrar resultados na página
+                let html = `
+                    <h2>Resultados do Teste</h2>
+                    <p><strong>Total de chamadas encontradas:</strong> ${data?.length || 0}</p>
+                `;
+
+                if (data && data.length > 0) {
+                    // Contar status
+                    const statusCount = {};
+                    data.forEach(call => {
+                        const status = call.status_voip || 'null';
+                        statusCount[status] = (statusCount[status] || 0) + 1;
+                    });
+
+                    html += `
+                        <h3>Por Status VOIP:</h3>
+                        <ul>
+                    `;
+                    
+                    Object.entries(statusCount).forEach(([status, count]) => {
+                        html += `<li><strong>${status}:</strong> ${count}</li>`;
+                    });
+                    
+                    html += '</ul>';
+
+                    // Mostrar dados agrupados
+                    html += '<h3>Dados Agrupados (como no gráfico):</h3>';
+                    groupedData.forEach((counts, date) => {
+                        const total = counts.answered + counts.missed;
+                        const rate = total > 0 ? Math.round((counts.answered / total) * 100) : 0;
+                        html += `
+                            <p><strong>${date}:</strong> 
+                            Total: ${total}, 
+                            Atendidas: ${counts.answered}, 
+                            Não Atendidas: ${counts.missed}, 
+                            Taxa: ${rate}%</p>
+                        `;
+                    });
+
+                    // Mostrar primeiros registros
+                    html += '<h3>Primeiros 10 registros:</h3><pre>';
+                    html += JSON.stringify(data.slice(0, 10), null, 2);
+                    html += '</pre>';
+                }
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                resultsDiv.innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+            }
+        }
+
+        // Executar teste quando a página carregar
+        testChartData();
+    </script>
+</body>
+</html>
+

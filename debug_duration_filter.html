@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug - Filtro de Duração</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+        .info { background: #e6f3ff; color: #0066cc; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Filtro de Duração</h1>
+    <div id="results">Carregando...</div>
+
+    <script type="module">
+        const supabaseUrl = 'https://lqpgfygqidzqxjxmhjkm.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGdmeWdxaWR6cXhqeG1oamttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU5OTc5NzYsImV4cCI6MjA0MTU3Mzk3Nn0.Gg_29rvEyJlGJfqWvUkRmUgwDCjqCiGXHe2RqfQWFU8';
+        
+        const resultsDiv = document.getElementById('results');
+
+        async function debugDurationFilter() {
+            try {
+                resultsDiv.innerHTML = '<div class="debug">Iniciando debug do filtro de duração...</div>';
+
+                const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2');
+                const supabase = createClient(supabaseUrl, supabaseKey);
+
+                let html = '';
+
+                // Teste 1: Estatísticas gerais de duração
+                html += '<div class="info"><h3>📊 Teste 1: Estatísticas de Duração</h3></div>';
+                
+                const { data: allCalls, error: allError } = await supabase
+                    .from('calls')
+                    .select('duration')
+                    .not('duration', 'is', null)
+                    .order('duration', { ascending: false })
+                    .limit(100);
+
+                if (allError) throw allError;
+
+                if (allCalls && allCalls.length > 0) {
+                    const durations = allCalls.map(c => c.duration).filter(d => d > 0);
+                    const maxDuration = Math.max(...durations);
+                    const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+                    
+                    html += `<div class="debug">
+                        <strong>Total de chamadas com duração:</strong> ${durations.length}<br>
+                        <strong>Duração máxima:</strong> ${maxDuration} segundos (${Math.round(maxDuration/60)} minutos)<br>
+                        <strong>Duração média:</strong> ${Math.round(avgDuration)} segundos (${Math.round(avgDuration/60)} minutos)<br>
+                        <strong>Chamadas > 1000 segundos:</strong> ${durations.filter(d => d >= 1000).length}<br>
+                        <strong>Chamadas > 600 segundos:</strong> ${durations.filter(d => d >= 600).length}<br>
+                        <strong>Chamadas > 300 segundos:</strong> ${durations.filter(d => d >= 300).length}<br>
+                        <strong>Chamadas > 60 segundos:</strong> ${durations.filter(d => d >= 60).length}
+                    </div>`;
+
+                    // Mostrar top 10 durações
+                    html += '<div class="debug"><strong>Top 10 maiores durações:</strong><ul>';
+                    durations.slice(0, 10).forEach((duration, i) => {
+                        html += `<li>${i+1}. ${duration} segundos (${Math.round(duration/60)} minutos)</li>`;
+                    });
+                    html += '</ul></div>';
+                } else {
+                    html += '<div class="error">❌ Nenhuma chamada com duração encontrada!</div>';
+                }
+
+                // Teste 2: Testar filtro de duração mínima = 1000
+                html += '<div class="info"><h3>🎯 Teste 2: Filtro min_duration = 1000</h3></div>';
+                
+                const { data: filtered1000, error: filter1000Error } = await supabase
+                    .from('calls')
+                    .select('id, duration, created_at, agent_id')
+                    .gte('duration', 1000)
+                    .order('duration', { ascending: false });
+
+                if (filter1000Error) throw filter1000Error;
+
+                html += `<div class="debug">
+                    <strong>Resultado do filtro duration >= 1000:</strong> ${filtered1000?.length || 0} chamadas
+                </div>`;
+
+                if (filtered1000 && filtered1000.length > 0) {
+                    html += '<div class="success">✅ Encontradas chamadas com duração >= 1000 segundos:</div>';
+                    html += '<div class="debug"><ul>';
+                    filtered1000.slice(0, 5).forEach(call => {
+                        html += `<li>ID: ${call.id}, Duração: ${call.duration}s (${Math.round(call.duration/60)}min), Data: ${new Date(call.created_at).toLocaleString('pt-BR')}</li>`;
+                    });
+                    html += '</ul></div>';
+                } else {
+                    html += '<div class="error">❌ Nenhuma chamada encontrada com duração >= 1000 segundos</div>';
+                }
+
+                // Teste 3: Testar filtros menores
+                html += '<div class="info"><h3>🔍 Teste 3: Filtros com durações menores</h3></div>';
+                
+                for (const minDuration of [60, 120, 300, 600]) {
+                    const { data: filteredData, error: filterError } = await supabase
+                        .from('calls')
+                        .select('id, duration')
+                        .gte('duration', minDuration)
+                        .limit(5);
+
+                    if (!filterError && filteredData) {
+                        html += `<div class="debug">
+                            <strong>Duração >= ${minDuration}s:</strong> ${filteredData.length > 0 ? 'Encontradas' : 'Nenhuma'} 
+                            ${filteredData.length > 0 ? `(exemplo: ${filteredData[0].duration}s)` : ''}
+                        </div>`;
+                    }
+                }
+
+                // Teste 4: Verificar se o problema está no tipo de dados
+                html += '<div class="info"><h3>🔧 Teste 4: Verificar tipos de dados</h3></div>';
+                
+                const { data: sampleCalls, error: sampleError } = await supabase
+                    .from('calls')
+                    .select('id, duration')
+                    .not('duration', 'is', null)
+                    .limit(5);
+
+                if (!sampleError && sampleCalls) {
+                    html += '<div class="debug"><strong>Amostras de dados:</strong><ul>';
+                    sampleCalls.forEach(call => {
+                        html += `<li>ID: ${call.id}, Duration: ${call.duration} (tipo: ${typeof call.duration})</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        }
+
+        debugDurationFilter();
+    </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste get_unique_sdrs</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste Específico: get_unique_sdrs</h1>
+    <div id="results"></div>
+    
+    <script>
+        const { createClient } = supabase;
+        const sb = createClient(
+            'https://mwlekwyxbfbxfxskywgx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13bGVrd3l4YmZieGZ4c2t5d2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTIzMjEsImV4cCI6MjA2NTY4ODMyMX0.rFX9H2pcGLNX7n3vKLYGi72JKwjUw6oG38IZGjO90HE'
+        );
+        
+        async function testGetUniqueSDRs() {
+            const results = document.getElementById('results');
+            
+            try {
+                console.log('🔍 Testando get_unique_sdrs...');
+                
+                const { data, error } = await sb.rpc('get_unique_sdrs');
+                
+                if (error) {
+                    results.innerHTML = `<h3>❌ Erro: ${JSON.stringify(error, null, 2)}</h3>`;
+                } else {
+                    results.innerHTML = `<h3>✅ Sucesso! ${data?.length || 0} SDRs</h3>`;
+                    
+                    if (data && data.length > 0) {
+                        results.innerHTML += '<h4>SDRs encontrados:</h4>';
+                        data.forEach((sdr, i) => {
+                            results.innerHTML += `<div>${i+1}. <strong>${sdr.sdr_name}</strong> - ${sdr.sdr_email} (${sdr.call_count} calls)</div>`;
+                        });
+                    } else {
+                        results.innerHTML += '<p>Nenhum SDR retornado pela função</p>';
+                    }
+                }
+                
+                // Teste direto na tabela calls para ver agent_ids
+                console.log('🔍 Testando agent_ids na tabela calls...');
+                const { data: agentIds, error: agentError } = await sb
+                    .from('calls')
+                    .select('agent_id')
+                    .not('agent_id', 'is', null)
+                    .limit(10);
+                
+                if (!agentError && agentIds) {
+                    results.innerHTML += '<h4>Agent IDs na tabela calls:</h4>';
+                    const unique = [...new Set(agentIds.map(c => c.agent_id))];
+                    unique.slice(0, 5).forEach(id => {
+                        results.innerHTML += `<div>• ${id}</div>`;
+                    });
+                }
+                
+            } catch (error) {
+                results.innerHTML = `<h3>💥 Erro: ${error.message}</h3>`;
+                console.error(error);
+            }
+        }
+        
+        window.onload = testGetUniqueSDRs;
+    </script>
+</body>
+</html>
