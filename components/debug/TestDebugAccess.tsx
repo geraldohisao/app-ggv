@@ -17,9 +17,9 @@ export const TestDebugAccess: React.FC = () => {
     return null;
   }
 
+  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const isDebugEnabled = user?.role === UserRole.SuperAdmin || 
-                        user?.role === UserRole.Admin || 
-                        (process.env.NODE_ENV === 'development' && user !== null);
+                        (isLocalDevelopment && user !== null);
 
   console.log('🧪 TestDebugAccess - Debug enabled:', isDebugEnabled);
 

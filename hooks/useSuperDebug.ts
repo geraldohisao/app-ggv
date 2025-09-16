@@ -9,10 +9,11 @@ export const useSuperDebug = () => {
   const { user } = useUser();
   
   // Verificar se o usuário é super admin
-  // TEMPORÁRIO: Para teste local, permitir também admins e em desenvolvimento
+  // Só permitir acesso para SuperAdmin ou em desenvolvimento local (localhost)
+  const isLocalDevelopment = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const isSuperAdmin = user?.role === UserRole.SuperAdmin || 
-                       user?.role === UserRole.Admin || 
-                       (process.env.NODE_ENV === 'development' && user !== null);
+                       (isLocalDevelopment && user !== null);
 
   /**
    * Adiciona um log ao painel de debug (se disponível)

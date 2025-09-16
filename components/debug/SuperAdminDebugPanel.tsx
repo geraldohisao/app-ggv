@@ -37,10 +37,10 @@ export const SuperAdminDebugPanel: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState(false);
 
   // Verificar se o usuário é super admin
-  // TEMPORÁRIO: Para teste local, permitir também admins e em desenvolvimento
+  // Só permitir acesso para SuperAdmin ou em desenvolvimento local (localhost)
+  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const isSuperAdmin = user?.role === UserRole.SuperAdmin || 
-                       user?.role === UserRole.Admin || 
-                       (process.env.NODE_ENV === 'development' && user !== null);
+                       (isLocalDevelopment && user !== null);
 
   console.log('🛡️ SuperAdminDebugPanel - User:', user);
   console.log('🛡️ SuperAdminDebugPanel - isSuperAdmin:', isSuperAdmin);

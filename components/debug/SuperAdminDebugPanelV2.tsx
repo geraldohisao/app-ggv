@@ -21,9 +21,9 @@ export const SuperAdminDebugPanelV2: React.FC = () => {
   const logCounter = useRef(0);
 
   // Verificar se é super admin (mais permissivo para desenvolvimento)
+  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const isSuperAdmin = user?.role === UserRole.SuperAdmin || 
-                       user?.role === UserRole.Admin || 
-                       (process.env.NODE_ENV === 'development' && user !== null);
+                       (isLocalDevelopment && user !== null);
 
   console.log('🚀 SuperAdminDebugPanelV2 - User:', user);
   console.log('🚀 SuperAdminDebugPanelV2 - isSuperAdmin:', isSuperAdmin);

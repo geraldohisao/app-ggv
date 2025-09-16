@@ -35,7 +35,9 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
 
   // 🔐 Verificar se é Super Admin
   const isSuperAdmin = user?.role === 'SuperAdmin';
-  const hasDebugAccess = isSuperAdmin || (process.env.NODE_ENV === 'development' && user !== null);
+  // Só permitir acesso em desenvolvimento local (localhost) ou para SuperAdmin
+  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const hasDebugAccess = isSuperAdmin || (isLocalDevelopment && user !== null);
 
   // 📊 Adicionar log com persistência
   const addLog = (level: DebugLog['level'], source: string, message: string, data?: any) => {

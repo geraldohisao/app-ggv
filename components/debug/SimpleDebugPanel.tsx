@@ -11,10 +11,10 @@ export const SimpleDebugPanel: React.FC = () => {
   console.log('🔥 User:', user);
   console.log('🔥 User role:', user?.role);
 
-  // Verificar acesso (temporariamente mais permissivo)
+  // Verificar acesso (restrito em produção)
+  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const hasAccess = user?.role === UserRole.SuperAdmin || 
-                   user?.role === UserRole.Admin || 
-                   user !== null; // Qualquer usuário logado
+                   (isLocalDevelopment && user !== null);
 
   console.log('🔥 Has access:', hasAccess);
 
