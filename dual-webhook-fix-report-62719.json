@@ -1,0 +1,18 @@
+{
+  "dealId": "62719",
+  "timestamp": "2025-09-17T11:18:23.168Z",
+  "testType": "dual-webhook-fix",
+  "updateFieldsTest": {
+    "success": false,
+    "status": 500,
+    "body": "{\"message\":\"Error in workflow\"}",
+    "type": "update_fields"
+  },
+  "diagnosticCompleteTest": {
+    "success": true,
+    "status": 200,
+    "body": "Negócio atualizado",
+    "type": "diagnostic_complete"
+  },
+  "conclusion": "NECESSITA MAIS AJUSTES"
+}
