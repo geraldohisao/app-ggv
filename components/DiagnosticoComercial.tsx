@@ -333,12 +333,15 @@ export const DiagnosticoComercial: React.FC = () => {
             // Enviar atualização ao Pipedrive (via N8N) somente se houver deal_id e alterações
             const urlParams = new URLSearchParams(window.location.search);
             const dealIdFromUrl = urlParams.get('deal_id') || undefined;
+            // 🚀 NOVA LÓGICA: Não enviar alterações separadamente
+            // Tudo será enviado junto no diagnóstico principal após IA estar pronta
             if (dealIdFromUrl && Object.keys(changed).length > 0) {
-                console.log('📤 SENDING TO PIPEDRIVE - Deal ID:', dealIdFromUrl);
-                console.log('📤 SENDING TO PIPEDRIVE - Changed fields only:', changed);
-                await updatePipedriveDealFields(dealIdFromUrl, changed, data);
+                console.log('📝 NOVA LÓGICA - Deal ID:', dealIdFromUrl);
+                console.log('📝 NOVA LÓGICA - Campos alterados serão enviados junto com o diagnóstico:', changed);
+                console.log('📝 NOVA LÓGICA - Aguardando análise IA para envio único...');
+                // await updatePipedriveDealFields(dealIdFromUrl, changed, data); // DESABILITADO
             } else if (dealIdFromUrl) {
-                console.log('🕊️ NO CHANGES DETECTED - Não enviando para Pipedrive');
+                console.log('🕊️ NO CHANGES DETECTED - Nenhuma alteração detectada');
             }
         } catch (e) {
             console.warn('⚠️ DIAGNOSTICO - Falha ao enviar atualização do Pipedrive (continuando):', e);

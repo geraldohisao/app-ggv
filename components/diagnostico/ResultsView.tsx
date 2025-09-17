@@ -282,9 +282,13 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         companyName: companyData.companyName,
                         email: companyData.email,
                         activityBranch: companyData.activityBranch,
+                        activitySector: (companyData as any).activitySector,
                         monthlyBilling: companyData.monthlyBilling,
                         salesTeamSize: companyData.salesTeamSize,
-                        salesChannels: companyData.salesChannels || []
+                        salesChannels: companyData.salesChannels || [],
+                        
+                        // 🚀 INCLUIR TODOS os campos que antes eram enviados separadamente
+                        ...(companyData as any) // Todos os outros campos do formulário
                     },
                     // 🆕 Contexto adicional do cliente - OBRIGATÓRIO para N8N!
                     clientContext: {

@@ -1,0 +1,24 @@
+{
+  "dealId": "62719",
+  "timestamp": "2025-09-17T11:46:15.210Z",
+  "testType": "single-send-logic-validation",
+  "newLogic": {
+    "success": true,
+    "status": 200,
+    "duration": 1655,
+    "body": "Negócio atualizado",
+    "payloadSize": 2160
+  },
+  "oldLogicSimulation": {
+    "totalRequests": 4,
+    "failedRequests": 3,
+    "successRequests": 1,
+    "efficiency": "25%"
+  },
+  "improvement": {
+    "requestReduction": "75%",
+    "eliminatedFailures": 3,
+    "efficiency": "100%"
+  },
+  "conclusion": "NOVA LÓGICA FUNCIONANDO - Envio único eficiente"
+}

@@ -298,151 +298,22 @@ export async function prefillFromN8n(dealId: string): Promise<AnyJson | null> {
     }
 }
 
-// Atualizar campos do negócio no Pipedrive (via N8N). Envia somente campos alterados
+// 🚀 NOVA LÓGICA: Desabilitar updatePipedriveDealFields separado
+// Agora tudo será enviado junto no diagnóstico principal após IA estar pronta
 export async function updatePipedriveDealFields(
     dealId: string,
     changedFields: Record<string, any>,
     fullFormData?: Partial<CompanyData & { situacao?: string; problema?: string; perfil_do_cliente?: string }>
 ): Promise<boolean> {
-    try {
-        if (!dealId || Object.keys(changedFields || {}).length === 0) {
-            console.log('🕊️ PIPEDRIVE UPDATE - Nada para atualizar (sem alterações)');
-            return true;
-        }
-
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const url = isLocal
-            ? 'http://localhost:8080/api/webhook/diag-ggv-register'
-            : 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
-
-        // 🚀 ESTRATÉGIA 1: Tentar com formato simplificado primeiro
-        const simplePayload = {
-            action: 'update_deal_fields',
-            deal_id: dealId,
-            timestamp: new Date().toISOString(),
-            
-            // Dados essenciais apenas
-            companyData: {
-                ...(fullFormData || {}),
-                dealId
-            },
-            
-            // Contexto obrigatório
-            clientContext: {
-                situacao: (fullFormData as any)?.situacao || 'Empresa atualizando informações do diagnóstico',
-                problema: (fullFormData as any)?.problema || 'Necessidade de atualização dos dados comerciais',
-                perfil_do_cliente: (fullFormData as any)?.perfil_do_cliente || 'Cliente em processo de diagnóstico comercial',
-            },
-            
-            source: 'ggv-diagnostic-update',
-            version: 'update-fields-v2'
-        } as const;
-
-        console.log('📤 PIPEDRIVE UPDATE - Tentativa 1 (formato simplificado):', simplePayload);
-        
-        // 🚀 TIMEOUT CONTROLLER para primeira tentativa
-        const controller1 = new AbortController();
-        const timeoutId1 = setTimeout(() => controller1.abort(), 10000); // 10s timeout
-        
-        let res: Response;
-        try {
-            res = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'GGV-Diagnostic/2.0',
-                    'X-Request-Type': 'update-fields',
-                    'X-Timeout': '10000'
-                },
-                body: JSON.stringify(simplePayload),
-                signal: controller1.signal
-            });
-            clearTimeout(timeoutId1);
-
-            if (res.ok) {
-                console.log('✅ PIPEDRIVE UPDATE - Sucesso com formato simplificado');
-                return true;
-            }
-        } catch (fetchError: any) {
-            clearTimeout(timeoutId1);
-            if (fetchError.name === 'AbortError') {
-                console.log('⏰ PIPEDRIVE UPDATE - TIMEOUT na tentativa 1 (10s)');
-            } else {
-                console.log('💥 PIPEDRIVE UPDATE - Erro de rede na tentativa 1:', fetchError.message);
-            }
-            // Continuar para tentativa 2
-        }
-
-        // 🚀 ESTRATÉGIA 2: Se falhar, tentar com formato original + contexto
-        console.log('⚠️ PIPEDRIVE UPDATE - Formato simplificado falhou, tentando formato original...');
-        
-        const originalPayload = {
-            action: 'update_deal_fields',
-            source: 'ggv-diagnostic-company-form',
-            dealId,
-            changedFields,
-            formData: fullFormData || null,
-            
-            // Contexto obrigatório
-            clientContext: {
-                situacao: (fullFormData as any)?.situacao || 'Empresa atualizando informações do diagnóstico',
-                problema: (fullFormData as any)?.problema || 'Necessidade de atualização dos dados comerciais',
-                perfil_do_cliente: (fullFormData as any)?.perfil_do_cliente || 'Cliente em processo de diagnóstico comercial',
-            },
-            
-            timestamp: new Date().toISOString(),
-        } as const;
-
-        // 🚀 TIMEOUT CONTROLLER para segunda tentativa
-        const controller2 = new AbortController();
-        const timeoutId2 = setTimeout(() => controller2.abort(), 10000); // 10s timeout
-        
-        try {
-            res = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'GGV-Diagnostic/2.0',
-                    'X-Request-Type': 'update-fields-fallback',
-                    'X-Timeout': '10000'
-                },
-                body: JSON.stringify(originalPayload),
-                signal: controller2.signal
-            });
-            clearTimeout(timeoutId2);
-        } catch (fetchError: any) {
-            clearTimeout(timeoutId2);
-            if (fetchError.name === 'AbortError') {
-                console.log('⏰ PIPEDRIVE UPDATE - TIMEOUT na tentativa 2 (10s)');
-            } else {
-                console.log('💥 PIPEDRIVE UPDATE - Erro de rede na tentativa 2:', fetchError.message);
-            }
-            // Continuar para estratégia 3 (não bloquear)
-            console.warn('⚠️ PIPEDRIVE UPDATE - Ambas tentativas falharam (timeout/erro), mas continuando fluxo');
-            console.warn('📝 PIPEDRIVE UPDATE - O diagnóstico principal ainda será enviado normalmente');
-            return true;
-        }
-
-        if (res.ok) {
-            console.log('✅ PIPEDRIVE UPDATE - Sucesso com formato original');
-            return true;
-        }
-
-        // 🚀 ESTRATÉGIA 3: Se ainda falhar, apenas logar mas não bloquear o fluxo
-        const txt = await res.text().catch(() => '');
-        console.warn('⚠️ PIPEDRIVE UPDATE - Ambos formatos falharam, mas continuando fluxo:', res.status, res.statusText, txt);
-        console.warn('📝 PIPEDRIVE UPDATE - O diagnóstico principal ainda será enviado normalmente');
-        
-        // Retornar true para não bloquear o fluxo principal
-        // O webhook principal do diagnóstico é mais importante
-        return true;
-        
-    } catch (e) {
-        console.error('❌ PIPEDRIVE UPDATE - Erro de rede:', e);
-        console.log('📝 PIPEDRIVE UPDATE - Continuando fluxo apesar do erro de rede');
-        // Retornar true para não bloquear o fluxo principal
-        return true;
-    }
+    // 🎯 NOVA ESTRATÉGIA: Não enviar update separado
+    // Tudo será enviado junto no diagnóstico principal
+    console.log('📝 PIPEDRIVE UPDATE - NOVA LÓGICA: Dados serão enviados junto com o diagnóstico principal');
+    console.log('📝 PIPEDRIVE UPDATE - Deal ID:', dealId);
+    console.log('📝 PIPEDRIVE UPDATE - Campos alterados:', changedFields);
+    console.log('📝 PIPEDRIVE UPDATE - Aguardando análise IA para envio único...');
+    
+    // Sempre retornar true - não há mais envio separado
+    return true;
 }
 
 export async function sendDiagnosticToN8n(payload: AnyJson, retryCount: number = 0): Promise<boolean> {
