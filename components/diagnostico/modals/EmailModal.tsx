@@ -154,10 +154,18 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
               </html>`;
             
             console.log('📧 EMAIL_MODAL - Enviando e-mail para:', email);
+            console.log('📧 EMAIL_MODAL - Assunto:', subject);
+            console.log('📧 EMAIL_MODAL - URL do relatório:', publicUrl);
+            
             await sendEmailViaGmail({ to: email, subject, html });
+            
             console.log('✅ EMAIL_MODAL - E-mail enviado com sucesso!');
+            console.log('📧 EMAIL_MODAL - IMPORTANTE: Verifique SPAM/Lixo Eletrônico se não receber');
+            console.log('📧 EMAIL_MODAL - E-mail enviado de:', companyData.email || 'sistema');
+            console.log('📧 EMAIL_MODAL - E-mail enviado para:', email);
+            
             setIsSent(true);
-            setTimeout(() => onClose(), 2000);
+            setTimeout(() => onClose(), 3000); // Aumentado para 3 segundos
         } catch (err: any) {
             console.error('❌ EMAIL_MODAL - Erro ao enviar:', err);
             
@@ -275,6 +283,14 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                         <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
                         <h3 className="text-xl font-bold text-slate-800">Relatório Enviado!</h3>
                         <p className="text-slate-500 mt-2">Verifique sua caixa de entrada em alguns instantes.</p>
+                        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-yellow-800 text-sm">
+                                <strong>⚠️ Importante:</strong> Se não receber o e-mail, verifique também a pasta <strong>SPAM/Lixo Eletrônico</strong>.
+                            </p>
+                        </div>
+                        <div className="mt-3 text-xs text-slate-400">
+                            Enviado para: <strong>{email}</strong>
+                        </div>
                     </div>
                 )}
             </div>

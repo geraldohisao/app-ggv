@@ -3,7 +3,7 @@ import type { CompanyData, MarketSegment, Answers } from '../types';
 import { CompanyInfoForm } from './diagnostico/CompanyInfoForm';
 import { QuestionnaireView } from './diagnostico/QuestionnaireView';
 import { ResultsView } from './diagnostico/ResultsView';
-import { prefillFromN8n, sendDiagnosticToN8n, sendDiagnosticToPipedrive } from '../services/supabaseService';
+import { prefillFromN8n, sendDiagnosticToN8n, sendDiagnosticToPipedrive, updatePipedriveDealFields } from '../services/supabaseService';
 
 
 import { GGVInteligenciaBrand } from './ui/BrandLogos';
@@ -193,6 +193,10 @@ export const DiagnosticoComercial: React.FC = () => {
                 monthlyBilling: pipedriveData.monthlyBilling || '',
                 salesTeamSize: pipedriveData.salesTeamSize || '',
                 salesChannels: pipedriveData.salesChannels || [],
+                // 🆕 Repasse dos novos campos
+                situacao: (pipedriveData as any).situacao || (pipedriveData as any)['situação'] || '',
+                problema: (pipedriveData as any).problema || '',
+                perfil_do_cliente: (pipedriveData as any).perfil_do_cliente || '',
             });
         }
     }, [pipedriveData]);
@@ -250,6 +254,10 @@ export const DiagnosticoComercial: React.FC = () => {
                 monthlyBilling: data.faturamento_mensal || '',
                 salesTeamSize: data.tamanho_equipe_comercial || '',
                 salesChannels: data.salesChannels || [],
+                // 🆕 Repasse dos novos campos
+                situacao: (data as any).situacao || (data as any)['situação'] || '',
+                problema: (data as any).problema || '',
+                perfil_do_cliente: (data as any).perfil_do_cliente || '',
             });
 
             // Salvar dados da busca manual para exibir mensagem de sucesso
@@ -283,7 +291,59 @@ export const DiagnosticoComercial: React.FC = () => {
         setAnswers(prev => ({ ...prev, [questionId]: score }));
     };
 
-    const handleCompanyInfoSubmit = (data: CompanyData, segment: MarketSegment) => {
+    const handleCompanyInfoSubmit = async (data: CompanyData, segment: MarketSegment) => {
+        // Detectar alterações em relação ao prefill para enviar somente o que mudou
+        try {
+            const changed: Record<string, any> = {};
+            const current = prefill || {};
+            const cmp = (a: any, b: any) => JSON.stringify(a ?? '') !== JSON.stringify(b ?? '');
+
+            // 🎯 CAMPOS PRIORITÁRIOS DO PIPEDRIVE (só enviar se alterados)
+            const pipedriveFields = [
+                'situacao', 'problema', 'perfil_do_cliente', 
+                'activityBranch', 'activitySector', 'monthlyBilling', 'salesTeamSize'
+            ];
+            
+            // 📝 CAMPOS BÁSICOS (sempre podem ser enviados se alterados)
+            const basicFields = ['companyName', 'email', 'salesChannels'];
+
+            // Verificar APENAS campos do Pipedrive que realmente mudaram
+            for (const field of pipedriveFields) {
+                const newVal = (data as any)[field];
+                const oldVal = (current as any)[field];
+                if (cmp(newVal, oldVal)) {
+                    changed[field] = newVal;
+                    console.log(`🔄 PIPEDRIVE FIELD CHANGED - ${field}:`, { old: oldVal, new: newVal });
+                }
+            }
+
+            // Verificar campos básicos (menos críticos)
+            for (const field of basicFields) {
+                const newVal = (data as any)[field];
+                const oldVal = (current as any)[field];
+                if (cmp(newVal, oldVal)) {
+                    changed[field] = newVal;
+                    console.log(`📝 BASIC FIELD CHANGED - ${field}:`, { old: oldVal, new: newVal });
+                }
+            }
+
+            console.log('🔍 CHANGE DETECTION - Campos alterados:', Object.keys(changed));
+            console.log('🔍 CHANGE DETECTION - Valores alterados:', changed);
+
+            // Enviar atualização ao Pipedrive (via N8N) somente se houver deal_id e alterações
+            const urlParams = new URLSearchParams(window.location.search);
+            const dealIdFromUrl = urlParams.get('deal_id') || undefined;
+            if (dealIdFromUrl && Object.keys(changed).length > 0) {
+                console.log('📤 SENDING TO PIPEDRIVE - Deal ID:', dealIdFromUrl);
+                console.log('📤 SENDING TO PIPEDRIVE - Changed fields only:', changed);
+                await updatePipedriveDealFields(dealIdFromUrl, changed, data);
+            } else if (dealIdFromUrl) {
+                console.log('🕊️ NO CHANGES DETECTED - Não enviando para Pipedrive');
+            }
+        } catch (e) {
+            console.warn('⚠️ DIAGNOSTICO - Falha ao enviar atualização do Pipedrive (continuando):', e);
+        }
+
         setCompanyData(data);
         setSelectedSegment(segment);
         setStep('questionnaire');

@@ -293,6 +293,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         salesTeamSize: companyData.salesTeamSize,
                         salesChannels: companyData.salesChannels || []
                     },
+                    // 🆕 Contexto adicional do cliente
+                    clientContext: {
+                        situacao: (companyData as any).situacao || null,
+                        problema: (companyData as any).problema || null,
+                        perfil_do_cliente: (companyData as any).perfil_do_cliente || null,
+                    },
                     segment: {
                         name: segment?.name || 'Geral',
                         id: segment?.id || 'geral'

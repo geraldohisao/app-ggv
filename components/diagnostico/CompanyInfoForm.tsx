@@ -41,6 +41,10 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
         salesTeamSize: '',
         salesChannels: [],
         activitySector: '',
+        // 🆕 NOVOS CAMPOS
+        situacao: '',
+        problema: '',
+        perfil_do_cliente: '',
     };
     const [formData, setFormData] = useState<CompanyData>({ ...initialData, ...(prefill || {}) });
     const [errors, setErrors] = useState<Partial<Record<keyof Omit<CompanyData, 'salesChannels'> | 'salesChannels', string>>>({});
@@ -152,6 +156,27 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
             console.log('❌ FORM - Nenhum setor encontrado nos dados');
         }
         
+        // 🆕 MAPEAR NOVOS CAMPOS DO PIPEDRIVE
+        console.log('🆕 FORM - Mapeando novos campos...');
+        console.log('🆕 FORM - data.situacao:', data.situacao);
+        console.log('🆕 FORM - data.problema:', data.problema);
+        console.log('🆕 FORM - data.perfil_do_cliente:', data.perfil_do_cliente);
+        
+        if ((data as any).situacao) {
+            mapped.situacao = (data as any).situacao;
+            console.log('✅ FORM - Situação mapeada:', mapped.situacao);
+        }
+        
+        if ((data as any).problema) {
+            mapped.problema = (data as any).problema;
+            console.log('✅ FORM - Problema mapeado:', mapped.problema);
+        }
+        
+        if ((data as any).perfil_do_cliente) {
+            mapped.perfil_do_cliente = (data as any).perfil_do_cliente;
+            console.log('✅ FORM - Perfil do cliente mapeado:', mapped.perfil_do_cliente);
+        }
+        
         return mapped;
     };
 
@@ -159,6 +184,10 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
     useEffect(() => {
         console.log('🔄 FORM - useEffect executado');
         console.log('📥 FORM - Prefill recebido:', prefill);
+        console.log('🆕 FORM - Verificando novos campos no prefill:');
+        console.log('  - prefill.situacao:', (prefill as any)?.situacao);
+        console.log('  - prefill.problema:', (prefill as any)?.problema);  
+        console.log('  - prefill.perfil_do_cliente:', (prefill as any)?.perfil_do_cliente);
         
         if (prefill) {
             console.log('🎯 FORM - ANÁLISE DETALHADA DOS DADOS RECEBIDOS:');
@@ -184,6 +213,12 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
                 setFormData(prev => {
                     const newData = { ...prev, ...mappedPrefill } as CompanyData;
                     console.log('📝 FORM - FormData final aplicado:', newData);
+                    
+                    // 🆕 DEBUG ESPECÍFICO DOS NOVOS CAMPOS
+                    console.log('🆕 FORM DEBUG - Situação no formData:', newData.situacao);
+                    console.log('🆕 FORM DEBUG - Problema no formData:', newData.problema);
+                    console.log('🆕 FORM DEBUG - Perfil no formData:', newData.perfil_do_cliente);
+                    console.log('🆕 FORM DEBUG - Condição da seção será:', !!(newData.situacao || newData.problema || newData.perfil_do_cliente));
                     
                     // Log específico dos campos que não estão preenchendo
                     console.log('💰 FORM - Faturamento no formData:', newData.monthlyBilling);
@@ -272,6 +307,46 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormInput id="companyName" name="companyName" label="Nome da Empresa" value={formData.companyName} onChange={handleChange} error={errors.companyName} placeholder="Digite o nome da sua empresa" required />
                         <FormInput id="email" name="email" type="email" label="E-mail para receber o resultado" value={formData.email} onChange={handleChange} error={errors.email} placeholder="seu@email.com" required />
+                    </div>
+
+                    {/* Contexto do cliente - padrão do formulário (sem bloco extra) */}
+                    <div className="grid grid-cols-1 gap-5">
+                        <div>
+                            <label htmlFor="situacao" className="block text-sm font-medium text-slate-700 mb-1">Situação Atual</label>
+                            <textarea
+                                id="situacao"
+                                name="situacao"
+                                className="w-full text-sm border border-slate-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y"
+                                placeholder="Descreva a situação do cliente"
+                                rows={5}
+                                value={formData.situacao || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, situacao: e.target.value }))}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="problema" className="block text-sm font-medium text-slate-700 mb-1">Problema Identificado</label>
+                            <textarea
+                                id="problema"
+                                name="problema"
+                                className="w-full text-sm border border-slate-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y"
+                                placeholder="Qual o principal desafio?"
+                                rows={5}
+                                value={formData.problema || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, problema: e.target.value }))}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="perfil_do_cliente" className="block text-sm font-medium text-slate-700 mb-1">Perfil do Cliente</label>
+                            <textarea
+                                id="perfil_do_cliente"
+                                name="perfil_do_cliente"
+                                className="w-full text-sm border border-slate-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y"
+                                placeholder="Quem é o cliente e como decide?"
+                                rows={5}
+                                value={formData.perfil_do_cliente || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, perfil_do_cliente: e.target.value }))}
+                            />
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <FormSelect id="activityBranch" name="activityBranch" label="Ramo de Atividade" value={formData.activityBranch} onChange={handleChange} error={errors.activityBranch} required>

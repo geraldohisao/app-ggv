@@ -298,6 +298,52 @@ export async function prefillFromN8n(dealId: string): Promise<AnyJson | null> {
     }
 }
 
+// Atualizar campos do negócio no Pipedrive (via N8N). Envia somente campos alterados
+export async function updatePipedriveDealFields(
+    dealId: string,
+    changedFields: Record<string, any>,
+    fullFormData?: Partial<CompanyData & { situacao?: string; problema?: string; perfil_do_cliente?: string }>
+): Promise<boolean> {
+    try {
+        if (!dealId || Object.keys(changedFields || {}).length === 0) {
+            console.log('🕊️ PIPEDRIVE UPDATE - Nada para atualizar (sem alterações)');
+            return true;
+        }
+
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const url = isLocal
+            ? 'http://localhost:8080/api/webhook/diag-ggv-register'
+            : 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register';
+
+        const payload = {
+            action: 'update_deal_fields',
+            source: 'ggv-diagnostic-company-form',
+            dealId,
+            changedFields,
+            formData: fullFormData || null,
+            timestamp: new Date().toISOString(),
+        } as const;
+
+        console.log('📤 PIPEDRIVE UPDATE - Enviando alterações:', payload);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.error('❌ PIPEDRIVE UPDATE - Falha:', res.status, res.statusText, txt);
+            return false;
+        }
+        console.log('✅ PIPEDRIVE UPDATE - Sucesso');
+        return true;
+    } catch (e) {
+        console.error('❌ PIPEDRIVE UPDATE - Erro de rede:', e);
+        return false;
+    }
+}
+
 export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
     // Detectar ambiente e usar endpoint apropriado
     const isLocal = window.location.hostname === 'localhost';
@@ -405,6 +451,13 @@ export async function sendDiagnosticToPipedrive(
                 monthlyBilling: companyData.monthlyBilling,
                 salesTeamSize: companyData.salesTeamSize,
                 salesChannels: companyData.salesChannels,
+            },
+
+            // 🆕 Contexto adicional do cliente para N8N/Pipedrive
+            clientContext: {
+                situacao: (companyData as any).situacao || null,
+                problema: (companyData as any).problema || null,
+                perfil_do_cliente: (companyData as any).perfil_do_cliente || null,
             },
             
             // Respostas do diagnóstico (9 perguntas) - formato textual

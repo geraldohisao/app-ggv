@@ -424,11 +424,19 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
         body: JSON.stringify({ raw }),
       });
       
+      console.log('📧 GMAIL - Resposta da API:', {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok,
+        destinatario: to
+      });
+      
       if (!res.ok) {
         let details = '';
         try { 
           const j = await res.json(); 
           details = j?.error?.message || JSON.stringify(j); 
+          console.log('❌ GMAIL - Detalhes do erro:', j);
         } catch {}
         
         // Se for erro de permissão, tentar reautenticar
@@ -442,7 +450,18 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
         throw new Error(`Gmail API falhou: ${res.status} ${res.statusText}${details ? ' - ' + details : ''}`);
       }
       
-      console.log('✅ GMAIL - E-mail enviado com sucesso');
+      // Obter detalhes da resposta de sucesso
+      let responseData = null;
+      try {
+        responseData = await res.json();
+        console.log('✅ GMAIL - Resposta de sucesso completa:', responseData);
+        console.log('📧 GMAIL - Message ID:', responseData?.id);
+        console.log('📧 GMAIL - Thread ID:', responseData?.threadId);
+      } catch (e) {
+        console.warn('⚠️ GMAIL - Não foi possível ler resposta JSON:', e);
+      }
+      
+      console.log('✅ GMAIL - E-mail enviado com sucesso para:', to);
       return true;
       
     } catch (error) {

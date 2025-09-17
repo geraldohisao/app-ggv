@@ -346,9 +346,15 @@ DADOS:
 **Informações da Empresa:**
 - Nome da Empresa: ${companyData.companyName}
 - Ramo de Atividade: ${companyData.activityBranch}
+- Setor de Atuação: ${companyData.activitySector || 'Não informado'}
 - Faturamento Mensal: ${companyData.monthlyBilling}
 - Tamanho da Equipe de Vendas: ${companyData.salesTeamSize}
 - Canais de Vendas Utilizados: ${companyData.salesChannels.join(', ')}
+
+**🆕 Contexto Adicional do Cliente (Pipedrive):**
+${companyData.situacao ? `- Situação Atual: ${companyData.situacao}` : ''}
+${companyData.problema ? `- Problema/Desafio Identificado: ${companyData.problema}` : ''}
+${companyData.perfil_do_cliente ? `- Perfil do Cliente: ${companyData.perfil_do_cliente}` : ''}
 
 **Informações do Segmento de Mercado (${segment?.name || 'Geral'}):**
 - Características: ${segment?.characteristics || '-'}
@@ -400,6 +406,11 @@ export const getDetailedAIAnalysis = async (
 1. Dados da Empresa Cliente:
    - Empresa: ${JSON.stringify(companyData)}
    - Segmento: ${JSON.stringify(segment)}
+   
+   🆕 Contexto Adicional do Cliente:
+   ${companyData.situacao ? `- Situação Atual: ${companyData.situacao}` : ''}
+   ${companyData.problema ? `- Problema/Desafio: ${companyData.problema}` : ''}
+   ${companyData.perfil_do_cliente ? `- Perfil do Cliente: ${companyData.perfil_do_cliente}` : ''}
 
 2. Resultado do Diagnóstico:
    - Pontuação Total: ${totalScore}/90

@@ -43,7 +43,11 @@ export interface CompanyData {
     monthlyBilling: string;
     salesTeamSize: string;
     salesChannels: string[];
-    activitySector?: string; // Novo: Setor de atuação
+    activitySector?: string; // Setor de atuação
+    // 🆕 NOVOS CAMPOS DO PIPEDRIVE
+    situacao?: string;        // Situação atual da empresa
+    problema?: string;        // Problema identificado
+    perfil_do_cliente?: string; // Perfil do cliente
 }
 
 export interface MarketSegment {

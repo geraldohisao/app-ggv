@@ -32,6 +32,10 @@ const mockDeals = {
     org_name: 'Tech Solutions LTDA',
     contact_email: 'vendas@techsolutions.com.br',
     person_email: 'vendas@techsolutions.com.br',
+    // 🆕 NOVOS CAMPOS DE TESTE
+    situacao: 'Empresa estabelecida, buscando modernizar processos de vendas e aumentar eficiência',
+    problema: 'Dependência excessiva de networking, dificuldade para escalar vendas de forma sistemática',
+    perfil_do_cliente: 'Empresário tradicional, mas aberto a mudanças que comprovem resultados práticos',
     _mockData: true
   },
   '62719': {
@@ -44,6 +48,10 @@ const mockDeals = {
     org_name: 'Inovação Digital Ltda',
     contact_email: 'comercial@inovacaodigital.com.br',
     person_email: 'comercial@inovacaodigital.com.br',
+    // 🆕 NOVOS CAMPOS DE TESTE
+    situacao: 'Empresa em crescimento acelerado, buscando estruturar processos comerciais para escalar',
+    problema: 'Equipe de vendas sobrecarregada, leads se perdem no funil e conversão está abaixo do esperado',
+    perfil_do_cliente: 'Diretor comercial experiente, busca otimização de resultados e implementação de metodologias',
     _mockData: true
   }
 };
@@ -103,11 +111,42 @@ app.get('/webhook/diag-ggv-register', (req, res) => {
       'De 11 a 25 colaboradores'
     ];
     
+    // 🆕 NOVOS CAMPOS DE TESTE
+    const situacoes = [
+      'Empresa em crescimento, buscando estruturar processos comerciais',
+      'Equipe de vendas desmotivada, baixa conversão de leads',
+      'Falta de controle e organização no pipeline de vendas',
+      'Dificuldade para escalar as vendas e atingir metas',
+      'Processo comercial funcionando, mas com oportunidades de melhoria'
+    ];
+    
+    const problemas = [
+      'Alta rotatividade na equipe comercial',
+      'Leads de baixa qualidade, muita prospecção sem resultado',
+      'Falta de padronização no processo de vendas',
+      'Equipe não sabe como fazer follow-up adequado',
+      'Dificuldade para fechar vendas de ticket mais alto',
+      'Concorrência acirrada, perda de clientes por preço'
+    ];
+    
+    const perfis = [
+      'Empresário tradicional, resistente a mudanças tecnológicas',
+      'Gestor jovem, aberto a inovações e novas metodologias',
+      'Diretor comercial experiente, busca otimização de resultados',
+      'Empreendedor digital, foca em automação e eficiência',
+      'Sócio-fundador, envolvido operacionalmente nas vendas'
+    ];
+    
     const empresaEscolhida = empresas[Math.floor(Math.random() * empresas.length)];
     const setorEscolhido = setores[Math.floor(Math.random() * setores.length)];
     const ramoEscolhido = ramos[Math.floor(Math.random() * ramos.length)];
     const faturamentoEscolhido = faturamentos[Math.floor(Math.random() * faturamentos.length)];
     const equipeEscolhida = equipes[Math.floor(Math.random() * equipes.length)];
+    
+    // 🆕 SELEÇÃO ALEATÓRIA DOS NOVOS CAMPOS
+    const situacaoEscolhida = situacoes[Math.floor(Math.random() * situacoes.length)];
+    const problemaEscolhido = problemas[Math.floor(Math.random() * problemas.length)];
+    const perfilEscolhido = perfis[Math.floor(Math.random() * perfis.length)];
     
     mockData = {
       companyName: empresaEscolhida,
@@ -119,6 +158,10 @@ app.get('/webhook/diag-ggv-register', (req, res) => {
       org_name: empresaEscolhida,
       contact_email: `contato@${empresaEscolhida.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')}.com.br`,
       person_email: `contato@${empresaEscolhida.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')}.com.br`,
+      // 🆕 NOVOS CAMPOS DE TESTE
+      situacao: situacaoEscolhida,
+      problema: problemaEscolhido,
+      perfil_do_cliente: perfilEscolhido,
       _mockData: true,
       _generated: true // Flag para indicar que foi gerado automaticamente
     };
