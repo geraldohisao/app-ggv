@@ -19,6 +19,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [gmailStatus, setGmailStatus] = useState<'checking' | 'configured' | 'not-configured'>('checking');
+    const [needsReauth, setNeedsReauth] = useState(false);
 
     // Verificar status do Gmail ao carregar
     React.useEffect(() => {
@@ -200,8 +201,9 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                 setError('⚠️ Problema de sessão detectado. Recarregue a página (F5) e tente novamente.');
             } else if (errorMessage.includes('Problema de conexão') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
                 setError('🌐 Problema de conexão. Verifique sua internet e tente novamente.');
-            } else if (errorMessage.includes('Falha após múltiplas tentativas') || errorMessage.includes('após 3 tentativas')) {
-                setError('📧 Não foi possível enviar o e-mail após várias tentativas. Clique em "Reautenticar" abaixo ou recarregue a página.');
+            } else if (errorMessage.includes('Falha após múltiplas tentativas') || errorMessage.includes('após 3 tentativas') || errorMessage.includes('Sistema de retry falhou')) {
+                setError('📧 Sistema de retry falhou. Clique em "Reautenticar Gmail" abaixo para resolver o problema.');
+                setNeedsReauth(true);
             } else {
                 // Mostrar erro original mas com emoji para melhor UX
                 setError(`❌ ${errorMessage}`);
@@ -215,11 +217,24 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
         try {
             setLoading(true);
             setError('');
+            setNeedsReauth(false);
+            
+            console.log('🔄 EMAIL_MODAL - Iniciando reautenticação do Gmail...');
+            
+            // Limpar cache e forçar nova autenticação
             await forceGmailReauth();
+            
+            // Verificar status após limpeza
             await checkGmailStatus();
-            setError('Reautenticação concluída. Tente enviar o e-mail novamente.');
+            
+            console.log('✅ EMAIL_MODAL - Reautenticação concluída');
+            setError('✅ Reautenticação concluída com sucesso! Tente enviar o e-mail novamente.');
+            
         } catch (err: any) {
-            setError('Erro na reautenticação: ' + (err?.message || 'Erro desconhecido'));
+            console.error('❌ EMAIL_MODAL - Erro na reautenticação:', err);
+            const errorMsg = err?.message || 'Erro desconhecido na reautenticação';
+            setError(`❌ Erro na reautenticação: ${errorMsg}. Tente recarregar a página (F5).`);
+            setNeedsReauth(true); // Manter botão disponível
         } finally {
             setLoading(false);
         }
@@ -272,24 +287,39 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                         <div className="flex justify-end gap-4 mt-6">
                             <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-bold py-2 px-5 rounded-lg hover:bg-slate-300 transition-colors">Cancelar</button>
                             
-                            {/* Botão de reautenticação se houver erro de permissão */}
-                            {error.includes('insufficient authentication scopes') || error.includes('insufficient permissions') ? (
+                            {/* Botão de reautenticação se houver erro de permissão ou retry falhou */}
+                            {needsReauth || error.includes('insufficient authentication scopes') || error.includes('insufficient permissions') || error.includes('Sistema de retry falhou') || error.includes('Reautenticar Gmail') ? (
                                 <button 
                                     type="button" 
                                     onClick={handleReauth} 
                                     disabled={loading}
                                     className="bg-orange-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-60"
                                 >
-                                    {loading ? 'Reautenticando...' : 'Reautenticar'}
+                                    {loading ? 'Reautenticando...' : 'Reautenticar Gmail'}
                                 </button>
                             ) : (
-                                <button 
-                                    type="submit" 
-                                    disabled={loading || gmailStatus === 'not-configured'} 
-                                    className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-60"
-                                >
-                                    {loading ? 'Enviando...' : 'Enviar'}
-                                </button>
+                                <>
+                                    <button 
+                                        type="submit" 
+                                        disabled={loading || gmailStatus === 'not-configured'} 
+                                        className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-60"
+                                    >
+                                        {loading ? 'Enviando...' : 'Enviar'}
+                                    </button>
+                                    
+                                    {/* 🚀 NOVO: Botão de fallback se houver erro persistente */}
+                                    {error && error.includes('Sistema de retry falhou') && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setError('📧 Para receber o relatório, copie este link e envie por WhatsApp ou outro meio: ' + (reportData ? window.location.origin + '/r/' + 'manual-' + Date.now() : 'Link não disponível'));
+                                            }}
+                                            className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                                        >
+                                            📱 Obter Link
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </form>

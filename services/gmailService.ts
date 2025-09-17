@@ -35,9 +35,12 @@ async function getGoogleClientId(): Promise<string> {
   // 4) Fallback para Client ID hardcoded (apenas para produção específica)
   const isProduction = window.location.hostname === 'app.grupoggv.com';
   if (isProduction) {
-    // Client ID específico para app.grupoggv.com (deve ser configurado no Google Cloud Console)
+    // 🚨 ATENÇÃO: Este Client ID deve estar configurado no Google Cloud Console
+    // para o domínio app.grupoggv.com com scopes gmail.send e gmail.compose
     const productionClientId = '1048970542386-8u3v6p7c2s8l5q9k1m0n2b4x7y6z3a5w.apps.googleusercontent.com';
     console.log('🔧 GMAIL - Usando Client ID de produção (fallback)');
+    console.log('⚠️ GMAIL - IMPORTANTE: Verificar se este Client ID está configurado corretamente no Google Console');
+    console.log('🔗 GMAIL - Console: https://console.cloud.google.com/apis/credentials');
     return productionClientId;
   }
 

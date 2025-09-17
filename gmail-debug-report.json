@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-09-17T11:56:33.896Z",
+  "issue": "Gmail API Sistema de retry falhou",
+  "environment": "Production (app.grupoggv.com)",
+  "identified_problems": [
+    "Token OAuth expirado ou inválido",
+    "Possível problema de configuração OAuth",
+    "Cache de token corrompido",
+    "Permissões insuficientes do Google"
+  ],
+  "proposed_solutions": [
+    {
+      "priority": "High",
+      "solution": "Adicionar botão de reautenticação no modal",
+      "implementation": "Immediate"
+    },
+    {
+      "priority": "High",
+      "solution": "Melhorar tratamento de erros OAuth",
+      "implementation": "Immediate"
+    },
+    {
+      "priority": "Medium",
+      "solution": "Implementar fallback de e-mail via servidor",
+      "implementation": "Short term"
+    },
+    {
+      "priority": "Low",
+      "solution": "Verificar configuração Google Console",
+      "implementation": "Investigation needed"
+    }
+  ],
+  "immediate_actions": [
+    "Add re-authentication button",
+    "Improve error handling",
+    "Clear invalid cache automatically",
+    "Add detailed logging"
+  ]
+}
