@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-09-17T03:41:28.758Z",
+  "totalTests": 5,
+  "passedTests": 5,
+  "failedTests": 0,
+  "results": [
+    {
+      "scenario": "Envio Normal - Primeira Tentativa",
+      "passed": true,
+      "duration": 5,
+      "attempts": 1
+    },
+    {
+      "scenario": "Erro Temporário - Deve Retentar",
+      "passed": true,
+      "duration": 156,
+      "attempts": 4,
+      "error": "HTTP 503"
+    },
+    {
+      "scenario": "Erro Cliente - Não Deve Retentar",
+      "passed": true,
+      "duration": 0,
+      "attempts": 1,
+      "error": "HTTP 400"
+    },
+    {
+      "scenario": "Timeout - Deve Retentar",
+      "passed": true,
+      "duration": 156,
+      "attempts": 4,
+      "error": "Network Error"
+    },
+    {
+      "scenario": "Sucesso na Segunda Tentativa",
+      "passed": true,
+      "duration": 51,
+      "attempts": 2
+    }
+  ]
+}

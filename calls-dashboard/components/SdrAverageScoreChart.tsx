@@ -153,10 +153,10 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
         {chartData.map((sdr, index) => {
           const percentage = maxScore > 0 ? (sdr.avg_score / maxScore) * 100 : 0;
           
-          // Cores baseadas na nota
+          // Cores baseadas na nota: Verde (8-10), Amarelo (6-7), Vermelho (<6)
           const getScoreColor = (score: number) => {
-            if (score >= 85) return 'bg-emerald-500';
-            if (score >= 70) return 'bg-yellow-500';
+            if (score >= 8) return 'bg-emerald-500';
+            if (score >= 6) return 'bg-yellow-500';
             return 'bg-red-500';
           };
           
@@ -172,7 +172,7 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
                     {sdr.sdr_name}
                   </div>
                   <div className="text-sm font-semibold text-slate-800">
-                    {Math.round(sdr.avg_score)}
+                    {sdr.avg_score.toFixed(1)}
                   </div>
                 </div>
                 
@@ -187,8 +187,8 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
                   <span>Taxa: {sdr.answered_rate}%</span>
                   <span>{sdr.total_calls} totais • {sdr.noted_calls} com nota</span>
                   <span>
-                    {sdr.avg_score >= 85 ? '🟢 Excelente' :
-                     sdr.avg_score >= 70 ? '🟡 Bom' : '🔴 Precisa melhorar'}
+                    {sdr.avg_score >= 8 ? '🟢 Excelente' :
+                     sdr.avg_score >= 6 ? '🟡 Bom' : '🔴 Precisa melhorar'}
                   </span>
                 </div>
               </div>

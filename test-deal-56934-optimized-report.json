@@ -1,0 +1,15 @@
+{
+  "dealId": "56934",
+  "timestamp": "2025-09-17T03:43:58.153Z",
+  "optimizedTest": {
+    "success": false,
+    "status": 500,
+    "duration": 966,
+    "body": "{\"message\":\"Error in workflow\"}"
+  },
+  "minimalTest": {
+    "success": false,
+    "status": 500,
+    "body": "{\"message\":\"Error in workflow\"}"
+  }
+}

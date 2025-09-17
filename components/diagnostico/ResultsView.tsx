@@ -34,56 +34,48 @@ interface ResultsViewProps {
 export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, answers, totalScore, dealId, onRetry }) => {
     const [activeTab, setActiveTab] = useState(REPORT_TABS[0]);
     
-    // CORREÇÃO CRÍTICA: SEMPRE priorizar deal_id da URL sobre props/localStorage
-    const fallbackDealId = (() => {
-        // SEMPRE verificar URL primeiro (fonte mais confiável)
+    // 🚀 MELHORIA: Lógica simplificada e robusta para deal_id
+    const finalDealId = useMemo(() => {
+        // 1. PRIORIDADE: URL (fonte mais confiável)
         const urlParams = new URLSearchParams(window.location.search);
         const dealIdFromUrl = urlParams.get('deal_id');
         
-        console.log('🔄 RESULTS - CORREÇÃO: Priorizando deal_id da URL:', dealIdFromUrl);
-        console.log('🔄 RESULTS - Deal ID das props (pode estar incorreto):', dealId);
-        
-        // Se há deal_id na URL, SEMPRE usá-lo (ignora props/localStorage)
-        if (dealIdFromUrl && dealIdFromUrl.trim() !== '') {
-            console.log('✅ RESULTS - Usando deal_id da URL (fonte confiável):', dealIdFromUrl);
+        if (dealIdFromUrl?.trim()) {
+            console.log('✅ DEAL_ID - Usando da URL:', dealIdFromUrl.trim());
             return dealIdFromUrl.trim();
         }
         
-        // Só usar props como fallback se não houver na URL
-        if (dealId && dealId.trim() !== '') {
-            console.log('⚠️ RESULTS - Usando deal_id das props (fallback):', dealId);
+        // 2. FALLBACK: Props
+        if (dealId?.trim()) {
+            console.log('⚠️ DEAL_ID - Usando das props:', dealId.trim());
             return dealId.trim();
         }
         
-        // ÚLTIMO RECURSO: Tentar extrair de localStorage ou outras fontes
-        try {
-            const savedState = localStorage.getItem('ggv_diagnostic_state');
-            if (savedState) {
-                const parsed = JSON.parse(savedState);
-                if (parsed.dealId && parsed.dealId.trim() !== '') {
-                    console.log('🔄 RESULTS - Deal ID encontrado no localStorage:', parsed.dealId);
-                    return parsed.dealId.trim();
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️ RESULTS - Erro ao verificar localStorage:', e);
-        }
-        
-        console.log('❌ RESULTS - Nenhum deal_id válido encontrado em nenhuma fonte');
+        console.log('❌ DEAL_ID - Nenhum deal_id válido encontrado');
         return null;
-    })();
+    }, [dealId]); // Recalcular apenas quando dealId prop mudar
     
-    console.log('🎯 RESULTS - Deal ID final usado:', fallbackDealId);
-    console.log('🎯 RESULTS - Deal ID original (prop):', dealId);
-    console.log('🎯 RESULTS - Usando fallback?', dealId !== fallbackDealId);
+    console.log('🎯 DEAL_ID FINAL:', finalDealId);
     const [showEmailModal, setShowEmailModal] = useState(false);
     // Removido: modal de PDF em favor do relatório público em nova guia
 
     const [summaryInsights, setSummaryInsights] = useState<SummaryInsights | null>(null);
     const [detailedAnalysis, setDetailedAnalysis] = useState<DetailedAIAnalysis | null>(null);
     const [specialistName, setSpecialistName] = useState<string>('');
-    // Controla se o webhook já foi enviado
-    const [aiSent, setAiSent] = useState<boolean>(false);
+    // 🚀 MELHORIA: Estado de envio mais robusto
+    const [webhookStatus, setWebhookStatus] = useState<{
+        sent: boolean;
+        sending: boolean;
+        success: boolean;
+        error: string | null;
+        attempts: number;
+    }>({
+        sent: false,
+        sending: false,
+        success: false,
+        error: null,
+        attempts: 0
+    });
     const [emergencyTimeout, setEmergencyTimeout] = useState<boolean>(false);
 
     useEffect(() => {
@@ -131,34 +123,31 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         fetchInsights();
     }, [companyData, answers, totalScore, segment]);
 
-    // Timeout removido: o envio ocorrerá quando a IA concluir ou após 30s como fallback
+    // 🚀 MELHORIA: Timeout mais inteligente
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (!aiSent && summaryInsights && detailedAnalysis) return; // IA ok
-            if (aiSent) return;
-            console.warn('⏰ Fallback: enviando diagnóstico mesmo sem IA');
+            if (webhookStatus.sent || webhookStatus.sending) return; // Já processado
+            if (summaryInsights && detailedAnalysis) return; // IA ok
+            console.warn('⏰ TIMEOUT: Forçando envio após 20s sem IA completa');
             setEmergencyTimeout(true);
-        }, 30000); // 30 segundos
+        }, 20000); // Reduzido para 20 segundos
         return () => clearTimeout(timer);
-    }, [aiSent, summaryInsights, detailedAnalysis]);
+    }, [webhookStatus.sent, webhookStatus.sending, summaryInsights, detailedAnalysis]);
 
     // OBS: Envio será feito **apenas** após a análise IA estar pronta.
     // O bloco de envio imediato foi removido para evitar dois webhooks.
 
-    // Envio ÚNICO para N8N após análise IA estar pronta (ou timeout de emergência)
+    // 🚀 MELHORIA: Envio ÚNICO para N8N com controle robusto
     useEffect(() => {
         const sendCompleteAnalysis = async () => {
             // DEBUG CRÍTICO: Verificar deal_id
             console.log('🔍 WEBHOOK DEBUG - dealId recebido (prop):', dealId);
-            console.log('🔍 WEBHOOK DEBUG - fallbackDealId (final):', fallbackDealId);
-            console.log('🔍 WEBHOOK DEBUG - Tipo do fallbackDealId:', typeof fallbackDealId);
-            console.log('🔍 WEBHOOK DEBUG - fallbackDealId é null?', fallbackDealId === null);
-            console.log('🔍 WEBHOOK DEBUG - fallbackDealId é undefined?', fallbackDealId === undefined);
-            console.log('🔍 WEBHOOK DEBUG - fallbackDealId é string vazia?', fallbackDealId === '');
+            console.log('🔍 WEBHOOK DEBUG - finalDealId:', finalDealId);
+            console.log('🔍 WEBHOOK DEBUG - webhookStatus:', webhookStatus);
             
-            // PROTEÇÃO CRÍTICA: Evitar envio duplo
-            if (aiSent) {
-                console.log('🚫 N8N - Já enviado, pulando...');
+            // 🚀 PROTEÇÃO CRÍTICA: Evitar envio duplo ou simultâneo
+            if (webhookStatus.sent || webhookStatus.sending) {
+                console.log('🚫 N8N - Já processado/processando, pulando...', webhookStatus);
                 return;
             }
             
@@ -175,11 +164,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 return;
             }
 
-            // MARCAR COMO ENVIADO IMEDIATAMENTE para evitar race conditions
-            setAiSent(true);
+            // 🚀 MARCAR COMO ENVIANDO IMEDIATAMENTE para evitar race conditions
+            setWebhookStatus(prev => ({ 
+                ...prev, 
+                sending: true, 
+                attempts: prev.attempts + 1 
+            }));
             
             console.log('🚀 N8N - ENVIANDO DIAGNÓSTICO ÚNICO', hasAI ? 'com análise IA' : 'por timeout');
-            console.log('🔒 N8N - aiSent marcado como true para evitar duplicação');
+            console.log('🔒 N8N - Status marcado como "sending" para evitar duplicação');
             
             try {
                 const isProduction = window.location.hostname === 'app.grupoggv.com';
@@ -202,7 +195,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                     return `${timestamp}-${Math.abs(hash).toString(36)}-${shortDealId}`;
                 };
                 
-                const secureToken = fallbackDealId ? generateSecureToken(fallbackDealId) : 'diagnostic-' + Date.now();
+                const secureToken = finalDealId ? generateSecureToken(finalDealId) : 'diagnostic-' + Date.now();
                 const publicReportUrl = `${baseUrl}/r/${secureToken}`;
 
                 // Salvar relatório público
@@ -216,7 +209,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         summaryInsights,
                         detailedAnalysis,
                         scoresByArea: scoresByArea,
-                        ...(fallbackDealId && { dealId: fallbackDealId })
+                        ...(finalDealId && { dealId: finalDealId })
                     };
                     
                     console.log('💾 N8N - Salvando relatório público:', { token: secureToken, hasDealId: !!dealId });
@@ -230,7 +223,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
                 // Payload completo para N8N (inclui score + análise IA se disponível)
                 const payload = {
-                    ...(fallbackDealId && { deal_id: fallbackDealId }), // Só incluir se houver deal_id
+                    ...(finalDealId && { deal_id: finalDealId }), // Só incluir se houver deal_id
                     timestamp: new Date().toISOString(),
                     action: 'ai_analysis_completed',
                     
@@ -239,7 +232,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                             maturityPercentage: Math.round((totalScore / 90) * 100)
                         },
                         resultUrl: publicReportUrl,
-                        ...(fallbackDealId && { deal_id: fallbackDealId }), // Só incluir se houver deal_id
+                        ...(finalDealId && { deal_id: finalDealId }), // Só incluir se houver deal_id
                         
                         // Incluir análise IA se disponível
                         ...(hasAI && {
@@ -293,11 +286,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                         salesTeamSize: companyData.salesTeamSize,
                         salesChannels: companyData.salesChannels || []
                     },
-                    // 🆕 Contexto adicional do cliente
+                    // 🆕 Contexto adicional do cliente - OBRIGATÓRIO para N8N!
                     clientContext: {
-                        situacao: (companyData as any).situacao || null,
-                        problema: (companyData as any).problema || null,
-                        perfil_do_cliente: (companyData as any).perfil_do_cliente || null,
+                        situacao: (companyData as any).situacao || 'Empresa buscando otimização dos processos comerciais',
+                        problema: (companyData as any).problema || 'Necessidade de estruturação e melhoria da eficiência comercial',
+                        perfil_do_cliente: (companyData as any).perfil_do_cliente || `${companyData.activityBranch || 'Empresa'} com ${companyData.salesTeamSize || 'equipe'} comercial`,
                     },
                     segment: {
                         name: segment?.name || 'Geral',
@@ -312,18 +305,22 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             console.log('  - payload.deal_id:', payload.deal_id);
             console.log('  - payload.body.deal_id:', payload.body.deal_id);
             console.log('  - dealId original (prop):', dealId);
-            console.log('  - fallbackDealId (usado):', fallbackDealId);
-            console.log('  - Tipo do fallbackDealId:', typeof fallbackDealId);
+            console.log('  - finalDealId (usado):', finalDealId);
+            console.log('  - Tipo do finalDealId:', typeof finalDealId);
             console.log('  - URL atual completa:', window.location.href);
-            console.log('  - Deal ID direto da URL:', new URLSearchParams(window.location.search).get('deal_id'));
             
-            // VALIDAÇÃO ANTI-ALUCINAÇÃO
+            // 🚀 VALIDAÇÃO ANTI-ALUCINAÇÃO MELHORADA
             const urlDealId = new URLSearchParams(window.location.search).get('deal_id');
             if (urlDealId && payload.deal_id !== urlDealId) {
                 console.error('🚨 INCONSISTÊNCIA CRÍTICA DETECTADA!');
                 console.error('  - Deal ID na URL:', urlDealId);
                 console.error('  - Deal ID no payload:', payload.deal_id);
                 console.error('  - Esta inconsistência pode causar dados incorretos!');
+                
+                // 🚀 AUTO-CORREÇÃO: Usar sempre o da URL se disponível
+                if (payload.deal_id) payload.deal_id = urlDealId;
+                if (payload.body.deal_id) payload.body.deal_id = urlDealId;
+                console.log('🔧 AUTO-CORREÇÃO aplicada - usando deal_id da URL');
             } else if (urlDealId) {
                 console.log('✅ VALIDAÇÃO OK - Deal ID do payload confere com a URL');
             }
@@ -342,26 +339,40 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 
                 if (response.ok) {
                     console.log('✅ N8N - Diagnóstico enviado com sucesso');
+                    setWebhookStatus(prev => ({ 
+                        ...prev, 
+                        sent: true, 
+                        sending: false, 
+                        success: true,
+                        error: null 
+                    }));
                 } else {
-                    console.warn('⚠️ N8N - Falha ao enviar, status:', response.status);
+                    const errorMsg = `Falha HTTP: ${response.status}`;
+                    console.warn('⚠️ N8N - Falha ao enviar:', errorMsg);
+                    setWebhookStatus(prev => ({ 
+                        ...prev, 
+                        sending: false, 
+                        success: false,
+                        error: errorMsg 
+                    }));
                 }
                 
                 // ADICIONAR: Envio para webhook do Pipedrive se houver deal_id
-                if (fallbackDealId && fallbackDealId.trim() !== '') {
-                    console.log('📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id:', fallbackDealId);
+                if (finalDealId && finalDealId.trim() !== '') {
+                    console.log('📤 PIPEDRIVE - Enviando para webhook do Pipedrive com deal_id:', finalDealId);
                     try {
                         const { sendDiagnosticToPipedrive } = await import('../../services/supabaseService');
                         const pipedriveSuccess = await sendDiagnosticToPipedrive(
                             companyData,
                             answers,
                             totalScore,
-                            fallbackDealId
+                            finalDealId
                         );
                         
                         if (pipedriveSuccess) {
-                            console.log('✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id:', fallbackDealId);
+                            console.log('✅ PIPEDRIVE - Webhook enviado com sucesso para deal_id:', finalDealId);
                         } else {
-                            console.warn('⚠️ PIPEDRIVE - Falha ao enviar webhook para deal_id:', fallbackDealId);
+                            console.warn('⚠️ PIPEDRIVE - Falha ao enviar webhook para deal_id:', finalDealId);
                         }
                     } catch (pipedriveError) {
                         console.error('❌ PIPEDRIVE - Erro ao enviar webhook:', pipedriveError);
@@ -369,17 +380,22 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 } else {
                     console.log('⚠️ PIPEDRIVE - Deal ID não disponível, pulando webhook do Pipedrive');
                 }
-                
-                setAiSent(true);
 
-            } catch (error) {
-                console.error('❌ N8N - Erro ao enviar:', error);
-                setAiSent(true); // Marcar como enviado para não ficar tentando
+            } catch (error: any) {
+                const errorMsg = error.message || 'Erro desconhecido';
+                console.error('❌ N8N - Erro ao enviar:', errorMsg);
+                setWebhookStatus(prev => ({ 
+                    ...prev, 
+                    sent: true, // Marcar como processado para não ficar tentando
+                    sending: false, 
+                    success: false,
+                    error: errorMsg 
+                }));
             }
         };
 
         sendCompleteAnalysis();
-    }, [summaryInsights, detailedAnalysis, emergencyTimeout, aiSent, companyData, answers, totalScore, fallbackDealId]);
+    }, [summaryInsights, detailedAnalysis, emergencyTimeout, webhookStatus.sent, webhookStatus.sending, companyData, answers, totalScore, finalDealId]);
 
     const handleNextTab = () => {
         const currentIndex = REPORT_TABS.indexOf(activeTab);
@@ -455,6 +471,30 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
                 {activeTab === 'Análise IA' && <AIAnalysisTab detailedAnalysis={detailedAnalysis} isGenerating={isLoadingDetailed} />}
             </div>
 
+            {/* 🚀 NOVO: Indicador de status do envio */}
+            {(webhookStatus.sending || webhookStatus.error) && (
+                <div className={`bg-white p-3 rounded-2xl shadow-lg border border-slate-200/50 flex items-center gap-3 ${
+                    webhookStatus.error ? 'border-red-200 bg-red-50' : 'border-blue-200 bg-blue-50'
+                }`}>
+                    {webhookStatus.sending && (
+                        <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            <span className="text-sm text-blue-700 font-medium">
+                                Enviando resultados... (Tentativa {webhookStatus.attempts})
+                            </span>
+                        </>
+                    )}
+                    {webhookStatus.error && (
+                        <>
+                            <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />
+                            <span className="text-sm text-red-700 font-medium">
+                                Erro no envio: {webhookStatus.error}
+                            </span>
+                        </>
+                    )}
+                </div>
+            )}
+            
             <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-200/50 flex flex-wrap items-center justify-center gap-4">
                 <button onClick={() => hasAIReady && setShowEmailModal(true)} disabled={!hasAIReady} className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-colors ${hasAIReady ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-slate-50 text-slate-400 cursor-not-allowed'}`} aria-disabled={!hasAIReady}>
                     <EnvelopeIcon className="w-5 h-5" /> Enviar por E-mail

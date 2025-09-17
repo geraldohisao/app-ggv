@@ -254,30 +254,16 @@ export async function getAnalysisStats(): Promise<{
       .select('*', { count: 'exact', head: true })
       .eq('ai_status', 'completed');
 
-    // Chamadas com notas (score) - usar MESMA lógica do frontend
-    const { data: callsForScore } = await supabase
+    // Chamadas com notas (score) - usar MESMA lógica do ranking SQL
+    const { data: callsWithScoreData } = await supabase
       .from('calls')
       .select(`
         id,
-        scorecard,
-        call_analysis!left(final_grade)
-      `);
+        call_analysis!inner(final_grade)
+      `)
+      .not('call_analysis.final_grade', 'is', null);
     
-    const callsWithScore = (callsForScore || []).filter(call => {
-      // Mesma lógica do convertToCallItem
-      const hasScorecard = call.scorecard && 
-                          call.scorecard !== 'null' &&
-                          (call.scorecard.final_score !== undefined || 
-                           call.scorecard.total_score !== undefined || 
-                           call.scorecard.score !== undefined);
-      
-      const hasAnalysis = call.call_analysis && 
-                         Array.isArray(call.call_analysis) && 
-                         call.call_analysis.length > 0 && 
-                         call.call_analysis[0]?.final_grade !== undefined;
-      
-      return hasScorecard || hasAnalysis;
-    }).length;
+    const callsWithScore = (callsWithScoreData || []).length;
 
     console.log('📊 STATS DEBUG:', {
       totalCalls: totalCalls || 0,

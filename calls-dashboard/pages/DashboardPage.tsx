@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabaseClient';
 import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
 import SdrAverageScoreChart from '../components/SdrAverageScoreChart';
+import { fetchUniqueSdrs } from '../services/callsService';
 
 const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState({
@@ -22,6 +23,8 @@ const DashboardPage = () => {
   });
 
   const [selectedPeriod, setSelectedPeriod] = useState(14);
+  const [selectedSdr, setSelectedSdr] = useState<string | null>(null);
+  const [sdrOptions, setSdrOptions] = useState<{ email: string; name: string }[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
@@ -119,6 +122,19 @@ const DashboardPage = () => {
     
     return { volumeData, sdrMetrics };
   };
+
+  useEffect(() => {
+    // Carregar SDRs para o seletor
+    const loadSdrs = async () => {
+      try {
+        const sdrs = await fetchUniqueSdrs();
+        setSdrOptions(sdrs.map(s => ({ email: s.email, name: s.name })));
+      } catch (e) {
+        console.warn('Não foi possível carregar SDRs para o dashboard');
+      }
+    };
+    loadSdrs();
+  }, []);
 
   useEffect(() => {
     console.log('🎯🎯🎯 useEffect EXECUTADO - VERSÃO FORÇADA!');
@@ -285,6 +301,19 @@ const DashboardPage = () => {
               <option value="90">Últimos 90 dias</option>
             </select>
           </div>
+          <div>
+            <label style={{ marginRight: '8px', fontSize: '14px', color: '#666' }}>SDR:</label>
+            <select 
+              value={selectedSdr || ''}
+              onChange={(e) => setSelectedSdr(e.target.value || null)}
+              style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+            >
+              <option value="">Todos os SDRs</option>
+              {sdrOptions.map(s => (
+                <option key={s.email} value={s.email}>{s.name || s.email}</option>
+              ))}
+            </select>
+          </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label style={{ fontSize: '14px', color: '#666' }}>
@@ -375,6 +404,7 @@ const DashboardPage = () => {
       <div style={{ marginBottom: '24px' }}>
         <CallVolumeChart 
           selectedPeriod={selectedPeriod} 
+          selectedSdrEmail={selectedSdr}
         />
       </div>
 

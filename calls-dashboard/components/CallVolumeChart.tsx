@@ -14,10 +14,11 @@ interface CallVolumeChartProps {
   onDateClick?: (date: string) => void;
   startDate?: string;
   endDate?: string;
+  selectedSdrEmail?: string | null; // novo filtro
 }
 
 // Função para buscar dados reais de chamadas via RPC (evita RLS/timezone)
-async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endDate?: string): Promise<CallData[]> {
+async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endDate?: string, selectedSdrEmail?: string | null): Promise<CallData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
     return [];
@@ -35,7 +36,7 @@ async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endD
 
     // Buscar chamadas no período usando a MESMA função da lista
     const { data, error } = await supabase.rpc('get_calls_with_filters', {
-      p_sdr: null,
+      p_sdr: selectedSdrEmail || null,
       p_status: null,
       p_type: null,
       p_start_date: startISO,
@@ -92,7 +93,7 @@ async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endD
 }
 
 // Simple SVG line chart without external libs
-export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate, endDate }: CallVolumeChartProps) {
+export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate, endDate, selectedSdrEmail }: CallVolumeChartProps) {
   const [data, setData] = useState<CallData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +121,7 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
       // console.log('🔄 CallVolumeChart useEffect disparado');
       
       try {
-        const callData = await fetchCallVolumeData(selectedPeriod, startDate, endDate);
+        const callData = await fetchCallVolumeData(selectedPeriod, startDate, endDate, selectedSdrEmail);
         console.log('📊 Dados retornados pela função:', callData);
         setData(callData);
       } catch (err: any) {
@@ -132,7 +133,7 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
     };
 
     loadData();
-  }, [selectedPeriod, startDate, endDate]);
+  }, [selectedPeriod, startDate, endDate, selectedSdrEmail]);
 
   if (loading) {
     return (

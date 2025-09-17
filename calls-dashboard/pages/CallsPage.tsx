@@ -334,18 +334,40 @@ export default function CallsPage() {
         result = result.sort((a, b) => getRealDuration(b) - getRealDuration(a));
         break;
       case 'score': {
+        // Helper para converter score para número válido
+        const getScoreValue = (call: any): number => {
+          if (call.score === null || call.score === undefined) return -1;
+          if (typeof call.score === 'number') return call.score;
+          if (typeof call.score === 'string') {
+            const parsed = parseFloat(call.score);
+            return isNaN(parsed) ? -1 : parsed;
+          }
+          return -1;
+        };
+        
         const withScore = result
-          .filter(c => typeof c.score === 'number')
-          .sort((a, b) => (b.score || 0) - (a.score || 0));
-        const withoutScore = result.filter(c => typeof c.score !== 'number');
+          .filter(c => getScoreValue(c) >= 0)
+          .sort((a, b) => getScoreValue(b) - getScoreValue(a));
+        const withoutScore = result.filter(c => getScoreValue(c) < 0);
         result = [...withScore, ...withoutScore];
         break;
       }
       case 'score_asc': {
+        // Helper para converter score para número válido
+        const getScoreValue = (call: any): number => {
+          if (call.score === null || call.score === undefined) return -1;
+          if (typeof call.score === 'number') return call.score;
+          if (typeof call.score === 'string') {
+            const parsed = parseFloat(call.score);
+            return isNaN(parsed) ? -1 : parsed;
+          }
+          return -1;
+        };
+        
         const withScore = result
-          .filter(c => typeof c.score === 'number')
-          .sort((a, b) => (a.score || 0) - (b.score || 0));
-        const withoutScore = result.filter(c => typeof c.score !== 'number');
+          .filter(c => getScoreValue(c) >= 0)
+          .sort((a, b) => getScoreValue(a) - getScoreValue(b));
+        const withoutScore = result.filter(c => getScoreValue(c) < 0);
         result = [...withScore, ...withoutScore];
         break;
       }

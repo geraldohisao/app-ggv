@@ -1,0 +1,16 @@
+{
+  "dealId": "56934",
+  "timestamp": "2025-09-17T03:45:52.073Z",
+  "hypothesis": "Contexto do cliente obrigatório",
+  "contextTest": {
+    "success": true,
+    "status": 200,
+    "duration": 1447,
+    "body": "Negócio atualizado"
+  },
+  "realFormatTest": {
+    "success": true,
+    "status": 200,
+    "body": "Negócio atualizado"
+  }
+}

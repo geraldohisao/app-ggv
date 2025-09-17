@@ -8,6 +8,10 @@ export interface PipedriveData {
   monthlyBilling?: string;
   salesTeamSize?: string;
   salesChannels?: string[];
+  // 🆕 NOVOS CAMPOS DO PIPEDRIVE
+  situacao?: string;        // Situação atual da empresa
+  problema?: string;        // Problema identificado
+  perfil_do_cliente?: string; // Perfil do cliente
   [key: string]: any; // Para campos adicionais que possam vir da resposta
 }
 
@@ -21,11 +25,8 @@ export interface UsePipedriveDataResult {
 // Detectar se está em ambiente de desenvolvimento ou produção
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-// URL do webhook - usar diretamente a função Netlify até o redirect funcionar
+// URL do webhook - FORÇAR PRODUÇÃO PARA TESTE COM DADOS REAIS
 const PIPEDRIVE_WEBHOOK_URL = 'https://app.grupoggv.com/.netlify/functions/diag-ggv-register';
-
-// Para desenvolvimento local com mock server, descomente:
-// const PIPEDRIVE_WEBHOOK_URL = isDevelopment ? 'http://localhost:8080/webhook/diag-ggv-register' : 'https://app.grupoggv.com/api/webhook/diag-ggv-register';
 
 /**
  * Hook para capturar deal_id da URL e buscar dados do Pipedrive
@@ -43,6 +44,7 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
     console.log('🔍 PIPEDRIVE - Hook executando, verificando URL...');
     console.log('🔍 PIPEDRIVE - Timestamp:', new Date().toISOString());
     console.log('🔍 PIPEDRIVE - Deal ID da URL (dependência):', currentDealIdFromUrl);
+    console.log('🔍 PIPEDRIVE - URL configurada:', PIPEDRIVE_WEBHOOK_URL);
     
     // Capturar deal_id da URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -81,6 +83,8 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
   }, [currentDealIdFromUrl]); // CORREÇÃO: Dependência do deal_id da URL para re-executar quando mudar
 
   const fetchPipedriveData = async (dealId: string) => {
+    console.log('🚀 PIPEDRIVE - fetchPipedriveData CHAMADO com deal_id:', dealId);
+    
     // Validação crítica: não fazer requisição sem deal_id
     if (!dealId || dealId.trim() === '') {
       console.error('❌ PIPEDRIVE - Tentativa de requisição sem deal_id válido');
@@ -91,6 +95,7 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
 
     const cleanDealId = dealId.trim();
     console.log('🔄 PIPEDRIVE - Iniciando requisição para deal_id:', cleanDealId);
+    console.log('🔄 PIPEDRIVE - URL que será usada:', PIPEDRIVE_WEBHOOK_URL);
     
     setLoading(true);
     setError(null);
@@ -206,6 +211,27 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
           : Array.isArray(responseData.canais_vendas)
           ? responseData.canais_vendas
           : [],
+        // 🆕 MAPEAMENTO DOS NOVOS CAMPOS - COM DEBUG (inclui chaves com acento)
+        situacao: (() => {
+          const valor =
+            responseData.situacao ||
+            (responseData as any)['situação'] ||
+            responseData.situacao_atual ||
+            responseData.current_situation ||
+            '';
+          console.log('🔥 MAPEAMENTO - situacao:', valor);
+          return valor;
+        })(),
+        problema: (() => {
+          const valor = responseData.problema || responseData.problema_identificado || responseData.identified_problem || '';
+          console.log('🔥 MAPEAMENTO - problema:', valor);
+          return valor;
+        })(),
+        perfil_do_cliente: (() => {
+          const valor = responseData.perfil_do_cliente || responseData['perfil_do_cliente'] || responseData.customer_profile || responseData.client_profile || '';
+          console.log('🔥 MAPEAMENTO - perfil_do_cliente:', valor);
+          return valor;
+        })(),
         // Preservar TODOS os dados originais para uso posterior
         ...responseData,
       };
@@ -230,7 +256,18 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
         'tamanho_equipe_comercial (com acentos)': responseData['tamanho_equipe_comercial'],
         'sales_team_size': responseData.sales_team_size,
         'salesTeamSize': responseData.salesTeamSize,
-        'tamanho_equipe_vendas': responseData.tamanho_equipe_vendas
+        'tamanho_equipe_vendas': responseData.tamanho_equipe_vendas,
+        // 🆕 NOVOS CAMPOS
+        'situacao': responseData.situacao,
+        'situacao_atual': responseData.situacao_atual,
+        'current_situation': responseData.current_situation,
+        'problema': responseData.problema,
+        'problema_identificado': responseData.problema_identificado,
+        'identified_problem': responseData.identified_problem,
+        'perfil_do_cliente': responseData.perfil_do_cliente,
+        'perfil_do_cliente (com acentos)': responseData['perfil_do_cliente'],
+        'customer_profile': responseData.customer_profile,
+        'client_profile': responseData.client_profile
       });
       
       // MAPEAMENTO FORÇADO PARA TODOS OS CAMPOS COM ACENTOS
@@ -314,7 +351,16 @@ export const usePipedriveData = (): UsePipedriveDataResult => {
       console.log('🎯 PIPEDRIVE - Setor:', mappedData.activitySector);
       console.log('💰 PIPEDRIVE - Faturamento:', mappedData.monthlyBilling);
       console.log('👥 PIPEDRIVE - Equipe:', mappedData.salesTeamSize);
+      console.log('🆕 PIPEDRIVE - Situação:', mappedData.situacao);
+      console.log('🆕 PIPEDRIVE - Problema:', mappedData.problema);
+      console.log('🆕 PIPEDRIVE - Perfil do Cliente:', mappedData.perfil_do_cliente);
       console.log('🔍 PIPEDRIVE - Dados completos:', mappedData);
+      
+      // 🆕 DEBUG CRÍTICO - Verificar se os dados estão sendo setados corretamente
+      console.log('🔥 HOOK DEBUG - Verificando se novos campos estão no mappedData:');
+      console.log('  - mappedData.situacao existe?', !!mappedData.situacao);
+      console.log('  - mappedData.problema existe?', !!mappedData.problema);
+      console.log('  - mappedData.perfil_do_cliente existe?', !!mappedData.perfil_do_cliente);
 
     } catch (err: any) {
       console.error('❌ PIPEDRIVE - Erro ao buscar dados para deal_id:', cleanDealId);

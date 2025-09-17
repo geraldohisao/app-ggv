@@ -183,14 +183,26 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       sortBy
     });
 
-    // Construir query com filtros aplicados (VERSÃO SIMPLES QUE FUNCIONAVA)
-    let query = supabase
-      .from('calls')
-      .select(`
+    // Determinar antecipadamente se a ordenação é por score (usado em várias etapas)
+    const isScoreFilter = sortBy === 'score' || sortBy === 'score_asc';
+
+    // Construir query com filtros aplicados
+    // Se for ordenação por score, usar INNER JOIN para garantir apenas chamadas com análise
+    const baseSelect = isScoreFilter
+      ? `
+        *,
+        scorecard,
+        call_analysis!inner(final_grade)
+      `
+      : `
         *,
         scorecard,
         call_analysis!left(final_grade)
-      `);
+      `;
+
+    let query = supabase
+      .from('calls')
+      .select(baseSelect);
 
     // Aplicar filtros (versão original que funcionava)
     if (sdr_email) {
@@ -228,10 +240,15 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     let orderField = 'created_at';
     let orderAscending = false;
     
-    // Para filtros de score, buscar TODAS as chamadas para ordenação global
-    const isScoreFilter = sortBy === 'score' || sortBy === 'score_asc';
+    // Para filtros de score, buscar TODAS as chamadas COM NOTA para ordenação global
     const effectiveLimit = isScoreFilter ? 10000 : limit; // Buscar todas para score
     const effectiveOffset = isScoreFilter ? 0 : offset; // Sempre do início para score
+    
+    // Se é ordenação por score, filtrar apenas chamadas com análise (mesma lógica do painel)
+    if (isScoreFilter) {
+      query = query.not('call_analysis.final_grade', 'is', null);
+      console.log('🎯 CALLS SERVICE - Filtro automático aplicado: apenas chamadas com call_analysis.final_grade');
+    }
     
     switch (sortBy) {
       case 'duration':
@@ -306,10 +323,16 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
       };
     }
 
-    // Contar total de registros com os mesmos filtros (VERSÃO SIMPLES)
-    let countQuery = supabase
-      .from('calls')
-      .select('*', { count: 'exact', head: true });
+    // Contar total de registros com os mesmos filtros
+    // Quando ordenando por nota, contamos APENAS chamadas com análise (final_grade presente)
+    let countQuery = isScoreFilter
+      ? supabase
+          .from('calls')
+          .select('id, call_analysis!inner(final_grade)', { count: 'exact', head: true })
+          .not('call_analysis.final_grade', 'is', null)
+      : supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true });
 
     // Aplicar os mesmos filtros para contagem
     if (sdr_email) {
@@ -333,6 +356,7 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     }
 
     // Não aplicar filtros de duração na contagem - será feito no frontend
+    // Para isScoreFilter, já aplicamos o filtro por análise acima
 
     // Timeout separado para contagem
     const countController = new AbortController();
@@ -418,7 +442,11 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
 
         let pageQuery = supabase
           .from('calls')
-          .select(`
+          .select(isScoreFilter ? `
+            *,
+            scorecard,
+            call_analysis!inner(final_grade)
+          ` : `
             *,
             scorecard,
             call_analysis!left(final_grade)
@@ -438,6 +466,11 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
         }
         if (endTimestamp) {
           pageQuery = pageQuery.lte('created_at', endTimestamp);
+        }
+
+        // Em ordenação por nota, garantir que apenas chamadas com nota sejam buscadas nas páginas adicionais
+        if (isScoreFilter) {
+          pageQuery = pageQuery.not('call_analysis.final_grade', 'is', null);
         }
 
         const { data: more, error: moreErr } = await pageQuery

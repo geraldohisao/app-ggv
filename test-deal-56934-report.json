@@ -1,0 +1,18 @@
+{
+  "dealId": "56934",
+  "timestamp": "2025-09-17T03:42:47.137Z",
+  "tests": {
+    "get": {
+      "success": true,
+      "status": 200,
+      "duration": 1889,
+      "body": "{\"tamanho_equipe_comercial\":\"De 1 a 3 colaboradores\",\"faturamento_mensal\":\"Acima de 1 milhão/mês\",\"setor_de_atuação\":\"Consultoria / Assessoria / Administração\",\"ramo_de_atividade\":\"Indústria\",\"email\":\"romaomonique4@gmail.com\",\"empresa\":\"GGV CONSULTORIA EMPRESARIAL\",\"situacao\":null,\"problema\":null,\"perfil_do_cliente\":null}"
+    },
+    "post": {
+      "success": false,
+      "status": 500,
+      "duration": 494,
+      "body": "{\"message\":\"Error in workflow\"}"
+    }
+  }
+}

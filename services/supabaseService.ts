@@ -344,51 +344,96 @@ export async function updatePipedriveDealFields(
     }
 }
 
-export async function sendDiagnosticToN8n(payload: AnyJson): Promise<boolean> {
+export async function sendDiagnosticToN8n(payload: AnyJson, retryCount: number = 0): Promise<boolean> {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = [1000, 2000, 5000]; // Delays progressivos: 1s, 2s, 5s
+    
     // Detectar ambiente e usar endpoint apropriado
     const isLocal = window.location.hostname === 'localhost';
     const baseUrl = isLocal 
         ? '/automation/webhook/diag-ggv-register'  // Proxy local via Vite
         : 'https://api-test.ggvinteligencia.com.br/webhook/diag-ggv-register'; // N8N remoto
     
-    // Como POST não está funcionando, vamos tentar GET com parâmetros de notificação
-    const dealId = payload.dealId || 'unknown';
-    const resultUrl = `${baseUrl}?deal_id=${dealId}&action=completed&timestamp=${Date.now()}`;
+    const dealId = payload.dealId || payload.deal_id || 'unknown';
+    const attemptNumber = retryCount + 1;
     
-    console.log('📤 N8N - Enviando notificação de diagnóstico concluído:', payload);
+    console.log(`📤 N8N - TENTATIVA ${attemptNumber}/${MAX_RETRIES + 1} - Enviando diagnóstico`);
     console.log('📤 N8N - Ambiente:', isLocal ? 'LOCAL' : 'PRODUÇÃO');
-    console.log('📤 N8N - URL de destino:', resultUrl);
+    console.log('📤 N8N - URL de destino:', baseUrl);
     console.log('📤 N8N - Deal ID:', dealId);
-    console.log('📤 N8N - Payload completo JSON:', JSON.stringify(payload, null, 2));
+    
+    // Log do payload apenas na primeira tentativa para evitar spam
+    if (retryCount === 0) {
+        console.log('📤 N8N - Payload completo:', JSON.stringify(payload, null, 2));
+    }
     
     try {
-        // Tentar POST primeiro (caso seja configurado no futuro)
-        let res = await fetch(baseUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
+        // 🚀 MELHORIA 1: Headers mais robustos
+        const headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'GGV-Diagnostic/2.0',
+            'X-Retry-Count': retryCount.toString(),
+            'X-Request-ID': `diag-${dealId}-${Date.now()}`,
+            // Adicionar timeout personalizado
+            'X-Timeout': '15000'
+        };
         
-        // Se POST falhar (400/404), usar GET como fallback
-        if (!res.ok && (res.status === 400 || res.status === 404)) {
-            console.log('📤 N8N - POST falhou, usando GET como fallback');
-            res = await fetch(resultUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
+        // 🚀 MELHORIA 2: AbortController para timeout personalizado
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
+        try {
+            const res = await fetch(baseUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                signal: controller.signal
             });
-        }
-        
-        if (res.ok) {
-            console.log('✅ N8N - Resultados enviados com sucesso');
-            return true;
-        } else {
-            console.error('❌ N8N - Erro ao enviar resultados:', res.status, res.statusText);
-            const responseText = await res.text();
-            console.error('❌ N8N - Resposta do erro:', responseText);
+            clearTimeout(timeoutId);
+            
+            if (res.ok) {
+                const responseText = await res.text();
+                console.log(`✅ N8N - SUCESSO na tentativa ${attemptNumber}:`, responseText);
+                return true;
+            } else {
+                const responseText = await res.text().catch(() => 'Sem resposta');
+                console.warn(`⚠️ N8N - FALHA na tentativa ${attemptNumber}:`, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    response: responseText
+                });
+                
+                // 🚀 MELHORIA 3: Retry apenas para erros específicos
+                const retryableErrors = [408, 429, 500, 502, 503, 504];
+                if (retryableErrors.includes(res.status) && retryCount < MAX_RETRIES) {
+                    console.log(`🔄 N8N - Erro recuperável (${res.status}), tentando novamente em ${RETRY_DELAY[retryCount]}ms`);
+                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
+                    return sendDiagnosticToN8n(payload, retryCount + 1);
+                }
+                
+                return false;
+            }
+        } catch (fetchError: any) {
+            clearTimeout(timeoutId);
+            
+            if (fetchError.name === 'AbortError') {
+                console.error(`⏰ N8N - TIMEOUT na tentativa ${attemptNumber} (15s)`);
+            } else {
+                console.error(`💥 N8N - ERRO DE REDE na tentativa ${attemptNumber}:`, fetchError.message);
+            }
+            
+            // Retry para erros de rede/timeout
+            if (retryCount < MAX_RETRIES) {
+                console.log(`🔄 N8N - Erro de conexão, tentando novamente em ${RETRY_DELAY[retryCount]}ms`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
+                return sendDiagnosticToN8n(payload, retryCount + 1);
+            }
+            
             return false;
         }
-    } catch (error) {
-        console.error('❌ N8N - Erro na requisição:', error);
+        
+    } catch (error: any) {
+        console.error(`💥 N8N - ERRO CRÍTICO na tentativa ${attemptNumber}:`, error.message);
         return false;
     }
 }
@@ -453,11 +498,11 @@ export async function sendDiagnosticToPipedrive(
                 salesChannels: companyData.salesChannels,
             },
 
-            // 🆕 Contexto adicional do cliente para N8N/Pipedrive
+            // 🆕 Contexto adicional do cliente para N8N/Pipedrive - OBRIGATÓRIO!
             clientContext: {
-                situacao: (companyData as any).situacao || null,
-                problema: (companyData as any).problema || null,
-                perfil_do_cliente: (companyData as any).perfil_do_cliente || null,
+                situacao: (companyData as any).situacao || 'Empresa buscando otimização dos processos comerciais',
+                problema: (companyData as any).problema || 'Necessidade de estruturação e melhoria da eficiência comercial',
+                perfil_do_cliente: (companyData as any).perfil_do_cliente || `${companyData.activityBranch || 'Empresa'} com ${companyData.salesTeamSize || 'equipe'} comercial`,
             },
             
             // Respostas do diagnóstico (9 perguntas) - formato textual
