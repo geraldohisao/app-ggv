@@ -410,10 +410,11 @@ export const DiagnosticoComercial: React.FC = () => {
         // Limpar estado persistido
         clearPersistedState();
         
-        // Limpar URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('deal_id');
-        window.history.replaceState({}, '', url.toString());
+        // CORREÇÃO CRÍTICA: NÃO remover deal_id da URL - é necessário para webhooks
+        // Comentado para preservar deal_id durante todo o fluxo
+        // const url = new URL(window.location.href);
+        // url.searchParams.delete('deal_id');
+        // window.history.replaceState({}, '', url.toString());
         
         console.log('🔄 RESET - Diagnóstico reiniciado completamente');
     };
@@ -610,10 +611,11 @@ export const DiagnosticoComercial: React.FC = () => {
                                                 setManualSearchData(null);
                                                 setShowSearchField(true);
                                                 
-                                                // Limpar URL
-                                                const url = new URL(window.location.href);
-                                                url.searchParams.delete('deal_id');
-                                                window.history.replaceState({}, '', url.toString());
+                                                // CORREÇÃO CRÍTICA: NÃO remover deal_id da URL - é necessário para webhooks
+                                                // Comentado para preservar deal_id durante todo o fluxo
+                                                // const url = new URL(window.location.href);
+                                                // url.searchParams.delete('deal_id');
+                                                // window.history.replaceState({}, '', url.toString());
                                             }}
                                             className="text-xs px-3 py-1 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-700 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
                                             title="Buscar outro Deal ID"
