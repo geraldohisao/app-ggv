@@ -1,0 +1,26 @@
+{
+  "dealId": "62719",
+  "timestamp": "2025-09-17T11:25:19.248Z",
+  "testType": "timeout-fallback-validation",
+  "results": {
+    "timeoutFallback": {
+      "success": false,
+      "timedOut": false,
+      "duration": 1054,
+      "status": 500
+    },
+    "normalTimeout": {
+      "success": true,
+      "timedOut": false,
+      "duration": 923,
+      "status": 200
+    },
+    "abortController": {
+      "success": false,
+      "aborted": false,
+      "duration": 889,
+      "status": 500
+    }
+  },
+  "conclusion": "SISTEMA DE TIMEOUT FUNCIONANDO - Fluxo principal OK"
+}

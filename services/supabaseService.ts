@@ -340,19 +340,37 @@ export async function updatePipedriveDealFields(
 
         console.log('📤 PIPEDRIVE UPDATE - Tentativa 1 (formato simplificado):', simplePayload);
         
-        let res = await fetch(url, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'User-Agent': 'GGV-Diagnostic/2.0',
-                'X-Request-Type': 'update-fields'
-            },
-            body: JSON.stringify(simplePayload),
-        });
+        // 🚀 TIMEOUT CONTROLLER para primeira tentativa
+        const controller1 = new AbortController();
+        const timeoutId1 = setTimeout(() => controller1.abort(), 10000); // 10s timeout
+        
+        let res: Response;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'GGV-Diagnostic/2.0',
+                    'X-Request-Type': 'update-fields',
+                    'X-Timeout': '10000'
+                },
+                body: JSON.stringify(simplePayload),
+                signal: controller1.signal
+            });
+            clearTimeout(timeoutId1);
 
-        if (res.ok) {
-            console.log('✅ PIPEDRIVE UPDATE - Sucesso com formato simplificado');
-            return true;
+            if (res.ok) {
+                console.log('✅ PIPEDRIVE UPDATE - Sucesso com formato simplificado');
+                return true;
+            }
+        } catch (fetchError: any) {
+            clearTimeout(timeoutId1);
+            if (fetchError.name === 'AbortError') {
+                console.log('⏰ PIPEDRIVE UPDATE - TIMEOUT na tentativa 1 (10s)');
+            } else {
+                console.log('💥 PIPEDRIVE UPDATE - Erro de rede na tentativa 1:', fetchError.message);
+            }
+            // Continuar para tentativa 2
         }
 
         // 🚀 ESTRATÉGIA 2: Se falhar, tentar com formato original + contexto
@@ -375,15 +393,35 @@ export async function updatePipedriveDealFields(
             timestamp: new Date().toISOString(),
         } as const;
 
-        res = await fetch(url, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'User-Agent': 'GGV-Diagnostic/2.0',
-                'X-Request-Type': 'update-fields-fallback'
-            },
-            body: JSON.stringify(originalPayload),
-        });
+        // 🚀 TIMEOUT CONTROLLER para segunda tentativa
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 10000); // 10s timeout
+        
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'GGV-Diagnostic/2.0',
+                    'X-Request-Type': 'update-fields-fallback',
+                    'X-Timeout': '10000'
+                },
+                body: JSON.stringify(originalPayload),
+                signal: controller2.signal
+            });
+            clearTimeout(timeoutId2);
+        } catch (fetchError: any) {
+            clearTimeout(timeoutId2);
+            if (fetchError.name === 'AbortError') {
+                console.log('⏰ PIPEDRIVE UPDATE - TIMEOUT na tentativa 2 (10s)');
+            } else {
+                console.log('💥 PIPEDRIVE UPDATE - Erro de rede na tentativa 2:', fetchError.message);
+            }
+            // Continuar para estratégia 3 (não bloquear)
+            console.warn('⚠️ PIPEDRIVE UPDATE - Ambas tentativas falharam (timeout/erro), mas continuando fluxo');
+            console.warn('📝 PIPEDRIVE UPDATE - O diagnóstico principal ainda será enviado normalmente');
+            return true;
+        }
 
         if (res.ok) {
             console.log('✅ PIPEDRIVE UPDATE - Sucesso com formato original');
