@@ -6,14 +6,43 @@ let tokenClient: any = null;
 let cachedAccessToken: string | null = null;
 
 async function getGoogleClientId(): Promise<string> {
+  // 1) Tentar buscar do Supabase primeiro
   try {
     const v = await getAppSetting('GOOGLE_OAUTH_CLIENT_ID');
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  } catch {}
+    if (typeof v === 'string' && v.trim()) {
+      console.log('✅ GMAIL - Client ID obtido do Supabase');
+      return v.trim();
+    }
+  } catch (error) {
+    console.warn('⚠️ GMAIL - Erro ao buscar Client ID do Supabase:', error);
+  }
+
+  // 2) Tentar buscar de configuração local/global
   const local: any = (globalThis as any).APP_CONFIG_LOCAL;
-  const id = local?.GOOGLE_OAUTH_CLIENT_ID;
-  if (!id) throw new Error('GOOGLE_OAUTH_CLIENT_ID não configurado');
-  return id;
+  const localId = local?.GOOGLE_OAUTH_CLIENT_ID;
+  if (localId && typeof localId === 'string' && localId.trim()) {
+    console.log('✅ GMAIL - Client ID obtido de configuração local');
+    return localId.trim();
+  }
+
+  // 3) Tentar buscar de variáveis de ambiente (Vite)
+  const envId = import.meta.env?.VITE_GMAIL_CLIENT_ID;
+  if (envId && typeof envId === 'string' && envId.trim()) {
+    console.log('✅ GMAIL - Client ID obtido de variável de ambiente');
+    return envId.trim();
+  }
+
+  // 4) Fallback para Client ID hardcoded (apenas para produção específica)
+  const isProduction = window.location.hostname === 'app.grupoggv.com';
+  if (isProduction) {
+    // Client ID específico para app.grupoggv.com (deve ser configurado no Google Cloud Console)
+    const productionClientId = '1048970542386-8u3v6p7c2s8l5q9k1m0n2b4x7y6z3a5w.apps.googleusercontent.com';
+    console.log('🔧 GMAIL - Usando Client ID de produção (fallback)');
+    return productionClientId;
+  }
+
+  console.error('❌ GMAIL - Nenhuma configuração de Client ID encontrada');
+  throw new Error('GOOGLE_OAUTH_CLIENT_ID não configurado. Verifique as configurações do Supabase ou variáveis de ambiente.');
 }
 
 async function ensureGis(): Promise<void> {
@@ -366,15 +395,33 @@ async function testGmailPermissions(token: string): Promise<boolean> {
 
 export async function sendEmailViaGmail({ to, subject, html }: { to: string; subject: string; html: string; }): Promise<boolean> {
   let retryCount = 0;
-  const maxRetries = 2;
+  const maxRetries = 3; // Aumentando para 3 tentativas
+  
+  console.log('📧 GMAIL - Iniciando processo de envio de e-mail...', {
+    destinatario: to,
+    assunto: subject.substring(0, 50) + '...',
+    tamanhoHtml: html.length,
+    timestamp: new Date().toISOString()
+  });
   
   while (retryCount <= maxRetries) {
     try {
       console.log(`📧 GMAIL - Tentativa ${retryCount + 1} de ${maxRetries + 1}...`);
       
+      // Verificar configuração do Client ID antes de tentar obter token
+      try {
+        const clientId = await getGoogleClientId();
+        console.log('✅ GMAIL - Client ID configurado:', clientId.substring(0, 20) + '...');
+      } catch (configError) {
+        console.error('❌ GMAIL - Erro de configuração:', configError);
+        throw new Error(`Configuração Gmail inválida: ${configError instanceof Error ? configError.message : 'Erro desconhecido'}`);
+      }
+      
       const token = await getAccessToken();
+      console.log('✅ GMAIL - Token obtido:', token.substring(0, 20) + '...');
       
       // Testar permissões antes de tentar enviar
+      console.log('🔍 GMAIL - Testando permissões...');
       const hasPermissions = await testGmailPermissions(token);
       if (!hasPermissions) {
         console.log('⚠️ GMAIL - Token inválido ou permissões insuficientes');
@@ -386,6 +433,7 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
           try {
             const cache: TokenCache = JSON.parse(cacheStr);
             wasSupabaseToken = cache.source === 'supabase';
+            console.log('📋 GMAIL - Tipo de token no cache:', cache.source);
           } catch {}
         }
         
@@ -403,6 +451,8 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
         retryCount++;
         continue;
       }
+      
+      console.log('✅ GMAIL - Permissões validadas com sucesso');
       
       // Dados do usuário para From (opcional)
       let fromName: string | undefined = undefined;
@@ -433,15 +483,53 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
       
       if (!res.ok) {
         let details = '';
+        let errorData = null;
         try { 
-          const j = await res.json(); 
-          details = j?.error?.message || JSON.stringify(j); 
-          console.log('❌ GMAIL - Detalhes do erro:', j);
-        } catch {}
+          errorData = await res.json(); 
+          details = errorData?.error?.message || JSON.stringify(errorData); 
+          console.log('❌ GMAIL - Detalhes do erro completo:', errorData);
+        } catch (parseError) {
+          console.warn('⚠️ GMAIL - Erro ao fazer parse da resposta de erro:', parseError);
+        }
         
-        // Se for erro de permissão, tentar reautenticar
+        // Diagnóstico específico para erro 401
+        if (res.status === 401) {
+          console.log('🚨 GMAIL - ERRO 401 UNAUTHORIZED - Diagnóstico detalhado:');
+          console.log('🔍 GMAIL - Status da sessão do usuário:');
+          
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('📋 GMAIL - Sessão ativa:', !!session);
+            console.log('📋 GMAIL - Provider:', session?.user?.app_metadata?.provider);
+            console.log('📋 GMAIL - User ID:', session?.user?.id?.substring(0, 8) + '...');
+            console.log('📋 GMAIL - Email:', session?.user?.email);
+            
+            // Verificar se há tokens na sessão
+            const sessionAny: any = session;
+            const hasProviderToken = !!(sessionAny?.provider_token || sessionAny?.provider_access_token);
+            console.log('📋 GMAIL - Tem token de provider:', hasProviderToken);
+            
+          } catch (sessionError) {
+            console.error('❌ GMAIL - Erro ao verificar sessão:', sessionError);
+          }
+          
+          console.log('🔧 GMAIL - Tentando limpar tokens e reautenticar...');
+          await clearCachedTokens();
+          retryCount++;
+          continue;
+        }
+        
+        // Se for erro de permissão (403), tentar reautenticar
         if (res.status === 403 && (details.includes('insufficient authentication scopes') || details.includes('insufficient permissions'))) {
-          console.log('🔄 GMAIL - Erro de permissão, tentando reautenticar...');
+          console.log('🔄 GMAIL - Erro de permissão 403, tentando reautenticar...');
+          await clearCachedTokens();
+          retryCount++;
+          continue;
+        }
+        
+        // Para outros erros de autorização, também tentar reautenticar
+        if ([401, 403].includes(res.status)) {
+          console.log(`🔄 GMAIL - Erro de autorização ${res.status}, tentando reautenticar...`);
           await clearCachedTokens();
           retryCount++;
           continue;
@@ -495,13 +583,104 @@ export async function forceGmailReauth(): Promise<void> {
 }
 
 // Função para verificar se o Gmail está configurado
-export async function checkGmailSetup(): Promise<{ configured: boolean; error?: string }> {
+export async function checkGmailSetup(): Promise<{ configured: boolean; error?: string; details?: any }> {
   try {
+    console.log('🔍 GMAIL - Verificando configuração completa...');
+    
     const clientId = await getGoogleClientId();
-    return { configured: !!clientId };
+    console.log('✅ GMAIL - Client ID encontrado:', clientId.substring(0, 20) + '...');
+    
+    // Verificar se o Google Identity Services pode ser carregado
+    await ensureGis();
+    console.log('✅ GMAIL - Google Identity Services carregado');
+    
+    // Verificar sessão do usuário
+    const { data: { session } } = await supabase.auth.getSession();
+    const isGoogleUser = session?.user?.app_metadata?.provider === 'google';
+    
+    const details = {
+      clientId: clientId.substring(0, 20) + '...',
+      gisLoaded: true,
+      hasSession: !!session,
+      isGoogleUser,
+      userEmail: session?.user?.email,
+      hostname: window.location.hostname,
+      isProduction: window.location.hostname === 'app.grupoggv.com'
+    };
+    
+    console.log('📋 GMAIL - Configuração detalhada:', details);
+    
+    return { configured: true, details };
   } catch (error) {
-    return { configured: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    console.error('❌ GMAIL - Erro na verificação de configuração:', error);
+    return { 
+      configured: false, 
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
+      details: {
+        hostname: window.location.hostname,
+        isProduction: window.location.hostname === 'app.grupoggv.com'
+      }
+    };
   }
+}
+
+// Função para diagnóstico completo do Gmail
+export async function diagnoseGmailIssue(): Promise<void> {
+  console.log('🩺 GMAIL - DIAGNÓSTICO COMPLETO INICIADO');
+  console.log('=' .repeat(50));
+  
+  // 1. Verificar configuração
+  console.log('1️⃣ VERIFICANDO CONFIGURAÇÃO...');
+  const setup = await checkGmailSetup();
+  console.log('Configuração:', setup);
+  
+  // 2. Verificar sessão do usuário
+  console.log('2️⃣ VERIFICANDO SESSÃO...');
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('Sessão ativa:', !!session);
+    if (session) {
+      console.log('Provider:', session.user?.app_metadata?.provider);
+      console.log('Email:', session.user?.email);
+      console.log('User ID:', session.user?.id?.substring(0, 8) + '...');
+      
+      // Verificar tokens na sessão
+      const sessionAny: any = session;
+      const providerToken = sessionAny?.provider_token || sessionAny?.provider_access_token;
+      console.log('Tem provider token:', !!providerToken);
+      if (providerToken) {
+        console.log('Provider token (início):', providerToken.substring(0, 20) + '...');
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao verificar sessão:', error);
+  }
+  
+  // 3. Verificar cache de tokens
+  console.log('3️⃣ VERIFICANDO CACHE...');
+  const cachedToken = await getTokenFromCache();
+  console.log('Token em cache:', !!cachedToken);
+  if (cachedToken) {
+    console.log('Token cache (início):', cachedToken.substring(0, 20) + '...');
+  }
+  
+  // 4. Testar obtenção de token
+  console.log('4️⃣ TESTANDO OBTENÇÃO DE TOKEN...');
+  try {
+    const token = await getAccessToken();
+    console.log('✅ Token obtido com sucesso:', token.substring(0, 20) + '...');
+    
+    // 5. Testar permissões
+    console.log('5️⃣ TESTANDO PERMISSÕES...');
+    const hasPermissions = await testGmailPermissions(token);
+    console.log('Permissões válidas:', hasPermissions);
+    
+  } catch (error) {
+    console.error('❌ Erro ao obter token:', error);
+  }
+  
+  console.log('=' .repeat(50));
+  console.log('🩺 GMAIL - DIAGNÓSTICO COMPLETO FINALIZADO');
 }
 
 

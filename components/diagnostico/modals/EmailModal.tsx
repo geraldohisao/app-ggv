@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { XMarkIcon, CheckCircleIcon } from '../../ui/icons';
 import { FormInput } from '../../ui/Form';
-import { sendEmailViaGmail, forceGmailReauth, checkGmailSetup } from '../../../services/gmailService';
+import { sendEmailViaGmail, forceGmailReauth, checkGmailSetup, diagnoseGmailIssue } from '../../../services/gmailService';
 import { createPublicReport } from '../../../services/supabaseService';
 import { LOGO_URLS } from '../../../config/logos';
 import { CompanyData } from '../../../types';
@@ -168,6 +168,14 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             setTimeout(() => onClose(), 3000); // Aumentado para 3 segundos
         } catch (err: any) {
             console.error('❌ EMAIL_MODAL - Erro ao enviar:', err);
+            
+            // Executar diagnóstico automático em caso de erro
+            console.log('🩺 Executando diagnóstico automático devido ao erro...');
+            try {
+                await diagnoseGmailIssue();
+            } catch (diagError) {
+                console.warn('Erro ao executar diagnóstico:', diagError);
+            }
             
             // Tratar erros específicos do Gmail com mensagens mais claras
             if (err?.message?.includes('insufficient authentication scopes') || err?.message?.includes('insufficient permissions')) {
