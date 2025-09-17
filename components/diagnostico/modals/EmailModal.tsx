@@ -178,26 +178,33 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             }
             
             // Tratar erros específicos do Gmail com mensagens mais claras
-            if (err?.message?.includes('insufficient authentication scopes') || err?.message?.includes('insufficient permissions')) {
+            const errorMessage = err?.message || 'Falha ao enviar e-mail pelo Gmail. Tente novamente.';
+            
+            if (errorMessage.includes('insufficient authentication scopes') || errorMessage.includes('insufficient permissions')) {
                 setError('🔐 Permissões insuficientes. Clique em "Reautenticar" para conceder acesso ao Gmail.');
-            } else if (err?.message?.includes('Google Identity Services')) {
+            } else if (errorMessage.includes('Google Identity Services')) {
                 setError('⚠️ Erro ao carregar serviços do Google. Recarregue a página e tente novamente.');
-            } else if (err?.message?.includes('Timeout')) {
+            } else if (errorMessage.includes('Timeout') || errorMessage.includes('timeout')) {
                 setError('⏰ Conexão lenta com o Google. Verifique sua internet e tente novamente.');
-            } else if (err?.message?.includes('pop-ups')) {
+            } else if (errorMessage.includes('pop-ups')) {
                 setError('🚫 Pop-ups bloqueados. Habilite pop-ups para este site e tente novamente.');
-            } else if (err?.message?.includes('GOOGLE_OAUTH_CLIENT_ID')) {
+            } else if (errorMessage.includes('GOOGLE_OAUTH_CLIENT_ID') || errorMessage.includes('Configuração não encontrada')) {
                 setError('⚙️ Configuração do Gmail não encontrada. Entre em contato com o suporte.');
-            } else if (err?.message?.includes('não configurado')) {
+            } else if (errorMessage.includes('não configurado')) {
                 setError('⚙️ Sistema de e-mail não configurado. Entre em contato com o suporte.');
-            } else if (err?.message?.includes('CSP') || err?.message?.includes('Content Security Policy')) {
+            } else if (errorMessage.includes('CSP') || errorMessage.includes('Content Security Policy')) {
                 setError('🛡️ Política de segurança bloqueou o Google. Recarregue a página e tente novamente.');
-            } else if (err?.message?.includes('script-src') || err?.message?.includes('violates')) {
+            } else if (errorMessage.includes('script-src') || errorMessage.includes('violates')) {
                 setError('🔒 Erro de segurança detectado. Recarregue a página completamente (Ctrl+F5).');
-            } else if (err?.message?.includes('Supabase') || err?.message?.includes('auth')) {
+            } else if (errorMessage.includes('Supabase') || errorMessage.includes('auth')) {
                 setError('⚠️ Problema de sessão detectado. Recarregue a página (F5) e tente novamente.');
+            } else if (errorMessage.includes('Problema de conexão') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
+                setError('🌐 Problema de conexão. Verifique sua internet e tente novamente.');
+            } else if (errorMessage.includes('Falha após múltiplas tentativas') || errorMessage.includes('após 3 tentativas')) {
+                setError('📧 Não foi possível enviar o e-mail após várias tentativas. Clique em "Reautenticar" abaixo ou recarregue a página.');
             } else {
-                setError(`❌ ${err?.message || 'Falha ao enviar e-mail pelo Gmail. Tente novamente.'}`);
+                // Mostrar erro original mas com emoji para melhor UX
+                setError(`❌ ${errorMessage}`);
             }
         } finally {
             setLoading(false);

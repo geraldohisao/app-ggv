@@ -556,13 +556,32 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
       console.error(`❌ GMAIL - Erro na tentativa ${retryCount + 1}:`, error);
       
       if (retryCount >= maxRetries) {
+        // Executar diagnóstico completo antes de falhar
+        console.log('🩺 GMAIL - Executando diagnóstico final...');
+        try {
+          await diagnoseGmailIssue();
+        } catch (diagError) {
+          console.warn('⚠️ GMAIL - Erro no diagnóstico:', diagError);
+        }
         
         // Se for erro de permissão, fornecer instruções específicas
         if (error instanceof Error && (error.message.includes('insufficient authentication scopes') || error.message.includes('insufficient permissions'))) {
-          throw new Error('Gmail API: Permissões insuficientes. Por favor, faça logout e login novamente para conceder permissões de envio de e-mail.');
+          throw new Error('🔐 Gmail API: Permissões insuficientes. Clique no botão "Reautenticar" abaixo ou faça logout e login novamente para conceder permissões de envio de e-mail.');
         }
         
-        throw error;
+        // Se for erro de configuração
+        if (error instanceof Error && error.message.includes('GOOGLE_OAUTH_CLIENT_ID')) {
+          throw new Error('⚙️ Gmail API: Configuração não encontrada. Entre em contato com o suporte técnico.');
+        }
+        
+        // Se for erro de rede/timeout
+        if (error instanceof Error && (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('timeout'))) {
+          throw new Error('🌐 Gmail API: Problema de conexão. Verifique sua internet e tente novamente.');
+        }
+        
+        // Erro genérico mais informativo
+        const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+        throw new Error(`📧 Gmail API: Não foi possível enviar o e-mail após 3 tentativas. Erro: ${errorMsg}. Tente reautenticar clicando no botão abaixo.`);
       }
       
       // Limpar tokens e tentar novamente
@@ -571,7 +590,8 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
     }
   }
   
-  throw new Error('Gmail API: Falha após múltiplas tentativas');
+  // Este ponto nunca deveria ser alcançado, mas mantemos como fallback
+  throw new Error('📧 Gmail API: Sistema de retry falhou. Tente reautenticar ou entre em contato com o suporte.');
 }
 
 
