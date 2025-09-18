@@ -138,21 +138,706 @@ export const BENCHMARK_DATA = {
 
 export const DEFAULT_DIAGNOSTIC_SEGMENTS: MarketSegment[] = [
     {
+        id: 'agro_1',
+        name: 'Agronegócio',
+        benchmarkMedio: 35,
+        topPerformers: 68,
+        characteristics: 'Setor B2B com vendas técnicas para produtores rurais e cooperativas. Decisões baseadas em produtividade e ROI agrícola.',
+        trends: 'Agricultura de precisão, sustentabilidade, biotecnologia, contratos de longo prazo, consultoria técnica especializada.',
+        challenges: 'Sazonalidade, dependência climática, ciclos longos de decisão, necessidade de comprovação técnica, financiamento complexo.',
+        successFactors: 'Expertise agronômica, demonstração de resultados, suporte técnico contínuo, relacionamento com cooperativas.',
+        aiFocusAreas: ['Processos', 'Pessoas', 'Relacionamento', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas consultivas para agronegócio, demonstração de ROI agrícola e gestão de ciclos sazonais.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos e especialização técnica. Para altos: expansão geográfica e parcerias com cooperativas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para produtores rurais, cooperativas, agroindústrias e distribuidores especializados.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + representantes técnicos regionais + parcerias com cooperativas.'
+        }
+    },
+    {
+        id: 'food_1',
+        name: 'Alimentação / Bebidas',
+        benchmarkMedio: 38,
+        topPerformers: 72,
+        characteristics: 'Setor B2B com vendas complexas para food service, indústrias e grandes corporações. Ciclos longos, múltiplos decisores e necessidade de consultoria técnica.',
+        trends: 'Automação industrial, ingredientes funcionais, sustentabilidade corporativa, contratos de longo prazo, customização de produtos.',
+        challenges: 'Ciclos de vendas extensos, múltiplos stakeholders, compliance rigoroso, negociações complexas de contratos, especificações técnicas detalhadas.',
+        successFactors: 'Expertise técnica, relacionamento C-level, demonstração de ROI, suporte pós-venda especializado, capacidade de customização.',
+        aiFocusAreas: ['Processos', 'Pessoas', 'Relacionamento', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas consultivas B2B, gestão de stakeholders múltiplos, ciclos longos e demonstração de valor para food service corporativo.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em especialização técnica e nichos. Para altos: expansão geográfica e diversificação de portfólio industrial.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias alimentícias, redes de food service, grandes corporações (refeitórios industriais).',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores especializados + representantes técnicos regionais.'
+        }
+    },
+    {
+        id: 'craft_1',
+        name: 'Artesanato ou Produção Manual',
+        benchmarkMedio: 32,
+        topPerformers: 62,
+        characteristics: 'Vendas B2B para grandes encomendas corporativas, eventos e projetos especiais. Foco em customização e qualidade artesanal.',
+        trends: 'Personalização corporativa, sustentabilidade, produtos únicos para eventos, branding experiencial, parcerias estratégicas.',
+        challenges: 'Escalabilidade limitada, precificação complexa, gestão de prazos, padronização de qualidade, capacidade produtiva.',
+        successFactors: 'Qualidade excepcional, capacidade de customização, cumprimento de prazos, relacionamento próximo, portfólio diferenciado.',
+        aiFocusAreas: ['Processos', 'Pessoas', 'Qualidade', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas para projetos corporativos, gestão de customização e escalabilidade de produção artesanal.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos premium. Para altos: sistematização de processos e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda para empresas (brindes corporativos), eventos corporativos, projetos de decoração empresarial.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + representantes especializados + parcerias com agências.'
+        }
+    },
+    {
+        id: 'auto_1',
+        name: 'Automotivo',
+        benchmarkMedio: 40,
+        topPerformers: 75,
+        characteristics: 'Setor B2B com vendas técnicas para frotas corporativas, concessionárias e indústria automotiva. Negociações complexas e ciclos longos.',
+        trends: 'Eletrificação, conectividade, frotas corporativas sustentáveis, leasing operacional, serviços integrados pós-venda.',
+        challenges: 'Ciclos de decisão longos, múltiplos stakeholders, financiamento complexo, regulamentações rigorosas, concorrência acirrada.',
+        successFactors: 'Expertise técnica, relacionamento com decisores, demonstração de TCO, suporte pós-venda robusto, soluções integradas.',
+        aiFocusAreas: ['Processos', 'Relacionamento', 'Tecnologia', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas consultivas para frotas corporativas, TCO e gestão de relacionamento com múltiplos decisores.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: expansão para soluções integradas e serviços.',
+        aiChannelInsights: {
+            b2b: 'Venda para frotas corporativas, concessionárias, empresas de logística e transporte.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + rede de concessionárias + parcerias com empresas de leasing.'
+        }
+    },
+    {
+        id: 'consumer_1',
+        name: 'Bens de Consumo Simples',
+        benchmarkMedio: 36,
+        topPerformers: 70,
+        characteristics: 'Vendas B2B para grandes redes varejistas, distribuidores e atacadistas. Foco em volume, logística e relacionamento comercial.',
+        trends: 'E-commerce B2B, sustentabilidade, produtos premium, automação de pedidos, análise de dados de vendas.',
+        challenges: 'Margens apertadas, concorrência por espaço no PDV, gestão de estoque, sazonalidade, negociação com grandes redes.',
+        successFactors: 'Eficiência logística, relacionamento comercial sólido, suporte ao PDV, análise de giro, flexibilidade comercial.',
+        aiFocusAreas: ['Processos', 'Relacionamento', 'Logística', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas para grandes volumes, gestão de relacionamento com redes varejistas e otimização logística.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em eficiência operacional. Para altos: expansão geográfica e diversificação de canais.',
+        aiChannelInsights: {
+            b2b: 'Venda para redes varejistas, atacadistas, distribuidores e grandes consumidores corporativos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores regionais + plataformas B2B.'
+        }
+    },
+    {
+        id: 'comm_1',
+        name: 'Comunicação / Agências / Gráficas',
+        benchmarkMedio: 42,
+        topPerformers: 78,
+        characteristics: 'Vendas B2B consultivas para projetos corporativos de comunicação. Ciclos médios, múltiplos stakeholders e necessidade de criatividade estratégica.',
+        trends: 'Marketing digital integrado, automação de marketing, branding experiencial, sustentabilidade, métricas de performance.',
+        challenges: 'Precificação de projetos criativos, gestão de expectativas, prazos apertados, concorrência por concorrências, ROI subjetivo.',
+        successFactors: 'Portfólio sólido, relacionamento C-level, capacidade estratégica, cumprimento de prazos, mensuração de resultados.',
+        aiFocusAreas: ['Processos', 'Pessoas', 'Criatividade', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas para projetos de comunicação, gestão de stakeholders criativos e demonstração de ROI.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: contas estratégicas e retainer agreements.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, agências parceiras, consultorias e grandes corporações.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias estratégicas + network de indicações.'
+        }
+    },
+    {
+        id: 'consult_1',
+        name: 'Consultoria / Assessoria / Administração',
+        benchmarkMedio: 45,
+        topPerformers: 82,
+        characteristics: 'Vendas consultivas complexas para serviços especializados. Ciclos longos, alta confiança necessária e demonstração de expertise.',
+        trends: 'Consultoria digital, especialização setorial, metodologias proprietárias, contratos de performance, parcerias estratégicas.',
+        challenges: 'Intangibilidade do serviço, ciclos longos de decisão, necessidade de credibilidade, concorrência por expertise, precificação por valor.',
+        successFactors: 'Expertise reconhecida, cases de sucesso, relacionamento C-level, metodologia diferenciada, resultados mensuráveis.',
+        aiFocusAreas: ['Processos', 'Pessoas', 'Expertise', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas de alto valor, demonstração de expertise e gestão de relacionamento de longo prazo.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em especialização e nichos. Para altos: escalabilidade e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, órgãos públicos, associações e outras consultorias.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + network profissional + parcerias com outras consultorias.'
+        }
+    },
+    {
+        id: 'insurance_1',
+        name: 'Corretagem / Seguros / Previdência',
+        benchmarkMedio: 38,
+        topPerformers: 72,
+        characteristics: 'Vendas B2B para seguros corporativos e benefícios empresariais. Relacionamento de longo prazo e gestão de riscos complexos.',
+        trends: 'Seguros paramétricos, digitalização de processos, wellness corporativo, seguros sustentáveis, analytics de risco.',
+        challenges: 'Regulamentação complexa, ciclos longos de decisão, gestão de sinistros, concorrência por preço, renovações anuais.',
+        successFactors: 'Expertise em riscos, relacionamento sólido, suporte na gestão de sinistros, consultoria preventiva, soluções customizadas.',
+        aiFocusAreas: ['Processos', 'Relacionamento', 'Gestão de Riscos', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas consultivas para seguros corporativos, gestão de relacionamento de longo prazo e consultoria em riscos.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: carteira diversificada e serviços agregados.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, corretoras parceiras, consultorias em RH e gestores de benefícios.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + rede de corretores + parcerias com consultorias.'
+        }
+    },
+    {
+        id: 'ecommerce_1',
+        name: 'E-commerce',
+        benchmarkMedio: 44,
+        topPerformers: 80,
+        characteristics: 'Vendas B2B de soluções e serviços para e-commerce. Mercado técnico com necessidade de integração e performance.',
+        trends: 'Omnichannel, inteligência artificial, automação, marketplaces B2B, analytics avançado, experiência do cliente.',
+        challenges: 'Evolução tecnológica rápida, integração complexa, concorrência global, métricas de performance, escalabilidade.',
+        successFactors: 'Expertise técnica, suporte especializado, integração eficiente, resultados mensuráveis, inovação constante.',
+        aiFocusAreas: ['Tecnologia', 'Processos', 'Performance', 'Inovação'],
+        aiCustomPrompt: 'Focar em vendas técnicas para e-commerce, demonstração de ROI digital e gestão de integrações complexas.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em soluções específicas. Para altos: plataformas integradas e serviços gerenciados.',
+        aiChannelInsights: {
+            b2b: 'Venda para e-commerces, marketplaces, agências digitais e empresas em transformação digital.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com agências + marketplace de soluções.'
+        }
+    },
+    {
         id: 'edu_1',
         name: 'Educação',
-        benchmarkMedio: 30,
-        topPerformers: 60,
-        characteristics: 'Mercado em transformação digital acelerada. Foco em resultados mensuráveis.',
-        trends: 'Ensino híbrido e plataformas digitais de aprendizagem.',
-        challenges: 'Orçamentos limitados, necessidade de comprovação de eficácia, adaptação tecnológica.',
-        successFactors: 'ROI educacional demonstrável, facilidade de uso, suporte pedagógico.',
-        aiFocusAreas: ['Processos', 'Tecnologia', 'Pessoas', 'Resultados'],
-        aiCustomPrompt: 'Focar a análise na jornada do aluno e na eficácia das ferramentas de EdTech.',
-        aiRevenueInsights: 'Para faturamentos baixos, focar em custo-benefício. Para altos, focar em escalabilidade e integração.',
+        benchmarkMedio: 35,
+        topPerformers: 68,
+        characteristics: 'Vendas B2B para instituições educacionais e treinamento corporativo. Foco em resultados educacionais e ROI de aprendizagem.',
+        trends: 'Educação digital, aprendizagem adaptativa, treinamento corporativo, certificações online, analytics educacional.',
+        challenges: 'Orçamentos limitados, ciclos de decisão longos, necessidade de comprovação de eficácia, resistência à mudança.',
+        successFactors: 'ROI educacional demonstrável, suporte pedagógico, facilidade de implementação, resultados mensuráveis.',
+        aiFocusAreas: ['Processos', 'Resultados', 'Pessoas', 'Tecnologia'],
+        aiCustomPrompt: 'Focar em vendas consultivas para educação corporativa, demonstração de ROI educacional e gestão de implementação.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em soluções específicas. Para altos: plataformas integradas e serviços gerenciados.',
         aiChannelInsights: {
-            b2b: 'Vendas para instituições de ensino (escolas, universidades).',
-            b2c: 'Vendas diretas para alunos e pais.',
-            hibrido: 'Parcerias com empresas para treinamento corporativo.'
+            b2b: 'Venda para empresas (treinamento), instituições educacionais, consultorias em RH.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias educacionais + canais de distribuição especializados.'
+        }
+    },
+,
+    {
+        id: 'packaging_1',
+        name: 'Embalagens / Papel',
+        benchmarkMedio: 36,
+        topPerformers: 70,
+        characteristics: 'Vendas B2B técnicas para indústrias com necessidades específicas de embalagem. Foco em especificações técnicas e sustentabilidade.',
+        trends: 'Embalagens sustentáveis, smart packaging, automação industrial, customização, economia circular.',
+        challenges: 'Especificações técnicas complexas, regulamentações ambientais, pressão por custos, inovação constante.',
+        successFactors: 'Expertise técnica, capacidade de customização, sustentabilidade, suporte técnico especializado.',
+        aiFocusAreas: ['Processos', 'Tecnologia', 'Sustentabilidade', 'Qualidade'],
+        aiCustomPrompt: 'Focar em vendas técnicas para embalagens industriais, sustentabilidade e customização de soluções.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos técnicos. Para altos: soluções integradas e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, distribuidores especializados, empresas de logística.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores regionais + representantes técnicos.'
+        }
+    },
+    {
+        id: 'energy_1',
+        name: 'Energia e Infraestrutura',
+        benchmarkMedio: 32,
+        topPerformers: 65,
+        characteristics: 'Vendas B2B complexas para projetos de infraestrutura e energia. Ciclos muito longos, múltiplos stakeholders e alta complexidade técnica.',
+        trends: 'Energias renováveis, eficiência energética, smart grids, sustentabilidade, digitalização de ativos.',
+        challenges: 'Ciclos extremamente longos, regulamentação complexa, investimentos altos, múltiplos decisores, riscos técnicos.',
+        successFactors: 'Expertise técnica profunda, relacionamento institucional, capacidade financeira, track record comprovado.',
+        aiFocusAreas: ['Processos', 'Relacionamento', 'Tecnologia', 'Compliance'],
+        aiCustomPrompt: 'Focar em vendas de projetos complexos de infraestrutura, gestão de stakeholders múltiplos e ciclos longos.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em projetos menores e nichos. Para altos: grandes projetos e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, órgãos públicos, concessionárias e grandes corporações.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + consórcios + parcerias técnicas internacionais.'
+        }
+    },
+    {
+        id: 'eng_1',
+        name: 'Engenharia',
+        benchmarkMedio: 38,
+        topPerformers: 72,
+        characteristics: 'Vendas B2B de serviços de engenharia para projetos corporativos e industriais. Alta especialização técnica e gestão de projetos complexos.',
+        trends: 'Engenharia digital, BIM, sustentabilidade, automação industrial, IoT, análise preditiva.',
+        challenges: 'Projetos complexos, gestão de riscos técnicos, prazos apertados, regulamentações rigorosas, responsabilidade técnica.',
+        successFactors: 'Expertise técnica reconhecida, gestão de projetos eficiente, compliance rigoroso, inovação tecnológica.',
+        aiFocusAreas: ['Processos', 'Tecnologia', 'Qualidade', 'Gestão de Projetos'],
+        aiCustomPrompt: 'Focar em vendas consultivas de engenharia, gestão de projetos complexos e demonstração de expertise técnica.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em especialização técnica. Para altos: projetos integrados e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, construtoras, órgãos públicos e empresas de infraestrutura.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias técnicas + consórcios de engenharia.'
+        }
+    },
+    {
+        id: 'industrial_1',
+        name: 'Componentes / Equipamentos Industriais',
+        benchmarkMedio: 37,
+        topPerformers: 71,
+        characteristics: 'Vendas B2B técnicas de componentes e equipamentos para indústrias. Foco em especificações técnicas, qualidade e suporte.',
+        trends: 'Indústria 4.0, IoT industrial, manutenção preditiva, automação, eficiência energética.',
+        challenges: 'Especificações técnicas rigorosas, ciclos de aprovação longos, concorrência global, necessidade de certificações.',
+        successFactors: 'Qualidade superior, suporte técnico especializado, certificações internacionais, inovação tecnológica.',
+        aiFocusAreas: ['Tecnologia', 'Qualidade', 'Suporte Técnico', 'Inovação'],
+        aiCustomPrompt: 'Focar em vendas técnicas industriais, demonstração de qualidade e suporte técnico especializado.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos técnicos. Para altos: soluções integradas e contratos de manutenção.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, distribuidores técnicos, integradores de sistemas.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores especializados + representantes técnicos regionais.'
+        }
+    },
+    {
+        id: 'beauty_1',
+        name: 'Estética / Beleza / Cosméticos',
+        benchmarkMedio: 40,
+        topPerformers: 74,
+        characteristics: 'Vendas B2B para salões, clínicas e redes de beleza. Foco em produtos profissionais e equipamentos especializados.',
+        trends: 'Beleza sustentável, tecnologia em tratamentos, personalização, wellness, produtos naturais.',
+        challenges: 'Regulamentação sanitária, concorrência acirrada, sazonalidade, necessidade de treinamento técnico.',
+        successFactors: 'Qualidade comprovada, suporte técnico, treinamento especializado, relacionamento próximo.',
+        aiFocusAreas: ['Processos', 'Pessoas', 'Qualidade', 'Treinamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas para profissionais de beleza, treinamento técnico e suporte especializado.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: redes e franquias.',
+        aiChannelInsights: {
+            b2b: 'Venda para salões, clínicas de estética, spas, distribuidores especializados.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores + representantes regionais especializados.'
+        }
+    },
+    {
+        id: 'events_1',
+        name: 'Eventos',
+        benchmarkMedio: 41,
+        topPerformers: 76,
+        characteristics: 'Vendas B2B de serviços para eventos corporativos. Projetos únicos, gestão de múltiplos fornecedores e execução impecável.',
+        trends: 'Eventos híbridos, tecnologia imersiva, sustentabilidade, experiências personalizadas, métricas de engajamento.',
+        challenges: 'Projetos únicos, gestão de múltiplos stakeholders, prazos inflexíveis, orçamentos variáveis, execução perfeita.',
+        successFactors: 'Criatividade, gestão de projetos eficiente, rede de fornecedores, execução impecável.',
+        aiFocusAreas: ['Processos', 'Criatividade', 'Gestão de Projetos', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas para eventos corporativos, gestão de projetos únicos e execução impecável.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: eventos de grande porte e contratos anuais.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, agências de comunicação, associações e órgãos públicos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com agências + network de indicações.'
+        }
+    },
+    {
+        id: 'fitness_1',
+        name: 'Fitness / Esporte',
+        benchmarkMedio: 39,
+        topPerformers: 73,
+        characteristics: 'Vendas B2B para academias, clubes esportivos e wellness corporativo. Foco em equipamentos, serviços e programas especializados.',
+        trends: 'Wellness corporativo, tecnologia fitness, treinamento personalizado, saúde preventiva, gamificação.',
+        challenges: 'Sazonalidade, concorrência por espaço, necessidade de resultados mensuráveis, rotatividade de clientes.',
+        successFactors: 'Resultados comprovados, tecnologia diferenciada, suporte especializado, programas customizados.',
+        aiFocusAreas: ['Processos', 'Resultados', 'Tecnologia', 'Pessoas'],
+        aiCustomPrompt: 'Focar em vendas consultivas para wellness corporativo, demonstração de resultados e programas customizados.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: programas corporativos e contratos anuais.',
+        aiChannelInsights: {
+            b2b: 'Venda para empresas (wellness corporativo), academias, clubes esportivos, consultorias em saúde.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com academias + consultorias especializadas.'
+        }
+    },
+    {
+        id: 'import_1',
+        name: 'Importação / Exportação',
+        benchmarkMedio: 34,
+        topPerformers: 67,
+        characteristics: 'Vendas B2B de serviços de comércio exterior para empresas. Complexidade regulatória e logística internacional.',
+        trends: 'Digitalização aduaneira, sustentabilidade logística, acordos comerciais, e-commerce internacional.',
+        challenges: 'Regulamentação complexa, câmbio variável, logística internacional, documentação extensa, riscos políticos.',
+        successFactors: 'Expertise regulatória, rede internacional, agilidade operacional, gestão de riscos.',
+        aiFocusAreas: ['Processos', 'Compliance', 'Logística', 'Gestão de Riscos'],
+        aiCustomPrompt: 'Focar em vendas consultivas para comércio exterior, gestão de compliance e otimização logística internacional.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos específicos. Para altos: soluções integradas e parcerias globais.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas exportadoras/importadoras, trading companies, indústrias.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias internacionais + agentes especializados.'
+        }
+    },
+    {
+        id: 'realestate_1',
+        name: 'Imóveis / Arquitetura / Construção civil',
+        benchmarkMedio: 33,
+        topPerformers: 66,
+        characteristics: 'Vendas B2B para projetos imobiliários corporativos e industriais. Ciclos muito longos, altos valores e múltiplos decisores.',
+        trends: 'Construção sustentável, BIM, automação predial, smart buildings, certificações ambientais.',
+        challenges: 'Ciclos extremamente longos, regulamentação complexa, financiamento complexo, múltiplos stakeholders.',
+        successFactors: 'Track record sólido, capacidade financeira, expertise técnica, relacionamento institucional.',
+        aiFocusAreas: ['Processos', 'Relacionamento', 'Gestão de Projetos', 'Compliance'],
+        aiCustomPrompt: 'Focar em vendas de projetos imobiliários corporativos, gestão de ciclos longos e múltiplos stakeholders.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em projetos menores. Para altos: grandes empreendimentos e parcerias.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, incorporadoras, órgãos públicos, fundos imobiliários.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias estratégicas + consórcios de construção.'
+        }
+    },
+    {
+        id: 'research_1',
+        name: 'Instituto de pesquisa',
+        benchmarkMedio: 36,
+        topPerformers: 69,
+        characteristics: 'Vendas B2B de serviços de pesquisa para empresas e órgãos públicos. Foco em metodologia, credibilidade e insights acionáveis.',
+        trends: 'Big data, inteligência artificial, pesquisa digital, analytics avançado, insights em tempo real.',
+        challenges: 'Intangibilidade do serviço, necessidade de credibilidade, concorrência por expertise, prazos apertados.',
+        successFactors: 'Metodologia reconhecida, expertise setorial, insights acionáveis, relacionamento institucional.',
+        aiFocusAreas: ['Processos', 'Metodologia', 'Expertise', 'Insights'],
+        aiCustomPrompt: 'Focar em vendas consultivas de pesquisa, demonstração de metodologia e geração de insights acionáveis.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: contratos anuais e pesquisas continuadas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, órgãos públicos, consultorias, associações setoriais.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias acadêmicas + network especializado.'
+        }
+    },
+    {
+        id: 'legal_1',
+        name: 'Jurídica',
+        benchmarkMedio: 43,
+        topPerformers: 79,
+        characteristics: 'Vendas B2B de serviços jurídicos especializados para empresas. Alta especialização, relacionamento de confiança e resultados mensuráveis.',
+        trends: 'Legal tech, automação jurídica, compliance digital, análise preditiva, serviços jurídicos preventivos.',
+        challenges: 'Intangibilidade do serviço, necessidade de confiança, concorrência por expertise, precificação por valor.',
+        successFactors: 'Expertise reconhecida, track record comprovado, relacionamento sólido, resultados mensuráveis.',
+        aiFocusAreas: ['Processos', 'Expertise', 'Relacionamento', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas consultivas jurídicas, demonstração de expertise e gestão de relacionamento de confiança.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em especialização. Para altos: clientes estratégicos e contratos de retainer.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, outras firmas jurídicas, órgãos públicos, associações.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + network profissional + parcerias estratégicas.'
+        }
+    },
+    {
+        id: 'logistics_1',
+        name: 'Logística',
+        benchmarkMedio: 37,
+        topPerformers: 71,
+        characteristics: 'Vendas B2B de soluções logísticas complexas para empresas. Foco em eficiência, tecnologia e gestão de cadeia de suprimentos.',
+        trends: 'Logística 4.0, automação, sustentabilidade, rastreabilidade, otimização de rotas, e-commerce.',
+        challenges: 'Margens apertadas, complexidade operacional, regulamentação, necessidade de investimento em tecnologia.',
+        successFactors: 'Eficiência operacional, tecnologia avançada, flexibilidade, relacionamento sólido, métricas claras.',
+        aiFocusAreas: ['Processos', 'Tecnologia', 'Eficiência', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas de logística, demonstração de eficiência e otimização de custos.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: soluções integradas e contratos de longo prazo.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, e-commerces, distribuidores, empresas de grande porte.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias estratégicas + rede de agentes regionais.'
+        }
+    },
+    {
+        id: 'manufacturing_1',
+        name: 'Manufatura Específica',
+        benchmarkMedio: 35,
+        topPerformers: 68,
+        characteristics: 'Vendas B2B de produtos manufaturados especializados para indústrias. Foco em especificações técnicas e qualidade.',
+        trends: 'Manufatura aditiva, customização em massa, sustentabilidade, automação, Indústria 4.0.',
+        challenges: 'Especificações técnicas rigorosas, concorrência global, necessidade de certificações, pressão por custos.',
+        successFactors: 'Qualidade superior, capacidade de customização, suporte técnico, inovação contínua.',
+        aiFocusAreas: ['Tecnologia', 'Qualidade', 'Customização', 'Inovação'],
+        aiCustomPrompt: 'Focar em vendas técnicas de manufatura, demonstração de qualidade e capacidade de customização.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos técnicos. Para altos: soluções integradas e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, distribuidores técnicos, integradores de sistemas.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores especializados + representantes técnicos.'
+        }
+    },
+    {
+        id: 'maintenance_1',
+        name: 'Manutenção',
+        benchmarkMedio: 38,
+        topPerformers: 72,
+        characteristics: 'Vendas B2B de serviços de manutenção industrial e predial. Contratos de longo prazo e relacionamento de confiança.',
+        trends: 'Manutenção preditiva, IoT, automação, contratos de performance, sustentabilidade.',
+        challenges: 'Concorrência por preço, necessidade de disponibilidade 24/7, gestão de equipes técnicas, SLAs rigorosos.',
+        successFactors: 'Confiabilidade, tempo de resposta, expertise técnica, relacionamento sólido, tecnologia avançada.',
+        aiFocusAreas: ['Processos', 'Confiabilidade', 'Tecnologia', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas de contratos de manutenção, demonstração de confiabilidade e gestão de SLAs.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: contratos integrados e manutenção preditiva.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, prédios comerciais, hospitais, shopping centers.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com construtoras + rede de técnicos regionais.'
+        }
+    },
+    {
+        id: 'construction_materials_1',
+        name: 'Materiais de construção / Madeiras',
+        benchmarkMedio: 34,
+        topPerformers: 67,
+        characteristics: 'Vendas B2B de materiais para construção civil e industrial. Foco em volume, qualidade e logística eficiente.',
+        trends: 'Materiais sustentáveis, construção modular, certificações ambientais, automação de pedidos.',
+        challenges: 'Sazonalidade, logística complexa, concorrência por preço, necessidade de financiamento, regulamentação ambiental.',
+        successFactors: 'Qualidade consistente, logística eficiente, relacionamento comercial, flexibilidade de pagamento.',
+        aiFocusAreas: ['Processos', 'Logística', 'Qualidade', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas de materiais de construção, gestão logística e relacionamento comercial de longo prazo.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: grandes obras e contratos de fornecimento.',
+        aiChannelInsights: {
+            b2b: 'Venda para construtoras, incorporadoras, distribuidores, grandes obras públicas.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores regionais + representantes comerciais.'
+        }
+    },
+    {
+        id: 'furniture_1',
+        name: 'Móveis',
+        benchmarkMedio: 37,
+        topPerformers: 70,
+        characteristics: 'Vendas B2B de móveis corporativos e projetos especiais. Foco em design, funcionalidade e projetos customizados.',
+        trends: 'Móveis inteligentes, sustentabilidade, ergonomia, home office corporativo, design colaborativo.',
+        challenges: 'Ciclos de projeto longos, necessidade de customização, logística de entrega, concorrência por design.',
+        successFactors: 'Design diferenciado, qualidade superior, capacidade de customização, suporte ao projeto.',
+        aiFocusAreas: ['Processos', 'Design', 'Customização', 'Projetos'],
+        aiCustomPrompt: 'Focar em vendas de móveis corporativos, gestão de projetos customizados e relacionamento com arquitetos.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos de design. Para altos: grandes projetos corporativos.',
+        aiChannelInsights: {
+            b2b: 'Venda para empresas, escritórios de arquitetura, construtoras, órgãos públicos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com arquitetos + showrooms especializados.'
+        }
+    },
+    {
+        id: 'outsourcing_1',
+        name: 'Outsourcing / Terceirização / Aluguel',
+        benchmarkMedio: 41,
+        topPerformers: 76,
+        characteristics: 'Vendas B2B de serviços terceirizados para empresas. Contratos de longo prazo e gestão de performance.',
+        trends: 'Outsourcing digital, automação de processos, contratos de performance, especialização setorial.',
+        challenges: 'Concorrência por preço, gestão de SLAs, necessidade de especialização, rotatividade de pessoal.',
+        successFactors: 'Expertise operacional, gestão de qualidade, flexibilidade, relacionamento sólido, tecnologia.',
+        aiFocusAreas: ['Processos', 'Qualidade', 'Gestão', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas de outsourcing, demonstração de eficiência operacional e gestão de SLAs.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: contratos integrados de longo prazo.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas de todos os portes, órgãos públicos, multinacionais.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias estratégicas + rede de consultores.'
+        }
+    },
+    {
+        id: 'chemicals_1',
+        name: 'Produtos químicos',
+        benchmarkMedio: 33,
+        topPerformers: 65,
+        characteristics: 'Vendas B2B técnicas de produtos químicos para indústrias. Alta regulamentação e necessidade de expertise técnica.',
+        trends: 'Química verde, sustentabilidade, automação industrial, produtos especializados, economia circular.',
+        challenges: 'Regulamentação rigorosa, segurança, logística especializada, especificações técnicas complexas.',
+        successFactors: 'Expertise técnica, compliance rigoroso, suporte especializado, inovação, segurança.',
+        aiFocusAreas: ['Tecnologia', 'Compliance', 'Segurança', 'Expertise'],
+        aiCustomPrompt: 'Focar em vendas técnicas de produtos químicos, gestão de compliance e suporte técnico especializado.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: soluções integradas e contratos de longo prazo.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, distribuidores especializados, laboratórios.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores técnicos + representantes especializados.'
+        }
+    },
+    {
+        id: 'health_1',
+        name: 'Saúde',
+        benchmarkMedio: 39,
+        topPerformers: 74,
+        characteristics: 'Vendas B2B para hospitais, clínicas e sistemas de saúde. Foco em qualidade, compliance e resultados clínicos.',
+        trends: 'Telemedicina, IA em saúde, medicina preventiva, sustentabilidade hospitalar, analytics de saúde.',
+        challenges: 'Regulamentação rigorosa, ciclos de aprovação longos, necessidade de evidências clínicas, orçamentos limitados.',
+        successFactors: 'Evidências clínicas, compliance rigoroso, suporte especializado, relacionamento médico, inovação.',
+        aiFocusAreas: ['Processos', 'Compliance', 'Qualidade', 'Evidências'],
+        aiCustomPrompt: 'Focar em vendas consultivas para saúde, demonstração de evidências clínicas e gestão de compliance.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: sistemas integrados e contratos de longo prazo.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para hospitais, clínicas, laboratórios, planos de saúde.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores médicos + parcerias com associações médicas.'
+        }
+    },
+    {
+        id: 'animal_health_1',
+        name: 'Saúde animal',
+        benchmarkMedio: 36,
+        topPerformers: 69,
+        characteristics: 'Vendas B2B para veterinários, fazendas e indústria pecuária. Foco em eficácia, segurança e produtividade animal.',
+        trends: 'Medicina veterinária preventiva, biotecnologia animal, sustentabilidade pecuária, rastreabilidade.',
+        challenges: 'Regulamentação rigorosa, necessidade de evidências, sazonalidade, concorrência global.',
+        successFactors: 'Eficácia comprovada, suporte técnico veterinário, relacionamento com produtores, inovação.',
+        aiFocusAreas: ['Processos', 'Eficácia', 'Suporte Técnico', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas consultivas para saúde animal, demonstração de eficácia e suporte técnico veterinário.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: grandes produtores e contratos anuais.',
+        aiChannelInsights: {
+            b2b: 'Venda para veterinários, fazendas, cooperativas, distribuidores especializados.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores veterinários + representantes técnicos regionais.'
+        }
+    },
+    {
+        id: 'security_1',
+        name: 'Segurança / Escolta / Monitoramento',
+        benchmarkMedio: 38,
+        topPerformers: 72,
+        characteristics: 'Vendas B2B de serviços de segurança para empresas. Contratos de longo prazo e alta confiabilidade necessária.',
+        trends: 'Segurança digital integrada, IoT, inteligência artificial, análise preditiva, automação.',
+        challenges: 'Concorrência por preço, necessidade de confiabilidade 24/7, regulamentação rigorosa, gestão de pessoal.',
+        successFactors: 'Confiabilidade, tecnologia avançada, pessoal qualificado, relacionamento sólido, compliance.',
+        aiFocusAreas: ['Processos', 'Confiabilidade', 'Tecnologia', 'Compliance'],
+        aiCustomPrompt: 'Focar em vendas de segurança corporativa, demonstração de confiabilidade e gestão de contratos de longo prazo.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: grandes corporações e contratos integrados.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, condomínios, shopping centers, órgãos públicos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com construtoras + rede de revendedores.'
+        }
+    },
+    {
+        id: 'environmental_1',
+        name: 'Serviços Ambientais e Sustentabilidade',
+        benchmarkMedio: 37,
+        topPerformers: 71,
+        characteristics: 'Vendas B2B de soluções ambientais para empresas. Foco em compliance, sustentabilidade e responsabilidade social.',
+        trends: 'ESG, economia circular, carbono neutro, certificações ambientais, tecnologias limpas.',
+        challenges: 'Regulamentação complexa, necessidade de especialização, ROI de longo prazo, conscientização do mercado.',
+        successFactors: 'Expertise ambiental, compliance rigoroso, inovação tecnológica, relacionamento institucional.',
+        aiFocusAreas: ['Processos', 'Compliance', 'Sustentabilidade', 'Inovação'],
+        aiCustomPrompt: 'Focar em vendas consultivas ambientais, demonstração de compliance e benefícios de sustentabilidade.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos regulatórios. Para altos: soluções integradas de ESG.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para indústrias, grandes corporações, órgãos públicos, consultorias.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com consultorias + network especializado.'
+        }
+    },
+    {
+        id: 'financial_1',
+        name: 'Serviços financeiros',
+        benchmarkMedio: 42,
+        topPerformers: 78,
+        characteristics: 'Vendas B2B de soluções financeiras para empresas. Alta regulamentação e necessidade de confiança e expertise.',
+        trends: 'Fintech, open banking, pagamentos digitais, crédito alternativo, analytics financeiro.',
+        challenges: 'Regulamentação rigorosa, necessidade de confiança, concorrência bancária, compliance complexo.',
+        successFactors: 'Expertise financeira, compliance rigoroso, relacionamento sólido, inovação tecnológica, segurança.',
+        aiFocusAreas: ['Processos', 'Compliance', 'Relacionamento', 'Segurança'],
+        aiCustomPrompt: 'Focar em vendas consultivas financeiras, demonstração de expertise e gestão de relacionamento de confiança.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: soluções integradas e parcerias bancárias.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, bancos, fintechs, consultorias financeiras.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias bancárias + network de contadores.'
+        }
+    },
+    {
+        id: 'associations_1',
+        name: 'Sindicatos / Associações / ONGs',
+        benchmarkMedio: 34,
+        topPerformers: 66,
+        characteristics: 'Vendas B2B para organizações sem fins lucrativos. Foco em impacto social, eficiência e transparência.',
+        trends: 'Digitalização de processos, transparência, impacto social mensurável, parcerias estratégicas.',
+        challenges: 'Orçamentos limitados, necessidade de transparência, múltiplos stakeholders, impacto social.',
+        successFactors: 'Impacto social demonstrável, transparência, eficiência de custos, relacionamento institucional.',
+        aiFocusAreas: ['Processos', 'Impacto Social', 'Transparência', 'Eficiência'],
+        aiCustomPrompt: 'Focar em vendas para organizações sociais, demonstração de impacto e eficiência de recursos.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em soluções específicas. Para altos: programas integrados e parcerias.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para sindicatos, associações, ONGs, órgãos públicos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias institucionais + network social.'
+        }
+    },
+    {
+        id: 'startup_1',
+        name: 'Startup',
+        benchmarkMedio: 44,
+        topPerformers: 81,
+        characteristics: 'Vendas B2B de soluções inovadoras para empresas. Foco em disrupção, escalabilidade e crescimento rápido.',
+        trends: 'Tecnologia disruptiva, escalabilidade, modelos de negócio inovadores, parcerias estratégicas.',
+        challenges: 'Credibilidade inicial, recursos limitados, necessidade de crescimento rápido, validação de mercado.',
+        successFactors: 'Inovação comprovada, escalabilidade, agilidade, relacionamento estratégico, resultados rápidos.',
+        aiFocusAreas: ['Inovação', 'Escalabilidade', 'Agilidade', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas de inovação, demonstração de disrupção e potencial de escalabilidade.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em validação e tração. Para altos: escalabilidade e parcerias estratégicas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas inovadoras, corporações, investidores, aceleradoras.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias estratégicas + network de inovação.'
+        }
+    },
+    {
+        id: 'retail_1',
+        name: 'Supermercado / Hipermercado',
+        benchmarkMedio: 39,
+        topPerformers: 73,
+        characteristics: 'Vendas B2B para redes varejistas e atacadistas. Foco em volume, eficiência operacional e tecnologia.',
+        trends: 'Omnichannel, automação, analytics de vendas, sustentabilidade, experiência do cliente.',
+        challenges: 'Margens apertadas, concorrência acirrada, necessidade de eficiência, gestão de estoque complexa.',
+        successFactors: 'Eficiência operacional, tecnologia avançada, relacionamento comercial, flexibilidade.',
+        aiFocusAreas: ['Processos', 'Tecnologia', 'Eficiência', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas para varejo, demonstração de eficiência operacional e tecnologia.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em soluções específicas. Para altos: plataformas integradas.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para redes varejistas, atacadistas, distribuidores, shopping centers.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com redes + representantes regionais.'
+        }
+    },
+    {
+        id: 'tech_1',
+        name: 'Tecnologia / Desenvolvimento / Sites',
+        benchmarkMedio: 46,
+        topPerformers: 83,
+        characteristics: 'Vendas B2B de soluções tecnológicas para empresas. Foco em inovação, integração e transformação digital.',
+        trends: 'Inteligência artificial, cloud computing, automação, cybersecurity, transformação digital.',
+        challenges: 'Evolução tecnológica rápida, necessidade de especialização, concorrência global, integração complexa.',
+        successFactors: 'Inovação tecnológica, expertise técnica, suporte especializado, resultados mensuráveis.',
+        aiFocusAreas: ['Tecnologia', 'Inovação', 'Integração', 'Resultados'],
+        aiCustomPrompt: 'Focar em vendas de tecnologia, demonstração de inovação e capacidade de integração.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em soluções específicas. Para altos: plataformas integradas e serviços gerenciados.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, órgãos públicos, outras empresas de tecnologia.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias tecnológicas + canais de distribuição.'
+        }
+    },
+    {
+        id: 'tourism_1',
+        name: 'Turismo',
+        benchmarkMedio: 35,
+        topPerformers: 68,
+        characteristics: 'Vendas B2B de serviços turísticos corporativos. Foco em experiências, gestão de grupos e eventos corporativos.',
+        trends: 'Turismo corporativo sustentável, experiências personalizadas, tecnologia de reservas, wellness travel.',
+        challenges: 'Sazonalidade, gestão de múltiplos fornecedores, necessidade de personalização, orçamentos variáveis.',
+        successFactors: 'Experiências diferenciadas, gestão eficiente, relacionamento sólido, flexibilidade.',
+        aiFocusAreas: ['Processos', 'Experiência', 'Gestão', 'Relacionamento'],
+        aiCustomPrompt: 'Focar em vendas de turismo corporativo, gestão de experiências e relacionamento de longo prazo.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: programas corporativos anuais.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, agências corporativas, associações, órgãos públicos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + parcerias com agências + network de fornecedores.'
+        }
+    },
+    {
+        id: 'fashion_1',
+        name: 'Vestuário',
+        benchmarkMedio: 38,
+        topPerformers: 72,
+        characteristics: 'Vendas B2B de uniformes corporativos e vestuário profissional. Foco em qualidade, personalização e prazos.',
+        trends: 'Sustentabilidade têxtil, personalização digital, uniformes inteligentes, e-commerce B2B.',
+        challenges: 'Sazonalidade, gestão de estoque, necessidade de personalização, prazos de entrega.',
+        successFactors: 'Qualidade superior, capacidade de personalização, cumprimento de prazos, relacionamento comercial.',
+        aiFocusAreas: ['Processos', 'Qualidade', 'Personalização', 'Prazos'],
+        aiCustomPrompt: 'Focar em vendas de vestuário corporativo, gestão de personalização e cumprimento de prazos.',
+        aiRevenueInsights: 'Para faturamentos baixos: focar em nichos especializados. Para altos: grandes corporações e contratos anuais.',
+        aiChannelInsights: {
+            b2b: 'Venda direta para empresas, hospitais, escolas, órgãos públicos.',
+            b2c: 'Não aplicável - foco exclusivo B2B.',
+            hibrido: 'Combinação de venda direta + distribuidores especializados + representantes regionais.'
         }
     },
     {
@@ -168,20 +853,6 @@ export const DEFAULT_DIAGNOSTIC_SEGMENTS: MarketSegment[] = [
         aiCustomPrompt: '',
         aiRevenueInsights: '',
         aiChannelInsights: { b2b: '', b2c: '', hibrido: '' }
-    },
-    {
-        id: 'ind_1',
-        name: 'Indústria',
-        benchmarkMedio: 35,
-        topPerformers: 65,
-        characteristics: 'Setor tradicional com foco em produto e eficiência operacional.',
-        trends: 'Indústria 4.0, automação, e busca por novos canais de venda.',
-        challenges: 'Logística complexa, dependência de distribuidores, margens apertadas.',
-        successFactors: 'Qualidade do produto, gestão de cadeia de suprimentos, e suporte técnico.',
-        aiFocusAreas: ['Processos', 'Tecnologia', 'Mercado', 'Resultados'],
-        aiCustomPrompt: 'Analisar a eficiência da cadeia de distribuição e o impacto da tecnologia na produção e vendas.',
-        aiRevenueInsights: '',
-        aiChannelInsights: { b2b: 'Venda para distribuidores ou outras indústrias.', b2c: 'Venda direta via e-commerce ou lojas de fábrica.', hibrido: 'Uso de representantes comerciais e venda direta.' }
     }
 ];
 

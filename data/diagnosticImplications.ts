@@ -38,7 +38,7 @@ export const DIAGNOSTIC_IMPLICATIONS: Record<DiagnosticArea, DiagnosticImplicati
         area: "Pessoas",
         title: "Teste de Perfil Comportamental",
         category: "Pessoas",
-        implication: "Sem entender o perfil do cliente, o vendedor padroniza o atendimento, comprometendo a empatia e a taxa de conversão.",
+        implication: "Sem conhecer o próprio perfil comportamental, o vendedor não consegue se adaptar ao perfil do cliente, perdendo conexão e comprometendo as conversões.",
         excellentComment: "Excelente! Conhecer o perfil comportamental maximiza a empatia. Para aprimorar, implemente treinamentos contínuos de adaptação de abordagem.",
         expectedImpact: "Melhoria na empatia e personalização do atendimento"
     },
@@ -54,7 +54,7 @@ export const DIAGNOSTIC_IMPLICATIONS: Record<DiagnosticArea, DiagnosticImplicati
         area: "Monitoramento",
         title: "Indicadores Comerciais",
         category: "Monitoramento",
-        implication: "Sem indicadores bem definidos, é como pilotar um avião sem painel. Decisões passam a ser feitas por intuição e não por dados.",
+        implication: "Sem indicadores bem definidos e rituais de acompanhamento, é como pilotar um avião sem painel. Decisões passam a ser feitas por intuição e não por dados.",
         excellentComment: "Excelente! Indicadores bem definidos garantem decisões assertivas. Para evoluir, implemente dashboards em tempo real e alertas automáticos.",
         expectedImpact: "Decisões mais assertivas baseadas em dados concretos"
     },

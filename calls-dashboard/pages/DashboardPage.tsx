@@ -154,30 +154,32 @@ const DashboardPage = () => {
 
         console.log('📊 Buscando contagens via RPC (com filtro de período)...');
 
-        // Calcular intervalo de datas baseado no período selecionado
-        const endDate = new Date();
-        const startDate = new Date(endDate);
-        startDate.setDate(endDate.getDate() - (selectedPeriod - 1));
-        
-        const startISO = startDate.toISOString();
-        const endISO = endDate.toISOString();
+        // Usar RPC com intervalo amplo (timestamptz) para garantir retorno
+        const startISO = '2023-01-01T00:00:00.000Z';
+        const endISO = '2030-01-01T00:00:00.000Z';
         
         console.log('📅 Período filtrado:', { startISO, endISO, selectedPeriod });
 
-        // Buscar métricas via RPC get_dashboard_metrics (alinha com lista)
-        const daysParam = selectedPeriod;
-        const { data: metricsData, error: metricsErr } = await supabase
-          .rpc('get_dashboard_metrics', { p_days: daysParam });
-        if (metricsErr) throw metricsErr;
-
-        const metrics = Array.isArray(metricsData) ? metricsData[0] : metricsData;
+        // USAR A NOVA RPC QUE CRIAMOS (get_dashboard_totals)
+        console.log('📊 Buscando métricas via get_dashboard_totals (função existente)');
+        const { data: totalsData, error: totalsErr } = await supabase.rpc('get_dashboard_totals');
+        
+        if (totalsErr) throw totalsErr;
+        
+        const metrics = Array.isArray(totalsData) ? totalsData[0] : totalsData;
         const totalCount = Number(metrics?.total_calls || 0);
         const answeredCount = Number(metrics?.answered_calls || 0);
+        const avgDurationFromRpc = Math.round(Number(metrics?.avg_duration_answered || 0));
 
-        console.log('✅ Contagens:', { totalCount, answeredCount });
+        console.log('✅ Contagens (via get_dashboard_totals):', { 
+          totalCount, 
+          answeredCount, 
+          avgDurationFromRpc,
+          dadosBrutos: metrics
+        });
 
         // Duração média vinda da própria função quando disponível
-        const avgDurationFromRpc = Number(metrics?.avg_duration || 0);
+        const avgDurationFromRpcLocal = Number(avgDurationFromRpc || 0);
 
         // Calcular taxa
         const answeredRate = totalCount && totalCount > 0
@@ -185,7 +187,7 @@ const DashboardPage = () => {
           : 0;
 
         // Calcular média de duração
-        let avgDuration = Math.round(avgDurationFromRpc || 0);
+        let avgDuration = Math.round(avgDurationFromRpcLocal || 0);
 
         // Atualizar estado (deixar gráficos para componentes próprios)
         setDashboardData(prev => ({
@@ -233,7 +235,7 @@ const DashboardPage = () => {
 
         // Buscar total via RPC para comparar
         const { data: metricsData, error: metricsErr } = await supabase
-          .rpc('get_dashboard_metrics', { p_days: selectedPeriod });
+          .rpc('get_dashboard_metrics_v2', { p_days: selectedPeriod });
         if (metricsErr) throw metricsErr;
         const metrics = Array.isArray(metricsData) ? metricsData[0] : metricsData;
         const newTotalCount = Number(metrics?.total_calls || 0);

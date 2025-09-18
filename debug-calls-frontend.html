@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Calls Frontend</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 Debug Frontend Calls</h1>
+    <div id="results"></div>
+
+    <script>
+        const supabaseUrl = 'https://gvdagxkdqhbdqvnvqmcq.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2ZGFneGtkcWhiZHF2bnZxbWNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjkwNzMzNTUsImV4cCI6MjA0NDY0OTM1NX0.y6b1pNZPx6Hl5yJ0JFdOd0C4J6hKnUE8UgZMhRQQAWs';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testAllFunctions() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>🔄 Testando todas as funções...</p>';
+            
+            try {
+                // Teste 1: get_calls_with_filters (que o gráfico usa)
+                resultsDiv.innerHTML += '<h3>📊 Teste 1: get_calls_with_filters</h3>';
+                const { data: data1, error: error1 } = await supabase.rpc('get_calls_with_filters', {
+                    p_sdr: null,
+                    p_status: null,
+                    p_type: null,
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_limit: 10,
+                    p_offset: 0,
+                    p_sort_by: 'created_at',
+                    p_min_duration: null,
+                    p_max_duration: null,
+                    p_min_score: null
+                });
+                
+                if (error1) {
+                    resultsDiv.innerHTML += `<p style="color: red">❌ Erro: ${error1.message}</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p style="color: green">✅ Sucesso! Retornou ${data1?.length || 0} registros</p>`;
+                    if (data1 && data1.length > 0) {
+                        resultsDiv.innerHTML += '<h4>📋 Primeiro registro:</h4>';
+                        resultsDiv.innerHTML += `<pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; font-size: 12px; overflow-x: auto;">${JSON.stringify(data1[0], null, 2)}</pre>`;
+                    }
+                }
+                
+                // Teste 2: get_calls_v2 (que estava sendo usada antes)
+                resultsDiv.innerHTML += '<h3>📊 Teste 2: get_calls_v2</h3>';
+                const { data: data2, error: error2 } = await supabase.rpc('get_calls_v2', {
+                    p_start_date: null,
+                    p_end_date: null,
+                    p_status: null,
+                    p_sdr_filter: null,
+                    p_search_term: null,
+                    p_offset: 0,
+                    p_limit: 10
+                });
+                
+                if (error2) {
+                    resultsDiv.innerHTML += `<p style="color: red">❌ Erro: ${error2.message}</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p style="color: green">✅ Sucesso! Retornou ${data2?.length || 0} registros</p>`;
+                }
+                
+                // Teste 3: get_calls (função simples)
+                resultsDiv.innerHTML += '<h3>📊 Teste 3: get_calls</h3>';
+                const { data: data3, error: error3 } = await supabase.rpc('get_calls', {
+                    p_limit: 10,
+                    p_offset: 0
+                });
+                
+                if (error3) {
+                    resultsDiv.innerHTML += `<p style="color: red">❌ Erro: ${error3.message}</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p style="color: green">✅ Sucesso! Retornou ${data3?.length || 0} registros</p>`;
+                }
+                
+                // Teste 4: Busca direta na tabela
+                resultsDiv.innerHTML += '<h3>📊 Teste 4: Busca direta na tabela calls</h3>';
+                const { data: data4, error: error4 } = await supabase
+                    .from('calls')
+                    .select('*')
+                    .limit(5);
+                
+                if (error4) {
+                    resultsDiv.innerHTML += `<p style="color: red">❌ Erro: ${error4.message}</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p style="color: green">✅ Sucesso! Retornou ${data4?.length || 0} registros</p>`;
+                    if (data4 && data4.length > 0) {
+                        resultsDiv.innerHTML += '<h4>📋 Estrutura dos dados:</h4>';
+                        resultsDiv.innerHTML += `<pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; font-size: 12px; overflow-x: auto;">${JSON.stringify(Object.keys(data4[0]), null, 2)}</pre>`;
+                    }
+                }
+                
+                // Teste 5: Verificar autenticação
+                resultsDiv.innerHTML += '<h3>🔐 Teste 5: Status de Autenticação</h3>';
+                const { data: userData } = await supabase.auth.getUser();
+                if (userData.user) {
+                    resultsDiv.innerHTML += `<p style="color: green">✅ Usuário autenticado: ${userData.user.email}</p>`;
+                } else {
+                    resultsDiv.innerHTML += '<p style="color: orange">⚠️ Usuário não autenticado</p>';
+                }
+                
+            } catch (error) {
+                console.error('💥 Erro durante teste:', error);
+                resultsDiv.innerHTML += `<p style="color: red">💥 Erro inesperado: ${error.message}</p>`;
+            }
+        }
+        
+        window.addEventListener('load', testAllFunctions);
+    </script>
+</body>
+</html>
+

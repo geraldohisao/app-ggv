@@ -277,13 +277,57 @@ export const CompanyInfoForm: React.FC<CompanyInfoFormProps> = ({ onSubmit, pref
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Encontrar segmento pelo nome selecionado; caso não exista na lista, usar 'Geral' ou o primeiro disponível
+        console.log('🚀 FORM - Botão Começar Diagnóstico clicado');
+        
+        // Debug da validação
+        const isValid = validate();
+        console.log('✅ FORM - Validação passou?', isValid);
+        console.log('❌ FORM - Erros encontrados:', errors);
+        
+        // Debug do estado dos segmentos
+        console.log('📊 FORM - Segments array:', segments);
+        console.log('📊 FORM - Segments é array?', Array.isArray(segments));
+        console.log('📊 FORM - Segments length:', segments?.length);
+        
+        // Verificar se segments existe antes de usar
+        if (!segments || !Array.isArray(segments) || segments.length === 0) {
+            console.log('❌ FORM - Segments não carregado! Usando fallback...');
+            // Usar segmento padrão se não carregou
+            const fallbackSegment = { 
+                id: 'gen_1', 
+                name: 'Geral',
+                benchmarkMedio: 40,
+                topPerformers: 70,
+                characteristics: 'Setor geral',
+                trends: '',
+                challenges: '',
+                successFactors: '',
+                aiFocusAreas: ['Processos', 'Pessoas'],
+                aiCustomPrompt: '',
+                aiRevenueInsights: '',
+                aiChannelInsights: { b2b: '', b2c: '', hibrido: '' }
+            };
+            console.log('✅ FORM - Usando segmento fallback:', fallbackSegment.name);
+            onSubmit(formData, fallbackSegment);
+            return;
+        }
+        
+        // Encontrar segmento pelo nome selecionado no campo "Setor de atuação"
         const selectedSegment =
-            segments.find(s => s.name === formData.activityBranch) ||
-            segments.find(s => s.name?.toLowerCase?.() === 'geral') ||
+            segments.find(s => s?.name === formData.activitySector) ||
+            segments.find(s => s?.name?.toLowerCase?.() === 'geral') ||
             segments[0];
-        if (validate() && selectedSegment) {
+            
+        console.log('🎯 FORM - Segmento encontrado:', selectedSegment?.name);
+        console.log('🔍 FORM - Procurando por:', formData.activitySector);
+        console.log('📊 FORM - Total de segmentos disponíveis:', segments.length);
+        console.log('🔍 FORM - Primeiros 5 segmentos:', segments.slice(0, 5).map(s => s?.name));
+        
+        if (isValid && selectedSegment) {
+            console.log('✅ FORM - Chamando onSubmit...');
             onSubmit(formData, selectedSegment);
+        } else {
+            console.log('❌ FORM - Submit bloqueado. Validação:', isValid, 'Segmento:', !!selectedSegment);
         }
     };
 

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense } fr
 import { AIMode, type AIMessage, type AIPersona, type ConversationHistories, type StoredKnowledgeDocument, Module } from '../types';
 import { getAIAssistantResponseStream, getLastSourcesMeta } from '../services/aiRouterClient';
 import { findMostRelevantDocuments, findRelevant } from '../services/embeddingService';
+import { autoSyncSectors } from '../services/sectorKnowledgeService';
 import { getLocalDocuments, syncQueuedDocuments } from '../services/localKnowledgeStore';
 import * as SupabaseService from '../services/supabaseService';
 import { PaperAirplaneIcon, RobotIcon, TrashIcon, ExclamationTriangleIcon, ClipboardDocumentIcon, CheckCircleIcon, RefreshIcon, PencilIcon } from './ui/icons';
@@ -116,6 +117,11 @@ const AssistenteIA: React.FC = () => {
             setFetchError(null);
             try {
                 console.log('🔄 CARREGANDO - Buscando dados do assistente...');
+
+                // Sincronizar setores no banco vetorial (não bloqueia o carregamento)
+                autoSyncSectors().catch(err => 
+                    console.warn('⚠️ Erro na sincronização automática de setores:', err)
+                );
 
                 // Carregar personas primeiro (com timeout)
                 const personasData = await withTimeout(SupabaseService.getAIPersonas(), 8000);

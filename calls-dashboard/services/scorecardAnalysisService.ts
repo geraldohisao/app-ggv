@@ -157,21 +157,46 @@ function extractJson(text: string): any {
   throw new Error('Não foi possível extrair JSON da resposta do Gemini');
 }
 
-// Buscar scorecard ativo
-async function getActiveScorecard(): Promise<Scorecard | null> {
+// Buscar scorecard inteligente baseado nos dados da chamada
+async function getActiveScorecard(callData?: any): Promise<Scorecard | null> {
   try {
-    const { data, error } = await supabase
-      .from('scorecards')
-      .select('*')
-      .eq('active', true)
-      .single();
+    console.log('🔍 Buscando scorecard inteligente para:', {
+      call_type: callData?.call_type,
+      pipeline: callData?.pipeline,
+      cadence: callData?.cadence
+    });
+
+    // Usar nossa nova função inteligente
+    const { data: scorecardMatch, error: matchError } = await supabase.rpc('get_scorecard_smart', {
+      call_type_param: callData?.call_type || null,
+      pipeline_param: callData?.pipeline || null,
+      cadence_param: callData?.cadence || null
+    });
     
-    if (error) {
-      console.warn('⚠️ Erro ao buscar scorecard:', error);
+    if (matchError) {
+      console.warn('⚠️ Erro ao buscar scorecard inteligente:', matchError);
       return null;
     }
     
-    return data;
+    if (!scorecardMatch || scorecardMatch.length === 0) {
+      console.warn('⚠️ Nenhum scorecard encontrado');
+      return null;
+    }
+    
+    const match = Array.isArray(scorecardMatch) ? scorecardMatch[0] : scorecardMatch;
+    console.log('✅ Scorecard inteligente selecionado:', {
+      name: match.name,
+      match_score: match.match_score,
+      id: match.id
+    });
+    
+    // Retornar o scorecard diretamente (já vem completo da função)
+    return {
+      id: match.id,
+      name: match.name,
+      description: match.description,
+      active: match.is_active
+    };
   } catch (error) {
     console.warn('⚠️ Erro ao buscar scorecard:', error);
     return null;
@@ -262,8 +287,9 @@ export async function analyzeScorecardWithAI(
     throw new Error('Transcrição não disponível para análise');
   }
 
-  // Buscar scorecard ativo
-  const scorecard = await getActiveScorecard();
+  // Buscar scorecard inteligente baseado nos dados da chamada
+  const callData = await supabase.rpc('get_call_detail', { p_call_id: callId });
+  const scorecard = await getActiveScorecard(callData?.data?.[0]);
   if (!scorecard) {
     throw new Error('Nenhum scorecard ativo encontrado. Configure um scorecard primeiro.');
   }

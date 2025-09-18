@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Module } from './types';
 import { DiagnosticoComercial } from './components/DiagnosticoComercial';
+import DealIdManager from './components/diagnostico/DealIdManager';
 import AssistenteIA from './components/AssistenteIA';
 import AppErrorBoundary, { AppErrorBoundaryEnhanced } from './components/common/AppErrorBoundary';
 import CalculadoraOTE from './components/CalculadoraOTE';
@@ -240,7 +241,10 @@ const AppContent: React.FC = () => {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto bg-slate-100">
-          <DiagnosticoComercial />
+          {(() => {
+            console.log('🔄 APP - Renderizando DealIdManager para diagnóstico');
+            return <DealIdManager />;
+          })()}
         </main>
       </div>
     );

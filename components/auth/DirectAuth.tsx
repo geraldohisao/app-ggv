@@ -54,7 +54,7 @@ export const DirectAuth: React.FC<DirectAuthProps> = ({ onAuthSuccess, onAuthErr
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send'
+            scope: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose'
           }
         }
       });

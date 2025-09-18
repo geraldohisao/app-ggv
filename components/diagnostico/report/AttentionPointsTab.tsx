@@ -108,7 +108,6 @@ export const AttentionPointsTab: React.FC<AttentionPointsTabProps> = ({
                                         (Top: {topPerformers.toFixed(0)}%)
                                     </span>
                                 </div>
-                                <p className="text-sm text-slate-500">{score}/{maxScore} pontos</p>
                             </div>
                         </div>
 

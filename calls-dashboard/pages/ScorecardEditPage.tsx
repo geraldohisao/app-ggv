@@ -9,6 +9,8 @@ interface EditScorecardData {
   name: string;
   description: string;
   call_types: string[];
+  pipelines: string[];
+  cadences: string[];
 }
 
 interface ScorecardCriterion {
@@ -24,9 +26,13 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
   const [editData, setEditData] = useState<EditScorecardData>({
     name: '',
     description: '',
-    call_types: []
+    call_types: [],
+    pipelines: [],
+    cadences: []
   });
   const [availableCallTypes, setAvailableCallTypes] = useState<string[]>([]);
+  const [availablePipelines, setAvailablePipelines] = useState<string[]>([]);
+  const [availableCadences, setAvailableCadences] = useState<string[]>([]);
   const [criteria, setCriteria] = useState<ScorecardCriterion[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,7 +48,7 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
 
   useEffect(() => {
     loadScorecard();
-    fetchAvailableCallTypes();
+    fetchAvailableOptions();
   }, [scorecardId]);
 
   const loadScorecard = async () => {
@@ -64,9 +70,11 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
       if (scorecardData && scorecardData.length > 0) {
         const scorecard = scorecardData[0];
         setEditData({
-          name: scorecard.name,
+          name: scorecard.name || '',
           description: scorecard.description || '',
-          call_types: scorecard.call_types || []
+          call_types: scorecard.target_call_types || scorecard.call_types || [],
+          pipelines: scorecard.target_pipelines || scorecard.pipelines || [],
+          cadences: scorecard.target_cadences || scorecard.cadences || []
         });
       } else {
         setError('Scorecard não encontrado');
@@ -128,15 +136,26 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
     }
   };
 
-  const fetchAvailableCallTypes = async () => {
+  const fetchAvailableOptions = async () => {
     try {
-      const { data, error } = await supabase.rpc('get_all_etapas_with_indefinida');
+      const { data, error } = await supabase.rpc('get_available_options');
       if (error) throw error;
-      // Mapear para formato compatível, incluindo indefinida
-      const etapas = (data || []).map((item: any) => item.etapa_codigo || 'indefinida');
-      setAvailableCallTypes(etapas);
-    } catch (err) {
-      console.error('Erro ao buscar etapas:', err);
+      
+      const options = Array.isArray(data) ? data[0] : data;
+      setAvailableCallTypes(options?.call_types || []);
+      setAvailablePipelines(options?.pipelines || []);
+      setAvailableCadences(options?.cadences || []);
+      
+      console.log('✅ Opções carregadas:', {
+        call_types: options?.call_types,
+        pipelines: options?.pipelines,
+        cadences: options?.cadences
+      });
+    } catch (error) {
+      console.warn('Erro ao buscar opções:', error);
+      setAvailableCallTypes(['Lead (Qualificação)', 'Oportunidade', 'Reunião Diagnóstico']);
+      setAvailablePipelines(['GGV Inteligência em Vendas']);
+      setAvailableCadences(['Inbound - Consultoria']);
     }
   };
 
@@ -266,46 +285,94 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
   };
 
   const saveScorecard = async () => {
-    if (!editData.name.trim()) {
+    if (saving) return;
+    const trimmedName = (editData.name || '').trim();
+    if (!trimmedName) {
       alert('Nome é obrigatório');
       return;
     }
 
-    if (editData.call_types.length === 0) {
-      alert('Selecione pelo menos uma etapa da ligação');
-      return;
-    }
+    // Normalizar e deduplicar arrays
+    const unique = (arr?: string[]) => Array.from(new Set((arr || []).filter(Boolean)));
+    const cleanCallTypes = unique(editData.call_types);
+    const cleanPipelines = unique(editData.pipelines);
+    const cleanCadences = unique(editData.cadences);
 
     try {
       setSaving(true);
-      const { data, error } = await supabase.rpc('edit_scorecard_with_call_types', {
-        scorecard_id_param: scorecardId,
-        scorecard_name: editData.name,
-        scorecard_description: editData.description,
-        call_types_array: editData.call_types
+      console.log('💾 Iniciando salvamento:', {
+        scorecardId,
+        name: trimmedName,
+        description: editData.description,
+        call_types: cleanCallTypes,
+        pipelines: cleanPipelines,
+        cadences: cleanCadences
       });
-      
-      if (error) {
-        console.error('Erro ao salvar scorecard:', error);
-        alert('Erro ao salvar scorecard: ' + error.message);
-        return;
+
+      // Tentar RPC estendido
+      const rpcResp = await supabase.rpc('edit_scorecard_with_call_types', {
+        scorecard_id_param: scorecardId,
+        scorecard_name: trimmedName,
+        scorecard_description: editData.description || '',
+        call_types_array: cleanCallTypes,
+        pipelines_array: cleanPipelines,
+        cadences_array: cleanCadences
+      });
+
+      console.log('📡 Resposta completa do RPC:', rpcResp);
+
+      if (rpcResp.error) {
+        console.error('❌ Erro no RPC:', rpcResp.error);
+        throw new Error(`Falha no RPC: ${rpcResp.error.message || 'Erro desconhecido'}`);
       }
-      
-      if (!data) {
-        alert('Erro ao salvar scorecard');
-        return;
+
+      if (rpcResp.data === false) {
+        throw new Error('RPC retornou false - atualização falhou');
       }
-      
-      alert('Scorecard salvo com sucesso!');
-      // Voltar para lista
+
+      // Verificar persistência
+      const { data: verifiedData, error: verifyError } = await supabase.rpc('get_scorecard_complete', { 
+        scorecard_id_param: scorecardId 
+      });
+
+      if (verifyError) {
+        console.warn('⚠️ Erro na verificação:', verifyError);
+        throw new Error(`Falha na verificação: ${verifyError.message}`);
+      }
+
+      const verified = verifiedData?.[0];
+      console.log('✅ Dados verificados:', verified);
+
+      // Comparar valores
+      const mismatches = [];
+      if (verified.name !== trimmedName) mismatches.push('nome');
+      if (verified.description !== (editData.description || '')) mismatches.push('descrição');
+      if (!arraysEqual(verified.target_call_types || [], cleanCallTypes)) mismatches.push('call_types');
+      if (!arraysEqual(verified.target_pipelines || [], cleanPipelines)) mismatches.push('pipelines');
+      if (!arraysEqual(verified.target_cadences || [], cleanCadences)) mismatches.push('cadences');
+
+      if (mismatches.length > 0) {
+        throw new Error(`Dados não persistiram corretamente nos campos: ${mismatches.join(', ')}`);
+      }
+
+      alert('Scorecard salvo com sucesso! Todos os dados verificados.');
       window.location.hash = '#/scorecards';
-    } catch (err) {
-      console.error('Erro inesperado:', err);
-      alert('Erro inesperado ao salvar scorecard');
+
+    } catch (err: any) {
+      console.error('💥 Erro ao salvar:', err);
+      alert(`Erro ao salvar: ${err.message || 'Erro desconhecido'}\nDetalhes no console.`);
     } finally {
       setSaving(false);
     }
   };
+
+  // Função auxiliar para comparar arrays
+  function arraysEqual(a: string[], b: string[]) {
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, idx) => val === sortedB[idx]);
+  }
 
   if (loading) {
     return (
@@ -342,7 +409,7 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
         </a>
       </div>
 
-      <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-6">
+      <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-6 relative z-[9000]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Nome */}
           <div>
@@ -425,6 +492,72 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
             </div>
           </div>
         )}
+
+        {/* Pipelines */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Pipelines (Funis)</label>
+          <select
+            className="w-full px-3 py-2 border border-slate-300 rounded-md mb-2"
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value && !(editData.pipelines || []).includes(value)) {
+                setEditData(prev => ({ ...prev, pipelines: [...(prev.pipelines || []), value] }));
+              }
+              e.target.value = '';
+            }}
+          >
+            <option value="">Selecione um pipeline...</option>
+            {availablePipelines.map(pipeline => (
+              <option key={pipeline} value={pipeline}>{pipeline}</option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-2">
+            {(editData.pipelines || []).map(pipeline => (
+              <span key={pipeline} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-1">
+                {pipeline}
+                <button
+                  onClick={() => setEditData(prev => ({ ...prev, pipelines: (prev.pipelines || []).filter(p => p !== pipeline) }))}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Cadências */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Cadências</label>
+          <select
+            className="w-full px-3 py-2 border border-slate-300 rounded-md mb-2"
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value && !(editData.cadences || []).includes(value)) {
+                setEditData(prev => ({ ...prev, cadences: [...(prev.cadences || []), value] }));
+              }
+              e.target.value = '';
+            }}
+          >
+            <option value="">Selecione uma cadência...</option>
+            {availableCadences.map(cadence => (
+              <option key={cadence} value={cadence}>{cadence}</option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-2">
+            {(editData.cadences || []).map(cadence => (
+              <span key={cadence} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center gap-1">
+                {cadence}
+                <button
+                  onClick={() => setEditData(prev => ({ ...prev, cadences: (prev.cadences || []).filter(c => c !== cadence) }))}
+                  className="text-green-600 hover:text-green-800"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
 
         {/* Critérios */}
         <div>
@@ -560,20 +693,40 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
         )}
 
         {/* Botões */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 relative z-[9999] isolate pointer-events-auto">
           <a 
             href="#/scorecards"
-            className="px-4 py-2 text-slate-600 hover:text-slate-800"
+            className="px-4 py-2 text-slate-600 hover:text-slate-800 relative z-[10000] pointer-events-auto"
           >
             Cancelar
           </a>
-          <button
-            onClick={saveScorecard}
-            disabled={saving}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+          <div 
+            onClick={() => {
+              console.log('🔘 Botão clicado!', { saving, editData });
+              if (saving) return;
+              saveScorecard();
+            }}
+            className={`
+              w-48 h-10 
+              flex items-center justify-center 
+              rounded cursor-pointer select-none relative z-[10000] pointer-events-auto
+              text-sm font-medium
+              transition-all duration-200
+              ${saving 
+                ? 'bg-gray-400 text-gray-600 cursor-wait' 
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800'
+              }
+            `}
+            style={{ 
+              minWidth: '192px',
+              minHeight: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             {saving ? 'Salvando...' : 'Salvar Scorecard'}
-          </button>
+          </div>
         </div>
 
         {/* Modal de Edição de Critério */}

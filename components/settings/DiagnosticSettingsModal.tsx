@@ -91,14 +91,14 @@ export const DiagnosticSettingsModal: React.FC<{ onClose: () => void }> = ({ onC
     };
 
     return (
-        <ModalBase title="Configurações do Diagnóstico Comercial" onClose={onClose}>
+        <ModalBase title="Configurações do Diagnóstico - Setores de Atuação" onClose={onClose}>
             {isLoading ? <LoadingSpinner /> : error ? <ErrorDisplay message={error} /> : !isFormOpen ? (
                 <div>
                     <div className="flex justify-between items-center mb-4">
-                        <p className="text-slate-600">Gerencie os segmentos de mercado para análise.</p>
+                        <p className="text-slate-600">Gerencie os setores de atuação para análise.</p>
                         {canEdit && (
                             <button onClick={handleAdd} className="flex items-center gap-2 bg-blue-900 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm">
-                                <PlusIcon className="w-5 h-5" /> Adicionar Novo Segmento
+                                <PlusIcon className="w-5 h-5" /> Adicionar Novo Setor
                             </button>
                         )}
                     </div>
@@ -106,14 +106,14 @@ export const DiagnosticSettingsModal: React.FC<{ onClose: () => void }> = ({ onC
                     {segments.length === 0 && canEdit && (
                         <div className="text-center py-10 text-slate-500 border-2 border-dashed border-slate-200 rounded-lg">
                             <ChartBarIcon className="w-12 h-12 mx-auto text-slate-400 mb-2" />
-                            <h3 className="font-semibold text-slate-700">Nenhum segmento encontrado.</h3>
-                            <p>Comece adicionando segmentos ou carregue dados de exemplo.</p>
+                            <h3 className="font-semibold text-slate-700">Nenhum setor encontrado.</h3>
+                            <p>Comece adicionando setores ou carregue dados de exemplo.</p>
                             <button
                                 onClick={handleSeedSegments}
                                 disabled={isSeeding}
                                 className="mt-4 flex items-center mx-auto gap-2 bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm disabled:bg-slate-400"
                             >
-                                {isSeeding ? 'Carregando...' : 'Adicionar Segmentos Padrão'}
+                                {isSeeding ? 'Carregando...' : 'Adicionar Setores Padrão'}
                             </button>
                         </div>
                     )}
@@ -215,7 +215,7 @@ const SegmentForm: React.FC<{ segment: MarketSegment | null; onSave: (segment: M
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800">{segment ? `Editar Segmento: ${segment.name}` : 'Criar Novo Segmento'}</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{segment ? `Editar Setor: ${segment.name}` : 'Criar Novo Setor'}</h2>
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6">
                     <button type="button" onClick={() => setActiveTab('basic')} className={`py-3 px-1 border-b-2 font-semibold text-sm ${activeTab === 'basic' ? 'border-blue-800 text-blue-800' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Configurações Básicas</button>
@@ -227,7 +227,7 @@ const SegmentForm: React.FC<{ segment: MarketSegment | null; onSave: (segment: M
                     <div className="space-y-4 animate-fade-in">
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                              <FormGroup>
-                                <label htmlFor="name" className={formLabelClass}>Nome do Segmento</label>
+                                <label htmlFor="name" className={formLabelClass}>Nome do Setor</label>
                                 <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} className={formInputClass} placeholder="Ex: Tecnologia, Saúde..." required disabled={!canEdit}/>
                             </FormGroup>
                             <FormGroup>
@@ -317,7 +317,7 @@ const SegmentForm: React.FC<{ segment: MarketSegment | null; onSave: (segment: M
             </div>
             <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-slate-200">
                 <button type="button" onClick={onCancel} className="bg-slate-200 text-slate-800 font-bold py-2 px-5 rounded-lg hover:bg-slate-300 transition-colors">Cancelar</button>
-                <button type="submit" disabled={!canEdit} className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed">{segment ? 'Salvar Alterações' : 'Criar Segmento'}</button>
+                <button type="submit" disabled={!canEdit} className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed">{segment ? 'Salvar Alterações' : 'Criar Setor'}</button>
             </div>
         </form>
     );

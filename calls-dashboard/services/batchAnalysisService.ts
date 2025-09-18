@@ -48,7 +48,7 @@ export async function getCallsNeedingAnalysis(): Promise<CallToAnalyze[]> {
   try {
     console.log('🔍 Buscando chamadas que precisam de análise...');
 
-    // Buscar chamadas com transcrição e sem análise
+    // Buscar chamadas com transcrição e verificar se realmente têm análise
     const { data: calls, error } = await supabase
       .from('calls')
       .select(`
@@ -59,7 +59,8 @@ export async function getCallsNeedingAnalysis(): Promise<CallToAnalyze[]> {
         sdr_name,
         enterprise,
         person,
-        ai_status
+        ai_status,
+        call_analysis(call_id)
       `)
       .not('transcription', 'is', null)
       .neq('transcription', '');
@@ -72,13 +73,19 @@ export async function getCallsNeedingAnalysis(): Promise<CallToAnalyze[]> {
     const callsToAnalyze = (calls || []).filter(call => {
       // Verificar duração >3min usando função auxiliar
       const durationSec = calculateDurationSeconds(call);
+      
+      // Verificar se realmente não tem análise (verificar na tabela call_analysis)
+      const hasAnalysis = call.call_analysis && call.call_analysis.length > 0;
+      
       const isValid = durationSec > 180 && 
              call.transcription && 
              call.transcription.trim().length > 50 &&
-             call.ai_status !== 'completed'; // Sem análise ainda
+             !hasAnalysis; // Sem análise na tabela call_analysis
       
       if (isValid) {
-        console.log(`✅ Chamada válida para análise: ${call.id} - ${durationSec}s - ai_status: ${call.ai_status}`);
+        console.log(`✅ Chamada válida para análise: ${call.id} - ${durationSec}s - sem análise prévia`);
+      } else {
+        console.log(`❌ Chamada filtrada: ${call.id} - duração: ${durationSec}s - tem análise: ${hasAnalysis} - ai_status: ${call.ai_status}`);
       }
       
       return isValid;
@@ -206,32 +213,24 @@ export async function getAnalysisStats(): Promise<{
   callsWithScore: number;
 }> {
   try {
-    // Total de chamadas
-    const { count: totalCalls } = await supabase
-      .from('calls')
-      .select('*', { count: 'exact', head: true });
-
-    // Chamadas >3min - usar duration_formated ou duration
-    const { data: callsData } = await supabase
-      .from('calls')
-      .select('duration, duration_formated');
+    // USAR A FUNÇÃO CORRIGIDA COM DADOS REAIS
+    const { data: statsData, error: statsErr } = await supabase.rpc('get_analysis_stats_real');
     
-    const callsOver3Min = (callsData || []).filter(call => 
-      calculateDurationSeconds(call) > 180
-    ).length;
-
-    // Chamadas >3min com transcrição
-    const { data: callsTranscriptionData } = await supabase
-      .from('calls')
-      .select('duration, duration_formated, transcription')
-      .not('transcription', 'is', null)
-      .neq('transcription', '');
+    if (statsErr) throw statsErr;
     
-    const callsWithTranscription = (callsTranscriptionData || []).filter(call => 
-      calculateDurationSeconds(call) > 180 && 
-      call.transcription && 
-      call.transcription.trim().length > 50
-    ).length;
+    const stats = Array.isArray(statsData) ? statsData[0] : statsData;
+    
+    return {
+      totalCalls: Number(stats?.total_calls || 0),
+      callsOver3Min: Number(stats?.calls_over_3min || 0),
+      callsWithTranscription: Number(stats?.calls_with_transcription || 0),
+      callsNeedingAnalysis: Number(stats?.calls_needing_analysis || 0),
+      callsAnalyzed: Number(stats?.calls_analyzed || 0),
+      callsWithScore: Number(stats?.calls_with_score || 0)
+    };
+
+    // Usar estatística da RPC para chamadas com transcrição
+    const callsWithTranscription = Number(stats?.calls_with_transcription || 0);
 
     // Chamadas que precisam de análise (mesma lógica do getCallsNeedingAnalysis)
     const { data: callsNeedingData } = await supabase
@@ -266,20 +265,20 @@ export async function getAnalysisStats(): Promise<{
     const callsWithScore = (callsWithScoreData || []).length;
 
     console.log('📊 STATS DEBUG:', {
-      totalCalls: totalCalls || 0,
-      callsOver3Min: callsOver3Min || 0,
+      totalCalls: stats?.total_calls || 0,
+      callsOver3Min: stats?.calls_over_3min || 0,
       callsWithTranscription: callsWithTranscription || 0,
-      callsNeedingAnalysis: callsNeedingAnalysis || 0,
-      callsAnalyzed: callsAnalyzed || 0,
+      callsNeedingAnalysis: stats?.calls_needing_analysis || 0,
+      callsAnalyzed: stats?.calls_analyzed || 0,
       callsWithScore: callsWithScore || 0
     });
 
     return {
-      totalCalls: totalCalls || 0,
-      callsOver3Min: callsOver3Min || 0,
+      totalCalls: Number(stats?.total_calls || 0),
+      callsOver3Min: Number(stats?.calls_over_3min || 0),
       callsWithTranscription: callsWithTranscription || 0,
-      callsNeedingAnalysis: callsNeedingAnalysis || 0,
-      callsAnalyzed: callsAnalyzed || 0,
+      callsNeedingAnalysis: Number(stats?.calls_needing_analysis || 0),
+      callsAnalyzed: Number(stats?.calls_analyzed || 0),
       callsWithScore: callsWithScore || 0
     };
 

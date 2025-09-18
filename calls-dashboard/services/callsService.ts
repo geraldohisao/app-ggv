@@ -186,7 +186,60 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
     // Determinar antecipadamente se a ordenação é por score (usado em várias etapas)
     const isScoreFilter = sortBy === 'score' || sortBy === 'score_asc';
 
-    // Construir query com filtros aplicados
+    // PRIMEIRA TENTATIVA: usar RPC get_calls_with_filters (mesma do gráfico) para evitar problemas de RLS
+    try {
+      console.log('🔍 CALLS SERVICE - Tentando RPC get_calls_with_filters...');
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_calls_with_filters', {
+        p_sdr: sdr_email || null,
+        p_status: status || null,
+        p_type: call_type || null,
+        p_start_date: startTimestamp,
+        p_end_date: endTimestamp,
+        p_limit: limit,
+        p_offset: offset,
+        p_sort_by: sortBy || 'created_at',
+        p_min_duration: min_duration ?? null,
+        p_max_duration: max_duration ?? null,
+        p_min_score: min_score ?? null
+      });
+
+      if (rpcError) {
+        console.warn('⚠️ CALLS SERVICE - RPC get_calls_with_filters falhou, usando fallback direto na tabela:', rpcError.message);
+      } else if (rpcData && rpcData.length >= 0) {
+        console.log('✅ CALLS SERVICE - RPC get_calls_with_filters retornou', rpcData.length, 'registros');
+        const callsWithFriendlyStatus = (rpcData || []).map((call: any) => {
+          // Calcular duration_formatted aqui no frontend (usando duration ou duration_seconds)
+          const durationVal = call.duration_seconds ?? call.duration ?? 0;
+          let durationFormatted = '00:00:00';
+          if (durationVal && durationVal > 0) {
+            const hours = Math.floor(durationVal / 3600);
+            const minutes = Math.floor((durationVal % 3600) / 60);
+            const seconds = durationVal % 60;
+            durationFormatted = `${hours.toString().padStart(2, '0')}:${minutes
+              .toString()
+              .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          }
+
+          return {
+            ...call,
+            duration: durationVal,
+            duration_formatted: durationFormatted,
+            status_voip_friendly: mapStatusVoip(call.status_voip),
+            total_count: call.total_count || (rpcData?.length ?? 0)
+          };
+        });
+
+        return {
+          calls: callsWithFriendlyStatus as any,
+          totalCount: (rpcData?.[0]?.total_count as number) || rpcData.length || 0,
+          hasMore: (offset + limit) < ((rpcData?.[0]?.total_count as number) || rpcData.length || 0)
+        };
+      }
+    } catch (rpcUnexpected) {
+      console.warn('⚠️ CALLS SERVICE - Erro inesperado usando RPC, usando fallback direto na tabela', rpcUnexpected);
+    }
+
+    // FALLBACK: Construir query com filtros aplicados diretamente na tabela (pode sofrer com RLS)
     // Se for ordenação por score, usar INNER JOIN para garantir apenas chamadas com análise
     const baseSelect = isScoreFilter
       ? `
@@ -518,41 +571,35 @@ export async function fetchCalls(filters: CallsFilters = {}): Promise<CallsRespo
  */
 export async function fetchCallDetail(callId: string): Promise<CallWithDetails | null> {
   try {
-    console.log('🔍 CALLS SERVICE - Buscando detalhes da call:', callId);
+    console.log('🔍 CALLS SERVICE - Buscando detalhes via get_call_detail:', callId);
 
-    // Buscar diretamente da tabela calls (mais confiável)
-    const { data, error } = await supabase
-      .from('calls')
-      .select(`
-        *,
-        scorecard,
-        call_analysis!left(final_grade)
-      `)
-      .eq('id', callId)
-      .single();
+    // Usar nossa nova função que funciona
+    const { data, error } = await supabase.rpc('get_call_detail', { p_call_id: callId });
 
     if (error) {
       console.error('❌ CALLS SERVICE - Erro ao buscar detalhes da call:', JSON.stringify(error, null, 2));
       throw error;
     }
 
-    if (!data) {
+    if (!data || data.length === 0) {
       console.log('📭 CALLS SERVICE - Call não encontrada');
       return null;
     }
 
-    // Mapear para o formato esperado
+    const callData = Array.isArray(data) ? data[0] : data;
+
+    // Mapear para o formato esperado usando dados corretos
     const callDetail: CallWithDetails = {
-      ...data,
-      status_voip_friendly: mapStatusVoip(data.status_voip),
-      company_name: data.insights?.company || data.insights?.enterprise || 'Empresa não informada',
-      person_name: data.insights?.person || data.insights?.person_name || 'Pessoa não informada',
-      person_email: data.insights?.person_email || '',
-      sdr_id: data.agent_id,
-      sdr_name: data.agent_id,
-      sdr_email: data.agent_id,
-      sdr_avatar_url: `https://i.pravatar.cc/64?u=${data.agent_id}`,
-      audio_url: data.recording_url || ''
+      ...callData,
+      status_voip_friendly: mapStatusVoip(callData.status_voip),
+      company_name: callData.enterprise || 'Empresa não informada',
+      person_name: callData.person || 'Pessoa não informada',
+      person_email: callData.insights?.person_email || '',
+      sdr_id: callData.agent_id,
+      sdr_name: callData.agent_id,
+      sdr_email: callData.sdr_email || callData.agent_id,
+      sdr_avatar_url: `https://i.pravatar.cc/64?u=${callData.agent_id}`,
+      audio_url: callData.recording_url || ''
     };
 
     console.log('✅ CALLS SERVICE - Detalhes da call encontrados');

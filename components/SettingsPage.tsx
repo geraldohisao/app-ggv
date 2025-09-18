@@ -10,6 +10,7 @@ import { ApiKeyManagerModal } from './settings/ApiKeyManagerModal';
 import { ServerKeyManagerModal } from './settings/ServerKeyManagerModal';
 import { ResetCacheModal } from './settings/ResetCacheModal';
 import { UserManagerModal } from './settings/UserManagerModal';
+import { SectorSyncPanel } from './settings/SectorSyncPanel';
 import Breadcrumb from './common/Breadcrumb';
 import InternalLink from './common/InternalLink';
 const Preferences = React.lazy(() => import('./settings/Preferences'));
@@ -65,6 +66,13 @@ const SettingsPage: React.FC = () => {
                 description: 'Adicione ou remova documentos da base de conhecimento que o assistente utiliza.',
                 icon: <BookOpenIcon className="w-6 h-6 text-purple-800"/>,
                 kbd: 'Alt+3',
+            } : null,
+            canManageKnowledge ? {
+                id: 'sectorSync',
+                title: 'Sincronizar Setores - Banco Vetorial',
+                description: 'Sincronize os setores de atuação com o banco vetorial para melhorar as respostas da IA.',
+                icon: <ChartBarIcon className="w-6 h-6 text-blue-600"/>,
+                kbd: 'Alt+S',
             } : null,
             {
                 id: 'preferences',
@@ -241,7 +249,7 @@ const SettingsPage: React.FC = () => {
                     )}
                     <SettingsSection title="Conteúdo e Inteligência Artificial">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {cards.filter(c => ['diagnostic','assistant','knowledge','preferences'].includes(c.id)).map(c => (
+                            {cards.filter(c => ['diagnostic','assistant','knowledge','sectorSync','preferences'].includes(c.id)).map(c => (
                                 <SettingsCard key={c.id} icon={c.icon} title={c.title} description={c.description} onClick={() => setActiveModal(c.id)} />
                             ))}
                         </div>
@@ -261,6 +269,7 @@ const SettingsPage: React.FC = () => {
             {activeModal === 'diagnostic' && <DiagnosticSettingsModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'assistant' && <AssistantSettingsModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'knowledge' && <KnowledgeSettingsModal onClose={() => setActiveModal(null)} />}
+            {activeModal === 'sectorSync' && <SectorSyncPanel onClose={() => setActiveModal(null)} />}
             {activeModal === 'apiStatus' && <ApiSettingsModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'apiKeyManager' && <ApiKeyManagerModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'resetCache' && <ResetCacheModal onClose={() => setActiveModal(null)} />}

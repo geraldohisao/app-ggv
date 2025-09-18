@@ -31,6 +31,9 @@ export const DiagnosticoComercial: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [prefill, setPrefill] = useState<Partial<CompanyData> | null>(null);
     
+    // NOTA: Validação de deal_id agora é responsabilidade do DealIdManager
+    // Este componente assume que sempre receberá um deal_id válido
+    
     // Estado para controlar se deve carregar estado persistido
     const [shouldLoadPersistedState, setShouldLoadPersistedState] = useState<boolean>(true);
     
@@ -113,18 +116,22 @@ export const DiagnosticoComercial: React.FC = () => {
             const urlDealId = new URLSearchParams(window.location.search).get('deal_id');
             const savedDealId = savedState.dealId;
             
-            // Se há deal_id na URL E é diferente do salvo, limpar estado
-            if (urlDealId && savedDealId && urlDealId !== savedDealId) {
-                console.log('🔄 PERSISTÊNCIA - Deal ID mudou na URL!');
-                console.log('  - URL atual:', urlDealId);
-                console.log('  - Salvo:', savedDealId);
-                console.log('🗑️ PERSISTÊNCIA - Limpando estado antigo para evitar inconsistência');
+            console.log('🔍 PERSISTÊNCIA - Validação de deal_id:');
+            console.log('  - URL deal_id:', urlDealId);
+            console.log('  - Saved deal_id:', savedDealId);
+            
+            // VALIDAÇÃO RIGOROSA: Ambos devem existir e ser iguais
+            if (!urlDealId || !savedDealId || urlDealId !== savedDealId) {
+                console.log('⚠️ PERSISTÊNCIA - Deal ID inválido ou inconsistente!');
+                console.log('🗑️ PERSISTÊNCIA - Limpando estado para evitar diagnósticos órfãos');
                 clearPersistedState();
                 setShouldLoadPersistedState(false);
                 return;
             }
             
-            // Só restaurar se não houver deal_id na URL (para não conflitar com links diretos)
+            console.log('✅ PERSISTÊNCIA - Deal IDs consistentes, restaurando estado...');
+            
+            // Só restaurar se deal_ids são consistentes
             if (!urlDealId) {
                 setStep(savedState.step);
                 setCompanyData(savedState.companyData);

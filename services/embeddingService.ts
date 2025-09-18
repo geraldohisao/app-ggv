@@ -205,10 +205,25 @@ export const findMostRelevantDocuments = async (
             const queryEmbedding = await generateEmbedding(query, 'RETRIEVAL_QUERY');
             const { supabase } = await import('./supabaseClient');
             const endKd = startStep({ requestId: 'n/a' }, 'kd_match');
-            const { data, error } = await supabase.rpc('kd_match', {
-                query_embedding: queryEmbedding,
-                top_k: topK
-            });
+            // Tentar usar a nova função que inclui setores, com fallback para a função original
+            let data, error;
+            try {
+                const result = await supabase.rpc('kd_match_with_sectors', {
+                    query_embedding: queryEmbedding,
+                    top_k: topK
+                });
+                data = result.data;
+                error = result.error;
+                console.log('🎯 BUSCA VETORIAL - Usando busca com setores');
+            } catch (e) {
+                console.log('📋 BUSCA VETORIAL - Fallback para busca padrão');
+                const result = await supabase.rpc('kd_match', {
+                    query_embedding: queryEmbedding,
+                    top_k: topK
+                });
+                data = result.data;
+                error = result.error;
+            }
             endKd();
             if (error) {
                 console.warn('kd_match falhou:', error?.message || error);

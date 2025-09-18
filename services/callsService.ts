@@ -73,18 +73,22 @@ export async function fetchCalls(query: CallsQuery): Promise<{ items: UiCallItem
       p_end: end ?? null,
     });
     
-    const { data, error } = await supabase.rpc('get_calls_v2', {
+    const { data, error } = await supabase.rpc('get_calls_with_filters', {
+      p_sdr: sdrId ?? null,
+      p_status: status ?? null,
+      p_type: callType ?? null,
       p_start_date: start ? new Date(start).toISOString() : null,
       p_end_date: end ? new Date(end).toISOString() : null,
-      p_status: status ?? null,
-      p_sdr_filter: sdrId ?? null,
-      p_search_term: null,
-      p_offset: offset,
       p_limit: limit,
+      p_offset: offset,
+      p_sort_by: 'created_at',
+      p_min_duration: minDuration ?? null,
+      p_max_duration: maxDuration ?? null,
+      p_min_score: null
     });
     
     if (error) {
-      console.error('❌ Erro na RPC get_calls_v2:', error);
+      console.error('❌ Erro na RPC get_calls_with_filters:', error);
       throw error;
     }
     
@@ -102,13 +106,14 @@ export async function fetchCalls(query: CallsQuery): Promise<{ items: UiCallItem
     
     const items: UiCallItem[] = (data || []).map((r: any) => ({
       id: r.id,
-      company: r.company || `Deal ${r.deal_id}` || 'Empresa não informada',
+      company: r.enterprise || r.company || `Deal ${r.deal_id}` || 'Empresa não informada',
       deal_id: r.deal_id,
       sdr_id: r.sdr_id,
-      sdr_name: r.sdr_name,
+      sdr_name: r.sdr_name || r.agent_id,
       sdr_email: r.sdr_email,
       status: r.status,
-      duration: r.duration,
+      duration: r.duration_seconds || r.duration || 0,
+      durationSec: r.duration_seconds || r.duration || 0, // Alias
       call_type: r.call_type,
       direction: r.direction,
       recording_url: r.recording_url,
@@ -123,6 +128,7 @@ export async function fetchCalls(query: CallsQuery): Promise<{ items: UiCallItem
       to_number: r.to_number,
       agent_id: r.agent_id,
       created_at: r.created_at,
+      date: r.created_at, // Alias
       updated_at: r.updated_at,
       processed_at: r.processed_at,
     }));
@@ -136,7 +142,7 @@ export async function fetchCalls(query: CallsQuery): Promise<{ items: UiCallItem
       filteredItems = filteredItems.filter(item => (item.duration || 0) <= maxDuration);
     }
 
-    const total = filteredItems.length > 0 ? (data[0]?.total_count ?? filteredItems.length) : 0;
+    const total = filteredItems.length;
     return { items: filteredItems, total };
   } catch (error) {
     console.error('❌ Erro geral em fetchCalls:', error);

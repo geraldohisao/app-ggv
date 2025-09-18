@@ -114,11 +114,19 @@ export async function analyzeCallWithAI(call: CallItem): Promise<AiInsight[]> {
   }
 }
 
-// Buscar scorecard apropriado
-async function getAppropriateScorecard(callType: string): Promise<Scorecard | null> {
+// Buscar scorecard apropriado usando seleção inteligente
+async function getAppropriateScorecard(
+  callType: string, 
+  pipeline?: string, 
+  cadence?: string
+): Promise<Scorecard | null> {
   try {
-    const { data, error } = await supabase.rpc('get_scorecard_by_call_type', {
-      p_call_type: callType
+    console.log('🔍 Buscando scorecard inteligente para:', { callType, pipeline, cadence });
+    
+    const { data, error } = await supabase.rpc('get_scorecard_smart', {
+      call_type_param: callType,
+      pipeline_param: pipeline || null,
+      cadence_param: cadence || null
     });
     
     if (error) {
@@ -126,7 +134,16 @@ async function getAppropriateScorecard(callType: string): Promise<Scorecard | nu
       return null;
     }
     
-    return data && data.length > 0 ? data[0] : null;
+    if (data && data.length > 0) {
+      const scorecard = data[0];
+      console.log('✅ Scorecard inteligente selecionado:', {
+        name: scorecard.name,
+        match_score: scorecard.match_score
+      });
+      return scorecard;
+    }
+    
+    return null;
   } catch (error) {
     console.error('Erro inesperado ao buscar scorecard:', error);
     return null;

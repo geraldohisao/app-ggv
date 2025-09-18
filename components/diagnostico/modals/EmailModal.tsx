@@ -88,71 +88,158 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             console.log('📧 EMAIL - URL do relatório:', publicUrl);
             
             const subject = `Seu Diagnóstico Comercial – ${companyData.companyName}`;
-            const html = `
-              <!DOCTYPE html>
-              <html lang="pt-BR">
-              <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Diagnóstico Comercial - GGV Inteligência</title>
-              </head>
-              <body style="margin:0;padding:0;background-color:#f8fafc;font-family:Arial,sans-serif">
-                <div style="max-width:640px;margin:0 auto;background-color:#ffffff">
-                  <!-- Header -->
-                  <div style="background: linear-gradient(135deg, #1e40af 0%, #0f766e 100%);padding:32px 24px;text-align:center">
-                    <div style="margin-bottom:16px">
-                      <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png" 
-                           alt="GGV Inteligência" 
-                           style="max-width:200px;height:auto;display:block;margin:0 auto;border:0;cursor:default"/>
-                    </div>
-                    <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;letter-spacing:-0.5px">Relatório de Maturidade Comercial</h1>
-                  </div>
-                  
-                  <!-- Content -->
-                  <div style="padding:32px 24px">
-                    <h2 style="color:#1e293b;font-size:20px;font-weight:600;margin:0 0 16px 0">Olá,</h2>
+            const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Comercial - GGV Inteligência</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: Arial, Helvetica, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+    
+    <!-- Preheader (hidden text for preview) -->
+    <div style="display: none; font-size: 1px; color: #f8fafc; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+        Seu Relatório de Maturidade Comercial está pronto! Acesse agora e descubra insights valiosos para sua empresa.
+    </div>
+    
+    <!-- Main Container -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                
+                <!-- Email Container -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px;">
                     
-                    <p style="color:#475569;line-height:1.6;margin:0 0 24px 0">
-                      Preparamos o seu <strong>Relatório de Maturidade Comercial</strong> personalizado com base nas suas respostas e benchmarks do mercado. 
-                      Acesse seu diagnóstico completo pelo botão abaixo:
-                    </p>
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #1e40af; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png" 
+                                             alt="GGV Inteligência" 
+                                             width="200" 
+                                             height="auto"
+                                             style="display: block; border: 0; outline: none; text-decoration: none; max-width: 200px; height: auto;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-top: 20px;">
+                                        <h1 style="color: #ffffff; font-size: 24px; font-weight: bold; margin: 0; line-height: 1.2;">
+                                            Relatório de Maturidade Comercial
+                                        </h1>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
                     
-                    <!-- CTA Button -->
-                    <div style="text-align:center;margin:32px 0">
-                      <a href="${publicUrl}" 
-                         style="display:inline-block;background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%);color:#ffffff;padding:16px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(15, 118, 110, 0.3)">
-                        📊 Acessar Relatório de Maturidade
-                      </a>
-                    </div>
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                
+                                <!-- Greeting -->
+                                <tr>
+                                    <td>
+                                        <h2 style="color: #1e293b; font-size: 20px; font-weight: 600; margin: 0 0 20px 0; line-height: 1.3;">
+                                            Olá!
+                                        </h2>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Main Message -->
+                                <tr>
+                                    <td>
+                                        <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                                            Preparamos o seu <strong>Relatório de Maturidade Comercial</strong> personalizado com base nas suas respostas e benchmarks do mercado.
+                                        </p>
+                                        <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                                            Acesse seu diagnóstico completo pelo botão abaixo:
+                                        </p>
+                                    </td>
+                                </tr>
+                                
+                                <!-- CTA Button -->
+                                <tr>
+                                    <td align="center" style="padding: 20px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="background-color: #0f766e; border-radius: 8px; text-align: center;">
+                                                    <a href="${publicUrl}" 
+                                                       style="display: inline-block; padding: 16px 32px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; line-height: 1.2;">
+                                                        📊 Acessar Relatório de Maturidade
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Info Box -->
+                                <tr>
+                                    <td style="background-color: #f1f5f9; border-left: 4px solid #0f766e; padding: 20px; border-radius: 0 8px 8px 0;">
+                                        <p style="color: #475569; font-size: 14px; margin: 0; line-height: 1.5;">
+                                            💡 <strong>Dica:</strong> Salve este e-mail para acessar seu relatório sempre que precisar.
+                                        </p>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Support Message -->
+                                <tr>
+                                    <td style="padding-top: 30px;">
+                                        <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0;">
+                                            Se precisar de qualquer ajuda, basta responder este e-mail.
+                                        </p>
+                                    </td>
+                                </tr>
+                                
+                            </table>
+                        </td>
+                    </tr>
                     
-                    <div style="background:#f1f5f9;border-left:4px solid #0f766e;padding:16px;margin:24px 0;border-radius:0 8px 8px 0">
-                      <p style="color:#475569;margin:0;font-size:14px">
-                        💡 <strong>Dica:</strong> Salve este e-mail para acessar seu relatório sempre que precisar.
-                      </p>
-                    </div>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 12px; margin: 0 0 15px 0; line-height: 1.4;">
+                                            Enviado por <strong>GGV Inteligência em Vendas</strong><br>
+                                            <a href="https://ggvinteligencia.com.br" style="color: #0f766e; text-decoration: none;">ggvinteligencia.com.br</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                                        <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
+                                             alt="Grupo GGV" 
+                                             width="100" 
+                                             height="auto"
+                                             style="display: block; border: 0; outline: none; text-decoration: none; max-width: 100px; height: auto; opacity: 0.7;">
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
                     
-                    <p style="color:#475569;line-height:1.6;margin:24px 0 0 0">
-                      Se precisar de qualquer ajuda, basta responder este e-mail.
-                    </p>
-                  </div>
-                  
-                  <!-- Footer -->
-                  <div style="background:#f8fafc;padding:24px;text-align:center;border-top:1px solid #e2e8f0">
-                    <p style="color:#64748b;font-size:12px;margin:0 0 16px 0">
-                      Enviado por <strong>GGV Inteligência em Vendas</strong><br>
-                      <a href="https://ggvinteligencia.com.br" style="color:#0f766e;text-decoration:none">ggvinteligencia.com.br</a>
-                    </p>
-                    
-                    <!-- Logo Grupo GGV -->
-                    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
-                      <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
-                           alt="Grupo GGV" 
-                           style="max-width:120px;height:auto;display:block;margin:0 auto;border:0;opacity:0.7;cursor:default;pointer-events:none"/>
-                    </div>
-                  </div>
-                </div>
-              </body>
-              </html>`;
+                </table>
+                
+            </td>
+        </tr>
+    </table>
+    
+</body>
+</html>`;
             
             console.log('📧 EMAIL_MODAL - Enviando e-mail para:', email);
             console.log('📧 EMAIL_MODAL - Assunto:', subject);
@@ -219,22 +306,37 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             setError('');
             setNeedsReauth(false);
             
-            console.log('🔄 EMAIL_MODAL - Iniciando reautenticação do Gmail...');
+            console.log('🔄 EMAIL_MODAL - Iniciando reautenticação OAuth completa do Gmail...');
             
-            // Limpar cache e forçar nova autenticação
+            // Usar a função de reautenticação disponível
             await forceGmailReauth();
+            console.log('✅ EMAIL_MODAL - Reautenticação OAuth concluída');
             
-            // Verificar status após limpeza
+            // Verificar status após reautenticação
             await checkGmailStatus();
             
-            console.log('✅ EMAIL_MODAL - Reautenticação concluída');
-            setError('✅ Reautenticação concluída com sucesso! Tente enviar o e-mail novamente.');
+            console.log('✅ EMAIL_MODAL - Reautenticação OAuth concluída');
+            setError('✅ Reautenticação OAuth concluída com sucesso! Agora você pode enviar o e-mail.');
             
         } catch (err: any) {
-            console.error('❌ EMAIL_MODAL - Erro na reautenticação:', err);
+            console.error('❌ EMAIL_MODAL - Erro na reautenticação OAuth:', err);
             const errorMsg = err?.message || 'Erro desconhecido na reautenticação';
-            setError(`❌ Erro na reautenticação: ${errorMsg}. Tente recarregar a página (F5).`);
-            setNeedsReauth(true); // Manter botão disponível
+            
+            // Fallback para reautenticação simples se OAuth falhar
+            if (errorMsg.includes('timeout') || errorMsg.includes('popup') || errorMsg.includes('blocked')) {
+                console.log('🔄 EMAIL_MODAL - OAuth falhou, tentando limpeza de cache...');
+                try {
+                    await forceGmailReauth();
+                    await checkGmailStatus();
+                    setError('⚠️ Reautenticação parcial concluída. Se o problema persistir, recarregue a página (F5).');
+                } catch (fallbackError) {
+                    setError(`❌ Erro na reautenticação: ${errorMsg}. Tente recarregar a página (F5).`);
+                    setNeedsReauth(true);
+                }
+            } else {
+                setError(`❌ Erro na reautenticação OAuth: ${errorMsg}. Tente recarregar a página (F5).`);
+                setNeedsReauth(true); // Manter botão disponível
+            }
         } finally {
             setLoading(false);
         }

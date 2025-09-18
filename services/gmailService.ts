@@ -601,8 +601,46 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
 
 // Função para forçar reautenticação
 export async function forceGmailReauth(): Promise<void> {
+  console.log('🔄 GMAIL - Iniciando reautenticação OAuth forçada...');
+  
+  // Limpar cache
   await clearCachedTokens();
-  console.log('🔄 GMAIL - Reautenticação forçada');
+  
+  try {
+    // Forçar novo OAuth com scopes corretos
+    const clientId = await getGoogleClientId();
+    await ensureGis();
+    
+    return new Promise((resolve, reject) => {
+      tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose',
+        prompt: 'consent', // Força tela de consentimento
+        callback: (response: any) => {
+          if (response.access_token) {
+            console.log('✅ GMAIL - Novo token OAuth obtido com sucesso');
+            cachedAccessToken = response.access_token;
+            saveTokenToCache(response.access_token, 3600, 'oauth');
+            resolve();
+          } else {
+            console.error('❌ GMAIL - Falha na reautenticação OAuth:', response);
+            reject(new Error('Falha na reautenticação OAuth'));
+          }
+        },
+        error_callback: (error: any) => {
+          console.error('❌ GMAIL - Erro na reautenticação OAuth:', error);
+          reject(new Error(`Erro OAuth: ${error.type || 'desconhecido'}`));
+        }
+      });
+      
+      console.log('🚀 GMAIL - Solicitando token OAuth...');
+      tokenClient.requestAccessToken();
+    });
+    
+  } catch (error) {
+    console.error('❌ GMAIL - Erro na configuração da reautenticação:', error);
+    throw error;
+  }
 }
 
 // Função para verificar se o Gmail está configurado

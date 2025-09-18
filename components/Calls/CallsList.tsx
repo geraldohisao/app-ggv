@@ -7,10 +7,15 @@ interface Call {
   from_number: string;
   to_number: string;
   agent_id: string;
+  sdr_name?: string;
+  company?: string;
+  deal_id?: string;
   status: string;
-  status_voip: string;
-  status_voip_friendly: string;
+  status_voip?: string;
+  status_voip_friendly?: string;
   duration: number;
+  call_type?: string;
+  direction?: string;
   created_at: string;
   total_count: number;
 }
@@ -23,7 +28,7 @@ export default function CallsList() {
     typeof import.meta !== 'undefined' &&
     (import.meta as any).env &&
     typeof (import.meta as any).env.VITE_CALLS_UNDER_DEV !== 'undefined'
-  ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : false; // ATIVADO: false = produção
+  ) ? ((import.meta as any).env.VITE_CALLS_UNDER_DEV === 'true') : false; // DESATIVADO: false = produção ativa
 
   useEffect(() => {
     if (IS_UNDER_DEVELOPMENT) {
@@ -38,15 +43,45 @@ export default function CallsList() {
           throw new Error('Supabase não inicializado');
         }
 
-        // Usar a função SQL criada no Supabase
+        // Usar a MESMA função que funciona no gráfico
         const { data: callsData, error: callsError } = await supabase
-          .rpc('get_calls', { p_limit: 500, p_offset: 0 });
+          .rpc('get_calls_with_filters', {
+            p_sdr: null,
+            p_status: null,
+            p_type: null,
+            p_start_date: null,
+            p_end_date: null,
+            p_limit: 500,
+            p_offset: 0,
+            p_sort_by: 'created_at',
+            p_min_duration: null,
+            p_max_duration: null,
+            p_min_score: null
+          });
 
         if (callsError) {
           throw new Error(`Erro ao buscar calls: ${callsError.message}`);
         }
 
-        const items = callsData || [];
+        const items = (callsData || []).map((call: any) => ({
+          id: call.id,
+          provider_call_id: call.provider_call_id || call.id,
+          from_number: call.from_number,
+          to_number: call.to_number,
+          agent_id: call.agent_id,
+          sdr_name: call.sdr_name,
+          company: call.company || call.deal_id || 'Empresa não informada',
+          deal_id: call.deal_id,
+          status: call.status,
+          status_voip: call.status_voip,
+          status_voip_friendly: call.status_voip_friendly || call.status,
+          duration: call.duration || 0,
+          call_type: call.call_type,
+          direction: call.direction,
+          created_at: call.created_at,
+          total_count: call.total_count || callsData.length
+        }));
+        
         const total = items.length > 0 ? items[0].total_count : 0;
 
         setData({ items, total });
@@ -99,10 +134,9 @@ export default function CallsList() {
               <table className="min-w-full">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-sm text-slate-600 border-b">
-                    <th className="p-4 font-medium">ID da Chamada</th>
-                    <th className="p-4 font-medium">De</th>
-                    <th className="p-4 font-medium">Para</th>
-                    <th className="p-4 font-medium">Agente</th>
+                    <th className="p-4 font-medium">Empresa</th>
+                    <th className="p-4 font-medium">SDR</th>
+                    <th className="p-4 font-medium">Tipo</th>
                     <th className="p-4 font-medium">Status</th>
                     <th className="p-4 font-medium">Duração</th>
                     <th className="p-4 font-medium">Data</th>
@@ -111,19 +145,31 @@ export default function CallsList() {
                 <tbody>
                   {data.items.map((call) => (
                     <tr key={call.id} className="border-b hover:bg-slate-50 transition-colors">
-                      <td className="p-4 font-mono text-sm">{call.provider_call_id}</td>
-                      <td className="p-4">{call.from_number || '-'}</td>
-                      <td className="p-4">{call.to_number || '-'}</td>
-                      <td className="p-4">{call.agent_id || '-'}</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          call.status_voip_friendly === 'Atendida' ? 'bg-green-100 text-green-800' :
-                          call.status_voip_friendly === 'Não atendida' ? 'bg-red-100 text-red-800' :
-                          call.status_voip_friendly === 'Cancelada pela SDR' ? 'bg-yellow-100 text-yellow-800' :
-                          call.status_voip_friendly === 'Numero mudou' ? 'bg-orange-100 text-orange-800' :
+                        <div className="font-medium text-slate-900">{call.company}</div>
+                        {call.deal_id && <div className="text-xs text-slate-500">Deal: {call.deal_id}</div>}
+                      </td>
+                      <td className="p-4">
+                        <div className="font-medium">{call.sdr_name || call.agent_id || '-'}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          call.call_type === 'prospeccao' ? 'bg-blue-100 text-blue-800' :
+                          call.call_type === 'follow_up' ? 'bg-yellow-100 text-yellow-800' :
+                          call.call_type === 'demo' ? 'bg-purple-100 text-purple-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {call.status_voip_friendly || call.status_voip || call.status}
+                          {call.call_type || call.direction || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          call.status === 'processed' ? 'bg-green-100 text-green-800' :
+                          call.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                          call.status === 'failed' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {call.status_voip_friendly || call.status}
                         </span>
                       </td>
                       <td className="p-4">

@@ -9,7 +9,10 @@ interface Scorecard {
   active?: boolean; // Para compatibilidade
   created_at: string;
   updated_at: string;
-  call_types: string[];
+  call_types?: string[]; // Para compatibilidade com dados antigos
+  target_call_types?: string[]; // Novos campos
+  target_pipelines?: string[];
+  target_cadences?: string[];
   criteria_count: number;
   total_weight: number;
 }
@@ -229,7 +232,7 @@ export default function ScorecardPage() {
                 </td>
                 <td className="p-4 text-sm text-slate-600">
                   <div className="flex flex-wrap gap-1">
-                    {s.call_types.map(type => (
+                    {(s.target_call_types || s.call_types || []).map(type => (
                       <span key={type} className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
                         {type}
                       </span>

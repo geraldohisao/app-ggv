@@ -374,8 +374,8 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
       <div className="fixed bottom-20 right-4 z-[9999]">
         {/* Indicador de status sempre visível */}
         <div className="flex flex-col items-end gap-2">
-          {/* Status do sistema */}
-          <div className="bg-black bg-opacity-90 text-white px-3 py-2 rounded-lg text-xs shadow-lg backdrop-blur-sm">
+          {/* Status do sistema - ocultado para não sobrepor elementos da UI */}
+          <div className="hidden">
             🛡️ {user ? 'Online' : 'Offline'} | {logs.filter(l => l.level === 'error').length} erros
             {hasDebugAccess && <span className="ml-1 text-green-400">| Super Admin</span>}
           </div>

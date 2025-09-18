@@ -38,17 +38,23 @@ export interface CallAnalysisRequest {
 }
 
 // Buscar scorecard por tipo de call
-export async function getScorecardByCallType(callType: string): Promise<Scorecard | null> {
+export async function getScorecardByCallType(
+  callType: string, 
+  pipeline?: string, 
+  cadence?: string
+): Promise<Scorecard | null> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
     return null;
   }
 
   try {
-    console.log('🔍 Buscando scorecard para tipo:', callType);
+    console.log('🔍 Buscando scorecard inteligente para:', { callType, pipeline, cadence });
     
-    const { data, error } = await supabase.rpc('get_scorecard_by_call_type', {
-      p_call_type: callType
+    const { data, error } = await supabase.rpc('get_scorecard_smart', {
+      call_type_param: callType,
+      pipeline_param: pipeline || null,
+      cadence_param: cadence || null
     });
 
     if (error) {
@@ -58,7 +64,11 @@ export async function getScorecardByCallType(callType: string): Promise<Scorecar
 
     if (data && data.length > 0) {
       const scorecard = data[0];
-      console.log('✅ Scorecard encontrado:', scorecard);
+      console.log('✅ Scorecard inteligente encontrado:', {
+        name: scorecard.name,
+        match_score: scorecard.match_score,
+        criteria: scorecard.criteria?.length || 0
+      });
       return {
         id: scorecard.id,
         name: scorecard.name,
@@ -67,7 +77,7 @@ export async function getScorecardByCallType(callType: string): Promise<Scorecar
       };
     }
 
-    console.log('⚠️ Nenhum scorecard encontrado para tipo:', callType);
+    console.log('⚠️ Nenhum scorecard encontrado para:', { callType, pipeline, cadence });
     return null;
 
   } catch (error) {
@@ -81,9 +91,23 @@ export async function analyzeCallWithAI(request: CallAnalysisRequest): Promise<C
   try {
     console.log('🤖 Iniciando análise IA da call:', request.callId);
     
-    // 1. Buscar scorecard apropriado
-    const callType = request.callType || 'consultoria_vendas';
-    const scorecard = await getScorecardByCallType(callType);
+    // 1. Buscar dados completos da ligação para seleção inteligente de scorecard
+    const { data: callData, error: callError } = await supabase
+      .from('calls')
+      .select('call_type, pipeline, cadence')
+      .eq('id', request.callId)
+      .single();
+    
+    if (callError) {
+      console.warn('⚠️ Erro ao buscar dados da ligação, usando dados do request:', callError);
+    }
+    
+    // 2. Buscar scorecard apropriado usando seleção inteligente
+    const callType = callData?.call_type || request.callType || 'consultoria_vendas';
+    const pipeline = callData?.pipeline;
+    const cadence = callData?.cadence;
+    
+    const scorecard = await getScorecardByCallType(callType, pipeline, cadence);
     
     if (!scorecard || !scorecard.criteria.length) {
       console.error('❌ Scorecard não encontrado ou sem critérios');

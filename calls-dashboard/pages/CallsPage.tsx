@@ -9,7 +9,7 @@ import MiniAudioPlayer from '../components/MiniAudioPlayer';
 import { AudioQualityDashboard } from '../components/AudioStatusIndicator';
 import { processCallAnalysis, getCallAnalysisFromDatabase } from '../services/callAnalysisBackendService';
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
-import BatchAnalysisPanel from '../components/BatchAnalysisPanel';
+import UnifiedBatchAnalysisPanel from '../components/UnifiedBatchAnalysisPanel';
 
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
@@ -142,25 +142,78 @@ export default function CallsPage() {
           max_duration_type: typeof (maxDuration ? parseInt(maxDuration) : undefined)
         });
         
-        const response = await fetchCalls({
-          sdr_email: sdr || undefined,
-          status: status || undefined,
-          call_type: type || undefined,
-          start: start || undefined,
-          end: end || undefined,
-          min_duration: minDuration ? parseInt(minDuration) : undefined,
-          max_duration: maxDuration ? parseInt(maxDuration) : undefined,
-          min_score: minScore ? parseFloat(minScore) : undefined,
-          limit: itemsPerPage,
-          offset: (currentPage - 1) * itemsPerPage,
-          sortBy: sortBy
+        // USAR A NOVA RPC PAGINADA (get_calls_paginated)
+        console.log('🔍 CALLS PAGE - Usando get_calls_paginated (com paginação)');
+        const offset = (currentPage - 1) * itemsPerPage;
+        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_paginated', {
+          p_limit: itemsPerPage,
+          p_offset: offset
         });
+        
+        if (callsError) {
+          throw new Error(`Erro ao buscar calls: ${callsError.message}`);
+        }
+        
+        console.log('🔍 DADOS BRUTOS DO SUPABASE:');
+        console.log('Enterprise:', callsData?.[0]?.enterprise);
+        console.log('Deal ID:', callsData?.[0]?.deal_id);
+        console.log('Person:', callsData?.[0]?.person);
+        console.log('Agent ID:', callsData?.[0]?.agent_id);
+        console.log('SDR Email:', callsData?.[0]?.sdr_email);
+        console.log('Primeiro registro completo:', callsData?.[0]);
+        
+        // Mapear dados completos da tabela calls
+        const response = {
+          calls: (callsData || []).map((call: any) => ({
+            id: call.id,
+            company: call.enterprise || `Deal ${call.deal_id}` || 'Empresa não informada', // ✅ ENTERPRISE
+            dealCode: call.deal_id || 'N/A', // ✅ DEAL_ID
+            sdr: {
+              id: call.agent_id || 'N/A', // ✅ AGENT_ID
+              name: call.agent_id || 'SDR não identificado', // ✅ AGENT_ID
+              email: call.sdr_email || '',
+              avatarUrl: `https://i.pravatar.cc/64?u=${call.agent_id || 'default'}`
+            },
+            date: call.created_at,
+            created_at: call.created_at,
+            duration_formated: call.duration_formated || '00:00:00',
+            durationSec: 0,
+            status: call.status,
+            status_voip: call.status_voip,
+            status_voip_friendly: call.status_voip === 'normal_clearing' ? 'Atendida' : 
+                                  call.status_voip === 'user_busy' ? 'Ocupado' : 
+                                  call.status_voip === 'no_answer' ? 'Não atendida' : 
+                                  call.status_voip || call.status,
+            call_type: call.call_type,
+            recording_url: call.recording_url,
+            transcription: call.transcription,
+            person_name: call.person, // ✅ PERSON
+            cadence: call.cadence,
+            pipeline: call.pipeline,
+            from_number: call.from_number,
+            to_number: call.to_number,
+            direction: call.direction,
+            // Campos extras para debug
+            enterprise_debug: call.enterprise,
+            deal_id_debug: call.deal_id,
+            person_debug: call.person,
+            agent_id_debug: call.agent_id
+          })),
+          totalCount: callsData?.[0]?.total_count || 0, // Total real da query
+          hasMore: offset + itemsPerPage < (callsData?.[0]?.total_count || 0)
+        };
 
-        console.log('✅ Calls carregadas:', response.calls.length, 'Max duration:', Math.max(...response.calls.map(c => c.duration || 0)));
+        console.log('✅ Calls carregadas:', response.calls.length);
 
-        const callItems = response.calls.map(convertToCallItem);
-        setCalls(callItems);
+        // USAR OS DADOS DIRETAMENTE (sem convertToCallItem que está estragando)
+        setCalls(response.calls);
         setTotalCount(response.totalCount);
+        
+        console.log('📊 DADOS FINAIS ENVIADOS PARA A LISTA:');
+        console.log('Primeira chamada final:', response.calls[0]);
+        console.log('Company final:', response.calls[0]?.company);
+        console.log('SDR final:', response.calls[0]?.sdr);
+        console.log('Deal final:', response.calls[0]?.dealCode);
       } catch (err: any) {
         console.error('Erro ao carregar calls:', JSON.stringify(err, null, 2));
         
@@ -216,13 +269,14 @@ export default function CallsPage() {
             setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
             continue;
           }
-          if (c.transcription && c.transcription.length > 50) {
-            const res = await processCallAnalysis(c.id, c.transcription, c.sdr.name, c.person_name);
-            if (res && typeof res.final_grade === 'number') {
-              const score10 = res.final_grade; // Manter escala 0-10
-              setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
-            }
-          }
+          // DESABILITADO: Análise automática para evitar spam de erros
+          // if (c.transcription && c.transcription.length > 50) {
+          //   const res = await processCallAnalysis(c.id, c.transcription, c.sdr.name, c.person_name);
+          //   if (res && typeof res.final_grade === 'number') {
+          //     const score10 = res.final_grade;
+          //     setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
+          //   }
+          // }
         } catch (e) {
           console.warn('Auto-score falhou', c.id, e);
         }
@@ -392,7 +446,7 @@ export default function CallsPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Painel de Análise IA em Lote */}
-      <BatchAnalysisPanel />
+      <UnifiedBatchAnalysisPanel />
 
 
       <div className="flex items-center justify-between">
