@@ -2,7 +2,7 @@
   publish = "dist"
   command = "./build-netlify.sh"
   functions = "netlify/functions"
-  # Force rebuild - diagnostic improvements v4
+  # Force rebuild - diagnostic improvements v5 (formatting fix)
 
 [build.environment]
   NODE_VERSION = "20.18.0"
