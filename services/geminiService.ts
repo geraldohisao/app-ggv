@@ -342,6 +342,12 @@ export const getSummaryInsights = async (
   const prompt = `Você é um especialista em diagnóstico comercial da GGV Inteligência em Vendas.
 Sua tarefa é gerar uma análise concisa e um comparativo de mercado com base nos dados fornecidos.
 
+**REGRAS DE FORMATAÇÃO:**
+- Use markdown com **negrito** para destacar pontos importantes
+- Estruture o texto com parágrafos claros e bem organizados
+- Use listas com "-" para enumerar pontos quando necessário
+- Mantenha tom profissional e consultivo
+
 DADOS:
 **Informações da Empresa:**
 - Nome da Empresa: ${companyData.companyName}
@@ -356,7 +362,7 @@ ${companyData.situacao ? `- Situação Atual: ${companyData.situacao}` : ''}
 ${companyData.problema ? `- Problema/Desafio Identificado: ${companyData.problema}` : ''}
 ${companyData.perfil_do_cliente ? `- Perfil do Cliente: ${companyData.perfil_do_cliente}` : ''}
 
-**Informações do Segmento de Mercado (${segment?.name || 'Geral'}):**
+**Informações do Setor de Atuação (${segment?.name || 'Geral'}):**
 - Características: ${segment?.characteristics || '-'}
 - Tendências: ${segment?.trends || '-'}
 - Desafios Comuns: ${segment?.challenges || '-'}
@@ -386,7 +392,7 @@ ${diagnosticQuestions.map(q => `- Pergunta: "${q.text}" | Resposta: ${getText(an
     const pct = Math.round((totalScore / 90) * 100);
     return {
       specialistInsight: `Análise preliminar: com base nas respostas, sua maturidade comercial está em ${pct}%. As maiores oportunidades estão nas áreas com menor pontuação relativa. Foque em padronização de processos, adoção de tecnologia e rotina de gestão.`,
-      marketBenchmark: `Comparativo rápido: seu resultado está ${pct > 60 ? 'acima' : pct >= 40 ? 'na média' : 'abaixo'} da média estimada do mercado no segmento ${segment?.name || 'geral'}.`
+      marketBenchmark: `Comparativo rápido: seu resultado está ${pct > 60 ? 'acima' : pct >= 40 ? 'na média' : 'abaixo'} da média estimada do mercado no setor ${segment?.name || 'geral'}.`
     };
   }
 };
@@ -401,11 +407,17 @@ export const getDetailedAIAnalysis = async (
     const getText = (score: number) => score === 10 ? 'Sim' : score === 5 ? 'Parcialmente/Às vezes' : 'Não';
     const prompt = `Você é um consultor de vendas sênior e estrategista da GGV Inteligência em Vendas. Sua missão é transformar os dados brutos de um diagnóstico comercial em um plano de ação estratégico e profundo para o cliente. A análise deve ser completa, bem estruturada e fornecer insights acionáveis e sofisticados.
 
+**IMPORTANTE - REGRAS DE FORMATAÇÃO:**
+- Para listas (strengths, criticalGaps, nextSteps): use texto simples SEM símbolos, números ou asteriscos
+- Para executiveSummary: use markdown com **negrito** para destacar pontos importantes
+- Para nextSteps: cada item deve ser uma ação clara SEM numeração (a numeração será feita pela interface)
+- Mantenha frases concisas e diretas nas listas
+
 **DADOS COMPLETOS PARA ANÁLISE PROFUNDA:**
 
 1. Dados da Empresa Cliente:
    - Empresa: ${JSON.stringify(companyData)}
-   - Segmento: ${JSON.stringify(segment)}
+   - Setor de Atuação: ${JSON.stringify(segment)}
    
    🆕 Contexto Adicional do Cliente:
    ${companyData.situacao ? `- Situação Atual: ${companyData.situacao}` : ''}

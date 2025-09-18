@@ -196,9 +196,9 @@ const PublicDiagnosticReport: React.FC = () => {
               <ul className="space-y-3">
                 {topStrengths.map((s: string, i: number) => (
                   <li key={i} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <div className="text-slate-700 leading-relaxed">
-                      <MarkdownRenderer text={s} />
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2.5 flex-shrink-0"></div>
+                    <div className="text-slate-700 leading-relaxed flex-1">
+                      <MarkdownRenderer text={s} inline={true} />
                     </div>
                   </li>
                 ))}
@@ -217,11 +217,11 @@ const PublicDiagnosticReport: React.FC = () => {
               <ul className="space-y-3">
                 {nextSteps.map((s: string, i: number) => (
                   <li key={i} className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-orange-600 font-bold text-sm">{i + 1}</span>
                     </div>
-                    <div className="text-slate-700 leading-relaxed">
-                      <MarkdownRenderer text={s} />
+                    <div className="text-slate-700 leading-relaxed flex-1">
+                      <MarkdownRenderer text={s} inline={true} />
                     </div>
                   </li>
                 ))}
