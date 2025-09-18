@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getPublicReport } from '../services/supabaseService';
 import { LoadingSpinner, ErrorDisplay } from './ui/Feedback';
 import { GGVInteligenciaBrand } from './ui/BrandLogos';
+import MarkdownRenderer from './ui/MarkdownRenderer';
 
 const PublicDiagnosticReport: React.FC = () => {
   const [params] = useSearchParams();
@@ -180,7 +181,7 @@ const PublicDiagnosticReport: React.FC = () => {
                 </div>
                 <h2 className="text-xl font-bold text-slate-800">Resumo Executivo</h2>
               </div>
-              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{summaryInsights.specialistInsight}</p>
+              <MarkdownRenderer text={summaryInsights.specialistInsight} className="text-slate-700 leading-relaxed" />
             </section>
           )}
 
@@ -196,7 +197,9 @@ const PublicDiagnosticReport: React.FC = () => {
                 {topStrengths.map((s: string, i: number) => (
                   <li key={i} className="flex items-start gap-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p className="text-slate-700 leading-relaxed">{s}</p>
+                    <div className="text-slate-700 leading-relaxed">
+                      <MarkdownRenderer text={s} />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -217,7 +220,9 @@ const PublicDiagnosticReport: React.FC = () => {
                     <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-orange-600 font-bold text-sm">{i + 1}</span>
                     </div>
-                    <p className="text-slate-700 leading-relaxed">{s}</p>
+                    <div className="text-slate-700 leading-relaxed">
+                      <MarkdownRenderer text={s} />
+                    </div>
                   </li>
                 ))}
               </ul>
