@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../contexts/DirectUserContext';
+import { useBulkAnalysis } from '../contexts/BulkAnalysisContext';
 import { UserRole } from '../types';
 import { reativacaoSchema, ReativacaoPayload } from '../src/schemas/reativacao';
 import { 
@@ -21,6 +22,7 @@ import { CheckCircleIcon, ExclamationTriangleIcon, BoltIcon, TrashIcon, ClockIco
 
 const ReativacaoLeadsPage: React.FC = () => {
   const { user } = useUser();
+  const { currentAnalysis, isRunning, startAnalysis, stopAnalysis, clearAnalysis } = useBulkAnalysis();
   
   // Helper function para verificar se um objeto existe e tem propriedades
   const safeGet = (obj: any, path: string, defaultValue: any = null) => {
@@ -102,50 +104,41 @@ const ReativacaoLeadsPage: React.FC = () => {
         (window as any).debugLog("reativacao:submit", "info", "AUTOMATION", validatedData);
       }
 
+      // 🚀 NOVO: Usar sistema de análise em massa persistente
+      await startAnalysis({
+        proprietario: validatedData.proprietario,
+        filtro: validatedData.filtro,
+        cadencia: validatedData.cadencia,
+        numero_negocio: validatedData.numero_negocio
+      });
+
       // ✅ FEEDBACK IMEDIATO - Mostrar que foi iniciado
       setResult({
         success: true,
-        message: `🚀 Automação REAL iniciada para ${validatedData.proprietario}! N8N processando ${validatedData.numero_negocio} leads com dados reais do Pipedrive...`,
-        data: { status: 'starting', immediate: true, real: true }
+        message: `🚀 Análise em massa iniciada para ${validatedData.proprietario}! Processando ${validatedData.numero_negocio} leads em background...`,
+        data: { status: 'starting', immediate: true, real: true, persistent: true }
       });
 
-      // Enviar para o backend (em background)
-      const response = await triggerReativacao(validatedData);
-      
-      // ✅ VERIFICAR SE RESPONSE EXISTE ANTES DE ACESSAR PROPRIEDADES
-      if (!response) {
-        setResult({
-          success: false,
-          message: `❌ Erro: Não foi possível obter resposta do sistema de automação.`,
-          data: null
-        });
-        return;
-      }
-      
-      // ✅ ATUALIZAR RESULTADO APENAS SE HOUVER PROBLEMA
-      if (response.status === 'error' || response.httpStatus === 500) {
-        setResult({
-          success: false,
-          message: `⚠️ Problema detectado no N8N: ${response.message || 'Erro interno do workflow'}. O processamento pode estar em andamento mesmo assim.`,
-          data: response
-        });
-      } else if (response.status === 'timeout_started' || response.timeout) {
-        setResult({
-          success: true,
-          message: `⏰ Automação iniciada com sucesso! O N8N demorou para responder, mas está processando. Verifique o histórico em alguns minutos.`,
-          data: response
-        });
-      }
-      // ✅ SE SUCESSO NORMAL, MANTER MENSAGEM IMEDIATA (não sobrescrever)
+      // Enviar para o backend (em background) - mantém compatibilidade
+      triggerReativacao(validatedData).then(response => {
+        console.log('📤 N8N - Resposta do backend:', response);
+        
+        // Log de sucesso
+        if ((window as any).debugLog) {
+          (window as any).debugLog("reativacao:success", "info", "AUTOMATION", response);
+        }
+      }).catch(error => {
+        console.error('❌ N8N - Erro no backend:', error);
+        
+        // Log de erro
+        if ((window as any).debugLog) {
+          (window as any).debugLog("reativacao:error", "error", "AUTOMATION", error);
+        }
+      });
 
       // Recarregar histórico se estiver visível
       if (showHistory) {
         loadHistory();
-      }
-
-      // Log de sucesso
-      if ((window as any).debugLog) {
-        (window as any).debugLog("reativacao:success", "info", "AUTOMATION", response);
       }
 
     } catch (error: any) {
@@ -540,10 +533,30 @@ const ReativacaoLeadsPage: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200">
-          <h1 className="text-2xl font-bold text-slate-900">Reativação de Leads (N8N)</h1>
-          <p className="text-slate-600 mt-1">
-            Acione automações de reativação de leads através do N8N
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Reativação de Leads (N8N)</h1>
+              <p className="text-slate-600 mt-1">
+                Acione automações de reativação de leads através do N8N
+              </p>
+            </div>
+            
+            {/* Indicador de análise em andamento */}
+            {isRunning && currentAnalysis && (
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-blue-800">
+                  Análise em andamento: {currentAnalysis.progress}%
+                </span>
+                <button
+                  onClick={stopAnalysis}
+                  className="text-blue-600 hover:text-blue-800 text-xs underline"
+                >
+                  Parar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Form */}
@@ -662,13 +675,18 @@ const ReativacaoLeadsPage: React.FC = () => {
           <div className="pt-6">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRunning}
               className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold px-8 py-4 rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none"
             >
               {isSubmitting ? (
                 <>
                   <LoadingSpinner />
-                  <span className="text-lg">Processando automação...</span>
+                  <span className="text-lg">Iniciando análise...</span>
+                </>
+              ) : isRunning ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-lg">Análise em andamento...</span>
                 </>
               ) : (
                 <>
@@ -677,6 +695,21 @@ const ReativacaoLeadsPage: React.FC = () => {
                 </>
               )}
             </button>
+            
+            {/* Aviso sobre análise em andamento */}
+            {isRunning && currentAnalysis && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-blue-800">
+                    <strong>Análise em background:</strong> {currentAnalysis.message}
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-blue-600">
+                  Você pode navegar para outras páginas - a análise continuará rodando.
+                </div>
+              </div>
+            )}
           </div>
         </form>
       </div>

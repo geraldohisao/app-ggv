@@ -122,29 +122,97 @@ export const fetchOrCreateUserWithRole = async (): Promise<User | null> => {
 // Nova listagem simples ligada diretamente a profiles
 export const listProfiles = async (): Promise<Array<{ id: string; email: string | null; name: string | null; role: UserRole; user_function: 'SDR' | 'Closer' | 'Gestor' | null }>> => {
     if (!supabase) throw new Error('Supabase client is not initialized.');
-    // Preferir RPC leve (com permissões de admin) para reduzir latência RLS
+    
+    console.log('🔄 SUPABASE SERVICE - listProfiles iniciado');
+    
+    // Tentar múltiplas abordagens para garantir que admins vejam todos os perfis
     try {
-        const { data, error } = await supabase.rpc('admin_list_profiles');
-        if (error) throw error;
-        return (data || []).map((p: any) => ({
-            id: p.id,
-            email: p.email ?? null,
-            name: p.name ?? null,
-            role: (p.role as UserRole) ?? UserRole.User,
-            user_function: (p.user_function as any) ?? null,
-        }));
-    } catch {
-        const { data, error } = await supabase
+        // 1. Tentar RPC admin_list_profiles primeiro (sem parâmetros)
+        console.log('🔄 SUPABASE SERVICE - Tentando RPC admin_list_profiles...');
+        const { data: rpcData, error: rpcError } = await supabase.rpc('admin_list_profiles');
+        
+        if (!rpcError && rpcData) {
+            console.log('✅ SUPABASE SERVICE - RPC admin_list_profiles sucesso:', rpcData.length, 'perfis');
+            return (rpcData || []).map((p: any) => ({
+                id: p.id,
+                email: p.email ?? null,
+                name: p.name ?? null,
+                role: (p.role as UserRole) ?? UserRole.User,
+                user_function: (p.user_function as any) ?? null,
+            }));
+        } else {
+            console.warn('⚠️ SUPABASE SERVICE - RPC admin_list_profiles falhou:', rpcError?.message);
+        }
+    } catch (rpcErr) {
+        console.warn('⚠️ SUPABASE SERVICE - RPC admin_list_profiles erro:', rpcErr);
+    }
+
+    try {
+        // 2. Fallback: Query direta na tabela profiles
+        console.log('🔄 SUPABASE SERVICE - Tentando query direta na tabela profiles...');
+        const { data: directData, error: directError } = await supabase
             .from('profiles')
             .select('id, email, name, role, user_function');
-        if (error) throw error;
-        return (data || []).map((p: any) => ({
-        id: p.id,
-        email: p.email ?? null,
-        name: p.name ?? null,
-        role: (p.role as UserRole) ?? UserRole.User,
-        user_function: (p.user_function as any) ?? null,
+            
+        if (!directError && directData) {
+            console.log('✅ SUPABASE SERVICE - Query direta sucesso:', directData.length, 'perfis');
+            return (directData || []).map((p: any) => ({
+                id: p.id,
+                email: p.email ?? null,
+                name: p.name ?? null,
+                role: (p.role as UserRole) ?? UserRole.User,
+                user_function: (p.user_function as any) ?? null,
+            }));
+        } else {
+            console.warn('⚠️ SUPABASE SERVICE - Query direta falhou:', directError?.message);
+        }
+    } catch (directErr) {
+        console.warn('⚠️ SUPABASE SERVICE - Query direta erro:', directErr);
+    }
+
+    try {
+        // 3. Último fallback: listProfilesOnly (mais robusto)
+        console.log('🔄 SUPABASE SERVICE - Tentando listProfilesOnly como último recurso...');
+        const fallbackProfiles = await listProfilesOnly();
+        console.log('✅ SUPABASE SERVICE - listProfilesOnly sucesso:', fallbackProfiles.length, 'perfis');
+        
+        return fallbackProfiles.map(p => ({
+            id: p.id,
+            email: p.email,
+            name: p.name,
+            role: p.role,
+            user_function: p.function as any,
         }));
+    } catch (fallbackErr) {
+        console.error('❌ SUPABASE SERVICE - Todos os métodos falharam:', fallbackErr);
+        
+        // 4. Fallback final: usar service role se disponível
+        try {
+            console.log('🔄 SUPABASE SERVICE - Tentando com service role como último recurso...');
+            const { createClient } = await import('./supabaseClient');
+            const serviceSupabase = createClient();
+            
+            if (serviceSupabase) {
+                const { data: serviceData, error: serviceError } = await serviceSupabase
+                    .from('profiles')
+                    .select('id, email, name, role, user_function');
+                    
+                if (!serviceError && serviceData) {
+                    console.log('✅ SUPABASE SERVICE - Service role sucesso:', serviceData.length, 'perfis');
+                    return (serviceData || []).map((p: any) => ({
+                        id: p.id,
+                        email: p.email ?? null,
+                        name: p.name ?? null,
+                        role: (p.role as UserRole) ?? UserRole.User,
+                        user_function: (p.user_function as any) ?? null,
+                    }));
+                }
+            }
+        } catch (serviceErr) {
+            console.error('❌ SUPABASE SERVICE - Service role também falhou:', serviceErr);
+        }
+        
+        return [];
     }
 };
 

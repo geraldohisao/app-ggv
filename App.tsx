@@ -17,6 +17,8 @@ import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
 import PublicDiagnosticReport from './components/PublicDiagnosticReport';
 import { UserProvider, useUser } from './contexts/DirectUserContext';
+import { BulkAnalysisProvider } from './contexts/BulkAnalysisContext';
+import { BulkAnalysisProgressNotification } from './components/BulkAnalysisProgressNotification';
 import { LoadingSpinner } from './components/ui/Feedback';
 import { initializeLogos } from './utils/fetchLogosFromDatabase';
 import UserMenu from './components/UserMenu';
@@ -292,19 +294,24 @@ const AppContent: React.FC = () => {
   const isFullScreen = activeModule === Module.OpportunityFeedback;
 
   return (
-    <div className="flex flex-col h-full font-sans">
-      {!isFullScreen && (
-        <Header activeModule={activeModule} setActiveModule={setActiveModule} onLogout={logout} />
-      )}
-      <main className={`flex-1 overflow-y-auto ${isFullScreen ? 'bg-white' : 'bg-slate-100'}`}>
-        {renderModule()}
-      </main>
-      
-      {/* Widget de feedback movido para o UserMenu */}
-      
-      {/* SuperAdmin Debug Panel com logs globais e Google Chat */}
-      <DebugPanelWrapper user={user} />
-    </div>
+    <BulkAnalysisProvider>
+      <div className="flex flex-col h-full font-sans">
+        {!isFullScreen && (
+          <Header activeModule={activeModule} setActiveModule={setActiveModule} onLogout={logout} />
+        )}
+        <main className={`flex-1 overflow-y-auto ${isFullScreen ? 'bg-white' : 'bg-slate-100'}`}>
+          {renderModule()}
+        </main>
+        
+        {/* Widget de feedback movido para o UserMenu */}
+        
+        {/* Notificação de progresso da análise em massa */}
+        <BulkAnalysisProgressNotification />
+        
+        {/* SuperAdmin Debug Panel com logs globais e Google Chat */}
+        <DebugPanelWrapper user={user} />
+      </div>
+    </BulkAnalysisProvider>
   );
 };
 
