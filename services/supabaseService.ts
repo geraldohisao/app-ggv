@@ -127,12 +127,12 @@ export const listProfiles = async (): Promise<Array<{ id: string; email: string 
     
     // Tentar múltiplas abordagens para garantir que admins vejam todos os perfis
     try {
-        // 1. Tentar RPC admin_list_profiles_robust primeiro (função com debug melhorado)
-        console.log('🔄 SUPABASE SERVICE - Tentando RPC admin_list_profiles_robust...');
-        const { data: rpcData, error: rpcError } = await supabase.rpc('admin_list_profiles_robust');
+        // 1. Tentar RPC list_all_profiles primeiro (função simples sem verificação de auth)
+        console.log('🔄 SUPABASE SERVICE - Tentando RPC list_all_profiles...');
+        const { data: rpcData, error: rpcError } = await supabase.rpc('list_all_profiles');
         
         if (!rpcError && rpcData) {
-            console.log('✅ SUPABASE SERVICE - RPC admin_list_profiles_robust sucesso:', rpcData.length, 'perfis');
+            console.log('✅ SUPABASE SERVICE - RPC list_all_profiles sucesso:', rpcData.length, 'perfis');
             return (rpcData || []).map((p: any) => ({
                 id: p.id,
                 email: p.email ?? null,
