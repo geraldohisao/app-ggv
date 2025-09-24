@@ -9,12 +9,16 @@ import {
   getAnalysisStats, 
   BatchAnalysisProgress 
 } from '../services/batchAnalysisService';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 export default function BatchAnalysisPanel() {
   const [stats, setStats] = useState<any>(null);
   const [progress, setProgress] = useState<BatchAnalysisProgress | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 🔐 Verificar permissões de administrador
+  const { canAccessManualAnalysis, canAccessBulkOperations, user } = useAdminFeatures();
 
   useEffect(() => {
     loadStats();
@@ -55,6 +59,12 @@ export default function BatchAnalysisPanel() {
       setIsRunning(false);
     }
   };
+
+  // 🔐 Verificar se usuário tem permissão para acessar análise manual
+  // Se não tiver permissão, não renderizar nada (ocultar completamente)
+  if (!canAccessManualAnalysis) {
+    return null;
+  }
 
   if (!stats) {
     return (

@@ -1,6 +1,7 @@
 import React from 'react';
 import AppBrand from './common/AppBrand';
 import UserMenu from './UserMenu';
+import NotificationCenter from './NotificationCenter';
 import { Module } from '../types';
 import ConnectionStatus from './ConnectionStatus';
 import { ChartBarIcon, CpuChipIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
@@ -50,9 +51,10 @@ const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule, onLogout
                         ))}
                     </nav>
 
-                    {/* Right side: Status and User Menu */}
-                    <div className="flex items-center gap-4">
+                    {/* Right side: Notifications, Status and User Menu */}
+                    <div className="flex items-center gap-3">
                        <ConnectionStatus />
+                       <NotificationCenter />
                        <UserMenu activeModule={activeModule} setActiveModule={setActiveModule} onLogout={onLogout} />
                     </div>
                 </div>

@@ -95,6 +95,44 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
     loadData();
   }, [selectedPeriod, data]);
 
+  // Listener para novas análises em tempo real
+  useEffect(() => {
+    console.log('🔄 Configurando listener de tempo real para call_analysis (ranking volume)...');
+    
+    const channel = supabase
+      .channel('volume_ranking_analysis_updates')
+      .on('postgres_changes', 
+        { 
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public', 
+          table: 'call_analysis' 
+        }, 
+        (payload) => {
+          console.log('🔔 Nova análise detectada! Recarregando ranking de volume...', payload);
+          
+          // Recarregar dados após nova análise
+          setTimeout(async () => {
+            setLoading(true);
+            try {
+              const rankingData = await fetchSdrRankingData(selectedPeriod);
+              setChartData(rankingData);
+              console.log('✅ Ranking de volume atualizado em tempo real!');
+            } catch (err) {
+              console.error('❌ Erro ao atualizar ranking de volume:', err);
+            } finally {
+              setLoading(false);
+            }
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔄 Removendo listener de análises (volume)...');
+      supabase.removeChannel(channel);
+    };
+  }, [selectedPeriod]);
+
   if (loading) {
     return (
       <div className="bg-white border border-slate-200 rounded-lg p-4">
@@ -171,7 +209,13 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
                 
                 <div className="flex justify-between text-xs text-slate-500 mt-1">
                   <span>Taxa: {sdr.total_calls > 0 ? Math.round((sdr.answered_calls / sdr.total_calls) * 100) : 0}%</span>
-                  <span>Duração: {sdr.avg_duration > 0 ? Math.round(sdr.avg_duration / 60) + 'm' : '0m'}</span>
+                  <span>Duração: {
+                    sdr.avg_duration > 0 
+                      ? sdr.avg_duration >= 60 
+                        ? Math.floor(sdr.avg_duration / 60) + 'm ' + Math.round(sdr.avg_duration % 60) + 's'
+                        : Math.round(sdr.avg_duration) + 's'
+                      : '0s'
+                  }</span>
                 </div>
               </div>
             </div>

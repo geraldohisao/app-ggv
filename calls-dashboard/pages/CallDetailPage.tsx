@@ -3,6 +3,7 @@ import { DATE_FORMATTER, TIME_FORMATTER, secondsToHuman } from '../constants';
 import { fetchCallDetail, convertToCallItem } from '../services/callsService';
 import { CallItem } from '../types';
 import AiAssistant from '../components/AiAssistant';
+import { v4 as uuidv4 } from 'uuid';
 import ScorecardAnalysis from '../components/ScorecardAnalysis';
 import AudioStatusIndicator from '../components/AudioStatusIndicator';
 import ParsedTranscription from '../components/ParsedTranscription';
@@ -10,7 +11,56 @@ import { formatCallType, getCallTypeColor } from '../utils/callTypeUtils';
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
 import { getCallAnalysisFromDatabase, processCallAnalysis } from '../services/callAnalysisBackendService';
 import { supabase } from '../../services/supabaseClient';
+import { getCurrentUserDisplayName } from '../../services/supabaseService';
+import CallAIAssistantChat from '../../components/Calls/CallAIAssistantChat';
 // import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
+
+// Funções auxiliares para dados do usuário
+const getAuthorDisplayName = (authorId: string | null | undefined): string => {
+  if (!authorId) return 'Usuário Anônimo'; // Fallback para null/undefined
+  
+  // Buscar do localStorage primeiro (dados reais do usuário)
+  const userName = localStorage.getItem('ggv_user_name') || 'Usuário';
+  
+  if (authorId === localStorage.getItem('ggv_user_id')) {
+    return userName;
+  }
+  
+  // Fallbacks para outros usuários
+  if (authorId === '00000000-0000-0000-0000-000000000001') return 'Sistema';
+  return 'Usuário';
+};
+
+const getAuthorEmail = (authorId: string | null | undefined): string => {
+  if (!authorId) return ''; // Fallback para null/undefined
+  
+  // Buscar do localStorage primeiro (dados reais do usuário)
+  const userEmail = localStorage.getItem('ggv_user_email') || '';
+  
+  if (authorId === localStorage.getItem('ggv_user_id')) {
+    return userEmail;
+  }
+  
+  if (authorId === '00000000-0000-0000-0000-000000000001') return 'sistema@grupoggv.com';
+  return '';
+};
+
+const getAuthorInitials = (name: string): string => {
+  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+};
+
+const getAuthorColor = (authorId: string | null | undefined): string => {
+  if (!authorId) return 'bg-gray-500'; // Fallback para null/undefined
+  if (authorId === '00000000-0000-0000-0000-000000000001') return 'bg-indigo-500';
+  
+  // Gerar cor baseada no hash do ID
+  const hash = authorId.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500'];
+  return colors[Math.abs(hash) % colors.length];
+};
 
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
@@ -32,6 +82,19 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [aiNote, setAiNote] = useState<string>('N/A');
   const [aiScore, setAiScore] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState('');
+  const [feedbacks, setFeedbacks] = useState<Array<{
+    id: string,
+    content: string, 
+    created_at: string,
+    author_id: string,
+    author_name?: string,
+    author_email?: string
+  }>>([]);
+  const [savingFb, setSavingFb] = useState(false);
+  const [fbError, setFbError] = useState<string | null>(null);
+  const [editingFeedback, setEditingFeedback] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   useEffect(() => {
     const loadCallDetail = async () => {
@@ -61,6 +124,137 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
 
     loadCallDetail();
   }, [callId]);
+
+  // Carregar feedbacks
+  useEffect(() => {
+    const loadFeedbacks = async () => {
+      if (!callId) return;
+      
+      try {
+        console.log('🔄 Carregando feedbacks para chamada:', callId);
+        
+        // Query ultra simples para evitar problemas de RLS
+        const { data, error } = await supabase
+          .rpc('get_call_feedbacks', { p_call_id: callId });
+        
+        console.log('📥 Resposta feedbacks:', { data, error });
+        
+        if (error) {
+          console.error('❌ Erro ao carregar feedbacks:', error);
+        } else if (data) {
+          console.log('✅ Feedbacks carregados:', data.length);
+          
+          // Mapear dados com informações do usuário
+          const mappedFeedbacks = data.map(fb => ({
+            ...fb,
+            author_name: getAuthorDisplayName(fb.author_id),
+            author_email: getAuthorEmail(fb.author_id)
+          }));
+          setFeedbacks(mappedFeedbacks as any);
+        }
+      } catch (err) {
+        console.error('❌ Erro geral ao carregar feedbacks:', err);
+      }
+    };
+    loadFeedbacks();
+  }, [callId]);
+
+  const submitFeedback = async () => {
+    if (!feedback.trim() || !call) return;
+    setSavingFb(true);
+    setFbError(null);
+    try {
+      console.log('🔄 Salvando feedback para chamada:', call.id);
+      
+      // Usar dados reais do usuário autenticado
+      const { data: { session } } = await supabase.auth.getSession();
+      const realUserId = session?.user?.id;
+      const userEmail = session?.user?.email || localStorage.getItem('ggv_user_email') || '';
+      const userName = session?.user?.user_metadata?.full_name || localStorage.getItem('ggv_user_name') || 'Usuário';
+      
+      // Usar o ID real ou fallback para UUID administrativo
+      const authorId = realUserId || '00000000-0000-0000-0000-000000000001';
+      
+      console.log('🔐 Auth check (dados reais):', {
+        realUserId,
+        userEmail,
+        userName,
+        authorId,
+        callId: call.id
+      });
+      
+      // Salvar dados do usuário no localStorage para uso posterior
+      if (userEmail) localStorage.setItem('ggv_user_email', userEmail);
+      if (userName) localStorage.setItem('ggv_user_name', userName);
+      if (realUserId) localStorage.setItem('ggv_user_id', realUserId);
+      
+      // Vincular feedback ao SDR dono da chamada, se disponível
+      const sdrId = (call as any).sdr_id && typeof (call as any).sdr_id === 'string' && (call as any).sdr_id.length === 36
+        ? (call as any).sdr_id
+        : null;
+      
+      console.log('📋 Dados do feedback:', {
+        call_id: call.id,
+        sdr_id: sdrId,
+        author_id: authorId,
+        content: feedback.trim()
+      });
+      
+      const insertPayload = {
+        call_id: call.id,
+        sdr_id: sdrId,
+        author_id: authorId,
+        content: feedback.trim()
+      };
+      
+      console.log('📤 Payload de inserção:', insertPayload);
+      
+        const { data, error } = await supabase
+        .from('call_feedbacks')
+        .insert(insertPayload)
+        .select('id, content, created_at, author_id')
+        .single();
+        
+      console.log('📥 Resposta do Supabase:', { data, error });
+        
+      if (error) {
+        console.error('❌ Erro detalhado ao salvar feedback:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        setFbError(`Erro: ${error.message}`);
+      } else if (data) {
+        console.log('✅ Feedback salvo com sucesso no banco:', data);
+        
+        // Adicionar dados do usuário ao feedback
+        const enrichedFeedback = {
+          ...data,
+          author_name: userName,
+          author_email: userEmail
+        };
+        
+        setFeedback('');
+        setFeedbacks(prev => [enrichedFeedback as any, ...prev]);
+        
+        // Verificar se realmente salvou (query de confirmação)
+        const { data: verification } = await supabase
+          .from('call_feedbacks')
+          .select('id, content')
+          .eq('id', data.id)
+          .single();
+          
+        console.log('🔍 Verificação de persistência:', verification);
+      }
+    } catch (err: any) {
+      console.error('❌ Erro geral ao salvar feedback:', err);
+      setFbError(`Erro: ${err.message || 'Falha desconhecida'}`);
+    } finally {
+      setSavingFb(false);
+    }
+  };
 
   const loadExistingAIAnalysis = async (callItem: CallItem) => {
     try {
@@ -92,6 +286,68 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
       console.error('❌ Erro ao carregar análise IA:', error);
       setAiNote('N/A');
       setAiScore(null);
+    }
+  };
+
+  const deleteFeedback = async (feedbackId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este feedback?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('call_feedbacks')
+        .delete()
+        .eq('id', feedbackId);
+        
+      if (error) {
+        console.error('❌ Erro ao excluir feedback:', error);
+        setFbError(`Erro ao excluir: ${error.message}`);
+      } else {
+        console.log('✅ Feedback excluído com sucesso');
+        setFeedbacks(prev => prev.filter(fb => fb.id !== feedbackId));
+      }
+    } catch (err: any) {
+      console.error('❌ Erro geral ao excluir feedback:', err);
+      setFbError(`Erro: ${err.message}`);
+    }
+  };
+
+  const startEditFeedback = (feedbackId: string, currentContent: string) => {
+    setEditingFeedback(feedbackId);
+    setEditContent(currentContent);
+  };
+
+  const cancelEdit = () => {
+    setEditingFeedback(null);
+    setEditContent('');
+  };
+
+  const saveEditFeedback = async (feedbackId: string) => {
+    if (!editContent.trim()) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('call_feedbacks')
+        .update({ content: editContent.trim() })
+        .eq('id', feedbackId)
+        .select('id, content, created_at, author_id')
+        .single();
+        
+      if (error) {
+        console.error('❌ Erro ao editar feedback:', error);
+        setFbError(`Erro ao editar: ${error.message}`);
+      } else {
+        console.log('✅ Feedback editado com sucesso');
+        setFeedbacks(prev => prev.map(fb => 
+          fb.id === feedbackId 
+            ? { ...fb, content: editContent.trim() }
+            : fb
+        ));
+        setEditingFeedback(null);
+        setEditContent('');
+      }
+    } catch (err: any) {
+      console.error('❌ Erro geral ao editar feedback:', err);
+      setFbError(`Erro: ${err.message}`);
     }
   };
 
@@ -163,9 +419,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                 <div className="text-xs text-slate-500">
                   {DATE_FORMATTER.format(new Date(call.date))} • {TIME_FORMATTER.format(new Date(call.date))}
                 </div>
-                {call.sdr.email && call.sdr.email !== call.sdr.name && (
-                  <div className="text-xs text-slate-400">{call.sdr.email}</div>
-                )}
+                {/* E-mail do SDR removido por solicitação */}
               </div>
             </div>
             <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
@@ -179,12 +433,13 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                 <div className="text-slate-500">Status</div>
                 <div className="font-semibold">
                   <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                    call.status === 'processed' ? 'bg-green-100 text-green-800' :
-                    call.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                    call.status === 'failed' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
+                    call.status_voip_friendly === 'Atendida' ? 'bg-green-100 text-green-800' :
+                    call.status_voip_friendly === 'Não atendida' ? 'bg-red-100 text-red-800' :
+                    call.status_voip_friendly === 'Cancelada pela SDR' ? 'bg-yellow-100 text-yellow-800' :
+                    call.status_voip_friendly === 'Numero mudou' ? 'bg-orange-100 text-orange-800' :
+                    'bg-slate-100 text-slate-800'
                   }`}>
-                    {call.status}
+                    {call.status_voip_friendly || call.status}
                   </span>
                 </div>
               </div>
@@ -225,9 +480,128 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
             )}
           </div>
 
+          {/* Feedback da Chamada (logo abaixo do áudio) */}
+          <div className="bg-white rounded-lg border border-slate-200 p-4">
+            <div className="mb-2 font-medium text-slate-800">💬 Feedback</div>
+            <textarea
+              className="w-full border border-slate-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              rows={3}
+              placeholder="Escreva um feedback objetivo para o SDR..."
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+            />
+            <div className="flex items-center justify-between mt-2">
+              {fbError && <div className="text-xs text-red-600">{fbError}</div>}
+              <div className="flex-1"></div>
+              <button
+                onClick={submitFeedback}
+                disabled={savingFb || !feedback.trim()}
+                className="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {savingFb ? 'Salvando...' : 'Salvar feedback'}
+              </button>
+            </div>
+
+            {feedbacks.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <div className="text-sm font-medium text-slate-700 border-b border-slate-200 pb-2">
+                  Feedbacks ({feedbacks.length})
+                </div>
+                {feedbacks.map(fb => {
+                  const authorName = getAuthorDisplayName(fb.author_id);
+                  const authorEmail = getAuthorEmail(fb.author_id);
+                  const initials = getAuthorInitials(authorName);
+                  const colorClass = getAuthorColor(fb.author_id);
+                  
+                  return (
+                    <div key={fb.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                      <div className="flex items-start gap-3">
+                        {/* Avatar */}
+                        <div className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center flex-shrink-0`}>
+                          <span className="text-white text-xs font-medium">{initials}</span>
+                        </div>
+                        
+                        {/* Conteúdo */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-800">{authorName}</span>
+                              {authorEmail && (
+                                <span className="text-xs text-slate-500">{authorEmail}</span>
+                              )}
+                              <span className="text-xs text-slate-400">
+                                {new Date(fb.created_at).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                            
+                            {/* Botões de ação */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => startEditFeedback(fb.id, fb.content)}
+                                className="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors"
+                                title="Editar feedback"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => deleteFeedback(fb.id)}
+                                className="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"
+                                title="Excluir feedback"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* Conteúdo editável ou texto */}
+                          {editingFeedback === fb.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => saveEditFeedback(fb.id)}
+                                  disabled={!editContent.trim()}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="px-3 py-1 border border-slate-300 text-slate-600 rounded text-sm hover:bg-slate-50"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                              {fb.content}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Transcrição */}
           {call.transcription && (
-            <div className="bg-white rounded-lg border border-slate-200 p-4">
+            <div className="bg-white rounded-lg border border-slate-200 p-4 max-h-[70vh] overflow-y-auto">
               <div className="mb-3 font-medium text-slate-800">📝 Transcrição da Chamada</div>
               <ParsedTranscription 
                 transcription={call.transcription || ''} 
@@ -238,7 +612,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <AudioStatusIndicator call={call} />
           <ScorecardAnalysis 
             call={call} 
@@ -248,9 +622,19 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
               updateCallScore(call.id, analysis.final_grade);
             }}
           />
+          
+          
           <AiAssistant call={call} />
         </div>
       </div>
+
+      {/* Chat flutuante do assistente IA */}
+      {(call.deal_id || call.dealCode) && (
+        <CallAIAssistantChat 
+          dealId={call.deal_id || call.dealCode} 
+          dealCode={call.dealCode || call.deal_id || 'N/A'} 
+        />
+      )}
     </div>
   );
 }

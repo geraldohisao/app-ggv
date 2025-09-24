@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 interface BatchJob {
   id: string;
@@ -37,6 +38,9 @@ export default function BatchAnalysisPanelV2() {
     callTypes: [] as string[],
     sdrs: [] as string[]
   });
+  
+  // 🔐 Verificar permissões de administrador
+  const { canAccessManualAnalysis, canAccessBulkOperations, user } = useAdminFeatures();
 
   useEffect(() => {
     loadJobs();
@@ -183,6 +187,12 @@ export default function BatchAnalysisPanelV2() {
       default: return '⏳';
     }
   };
+
+  // 🔐 Verificar se usuário tem permissão para acessar análise manual
+  // Se não tiver permissão, não renderizar nada (ocultar completamente)
+  if (!canAccessManualAnalysis) {
+    return null;
+  }
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-6">

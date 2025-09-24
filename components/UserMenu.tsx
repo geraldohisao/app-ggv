@@ -4,11 +4,13 @@ import {
     ArrowLeftOnRectangleIcon,
     Cog6ToothIcon,
     FlagIcon,
-    BoltIcon
+    BoltIcon,
+    ChatBubbleLeftRightIcon
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
 import { navigateToModule } from '../utils/router';
+import FeedbackSidebar from './ui/FeedbackSidebar';
 
 
 interface UserMenuProps {
@@ -20,6 +22,7 @@ interface UserMenuProps {
 const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLogout }) => {
     const { user } = useUser();
     const [isOpen, setIsOpen] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const dropdown = useRef<HTMLDivElement>(null);
 
@@ -54,6 +57,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
         e.preventDefault();
         setIsOpen(false);
         onLogout();
+    }
+
+    const openFeedback = () => {
+        setShowFeedback(true);
+        setIsOpen(false);
     }
     
     if (!user) {
@@ -92,6 +100,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                     </div>
                     
                     <ul className="py-1">
+                        <MenuItem 
+                            icon={<ChatBubbleLeftRightIcon className="w-5 h-5"/>} 
+                            text="Melhorias e Bugs" 
+                            isActive={false}
+                            onClick={openFeedback}
+                        />
                         {canSeeFeedback && (
                             <MenuItem 
                                 icon={<FlagIcon className="w-5 h-5"/>} 
@@ -129,6 +143,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                      </ul>
                 </div>
             )}
+
+            {/* Feedback Sidebar */}
+            <FeedbackSidebar 
+                isOpen={showFeedback} 
+                onClose={() => setShowFeedback(false)} 
+            />
         </div>
     );
 };

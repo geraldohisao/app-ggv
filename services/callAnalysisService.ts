@@ -1,435 +1,349 @@
-import { supabase } from './supabaseClient';
+// services/callAnalysisService.ts
+// Serviço especializado em análise de IA para ligações por deal
 
-export interface ScorecardCriterion {
-  id: string;
-  category: string;
-  text: string;
-  weight: number;
-  order_index: number;
+import { supabase } from './supabaseClient';
+import { getAIAssistantResponseStream } from './geminiService';
+
+export interface CallTranscription {
+  call_id: string;
+  provider_call_id: string;
+  from_number: string;
+  to_number: string;
+  agent_id: string;
+  direction: string;
+  call_type: string;
+  duration: number;
+  transcription: string;
+  insights: any;
+  scorecard: any;
+  created_at: string;
+  call_status: string;
 }
 
-export interface Scorecard {
-  id: string;
-  name: string;
-  description: string;
-  criteria: ScorecardCriterion[];
+export interface DealCallStats {
+  total_calls: number;
+  total_duration: number;
+  avg_duration: number;
+  successful_calls: number;
+  first_call_date: string;
+  last_call_date: string;
+  call_types: Record<string, number>;
+  agents_involved: Record<string, number>;
 }
 
 export interface CallAnalysisResult {
-  finalScore: number;
-  analysis: {
-    summary: string;
-    strengths: string[];
-    improvements: string[];
-    recommendations: string[];
+  deal_id: string;
+  analysis_content: string;
+  transcription_summary: string;
+  call_count: number;
+  total_duration: number;
+  created_at: string;
+}
+
+/**
+ * Busca todas as transcrições de um deal específico
+ */
+export async function getDealTranscriptions(dealId: string): Promise<CallTranscription[]> {
+  try {
+    console.log('🔍 CALL ANALYSIS - Buscando transcrições para deal:', dealId);
+    
+    const { data, error } = await supabase.rpc('get_deal_transcriptions_direct', {
+      p_deal_id: dealId
+    });
+
+    if (error) {
+      console.error('❌ CALL ANALYSIS - Erro ao buscar transcrições:', error);
+      throw new Error(`Erro ao buscar transcrições: ${error.message}`);
+    }
+
+    console.log('✅ CALL ANALYSIS - Transcrições encontradas:', data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro geral ao buscar transcrições:', error);
+    throw error;
+  }
+}
+
+/**
+ * Busca estatísticas das ligações de um deal
+ */
+export async function getDealCallStats(dealId: string): Promise<DealCallStats | null> {
+  try {
+    console.log('📊 CALL ANALYSIS - Buscando estatísticas para deal:', dealId);
+    
+    const { data, error } = await supabase.rpc('get_deal_call_stats', {
+      p_deal_id: dealId
+    });
+
+    if (error) {
+      console.error('❌ CALL ANALYSIS - Erro ao buscar estatísticas:', error);
+      return null;
+    }
+
+    console.log('✅ CALL ANALYSIS - Estatísticas encontradas:', data?.[0]);
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro geral ao buscar estatísticas:', error);
+    return null;
+  }
+}
+
+/**
+ * Gera análise completa das ligações de um deal usando IA
+ */
+export async function* analyzeDealCallsWithAI(
+  dealId: string,
+  customPrompt?: string
+): AsyncGenerator<string, void, unknown> {
+  try {
+    console.log('🤖 CALL ANALYSIS - Iniciando análise IA para deal:', dealId);
+
+    // 1. Buscar transcrições e estatísticas
+    const [transcriptions, stats] = await Promise.all([
+      getDealTranscriptions(dealId),
+      getDealCallStats(dealId)
+    ]);
+
+    if (!transcriptions || transcriptions.length === 0) {
+      yield '❌ **Nenhuma transcrição encontrada**\n\nEste deal não possui ligações com transcrições disponíveis para análise.';
+      return;
+    }
+
+    console.log('📝 CALL ANALYSIS - Processando', transcriptions.length, 'transcrições');
+
+    // 2. Preparar contexto para a IA
+    const contextData = prepareAnalysisContext(transcriptions, stats, dealId);
+    
+    // 3. Buscar persona especializada
+    const analystPersona = await getCallAnalystPersona();
+    if (!analystPersona) {
+      yield '❌ **Erro de configuração**\n\nA persona de análise de ligações não está configurada.';
+      return;
+    }
+
+    // 4. Preparar prompt personalizado ou usar padrão
+    const analysisPrompt = customPrompt || generateDefaultAnalysisPrompt(contextData);
+
+    // 5. Gerar análise com IA
+    console.log('🧠 CALL ANALYSIS - Gerando análise com IA...');
+    
+    let fullAnalysisContent = '';
+    for await (const chunk of getAIAssistantResponseStream(
+      analysisPrompt,
+      analystPersona,
+      [], // sem histórico para análise
+      contextData.transcriptionContext,
+      { requestId: `call_analysis_${dealId}_${Date.now()}` }
+    )) {
+      fullAnalysisContent += chunk;
+      yield chunk;
+    }
+
+    // 6. Salvar análise permanentemente no histórico
+    await saveAnalysisToHistory(dealId, fullAnalysisContent, contextData, customPrompt);
+
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro na análise:', error);
+    yield `❌ **Erro na análise**\n\nOcorreu um erro ao analisar as ligações: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
+  }
+}
+
+/**
+ * Prepara o contexto para análise das transcrições
+ */
+function prepareAnalysisContext(
+  transcriptions: CallTranscription[], 
+  stats: DealCallStats | null, 
+  dealId: string
+): {
+  transcriptionContext: string;
+  summaryData: any;
+} {
+  const transcriptionContext = transcriptions
+    .map((call, index) => {
+      const callDate = new Date(call.created_at).toLocaleDateString('pt-BR');
+      const callDuration = Math.round(call.duration / 60); // em minutos
+      
+      return `[#src:call_${index + 1}]
+**LIGAÇÃO ${index + 1} - ${callDate}**
+- **ID**: ${call.provider_call_id}
+- **Direção**: ${call.direction}
+- **Tipo**: ${call.call_type || 'N/A'}
+- **Duração**: ${callDuration} minutos
+- **Agente**: ${call.agent_id}
+- **Status**: ${call.call_status}
+
+**TRANSCRIÇÃO:**
+${call.transcription}
+
+${call.insights && Object.keys(call.insights).length > 0 ? `
+**INSIGHTS EXISTENTES:**
+${JSON.stringify(call.insights, null, 2)}
+` : ''}
+
+---`;
+    })
+    .join('\n\n');
+
+  const summaryData = {
+    deal_id: dealId,
+    total_calls: stats?.total_calls || transcriptions.length,
+    total_duration: stats?.total_duration || transcriptions.reduce((sum, call) => sum + call.duration, 0),
+    avg_duration: stats?.avg_duration || 0,
+    successful_calls: stats?.successful_calls || transcriptions.length,
+    first_call_date: stats?.first_call_date || transcriptions[0]?.created_at,
+    last_call_date: stats?.last_call_date || transcriptions[transcriptions.length - 1]?.created_at,
+    call_types: stats?.call_types || {},
+    agents_involved: stats?.agents_involved || {}
   };
-  criteria: Array<{
-    id: string;
-    score: number;
-    justification: string;
-  }>;
+
+  return {
+    transcriptionContext,
+    summaryData
+  };
 }
 
-export interface CallAnalysisRequest {
-  callId: string;
-  transcription: string;
-  callType?: string;
-  duration?: number;
+/**
+ * Gera prompt padrão para análise
+ */
+function generateDefaultAnalysisPrompt(contextData: any): string {
+  return `Analise todas as ligações deste deal e forneça uma visão estratégica completa.
+
+**CONTEXTO DO DEAL:**
+- Total de ligações: ${contextData.summaryData.total_calls}
+- Duração total: ${Math.round(contextData.summaryData.total_duration / 60)} minutos
+- Período: ${new Date(contextData.summaryData.first_call_date).toLocaleDateString('pt-BR')} a ${new Date(contextData.summaryData.last_call_date).toLocaleDateString('pt-BR')}
+
+**Solicito uma análise que inclua:**
+
+1. **Resumo Executivo** - Visão geral do relacionamento comercial
+2. **Progressão do Deal** - Como evoluiu ao longo das ligações
+3. **Objeções Identificadas** - Principais preocupações do cliente
+4. **Oportunidades** - Momentos de oportunidade perdidos ou aproveitados
+5. **Qualidade da Abordagem** - Efetividade das estratégias do vendedor
+6. **Próximos Passos** - Recomendações estratégicas baseadas no histórico
+
+**Transcrições para análise:**
+${contextData.transcriptionContext}`;
 }
 
-// Buscar scorecard por tipo de call
-export async function getScorecardByCallType(
-  callType: string, 
-  pipeline?: string, 
-  cadence?: string
-): Promise<Scorecard | null> {
-  if (!supabase) {
-    console.log('⚠️ Supabase não inicializado');
-    return null;
-  }
-
-  try {
-    console.log('🔍 Buscando scorecard inteligente para:', { callType, pipeline, cadence });
-    
-    const { data, error } = await supabase.rpc('get_scorecard_smart', {
-      call_type_param: callType,
-      pipeline_param: pipeline || null,
-      cadence_param: cadence || null
-    });
-
-    if (error) {
-      console.error('❌ Erro ao buscar scorecard:', error);
-      return null;
-    }
-
-    if (data && data.length > 0) {
-      const scorecard = data[0];
-      console.log('✅ Scorecard inteligente encontrado:', {
-        name: scorecard.name,
-        match_score: scorecard.match_score,
-        criteria: scorecard.criteria?.length || 0
-      });
-      return {
-        id: scorecard.id,
-        name: scorecard.name,
-        description: scorecard.description,
-        criteria: scorecard.criteria || []
-      };
-    }
-
-    console.log('⚠️ Nenhum scorecard encontrado para:', { callType, pipeline, cadence });
-    return null;
-
-  } catch (error) {
-    console.error('❌ Erro geral ao buscar scorecard:', error);
-    return null;
-  }
-}
-
-// Analisar call com IA
-export async function analyzeCallWithAI(request: CallAnalysisRequest): Promise<CallAnalysisResult | null> {
-  try {
-    console.log('🤖 Iniciando análise IA da call:', request.callId);
-    
-    // 1. Buscar dados completos da ligação para seleção inteligente de scorecard
-    const { data: callData, error: callError } = await supabase
-      .from('calls')
-      .select('call_type, pipeline, cadence')
-      .eq('id', request.callId)
-      .single();
-    
-    if (callError) {
-      console.warn('⚠️ Erro ao buscar dados da ligação, usando dados do request:', callError);
-    }
-    
-    // 2. Buscar scorecard apropriado usando seleção inteligente
-    const callType = callData?.call_type || request.callType || 'consultoria_vendas';
-    const pipeline = callData?.pipeline;
-    const cadence = callData?.cadence;
-    
-    const scorecard = await getScorecardByCallType(callType, pipeline, cadence);
-    
-    if (!scorecard || !scorecard.criteria.length) {
-      console.error('❌ Scorecard não encontrado ou sem critérios');
-      return null;
-    }
-
-    console.log('📋 Scorecard carregado:', scorecard.name);
-    console.log('📋 Critérios:', scorecard.criteria.length);
-
-    // 2. Preparar prompt para IA
-    const prompt = buildAnalysisPrompt(request.transcription, scorecard, request.duration);
-    
-    console.log('📝 Prompt preparado, chamando IA...');
-
-    // 3. Chamar Gemini API
-    const aiResponse = await callGeminiAPILocal(prompt);
-    
-    if (!aiResponse) {
-      console.error('❌ Erro na resposta da IA');
-      return null;
-    }
-
-    console.log('✅ Resposta da IA recebida');
-
-    // 4. Processar resposta da IA
-    const analysisResult = parseAIResponse(aiResponse, scorecard.criteria);
-    
-    if (!analysisResult) {
-      console.error('❌ Erro ao processar resposta da IA');
-      return null;
-    }
-
-    console.log('✅ Análise processada com sucesso');
-    return analysisResult;
-
-  } catch (error) {
-    console.error('❌ Erro geral na análise IA:', error);
-    return null;
-  }
-}
-
-// Salvar análise no Supabase
-export async function saveCallAnalysis(callId: string, analysis: CallAnalysisResult): Promise<boolean> {
-  if (!supabase) {
-    console.log('⚠️ Supabase não inicializado');
-    return false;
-  }
-
-  try {
-    console.log('💾 Salvando análise da call:', callId);
-    
-    const { data, error } = await supabase.rpc('save_call_analysis', {
-      p_call_id: callId,
-      p_final_score: analysis.finalScore,
-      p_analysis: {
-        summary: analysis.analysis.summary,
-        strengths: analysis.analysis.strengths,
-        improvements: analysis.analysis.improvements,
-        recommendations: analysis.analysis.recommendations
-      },
-      p_criteria_scores: analysis.criteria
-    });
-
-    if (error) {
-      console.error('❌ Erro ao salvar análise:', error);
-      return false;
-    }
-
-    console.log('✅ Análise salva com sucesso');
-    return true;
-
-  } catch (error) {
-    console.error('❌ Erro geral ao salvar análise:', error);
-    return false;
-  }
-}
-
-// Buscar análise completa de uma call
-export async function getCallAnalysis(callId: string) {
-  if (!supabase) {
-    console.log('⚠️ Supabase não inicializado');
-    return null;
-  }
-
-  try {
-    console.log('🔍 Buscando análise da call:', callId);
-    
-    const { data, error } = await supabase.rpc('get_call_analysis', {
-      p_call_id: callId
-    });
-
-    if (error) {
-      console.error('❌ Erro ao buscar análise:', error);
-      return null;
-    }
-
-    if (data && data.length > 0) {
-      console.log('✅ Análise encontrada');
-      return data[0];
-    }
-
-    console.log('⚠️ Nenhuma análise encontrada');
-    return null;
-
-  } catch (error) {
-    console.error('❌ Erro geral ao buscar análise:', error);
-    return null;
-  }
-}
-
-// Função auxiliar para construir o prompt da IA
-function buildAnalysisPrompt(transcription: string, scorecard: Scorecard, duration?: number): string {
-  const criteriaText = scorecard.criteria
-    .map((c, index) => `${index + 1}. ${c.category}: ${c.text} (peso: ${c.weight})`)
-    .join('\n');
-
-  const durationText = duration ? `\nDuração da ligação: ${Math.round(duration / 60)} minutos` : '';
-
-  return `Você é um especialista em vendas e análise de ligações comerciais. Sua tarefa é analisar uma transcrição de ligação e avaliá-la segundo os critérios fornecidos.
-
-**TRANSCRIÇÃO DA LIGAÇÃO:**
-${transcription}${durationText}
-
-**CRITÉRIOS DE AVALIAÇÃO:**
-${criteriaText}
-
-**INSTRUÇÕES:**
-1. Analise cada critério individualmente
-2. Atribua uma nota de 0 a 10 para cada critério
-3. Justifique cada nota com base na transcrição
-4. Calcule a nota final ponderada
-5. Forneça um resumo geral da ligação
-
-**FORMATO DE RESPOSTA (JSON):**
-{
-  "finalScore": 75,
-  "analysis": {
-    "summary": "Resumo geral da qualidade da ligação",
-    "strengths": ["Ponto forte 1", "Ponto forte 2"],
-    "improvements": ["Melhoria 1", "Melhoria 2"],
-    "recommendations": ["Recomendação 1", "Recomendação 2"]
-  },
-  "criteria": [
-    {
-      "id": "criterion_id_1",
-      "score": 8,
-      "justification": "Justificativa detalhada da nota"
-    }
-  ]
-}
-
-**IMPORTANTE:**
-- Seja objetivo e baseado apenas na transcrição
-- Justifique cada nota com exemplos específicos
-- A nota final deve ser calculada considerando os pesos dos critérios
-- Forneça insights acionáveis para melhorias
-
-Responda APENAS com o JSON válido, sem texto adicional.`;
-}
-
-// Função auxiliar para processar resposta da IA
-function parseAIResponse(aiResponse: string, criteria: ScorecardCriterion[]): CallAnalysisResult | null {
-  try {
-    // Tentar extrair JSON da resposta
-    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('❌ JSON não encontrado na resposta da IA');
-      return null;
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    
-    // Validar estrutura
-    if (!parsed.finalScore || !parsed.analysis || !parsed.criteria) {
-      console.error('❌ Estrutura JSON inválida');
-      return null;
-    }
-
-    // Mapear critérios com IDs corretos
-    const mappedCriteria = parsed.criteria.map((criterion: any, index: number) => ({
-      id: criteria[index]?.id || `criterion_${index}`,
-      score: Math.max(0, Math.min(10, criterion.score || 0)),
-      justification: criterion.justification || 'Sem justificativa'
-    }));
-
-    return {
-      finalScore: Math.max(0, Math.min(100, parsed.finalScore || 0)),
-      analysis: {
-        summary: parsed.analysis.summary || 'Análise não disponível',
-        strengths: Array.isArray(parsed.analysis.strengths) ? parsed.analysis.strengths : [],
-        improvements: Array.isArray(parsed.analysis.improvements) ? parsed.analysis.improvements : [],
-        recommendations: Array.isArray(parsed.analysis.recommendations) ? parsed.analysis.recommendations : []
-      },
-      criteria: mappedCriteria
-    };
-
-  } catch (error) {
-    console.error('❌ Erro ao processar resposta da IA:', error);
-    return null;
-  }
-}
-
-// Função para sincronizar deal com empresa
-export async function syncDealCompany(
-  dealId: string, 
-  companyName: string, 
-  companyEmail?: string, 
-  companyPhone?: string
-): Promise<boolean> {
-  if (!supabase) {
-    console.log('⚠️ Supabase não inicializado');
-    return false;
-  }
-
-  try {
-    console.log('🔄 Sincronizando deal:', dealId, 'com empresa:', companyName);
-    
-    const { data, error } = await supabase.rpc('sync_deal_company', {
-      p_deal_id: dealId,
-      p_company_name: companyName,
-      p_company_email: companyEmail || null,
-      p_company_phone: companyPhone || null
-    });
-
-    if (error) {
-      console.error('❌ Erro ao sincronizar deal:', error);
-      return false;
-    }
-
-    console.log('✅ Deal sincronizado com sucesso');
-    return true;
-
-  } catch (error) {
-    console.error('❌ Erro geral ao sincronizar deal:', error);
-    return false;
-  }
-}
-
-// Função para buscar empresa por deal_id
-export async function getCompanyByDealId(dealId: string) {
-  if (!supabase) {
-    console.log('⚠️ Supabase não inicializado');
-    return null;
-  }
-
+/**
+ * Busca a persona especializada em análise de ligações
+ */
+async function getCallAnalystPersona() {
   try {
     const { data, error } = await supabase
-      .from('companies')
+      .from('ai_personas')
       .select('*')
-      .eq('deal_id', dealId)
+      .eq('id', 'call_analyst')
       .single();
 
     if (error) {
-      console.error('❌ Erro ao buscar empresa:', error);
+      console.error('❌ CALL ANALYSIS - Erro ao buscar persona:', error);
       return null;
     }
 
     return data;
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro geral ao buscar persona:', error);
+    return null;
+  }
+}
 
-     } catch (error) {
-     console.error('❌ Erro geral ao buscar empresa:', error);
-     return null;
-   }
- }
-
-// Função local para chamar Gemini API
-async function callGeminiAPILocal(prompt: string): Promise<string | null> {
+/**
+ * Salva a análise permanentemente no histórico
+ */
+async function saveAnalysisToHistory(
+  dealId: string, 
+  analysisContent: string,
+  contextData: any, 
+  customPrompt?: string
+): Promise<string | null> {
   try {
-    // Obter chave da API do Supabase
-    const { data: config } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'GEMINI_API_KEY')
-      .single();
+    console.log('💾 CALL ANALYSIS - Salvando análise permanentemente para deal:', dealId);
 
-    const apiKey = config?.value;
-    if (!apiKey) {
-      console.error('❌ Chave da API Gemini não configurada');
+    const { data, error } = await supabase.rpc('save_analysis_permanent', {
+      p_deal_id: dealId,
+      p_analysis_content: analysisContent,
+      p_transcription_summary: `Total: ${contextData.summaryData.total_calls} ligações, ${Math.round(contextData.summaryData.total_duration / 60)} minutos`,
+      p_call_count: contextData.summaryData.total_calls,
+      p_total_duration: contextData.summaryData.total_duration,
+      p_custom_prompt: customPrompt || null
+    });
+
+    if (error) {
+      console.error('❌ CALL ANALYSIS - Erro ao salvar no histórico:', error);
+      return null;
+    } else {
+      console.log('✅ CALL ANALYSIS - Análise salva permanentemente, ID:', data);
+      return data;
+    }
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro geral ao salvar no histórico:', error);
+    return null;
+  }
+}
+
+/**
+ * Busca a última análise do histórico
+ */
+export async function getLatestAnalysis(dealId: string): Promise<CallAnalysisResult | null> {
+  try {
+    const { data, error } = await supabase.rpc('get_latest_analysis', {
+      p_deal_id: dealId
+    });
+
+    if (error) {
+      console.log('ℹ️ CALL ANALYSIS - Nenhuma análise no histórico encontrada');
       return null;
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-    
-    const body = {
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        topK: 40,
-        topP: 0.8,
-        maxOutputTokens: 2048,
-      },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
-      ]
-    };
+    console.log('✅ CALL ANALYSIS - Última análise encontrada:', data?.[0]?.id);
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro ao buscar histórico:', error);
+    return null;
+  }
+}
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body)
+/**
+ * Busca todo o histórico de análises de um deal
+ */
+export async function getAnalysisHistory(dealId: string): Promise<CallAnalysisResult[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_deal_analysis_history', {
+      p_deal_id: dealId
     });
 
-    if (!response.ok) {
-      throw new Error(`Erro na API Gemini: ${response.status} ${response.statusText}`);
+    if (error) {
+      console.error('❌ CALL ANALYSIS - Erro ao buscar histórico:', error);
+      return [];
     }
 
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text).filter(Boolean).join(' ');
-    return text || null;
-
+    console.log('✅ CALL ANALYSIS - Histórico encontrado:', data?.length || 0, 'análises');
+    return data || [];
   } catch (error) {
-    console.error('❌ Erro ao chamar Gemini API:', error);
-    return null;
+    console.error('❌ CALL ANALYSIS - Erro geral ao buscar histórico:', error);
+    return [];
+  }
+}
+
+/**
+ * Limpa análises expiradas do cache
+ */
+export async function cleanupExpiredAnalyses(): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('cleanup_expired_call_analysis');
+
+    if (error) {
+      console.error('❌ CALL ANALYSIS - Erro ao limpar cache:', error);
+      return 0;
+    }
+
+    console.log('🧹 CALL ANALYSIS - Análises expiradas removidas:', data || 0);
+    return data || 0;
+  } catch (error) {
+    console.error('❌ CALL ANALYSIS - Erro geral ao limpar cache:', error);
+    return 0;
   }
 }

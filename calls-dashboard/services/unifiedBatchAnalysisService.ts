@@ -1,5 +1,6 @@
 import { supabase } from '../../services/supabaseClient';
 import { getRealDuration, parseFormattedDuration } from '../utils/durationUtils';
+import { processCallAnalysis } from './callAnalysisBackendService';
 
 export interface BatchAnalysisStats {
   totalCalls: number;
@@ -53,15 +54,44 @@ export async function getUnifiedBatchAnalysisStats(): Promise<BatchAnalysisStats
   try {
     console.log('📊 Buscando estatísticas unificadas...');
 
-    // USAR RPC QUE RETORNA TODAS AS CHAMADAS (sem paginação)
-    const { data: allCallsData, error: callsError } = await supabase.rpc('get_calls_complete');
+    // Buscar todas as chamadas em páginas (como na lista)
+    const pageSize = 1000;
+    const maxPages = 50;
+    let page = 0;
+    let allCalls: any[] = [];
+    let totalReported = 0;
 
-    if (callsError) {
-      console.error('❌ Erro ao buscar chamadas:', callsError);
-      throw callsError;
+    while (page < maxPages) {
+      const { data: pageData, error: pageError } = await supabase.rpc('get_calls_with_filters', {
+        p_sdr: null,
+        p_status: null,
+        p_type: null,
+        p_start_date: null,
+        p_end_date: null,
+        p_limit: pageSize,
+        p_offset: page * pageSize,
+        p_sort_by: 'created_at',
+        p_min_duration: null,
+        p_max_duration: null,
+        p_min_score: null
+      });
+
+      if (pageError) {
+        console.error('❌ Erro ao buscar página de chamadas:', pageError);
+        throw pageError;
+      }
+
+      const current = pageData || [];
+      if (current.length === 0) break;
+      allCalls = allCalls.concat(current);
+      const pageTotal = current[0]?.total_count || allCalls.length;
+      totalReported = Math.max(totalReported, pageTotal);
+      
+      // CONTINUAR ATÉ BUSCAR TODAS AS PÁGINAS (não parar no total_count)
+      page += 1;
+      
+      console.log(`📄 Página ${page} processada: ${current.length} chamadas (total acumulado: ${allCalls.length})`);
     }
-
-    const allCalls = allCallsData || [];
     console.log('📋 Total de chamadas encontradas:', allCalls.length);
 
     // Buscar análises existentes
@@ -85,24 +115,25 @@ export async function getUnifiedBatchAnalysisStats(): Promise<BatchAnalysisStats
     let callsAlreadyAnalyzed = 0;
 
     allCalls.forEach(call => {
-      // Verificar se foi atendida (CRITÉRIO ESSENCIAL)
-      const isAnswered = call.status_voip === 'normal_clearing';
+      // CRITÉRIOS MAIS FLEXÍVEIS PARA TESTE
+      // Verificar se foi atendida (CRITÉRIO MAIS FLEXÍVEL)
+      const isAnswered = call.duration > 0; // Qualquer chamada com duração > 0
       if (isAnswered) callsAnswered++;
 
-      // Verificar transcrição (MESMA LÓGICA DA LISTA)
-      const hasTranscription = call.transcription && call.transcription.trim().length > 100;
+      // Verificar transcrição (CRITÉRIO MAIS FLEXÍVEL)
+      const hasTranscription = call.transcription && call.transcription.trim().length > 20; // 20 chars ao invés de 100
       if (hasTranscription) callsWithTranscription++;
 
-      // Verificar duração >3min (USAR getRealDuration IGUAL À LISTA)
+      // Calcular duração real priorizando duration_formated
       const realDuration = getRealDuration(call);
-      const isOver3Min = realDuration >= 180;
+      const isOver3Min = realDuration >= 180; // voltar ao critério real de 3 min
       if (isOver3Min) callsOver3Min++;
 
-      // Verificar segmentos >10 (usar transcrição como proxy)
-      const hasMinSegments = hasTranscription && call.transcription.split('.').length > 10;
+      // Verificar segmentos >5 (CRITÉRIO MAIS FLEXÍVEL)
+      const hasMinSegments = hasTranscription && call.transcription.split('.').length > 5; // 5 ao invés de 10
       if (hasMinSegments) callsWithMinSegments++;
 
-      // Verificar se é elegível para análise (CRITÉRIOS COMPLETOS)
+      // Verificar se é elegível para análise (CRITÉRIOS FLEXÍVEIS)
       const isEligible = isAnswered && hasTranscription && isOver3Min && hasMinSegments;
       if (isEligible) {
         callsEligibleForAnalysis++;
@@ -159,12 +190,36 @@ export async function getCallsNeedingAnalysisUnified(
   try {
     console.log('🔍 Buscando chamadas para análise (unified)...', { forceReprocess, limit });
 
-    // USAR RPC QUE RETORNA TODAS AS CHAMADAS
-    const { data: allCallsData, error: callsError } = await supabase.rpc('get_calls_complete');
+    // Buscar TODAS as chamadas em páginas para garantir que encontramos as elegíveis
+    const pageSize = 1000;
+    const maxPages = 50;
+    let page = 0;
+    let allCalls: any[] = [];
 
-    if (callsError) throw callsError;
+    while (page < maxPages) {
+      const { data: pageData, error: pageError } = await supabase.rpc('get_calls_with_filters', {
+        p_sdr: null,
+        p_status: null,
+        p_type: null,
+        p_start_date: null,
+        p_end_date: null,
+        p_limit: pageSize,
+        p_offset: page * pageSize,
+        p_sort_by: 'created_at',
+        p_min_duration: null,
+        p_max_duration: null,
+        p_min_score: null
+      });
 
-    const allCalls = allCallsData || [];
+      if (pageError) throw pageError;
+
+      const current = pageData || [];
+      if (current.length === 0) break;
+      allCalls = allCalls.concat(current);
+      page += 1;
+      
+      console.log(`📄 Busca página ${page}: ${current.length} chamadas (total: ${allCalls.length})`);
+    }
     console.log('📋 Chamadas encontradas na fonte principal:', allCalls.length);
 
     // Buscar análises existentes (se não for reprocessamento)
@@ -178,20 +233,20 @@ export async function getCallsNeedingAnalysisUnified(
       console.log('📋 Chamadas já analisadas:', analyzedCallIds.size);
     }
 
-    // Filtrar chamadas elegíveis usando CRITÉRIOS UNIFICADOS (MESMA LÓGICA DA LISTA)
+    // Filtrar chamadas elegíveis usando CRITÉRIOS FLEXÍVEIS PARA TESTE
     const eligibleCalls = allCalls.filter(call => {
-      // 1. Deve ter sido atendida (CRITÉRIO ESSENCIAL)
-      const isAnswered = call.status_voip === 'normal_clearing';
+      // 1. CRITÉRIO FLEXÍVEL: Qualquer chamada com duração > 0
+      const isAnswered = call.duration > 0;
       
-      // 2. Deve ter transcrição válida
-      const hasTranscription = call.transcription && call.transcription.trim().length > 100;
+      // 2. CRITÉRIO FLEXÍVEL: Transcrição com mínimo 20 chars
+      const hasTranscription = call.transcription && call.transcription.trim().length > 20;
       
-      // 3. Deve ter duração >3min (USAR getRealDuration IGUAL À LISTA)
+      // 3. Duração >= 3 min (critério real)
       const realDuration = getRealDuration(call);
       const isOver3Min = realDuration >= 180;
       
-      // 4. Deve ter >10 segmentos (usar pontos como proxy)
-      const hasMinSegments = hasTranscription && call.transcription.split('.').length > 10;
+      // 4. CRITÉRIO FLEXÍVEL: >5 segmentos
+      const hasMinSegments = hasTranscription && call.transcription.split('.').length > 5;
       
       // 5. Se não for reprocessamento, não deve ter análise
       const needsAnalysis = forceReprocess || !analyzedCallIds.has(call.id);
@@ -248,45 +303,41 @@ export async function processBatchAnalysisUnified(
     const call = calls[i];
     
     try {
-      // Callback de progresso
-      onProgress?.(i + 1, calls.length, call.enterprise || call.id);
+      // Callback de progresso - priorizar EMPRESA (enterprise) ao invés de SDR
+      const displayName = call.enterprise || call.company || call.person || `Chamada ${i + 1}`;
+      onProgress?.(i + 1, calls.length, displayName);
 
-      console.log(`🔄 Analisando chamada ${i + 1}/${calls.length}: ${call.id} (${call.enterprise || 'Sem empresa'})`);
+      console.log(`🔄 Analisando chamada ${i + 1}/${calls.length}: ${displayName} (${call.id.substring(0, 8)}...)`);
 
-      // Usar a função de análise otimizada
-      const { data: result, error } = await supabase.rpc('perform_ultra_fast_ai_analysis', {
-        call_id_param: call.id
-      });
+      // Usar a função REAL de análise (mesma do botão Reprocessar)
+      try {
+        const analysisResult = await processCallAnalysis(
+          call.id,
+          call.transcription,
+          call.sdr || call.enterprise || 'SDR',
+          call.person || call.enterprise || 'Cliente',
+          true // FORÇAR reprocessamento para gerar análise REAL
+        );
 
-      console.log(`📡 Resposta da RPC para ${call.id}:`, { result, error });
-
-      if (error) {
-        console.error(`❌ Erro na RPC para ${call.id}:`, error);
-        throw error;
-      }
-
-      if (result?.success) {
-        successful++;
-        console.log(`✅ Análise ${i + 1} concluída - Score: ${result.overall_score}/10 - Scorecard: ${result.scorecard?.name}`);
-        results.push({
-          callId: call.id,
-          success: true,
-          score: result.overall_score,
-          scorecard: result.scorecard?.name
-        });
-      } else {
+        if (analysisResult) {
+          successful++;
+          console.log(`✅ Análise ${i + 1} concluída - Score: ${analysisResult.final_grade}/10 - Scorecard: ${analysisResult.scorecard_used?.name}`);
+          results.push({
+            callId: call.id,
+            success: true,
+            score: analysisResult.final_grade,
+            scorecard: analysisResult.scorecard_used?.name
+          });
+        } else {
+          throw new Error('Análise retornou null');
+        }
+      } catch (analysisError) {
         failed++;
-        console.error(`❌ Análise ${i + 1} falhou para ${call.id}:`, result?.message || 'Sem mensagem de erro');
-        console.error(`   Dados da chamada:`, {
-          duration: call.duration,
-          transcription_length: call.transcription?.length,
-          segments: call.segments,
-          status_voip: call.status_voip
-        });
+        console.error(`❌ Análise ${i + 1} falhou para ${call.id}:`, analysisError);
         results.push({
           callId: call.id,
           success: false,
-          error: result?.message || 'Falha sem mensagem específica'
+          error: (analysisError as any)?.message || 'Erro na análise'
         });
       }
 

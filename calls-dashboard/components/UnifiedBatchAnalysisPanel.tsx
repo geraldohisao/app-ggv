@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getUnifiedBatchAnalysisStats, getCallsNeedingAnalysisUnified, processBatchAnalysisUnified, BatchAnalysisStats, CallForAnalysis } from '../services/unifiedBatchAnalysisService';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 interface AnalysisProgress {
   current: number;
@@ -15,6 +16,9 @@ export default function UnifiedBatchAnalysisPanel() {
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
   const [results, setResults] = useState<any>(null);
+  
+  // 🔐 Verificar permissões de administrador
+  const { canAccessManualAnalysis, canAccessBulkOperations, user } = useAdminFeatures();
 
   useEffect(() => {
     loadStats();
@@ -85,6 +89,12 @@ export default function UnifiedBatchAnalysisPanel() {
       setAnalyzing(false);
     }
   };
+
+  // 🔐 Verificar se usuário tem permissão para acessar análise manual
+  // Se não tiver permissão, não renderizar nada (ocultar completamente)
+  if (!canAccessManualAnalysis) {
+    return null;
+  }
 
   if (loading) {
     return (

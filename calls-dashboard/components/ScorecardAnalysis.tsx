@@ -9,6 +9,7 @@ import {
   getCallAnalysisFromDatabase,
   hasExistingAnalysis 
 } from '../services/callAnalysisBackendService';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 interface ScorecardAnalysisProps {
   call: CallItem;
@@ -20,6 +21,10 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasExisting, setHasExisting] = useState<boolean>(false);
+  const [autoReprocessed, setAutoReprocessed] = useState<boolean>(false);
+  
+  // 🔐 Verificar permissões de administrador para reprocessamento
+  const { canAccessReprocessing, user } = useAdminFeatures();
 
   // SEMPRE verificar se já existe análise ao carregar (PERSISTÊNCIA GARANTIDA)
   React.useEffect(() => {
@@ -33,11 +38,30 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
           setHasExisting(true);
           console.log('✅ Análise carregada do banco (PERSISTIDA):', {
             final_grade: existing.final_grade,
-            scorecard: existing.scorecard_used?.name
+            scorecard: existing.scorecard_used?.name,
+            criteria_analysis: existing.criteria_analysis,
+            strengths: existing.strengths,
+            improvements: existing.improvements,
+            general_feedback: existing.general_feedback,
+            dados_completos: existing
           });
           
           // Notificar componente pai SEMPRE
           onAnalysisComplete?.(existing);
+
+          // 🚀 Auto-reprocessar análises parciais (somente uma vez)
+          const isPartial = (
+            (!existing.criteria_analysis || existing.criteria_analysis.length === 0) &&
+            (!existing.strengths || existing.strengths.length === 0) &&
+            (!existing.improvements || existing.improvements.length === 0)
+          );
+          const hasGoodTranscription = !!call.transcription && call.transcription.trim().length > 100;
+          if (isPartial && hasGoodTranscription && !autoReprocessed) {
+            console.log('⚠️ Análise parcial detectada. Reprocessando automaticamente...');
+            setAutoReprocessed(true);
+            // Executar reprocessamento em background
+            handleAnalyze();
+          }
         } else {
           console.log('ℹ️ Nenhuma análise persistida encontrada para:', call.id);
           setAnalysis(null);
@@ -152,22 +176,33 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
           )}
           
           {analysis && (
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  Reprocessando...
-                </>
+            <>
+              {canAccessReprocessing ? (
+                <button
+                  onClick={handleAnalyze}
+                  disabled={loading}
+                  className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      Reprocessando...
+                    </>
+                  ) : (
+                    <>
+                      🔄 Reprocessar
+                    </>
+                  )}
+                </button>
               ) : (
-                <>
-                  🔄 Reprocessar
-                </>
+                <div className="px-3 py-2 border border-gray-300 text-gray-500 rounded-lg bg-gray-50 flex items-center gap-2 cursor-not-allowed" title="Apenas Admin/Super Admin podem reprocessar">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  🔒 Acesso Restrito
+                </div>
               )}
-            </button>
+            </>
           )}
         </div>
       </div>

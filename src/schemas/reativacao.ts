@@ -6,13 +6,7 @@ export const reativacaoSchema = z.object({
     "Lista de reativação - Topo de funil",
     "Lista de reativação - Fundo de funil",
   ]),
-  proprietario: z.enum([
-    "Andressa",
-    "Camila Ataliba",
-    "Lô-Ruama Oliveira",
-    "Mariana",
-    "William Martins",
-  ]),
+  proprietario: z.string().min(1, "Nome do proprietário é obrigatório"),
   cadencia: z.enum([
     "Reativação - Sem Retorno",
     // (deixe aberto para futuras cadências; por ora, esta é a default)

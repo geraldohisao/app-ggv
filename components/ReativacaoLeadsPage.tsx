@@ -9,6 +9,7 @@ import {
   getReactivatedLeadsHistory,
   ReactivatedLeadHistoryItem
 } from '../services/automationService';
+import { listProfiles } from '../services/supabaseService';
 
 // Tipo para o estado do formulário (permite valores temporários durante digitação)
 type FormData = Omit<ReativacaoPayload, 'numero_negocio'> & {
@@ -31,6 +32,8 @@ const ReativacaoLeadsPage: React.FC = () => {
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
+  const [sdrs, setSdrs] = useState<Array<{ name: string; id: string }>>([]);
+  const [isLoadingSdrs, setIsLoadingSdrs] = useState(true);
   const [formData, setFormData] = useState<FormData>({
     filtro: "Lista de reativação - Topo de funil",
     proprietario: "Andressa",
@@ -168,6 +171,42 @@ const ReativacaoLeadsPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Função para carregar SDRs da tabela profiles
+  const loadSdrs = async () => {
+    try {
+      setIsLoadingSdrs(true);
+      console.log('🔄 REATIVACAO PAGE - Carregando SDRs da tabela profiles...');
+      
+      const profiles = await listProfiles();
+      console.log('📋 REATIVACAO PAGE - Perfis carregados:', profiles);
+      
+      // Filtrar apenas perfis que têm nome e extrair apenas o nome
+      const sdrsList = profiles
+        .filter(profile => profile.name && profile.name.trim() !== '')
+        .map(profile => ({
+          name: profile.name!,
+          id: profile.id
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)); // Ordenar alfabeticamente
+      
+      console.log('✅ REATIVACAO PAGE - SDRs processados:', sdrsList);
+      setSdrs(sdrsList);
+      
+      // Se não há SDRs carregados ainda, manter o valor padrão
+      if (sdrsList.length > 0 && !sdrsList.find(sdr => sdr.name === formData.proprietario)) {
+        // Se o proprietário atual não está na lista, usar o primeiro disponível
+        setFormData(prev => ({ ...prev, proprietario: sdrsList[0].name as any }));
+      }
+      
+    } catch (error: any) {
+      console.error('❌ REATIVACAO PAGE - Erro ao carregar SDRs:', error);
+      // Em caso de erro, manter lista vazia e usar fallback
+      setSdrs([]);
+    } finally {
+      setIsLoadingSdrs(false);
+    }
+  };
+
   // Função para carregar histórico da nova tabela reactivated_leads
   const loadHistory = async (page: number = 1) => {
     try {
@@ -205,6 +244,11 @@ const ReativacaoLeadsPage: React.FC = () => {
     }
   };
 
+  // Carregar SDRs quando o componente for montado
+  useEffect(() => {
+    loadSdrs();
+  }, []);
+
   // Carregar histórico quando mostrar
   useEffect(() => {
     if (showHistory) {
@@ -219,10 +263,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     const hasActive = history.some(h => (
       h && h.status && (
         h.status === 'processing' ||
-        h.status === 'starting' ||
-        h.status === 'finalizing' ||
-        h.status === 'connecting' ||
-        h.status === 'fetching'
+        h.status === 'pending'
       )
     ));
 
@@ -533,12 +574,19 @@ const ReativacaoLeadsPage: React.FC = () => {
             value={formData.proprietario}
             onChange={(e) => handleInputChange('proprietario', e.target.value)}
             required
+            disabled={isLoadingSdrs}
           >
-              <option value="Andressa">Andressa</option>
-              <option value="Camila Ataliba">Camila Ataliba</option>
-              <option value="Lô-Ruama Oliveira">Lô-Ruama Oliveira</option>
-              <option value="Mariana">Mariana</option>
-              <option value="William Martins">William Martins</option>
+              {isLoadingSdrs ? (
+                <option value="">Carregando SDRs...</option>
+              ) : sdrs.length === 0 ? (
+                <option value="">Nenhum SDR encontrado</option>
+              ) : (
+                sdrs.map((sdr) => (
+                  <option key={sdr.id} value={sdr.name}>
+                    {sdr.name}
+                  </option>
+                ))
+              )}
             </FormSelect>
 
           <FormSelect

@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 export default function SimpleBatchAnalysis() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  
+  // 🔐 Verificar permissões de administrador
+  const { canAccessManualAnalysis, canAccessBulkOperations, user } = useAdminFeatures();
 
   const testBatchSystem = async () => {
     if (loading) return;
@@ -69,6 +73,12 @@ export default function SimpleBatchAnalysis() {
       setLoading(false);
     }
   };
+
+  // 🔐 Verificar se usuário tem permissão para acessar análise manual
+  // Se não tiver permissão, não renderizar nada (ocultar completamente)
+  if (!canAccessManualAnalysis) {
+    return null;
+  }
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-4">

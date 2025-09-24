@@ -240,10 +240,40 @@ const DashboardPage = () => {
         const metrics = Array.isArray(metricsData) ? metricsData[0] : metricsData;
         const newTotalCount = Number(metrics?.total_calls || 0);
         
-        // Se houver mudança na contagem, recarregar dados
+        // Se houver mudança na contagem, recarregar dados SEM RESETAR FILTROS
         if (newTotalCount !== dashboardData.totalCalls) {
-          console.log('📊 Novos dados detectados! Recarregando...', newTotalCount, 'vs', dashboardData.totalCalls);
-          window.location.reload();
+          console.log('📊 Novos dados detectados! Atualizando sem resetar filtros...', newTotalCount, 'vs', dashboardData.totalCalls);
+          
+          // Recarregar dados preservando filtros (selectedSdr, selectedPeriod)
+          const fetchAllData = async () => {
+            try {
+              const { data: totalsData, error: totalsErr } = await supabase.rpc('get_dashboard_totals');
+              if (totalsErr) throw totalsErr;
+              
+              const metrics = Array.isArray(totalsData) ? totalsData[0] : totalsData;
+              const totalCount = Number(metrics?.total_calls || 0);
+              const answeredCount = Number(metrics?.answered_calls || 0);
+              const avgDurationFromRpc = Math.round(Number(metrics?.avg_duration_answered || 0));
+              const answeredRate = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
+
+              setDashboardData(prev => ({
+                ...prev,
+                totalCalls: totalCount,
+                answeredCalls: answeredCount,
+                answeredRate,
+                avgDuration: avgDurationFromRpc,
+                loading: false,
+                error: null
+              }));
+              
+              setLastUpdate(new Date());
+              console.log('✅ Dashboard atualizado preservando filtros!');
+            } catch (err) {
+              console.error('❌ Erro ao atualizar dashboard:', err);
+            }
+          };
+          
+          fetchAllData();
         } else {
           // Apenas atualizar timestamp se não houver mudanças
           setLastUpdate(new Date());

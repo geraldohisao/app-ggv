@@ -595,7 +595,8 @@ export async function fetchCallDetail(callId: string): Promise<CallWithDetails |
       company_name: callData.enterprise || 'Empresa não informada',
       person_name: callData.person || 'Pessoa não informada',
       person_email: callData.insights?.person_email || '',
-      sdr_id: callData.agent_id,
+      // usar o UUID real do SDR quando disponível
+      sdr_id: callData.sdr_id || null,
       sdr_name: callData.agent_id,
       sdr_email: callData.sdr_email || callData.agent_id,
       sdr_avatar_url: `https://i.pravatar.cc/64?u=${callData.agent_id}`,

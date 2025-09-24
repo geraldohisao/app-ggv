@@ -101,6 +101,44 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
     loadData();
   }, [selectedPeriod]);
 
+  // Listener para novas análises em tempo real
+  useEffect(() => {
+    console.log('🔄 Configurando listener de tempo real para call_analysis...');
+    
+    const channel = supabase
+      .channel('ranking_analysis_updates')
+      .on('postgres_changes', 
+        { 
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public', 
+          table: 'call_analysis' 
+        }, 
+        (payload) => {
+          console.log('🔔 Nova análise detectada! Recarregando ranking...', payload);
+          
+          // Pequeno delay para garantir que dados foram commitados
+          setTimeout(async () => {
+            setLoading(true);
+            try {
+              const rankingData = await fetchSdrScoreRankingData(selectedPeriod);
+              setChartData(rankingData);
+              console.log('✅ Ranking atualizado em tempo real!');
+            } catch (err) {
+              console.error('❌ Erro ao atualizar ranking em tempo real:', err);
+            } finally {
+              setLoading(false);
+            }
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔄 Removendo listener de análises...');
+      supabase.removeChannel(channel);
+    };
+  }, [selectedPeriod]);
+
   if (loading) {
     return (
       <div className="bg-white border border-slate-200 rounded-lg p-4">

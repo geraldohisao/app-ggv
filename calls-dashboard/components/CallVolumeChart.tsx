@@ -17,7 +17,7 @@ interface CallVolumeChartProps {
   selectedSdrEmail?: string | null; // novo filtro
 }
 
-// Função para buscar dados reais de chamadas via RPC (evita RLS/timezone)
+// Função para buscar dados reais de chamadas via RPC (usando dados reais da lista)
 async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endDate?: string, selectedSdrEmail?: string | null): Promise<CallData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
@@ -25,26 +25,48 @@ async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endD
   }
 
   try {
-    console.log('🔍 fetchCallVolumeData via RPC get_calls_with_filters:', { days });
+    // Calcular período solicitado (últimos N dias a partir de hoje)
+    const periodEnd = new Date();
+    const periodStart = new Date();
+    periodStart.setDate(periodEnd.getDate() - days + 1);
 
-    // USAR A MESMA RPC QUE FUNCIONA (get_unique_sdrs) e simular dados do gráfico
-    console.log('🔍 Buscando dados via get_unique_sdrs (que funciona)');
-    const { data: sdrData, error: rpcError } = await supabase.rpc('get_unique_sdrs');
+    console.log('🔍 fetchCallVolumeData - FILTRO SDR ATIVO:', { 
+      days, 
+      selectedSdrEmail,
+      filtroAtivo: !!selectedSdrEmail,
+      periodStart: periodStart.toISOString().split('T')[0],
+      periodEnd: periodEnd.toISOString().split('T')[0]
+    });
+
+    // Primeiro buscar dados agregados dos SDRs para comparação
+    const { data: sdrMetrics, error: sdrError } = await supabase.rpc('get_sdr_metrics', {
+      p_days: 99999 // Todas as chamadas, igual aos rankings
+    });
+    
+    if (sdrError) {
+      console.error('❌ Erro get_sdr_metrics:', sdrError);
+    }
+    
+    // Buscar volume agregado NO BACKEND para evitar limites de paginação
+    console.log('🔄 Usando RPC get_calls_volume_by_day para trazer volume agregado por dia...');
+
+    const { data: callsData, error: rpcError } = await supabase.rpc('get_calls_volume_by_day', {
+      p_start_date: periodStart.toISOString(),
+      p_end_date: periodEnd.toISOString(),
+      p_sdr: selectedSdrEmail || null
+    });
     
     if (rpcError) {
-      console.error('❌ Erro get_sdr_metrics:', rpcError);
+      console.error('❌ Erro query direta calls:', rpcError);
       return [];
     }
     
-    // Buscar também get_sdr_metrics para dados de answered_calls
-    const { data: sdrMetricsData, error: metricsErr } = await supabase.rpc('get_sdr_metrics');
-    
-    // Simular dados do gráfico baseado nos totais dos SDRs
-    const totalCalls = sdrData?.reduce((sum: number, sdr: any) => sum + (sdr.call_count || 0), 0) || 0;
-    const answeredCalls = sdrMetricsData?.reduce((sum: number, sdr: any) => sum + (sdr.answered_calls || 0), 0) || 0;
-    const missedCalls = totalCalls - answeredCalls;
-    
-    console.log('📊 Totais calculados:', { totalCalls, answeredCalls, missedCalls });
+    if (!callsData || callsData.length === 0) {
+      console.log('📭 Nenhuma chamada encontrada');
+      return [];
+    }
+
+    console.log('✅ Dias carregados da RPC (volume agregado):', callsData.length);
     
     // Helper para chave local YYYY-MM-DD
     const toLocalKey = (d: Date) => {
@@ -54,44 +76,132 @@ async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endD
       return `${y}-${m}-${day}`;
     };
 
-    // Criar dados do gráfico baseado nos totais (distribuir pelos últimos 14 dias)
+    // Agrupar chamadas por data - MOSTRAR TODAS AS DATAS COM DADOS
     const grouped = new Map<string, { total: number; answered: number; missed: number }>();
     
-    // Criar últimos 14 dias
-    const today = new Date();
-    for (let i = 13; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      grouped.set(toLocalKey(date), { total: 0, answered: 0, missed: 0 });
-    }
+    // NÃO inicializar dias vazios - só mostrar dias que têm dados reais
+    // Isso evita dilatar o gráfico com muitos dias sem chamadas
     
-    // Distribuir os totais pelos dias (simulação)
-    if (totalCalls > 0) {
-      const callsPerDay = Math.ceil(totalCalls / 14);
-      const answeredPerDay = Math.ceil(answeredCalls / 14);
-      const missedPerDay = Math.ceil(missedCalls / 14);
+    // Processar TODAS as chamadas (ignorar filtro de dias para mostrar volume real)
+    callsData.forEach((call: any) => {
+      if (!call.created_at) return;
       
-      Array.from(grouped.keys()).forEach((date, index) => {
-        const isLastDay = index === 13;
-        grouped.set(date, {
-          total: isLastDay ? totalCalls - (callsPerDay * 13) : callsPerDay,
-          answered: isLastDay ? answeredCalls - (answeredPerDay * 13) : answeredPerDay,
-          missed: isLastDay ? missedCalls - (missedPerDay * 13) : missedPerDay
+      const callDate = new Date(call.created_at);
+      const dateKey = toLocalKey(callDate);
+      
+      // Inicializar dia se não existir
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, { total: 0, answered: 0, missed: 0 });
+      }
+      
+      const dayData = grouped.get(dateKey)!;
+      dayData.total++;
+      
+      // Considerar atendida se status_voip é 'normal_clearing'
+      if (call.status_voip === 'normal_clearing') {
+        dayData.answered++;
+      } else {
+        dayData.missed++;
+      }
+      
+      grouped.set(dateKey, dayData);
+    });
+
+    // Não filtrar por período - mostrar TODOS os dias que têm dados
+    console.log('📅 ANÁLISE COMPLETA DOS DADOS POR DIA:');
+    
+    // Se vier agregado do backend, preencher o grouped diretamente
+    if (Array.isArray(callsData) && callsData.length > 0 && (callsData[0] as any).day) {
+      callsData.forEach((row: any) => {
+        const key = String(row.day);
+        grouped.set(key, {
+          total: Number(row.total) || 0,
+          answered: Number(row.answered) || 0,
+          missed: (Number(row.total) || 0) - (Number(row.answered) || 0)
         });
       });
     }
 
-    const result: CallData[] = Array.from(grouped.entries()).map(([date, c]) => {
+    // Pegar todas as entradas e ordenar por data
+    const allEntries = Array.from(grouped.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    
+    console.log('🔍 TODOS OS DIAS COM DADOS:', {
+      totalDiasComDados: allEntries.length,
+      primeiroDia: allEntries[0]?.[0],
+      ultimoDia: allEntries[allEntries.length - 1]?.[0],
+      periodoSelecionado: days,
+      todosOsDias: allEntries.map(([date, data]) => ({ 
+        data: date, 
+        chamadas: data.total 
+      }))
+    });
+    
+    // Se o período for menor que o total de dias, pegar apenas os últimos N dias
+    const finalEntries = days < allEntries.length 
+      ? allEntries.slice(-days) // Últimos N dias dos dados disponíveis
+      : allEntries; // Todos os dias
+    
+    console.log('🎯 DADOS FINAIS PARA O GRÁFICO:', {
+      diasSelecionados: finalEntries.length,
+      primeiroDiaGrafico: finalEntries[0]?.[0],
+      ultimoDiaGrafico: finalEntries[finalEntries.length - 1]?.[0],
+      dadosFinais: finalEntries.map(([date, data]) => ({ 
+        data: date, 
+        chamadas: data.total,
+        atendidas: data.answered 
+      }))
+    });
+
+    // Usar as entradas finais (filtradas por período se necessário)
+    const result: CallData[] = finalEntries.map(([date, c]) => {
       const answeredRate = c.total > 0 ? Math.round((c.answered / c.total) * 100) : 0;
       return { date, total: c.total, answered: c.answered, missed: c.missed, answeredRate };
     }).sort((a, b) => a.date.localeCompare(b.date));
 
-    console.log('📊 Dados do gráfico (simulados via SDR metrics):', {
-      totalCallsCalculado: totalCalls,
-      answeredCallsCalculado: answeredCalls,
-      resultadoFinal: result,
-      sdrDataUsado: sdrData?.length
+    // Calcular totais para comparação DETALHADA
+    const totalFromSDRMetrics = sdrMetrics?.reduce((sum: number, sdr: any) => sum + (sdr.total_calls || 0), 0) || 0;
+    const totalAnsweredFromSDRMetrics = sdrMetrics?.reduce((sum: number, sdr: any) => sum + (sdr.answered_calls || 0), 0) || 0;
+    const totalFromDirectQuery = callsData.length;
+    const totalFromChart = result.reduce((sum, day) => sum + day.total, 0);
+    const totalAnsweredFromChart = result.reduce((sum, day) => sum + day.answered, 0);
+    
+    console.log('📊 COMPARAÇÃO COMPLETA - DASHBOARD vs GRÁFICO:', {
+      '🏢 DASHBOARD TOTALS': {
+        totalChamadas: totalFromSDRMetrics,
+        totalAtendidas: totalAnsweredFromSDRMetrics,
+        taxaAtendimento: totalFromSDRMetrics > 0 ? Math.round((totalAnsweredFromSDRMetrics / totalFromSDRMetrics) * 100) + '%' : '0%'
+      },
+      
+      '📊 GRÁFICO TOTALS': {
+        totalChamadas: totalFromChart,
+        totalAtendidas: totalAnsweredFromChart,
+        taxaAtendimento: totalFromChart > 0 ? Math.round((totalAnsweredFromChart / totalFromChart) * 100) + '%' : '0%'
+      },
+      
+      '🔍 ANÁLISE DETALHADA': {
+        queryRetornou: totalFromDirectQuery + ' chamadas',
+        graficoMostra: totalFromChart + ' chamadas (últimos ' + days + ' dias)',
+        diferençaTotal: Math.abs(totalFromSDRMetrics - totalFromChart),
+        diferençaAtendidas: Math.abs(totalAnsweredFromSDRMetrics - totalAnsweredFromChart),
+        consistenciaChamadas: totalFromDirectQuery === totalFromChart ? '✅ CONSISTENTE' : '❌ INCONSISTENTE',
+        consistenciaAtendidas: totalAnsweredFromSDRMetrics === totalAnsweredFromChart ? '✅ CONSISTENTE' : '❌ INCONSISTENTE'
+      },
+      
+      '📅 DADOS POR DIA': result.map(r => ({ 
+        data: r.date, 
+        total: r.total, 
+        atendidas: r.answered,
+        taxa: r.answeredRate + '%'
+      })),
+      
+      '🔬 SAMPLE DE CHAMADAS BRUTAS': callsData.slice(0, 10).map(c => ({ 
+        data: c.created_at?.split('T')[0], 
+        status: c.status_voip,
+        statusFriendly: c.status_voip === 'normal_clearing' ? 'ATENDIDA' : 'NÃO ATENDIDA',
+        agent: c.agent_id 
+      }))
     });
+    
     return result;
 
   } catch (error) {
@@ -185,7 +295,7 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
   // Dimensões responsivas: usar largura do contêiner
   const width = typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 1400) : 800;
   const height = 300;
-  const margin = { top: 20, right: 30, bottom: 40, left: 60 };
+  const margin = { top: 20, right: 60, bottom: 40, left: 60 }; // Aumentar margem direita
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
 
@@ -238,15 +348,22 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
         tooltipY = event.clientY + 20;
       }
       
+      // Comparar com a média para dar contexto
+      const diffFromAvg = answeredRate - avgAnsweredRate;
+      const trendText = diffFromAvg > 5 ? '📈 Acima da média' :
+                       diffFromAvg < -5 ? '📉 Abaixo da média' : 
+                       '📊 Próximo da média';
+      
+      const performanceColor = answeredRate >= avgAnsweredRate ? '🟢' : '🔴';
+      
       setTooltip({
         visible: true,
         x: tooltipX,
         y: tooltipY,
-        content: `${formatDate(point.date)}
-📞 Total: ${total} chamadas
-✅ Atendidas: ${point.answered} (${answeredRate}%)
-❌ Não Atendidas: ${point.missed}
-📊 Taxa de Atendimento: ${answeredRate}%`
+        content: `${formatDate(point.date)} • ${total} chamadas
+${performanceColor} ${point.answered} atendidas (${answeredRate}%)
+${trendText} (${diffFromAvg > 0 ? '+' : ''}${diffFromAvg}% vs média ${avgAnsweredRate}%)
+❌ ${point.missed} não atendidas`
       });
     } else {
       setTooltip(prev => ({ ...prev, visible: false }));
@@ -275,16 +392,89 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
     
   console.log('🏷️ Título definido:', chartTitle);
 
+  // Calcular taxa real (total de atendidas / total de chamadas)
+  const totalCalls = data.reduce((sum, d) => sum + d.total, 0);
+  const totalAnswered = data.reduce((sum, d) => sum + d.answered, 0);
+  const avgAnsweredRate = totalCalls > 0 
+    ? Math.round((totalAnswered / totalCalls) * 100)
+    : 0;
+
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4">
-      <div className="mb-3">
-        <h3 className="font-semibold text-slate-800">{chartTitle}</h3>
-        <p className="text-sm text-slate-500">
-          {isSpecificDateForTitle 
-            ? 'Dados desta data específica' 
-            : 'Clique em um ponto para filtrar por data • Passe o mouse para ver detalhes'
-          }
-        </p>
+    <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+      {/* Header melhorado */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-slate-800 text-lg">{chartTitle}</h3>
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-slate-600">
+              📊 Média: <span className="font-medium text-indigo-600">{avgAnsweredRate}%</span>
+            </span>
+            <span className="text-slate-600">
+              📈 {data.length} dias
+            </span>
+          </div>
+        </div>
+        
+        {/* Legenda interativa melhorada */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6 text-sm">
+            <button 
+              className="flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded transition-colors"
+              title="Clique para destacar linha"
+            >
+              <div className="w-3 h-3 bg-blue-500 rounded shadow-sm"></div>
+              <span className="text-slate-700 font-medium">Total</span>
+            </button>
+            <button 
+              className="flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded transition-colors"
+              title="Clique para destacar linha"
+            >
+              <div className="w-3 h-3 bg-green-500 rounded shadow-sm"></div>
+              <span className="text-slate-700 font-medium">Atendidas</span>
+            </button>
+            <button 
+              className="flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded transition-colors"
+              title="Clique para destacar linha"
+            >
+              <div className="w-3 h-3 bg-red-500 rounded shadow-sm"></div>
+              <span className="text-slate-700 font-medium">Não Atendidas</span>
+            </button>
+            <button 
+              className="flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded transition-colors"
+              title="Linha de % atendimento"
+            >
+              <div className="w-4 h-1 bg-purple-500 rounded shadow-sm"></div>
+              <span className="text-slate-700 font-medium">% Atendimento</span>
+            </button>
+          </div>
+          
+          {/* Insights rápidos */}
+          <div className="flex items-center gap-3 text-xs">
+            {data.length > 1 && (() => {
+              const firstDay = data[0];
+              const lastDay = data[data.length - 1];
+              const trendTotal = lastDay.total - firstDay.total;
+              const trendRate = lastDay.answeredRate - firstDay.answeredRate;
+              
+              return (
+                <>
+                  <span className={`px-2 py-1 rounded font-medium ${
+                    trendTotal > 0 ? 'bg-blue-50 text-blue-700' : 
+                    trendTotal < 0 ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700'
+                  }`}>
+                    Volume: {trendTotal > 0 ? '+' : ''}{trendTotal}
+                  </span>
+                  <span className={`px-2 py-1 rounded font-medium ${
+                    trendRate > 0 ? 'bg-green-50 text-green-700' : 
+                    trendRate < 0 ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700'
+                  }`}>
+                    Taxa: {trendRate > 0 ? '+' : ''}{trendRate}%
+                  </span>
+                </>
+              );
+            })()}
+          </div>
+        </div>
       </div>
       
       <div className="relative w-full overflow-visible">
@@ -295,9 +485,28 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
           onClick={handleClick}
-          className="cursor-pointer"
+          className="cursor-pointer hover:bg-slate-50 transition-colors rounded"
           style={{ width: '100%' }}
         >
+          {/* Definir gradientes */}
+          <defs>
+            <linearGradient id="totalGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3"/>
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.1"/>
+            </linearGradient>
+            <linearGradient id="answeredGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.1"/>
+            </linearGradient>
+            <filter id="glow">
+              <feMorphology operator="dilate" radius="1"/>
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge> 
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((tick, i) => (
             <g key={i}>
@@ -321,20 +530,22 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
             </g>
           ))}
 
-          {/* Right Y-axis for % */}
+          {/* Right Y-axis for % - melhor posicionamento */}
           {[0, 0.25, 0.5, 0.75, 1].map((tick, i) => (
-            <g key={`r${i}`} transform={`translate(${chartWidth + margin.left + 10},0)`}>
+            <g key={`r${i}`} transform={`translate(${width - 45},0)`}>
               <text
                 x={0}
                 y={margin.top + tick * chartHeight + 4}
                 textAnchor="start"
                 fontSize="12"
                 fill="#7c3aed"
+                fontWeight="500"
               >
                 {Math.round(100 * (1 - tick))}%
               </text>
             </g>
           ))}
+          
 
           {/* X-axis labels */}
           {data.map((d, i) => (
@@ -351,7 +562,47 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
             </text>
           ))}
 
-          {/* Lines */}
+          {/* Linha de referência da média */}
+          <g transform={`translate(${margin.left}, ${margin.top})`}>
+            <line
+              x1="0"
+              y1={yScaleRate(avgAnsweredRate)}
+              x2={chartWidth}
+              y2={yScaleRate(avgAnsweredRate)}
+              stroke="#94a3b8"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+              opacity="0.6"
+            />
+            <text
+              x={chartWidth - 10}
+              y={yScaleRate(avgAnsweredRate) - 5}
+              textAnchor="end"
+              fontSize="10"
+              fill="#64748b"
+            >
+              Média {avgAnsweredRate}%
+            </text>
+          </g>
+
+          {/* Áreas preenchidas sob as linhas */}
+          <g transform={`translate(${margin.left}, ${margin.top})`}>
+            {/* Área preenchida - Total */}
+            <polygon
+              points={`0,${chartHeight} ${totalPoints} ${chartWidth},${chartHeight}`}
+              fill="url(#totalGradient)"
+              opacity="0.4"
+            />
+            
+            {/* Área preenchida - Atendidas */}
+            <polygon
+              points={`0,${chartHeight} ${answeredPoints} ${chartWidth},${chartHeight}`}
+              fill="url(#answeredGradient)"
+              opacity="0.6"
+            />
+          </g>
+
+          {/* Lines principais */}
           <g transform={`translate(${margin.left}, ${margin.top})`}>
             {/* Total calls line */}
             <polyline
@@ -361,7 +612,9 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
+              filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.25))"
             />
+            
             {/* Answered calls line */}
             <polyline
               points={answeredPoints}
@@ -370,87 +623,136 @@ export default function CallVolumeChart({ selectedPeriod, onDateClick, startDate
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
+              filter="drop-shadow(0 3px 6px rgba(16, 185, 129, 0.25))"
             />
             
-            {/* Missed calls line */}
+            {/* Missed calls line - mais sutil */}
             <polyline
               points={missedPoints}
               fill="none"
               stroke="#ef4444"
-              strokeWidth="3"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              opacity="0.8"
             />
 
-            {/* Answer rate line (%), using right axis */}
+            {/* Answer rate line (%) - destaque especial */}
             <polyline
               points={ratePoints}
               fill="none"
               stroke="#7c3aed"
-              strokeDasharray="6 6"
-              strokeWidth="2"
+              strokeDasharray="8 4"
+              strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
+              filter="url(#glow)"
             />
 
-            {/* Data points com hover melhorado */}
-            {data.map((d, i) => (
-              <g key={i}>
-                {/* Área invisível maior para facilitar hover */}
-                <circle
-                  cx={xScale(i)}
-                  cy={yScaleCount(Math.max(d.total, d.answered, d.missed))}
-                  r="15"
-                  fill="transparent"
-                  className="cursor-pointer"
-                />
-                
-                {/* Ponto do total */}
-                <circle
-                  cx={xScale(i)}
-                  cy={yScaleCount(d.total)}
-                  r="4"
-                  fill="#3b82f6"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="hover:r-6 transition-all duration-200 cursor-pointer drop-shadow-sm"
-                />
-                
-                {/* Ponto das atendidas */}
-                <circle
-                  cx={xScale(i)}
-                  cy={yScaleCount(d.answered)}
-                  r="5"
-                  fill="#10b981"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="hover:r-7 transition-all duration-200 cursor-pointer drop-shadow-sm"
-                />
-                
-                {/* Ponto das não atendidas */}
-                <circle
-                  cx={xScale(i)}
-                  cy={yScaleCount(d.missed)}
-                  r="5"
-                  fill="#ef4444"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="hover:r-7 transition-all duration-200 cursor-pointer drop-shadow-sm"
-                />
-              </g>
-            ))}
+            {/* Data points com alertas visuais */}
+            {data.map((d, i) => {
+              const isLowPerformance = d.answeredRate < avgAnsweredRate - 10;
+              const isHighPerformance = d.answeredRate > avgAnsweredRate + 10;
+              
+              return (
+                <g key={i}>
+                  {/* Área invisível maior para facilitar hover */}
+                  <circle
+                    cx={xScale(i)}
+                    cy={yScaleCount(Math.max(d.total, d.answered, d.missed))}
+                    r="15"
+                    fill="transparent"
+                    className="cursor-pointer"
+                  />
+                  
+                  {/* Alerta visual para performance baixa */}
+                  {isLowPerformance && (
+                    <circle
+                      cx={xScale(i)}
+                      cy={yScaleRate(d.answeredRate)}
+                      r="8"
+                      fill="rgba(239, 68, 68, 0.2)"
+                      stroke="#ef4444"
+                      strokeWidth="2"
+                      strokeDasharray="2 2"
+                    />
+                  )}
+                  
+                  {/* Destaque para performance alta */}
+                  {isHighPerformance && (
+                    <circle
+                      cx={xScale(i)}
+                      cy={yScaleRate(d.answeredRate)}
+                      r="8"
+                      fill="rgba(16, 185, 129, 0.2)"
+                      stroke="#10b981"
+                      strokeWidth="2"
+                    />
+                  )}
+                  
+                  {/* Ponto do total */}
+                  <circle
+                    cx={xScale(i)}
+                    cy={yScaleCount(d.total)}
+                    r="4"
+                    fill="#3b82f6"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="hover:r-6 transition-all duration-200 cursor-pointer"
+                  />
+                  
+                  {/* Ponto das atendidas */}
+                  <circle
+                    cx={xScale(i)}
+                    cy={yScaleCount(d.answered)}
+                    r="4"
+                    fill="#10b981"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="hover:r-6 transition-all duration-200 cursor-pointer"
+                  />
+                  
+                  {/* Ponto do % atendimento */}
+                  <circle
+                    cx={xScale(i)}
+                    cy={yScaleRate(d.answeredRate)}
+                    r="3"
+                    fill={isLowPerformance ? "#ef4444" : isHighPerformance ? "#10b981" : "#7c3aed"}
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="hover:r-5 transition-all duration-200 cursor-pointer"
+                  />
+                </g>
+              );
+            })}
           </g>
 
-          {/* Legend */}
-          <g transform={`translate(${margin.left}, ${margin.top - 10})`}>
-            <circle cx="0" cy="0" r="4" fill="#3b82f6" />
-            <text x="10" y="4" fontSize="12" fill="#374151">Total</text>
-            <circle cx="60" cy="0" r="4" fill="#10b981" />
-            <text x="70" y="4" fontSize="12" fill="#374151">Atendidas</text>
-            <circle cx="160" cy="0" r="4" fill="#ef4444" />
-            <text x="170" y="4" fontSize="12" fill="#374151">Não Atendidas</text>
-            <rect x="280" y="-6" width="12" height="2" fill="#7c3aed" />
-            <text x="300" y="4" fontSize="12" fill="#374151">% Atendimento (eixo direito)</text>
+          {/* Indicadores de tendência nos pontos */}
+          <g transform={`translate(${margin.left}, ${margin.top})`}>
+            {data.map((d, i) => {
+              if (i === 0) return null; // Primeiro ponto não tem comparação
+              
+              const prevRate = data[i - 1]?.answeredRate || 0;
+              const currentRate = d.answeredRate;
+              const trend = currentRate - prevRate;
+              
+              if (Math.abs(trend) > 5) { // Só mostrar se mudança > 5%
+                return (
+                  <text
+                    key={`trend-${i}`}
+                    x={xScale(i)}
+                    y={yScaleRate(currentRate) - 15}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fill={trend > 0 ? "#10b981" : "#ef4444"}
+                    fontWeight="bold"
+                  >
+                    {trend > 0 ? '↗' : '↘'}{Math.abs(Math.round(trend))}%
+                  </text>
+                );
+              }
+              return null;
+            })}
           </g>
         </svg>
 

@@ -28,8 +28,7 @@ import { enableCriticalFetchAlerts } from './src/utils/net';
 import AlwaysVisibleDebugPanel from './components/debug/AlwaysVisibleDebugPanel';
 // Utilitários de debug globais
 import './utils/debugHelpers';
-// Widget de feedback para usuários
-import FeedbackWidget from './components/ui/FeedbackWidget';
+// Widget de feedback movido para o UserMenu
 
 // Debug Panel sempre visível - não depende de permissões
 const DebugPanelWrapper: React.FC<{ user: any }> = ({ user }) => {
@@ -301,8 +300,7 @@ const AppContent: React.FC = () => {
         {renderModule()}
       </main>
       
-      {/* Widget de feedback para usuários */}
-      <FeedbackWidget />
+      {/* Widget de feedback movido para o UserMenu */}
       
       {/* SuperAdmin Debug Panel com logs globais e Google Chat */}
       <DebugPanelWrapper user={user} />

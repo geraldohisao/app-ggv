@@ -66,7 +66,6 @@ export default function CallsPage() {
   const [minDuration, setMinDuration] = useState('');
   const [maxDuration, setMaxDuration] = useState('');
   const [minScore, setMinScore] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   const [editingEtapa, setEditingEtapa] = useState<string | null>(null);
   const [newEtapa, setNewEtapa] = useState('');
   const [availableEtapas, setAvailableEtapas] = useState<string[]>([]);
@@ -103,7 +102,7 @@ export default function CallsPage() {
     setCurrentPage(1);
     setCalls([]); // Limpar dados antigos
     setTotalCount(0);
-  }, [sdr, status, type, start, end, minDuration, maxDuration, minScore, sortBy]);
+  }, [sdr, status, type, start, end, minDuration, maxDuration, minScore, sortBy, query]);
 
   // Controle de requisições para evitar loops
   const [isRequestInProgress, setIsRequestInProgress] = useState(false);
@@ -142,12 +141,22 @@ export default function CallsPage() {
           max_duration_type: typeof (maxDuration ? parseInt(maxDuration) : undefined)
         });
         
-        // USAR A NOVA RPC PAGINADA (get_calls_paginated)
-        console.log('🔍 CALLS PAGE - Usando get_calls_paginated (com paginação)');
+        // USAR A RPC COM FILTROS E ORDENAÇÃO (get_calls_with_filters)
+        console.log('🔍 CALLS PAGE - Usando get_calls_with_filters (com filtros e ordenação)');
         const offset = (currentPage - 1) * itemsPerPage;
-        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_paginated', {
+        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+          p_sdr: sdr || null,
+          p_status: status || null,
+          p_type: type || null,
+          p_start_date: start ? new Date(start + 'T00:00:00.000Z').toISOString() : null,
+          p_end_date: end ? new Date(end + 'T23:59:59.999Z').toISOString() : null,
           p_limit: itemsPerPage,
-          p_offset: offset
+          p_offset: offset,
+          p_sort_by: sortBy || 'created_at',
+          p_min_duration: minDuration ? parseInt(minDuration) : null,
+          p_max_duration: maxDuration ? parseInt(maxDuration) : null,
+          p_min_score: minScore ? parseFloat(minScore) : null,
+          p_search_query: query.trim() || null  // NOVO: filtro de empresa/deal no backend
         });
         
         if (callsError) {
@@ -166,11 +175,13 @@ export default function CallsPage() {
         const response = {
           calls: (callsData || []).map((call: any) => ({
             id: call.id,
-            company: call.enterprise || `Deal ${call.deal_id}` || 'Empresa não informada', // ✅ ENTERPRISE
+            // Empresa: usar EXCLUSIVAMENTE o campo enterprise retornado pela RPC
+            company: call.enterprise,
             dealCode: call.deal_id || 'N/A', // ✅ DEAL_ID
             sdr: {
               id: call.agent_id || 'N/A', // ✅ AGENT_ID
-              name: call.agent_id || 'SDR não identificado', // ✅ AGENT_ID
+              // SDR: usar EXCLUSIVAMENTE agent_id como nome exibido
+              name: call.agent_id || 'SDR não identificado',
               email: call.sdr_email || '',
               avatarUrl: `https://i.pravatar.cc/64?u=${call.agent_id || 'default'}`
             },
@@ -180,19 +191,20 @@ export default function CallsPage() {
             durationSec: 0,
             status: call.status,
             status_voip: call.status_voip,
-            status_voip_friendly: call.status_voip === 'normal_clearing' ? 'Atendida' : 
-                                  call.status_voip === 'user_busy' ? 'Ocupado' : 
-                                  call.status_voip === 'no_answer' ? 'Não atendida' : 
-                                  call.status_voip || call.status,
+            // Usar friendly do backend; fallback para status_voip; por fim, status processual
+            status_voip_friendly: call.status_voip_friendly || call.status_voip || call.status,
             call_type: call.call_type,
             recording_url: call.recording_url,
             transcription: call.transcription,
-            person_name: call.person, // ✅ PERSON
+            // Contato: usar EXCLUSIVAMENTE o campo person
+            person_name: call.person,
             cadence: call.cadence,
             pipeline: call.pipeline,
             from_number: call.from_number,
             to_number: call.to_number,
             direction: call.direction,
+            // SCORE: usar calculated_score da RPC (já vem do banco)
+            score: call.calculated_score > 0 ? call.calculated_score : null,
             // Campos extras para debug
             enterprise_debug: call.enterprise,
             deal_id_debug: call.deal_id,
@@ -206,8 +218,10 @@ export default function CallsPage() {
         console.log('✅ Calls carregadas:', response.calls.length);
 
         // USAR OS DADOS DIRETAMENTE (sem convertToCallItem que está estragando)
+        // Usar total_count da função RPC para paginação correta
+        const totalFromRpc = callsData?.[0]?.total_count || callsData?.length || 0;
         setCalls(response.calls);
-        setTotalCount(response.totalCount);
+        setTotalCount(totalFromRpc);
         
         console.log('📊 DADOS FINAIS ENVIADOS PARA A LISTA:');
         console.log('Primeira chamada final:', response.calls[0]);
@@ -237,7 +251,7 @@ export default function CallsPage() {
       clearTimeout(timeoutId);
       setIsRequestInProgress(false); // Limpar flag ao desmontar
     };
-  }, [sdr, status, type, start, end, minDuration, maxDuration, minScore, currentPage, itemsPerPage, sortBy]); // Adicionar todos os filtros às dependências
+  }, [sdr, status, type, start, end, minDuration, maxDuration, minScore, currentPage, itemsPerPage, sortBy, query]); // Adicionar query às dependências
 
   // Carregar etapas disponíveis
   useEffect(() => {
@@ -254,36 +268,10 @@ export default function CallsPage() {
     loadAvailableEtapas();
   }, []);
 
-  // Auto-gerar nota para chamadas > 3min sem score visível
-  useEffect(() => {
-    const run = async () => {
-      const pageStart = (currentPage - 1) * itemsPerPage;
-      const pageEnd = currentPage * itemsPerPage;
-      const visible = calls.slice(pageStart, pageEnd);
-      for (const c of visible) {
-        if (typeof c.score === 'number' || getRealDuration(c) < 180) continue;
-        try {
-          const existing = await getCallAnalysisFromDatabase(c.id);
-          if (existing && typeof existing.final_grade === 'number') {
-            const score10 = existing.final_grade; // Manter escala 0-10
-            setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
-            continue;
-          }
-          // DESABILITADO: Análise automática para evitar spam de erros
-          // if (c.transcription && c.transcription.length > 50) {
-          //   const res = await processCallAnalysis(c.id, c.transcription, c.sdr.name, c.person_name);
-          //   if (res && typeof res.final_grade === 'number') {
-          //     const score10 = res.final_grade;
-          //     setCalls(prev => prev.map(pc => pc.id === c.id ? { ...pc, score: score10 } : pc));
-          //   }
-          // }
-        } catch (e) {
-          console.warn('Auto-score falhou', c.id, e);
-        }
-      }
-    };
-    if (calls.length > 0) run();
-  }, [calls, currentPage, itemsPerPage]);
+  // DESABILITADO: As notas já vêm da RPC (calculated_score)
+  // useEffect(() => {
+  //   // Busca individual desabilitada - usar calculated_score da RPC
+  // }, []);
 
   const editCallEtapa = async () => {
     if (!editingEtapa) return;
@@ -338,20 +326,13 @@ export default function CallsPage() {
 
   // Constante para paginação
   const ITEMS_PER_PAGE = 50;
-  const isScoreSort = sortBy === 'score' || sortBy === 'score_asc';
+  // REMOVIDO: isScoreSort - agora toda ordenação é feita no backend
   
   // Filtros locais combinados
   const filtered = useMemo(() => {
     let result = calls;
     
-    // Filtro por query (empresa/deal)
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      result = result.filter((c) => 
-        c.company.toLowerCase().includes(q) || 
-        c.dealCode.toLowerCase().includes(q)
-      );
-    }
+    // REMOVIDO: Filtro por query (empresa/deal) - agora é feito no backend
     
     // Filtro por duração mínima (em segundos) - usando duração real
     if (minDuration.trim()) {
@@ -371,16 +352,7 @@ export default function CallsPage() {
     
     // Filtro por score mínimo agora é feito no backend via get_calls_with_filters
     
-    // Filtro por termo de busca (nome da empresa, pessoa, etc.)
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter((c) => 
-        c.company.toLowerCase().includes(term) || 
-        c.dealCode.toLowerCase().includes(term) ||
-        c.sdr.name.toLowerCase().includes(term) ||
-        (c.person_name && c.person_name.toLowerCase().includes(term))
-      );
-    }
+    // REMOVIDO: searchTerm - usar apenas o filtro "Empresa ou Deal ID" que já funciona no backend
     
     // Aplicar ordenação local se necessário (fallback)
     switch (sortBy) {
@@ -425,29 +397,24 @@ export default function CallsPage() {
         result = [...withScore, ...withoutScore];
         break;
       }
-      case 'company':
-        result = result.sort((a, b) => a.company.localeCompare(b.company));
-        break;
       default: // created_at
         result = result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         break;
     }
     
     return result;
-  }, [calls, query, minDuration, maxDuration, minScore, searchTerm, sortBy]);
+  }, [calls, query, minDuration, maxDuration, minScore, sortBy]);
 
-  // Paginação: se ordenando por score, fazemos a paginação no cliente sobre a lista completa globalmente ranqueada
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = currentPage * itemsPerPage;
-  const paginatedCalls = isScoreSort ? filtered.slice(startIndex, endIndex) : filtered;
-
-  const totalItems = isScoreSort ? filtered.length : totalCount;
+  // Paginação: toda ordenação é feita no backend, usar dados direto da RPC
+  const paginatedCalls = filtered;
+  const totalItems = totalCount;
 
   return (
     <div className="p-6 space-y-6">
       {/* Painel de Análise IA em Lote */}
       <UnifiedBatchAnalysisPanel />
 
+      {/* Abas já existentes no shell - removido menu duplicado */}
 
       <div className="flex items-center justify-between">
         <div>
@@ -549,13 +516,7 @@ export default function CallsPage() {
         </div>
         
         {/* Segunda linha - Filtros avançados */}
-        <div className="grid grid-cols-1 lg:grid-cols-7 gap-3 pt-2 border-t border-slate-200">
-          <input
-            className="border border-slate-300 rounded px-3 py-2 text-sm"
-            placeholder="Buscar por nome, empresa..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-200">
           <select 
             className="border border-slate-300 rounded px-3 py-2 text-sm" 
             value={sortBy} 
@@ -565,7 +526,6 @@ export default function CallsPage() {
             <option value="duration">⏱️ Maior Duração</option>
             <option value="score">⭐ Maior Nota</option>
             <option value="score_asc">⬇️ Menor Nota</option>
-            <option value="company">🏢 Empresa A-Z</option>
           </select>
           <input
             className="border border-slate-300 rounded px-3 py-2 text-sm"
@@ -597,7 +557,6 @@ export default function CallsPage() {
           <button
             onClick={() => {
               setQuery('');
-              setSearchTerm('');
               setMinDuration('');
               setMaxDuration('');
               setMinScore('');
@@ -653,7 +612,7 @@ export default function CallsPage() {
           </button>
           <div className="flex items-center text-xs text-slate-500 flex-wrap gap-2">
             <span>
-              📊 {isScoreSort ? filtered.length : calls.length} de {totalItems} chamadas
+              📊 {calls.length} de {totalItems} chamadas
             </span>
             {loading && (
               <span className="text-orange-600">🔄 Carregando...</span>
@@ -720,6 +679,7 @@ export default function CallsPage() {
                 {paginatedCalls.map((call) => (
                   <tr 
                     key={call.id} 
+                    data-call-id={call.id}
                     className="border-b hover:bg-slate-50 transition-colors cursor-pointer"
                     onClick={() => window.location.hash = `/calls/${call.id}`}
                     title="Clique para ver detalhes da chamada"
