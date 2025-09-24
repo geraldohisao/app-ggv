@@ -12,6 +12,8 @@ export const AdminPermissionsDebug: React.FC = () => {
   
   // Verificar localStorage
   const localStorageData = {
+    ggv_user: localStorage.getItem('ggv-user'),
+    ggv_user_timestamp: localStorage.getItem('ggv-user-timestamp'),
     ggv_user_email: localStorage.getItem('ggv_user_email'),
     ggv_user_name: localStorage.getItem('ggv_user_name'),
     ggv_user_id: localStorage.getItem('ggv_user_id'),
