@@ -268,7 +268,7 @@ async function clearCachedTokens(): Promise<void> {
   console.log('🧹 GMAIL - Tokens cacheados limpos');
 }
 
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   // 1) Verificar cache em memória primeiro
   if (cachedAccessToken) {
     console.log('🔄 GMAIL - Usando token da memória');
@@ -386,7 +386,7 @@ async function getAccessToken(): Promise<string> {
   return token;
 }
 
-async function testGmailPermissions(token: string): Promise<boolean> {
+export async function testGmailPermissions(token: string): Promise<boolean> {
   try {
     const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -551,6 +551,11 @@ export async function sendEmailViaGmail({
           } catch (logError) {
             console.warn('⚠️ EMAIL_LOG - Erro ao logar erro de permissões:', logError);
           }
+        }
+        
+        // Se for erro 401, lançar erro específico para mostrar botão de reautenticação
+        if (retryCount >= maxRetries) {
+          throw new Error('🔐 Gmail API: Token inválido ou expirado. Clique no botão "Reautenticar" abaixo para obter novas permissões.');
         }
         
         // Verificar se era um token do Supabase
@@ -806,6 +811,11 @@ export async function sendEmailViaGmail({
         // Se for erro de permissão, fornecer instruções específicas
         if (error instanceof Error && (error.message.includes('insufficient authentication scopes') || error.message.includes('insufficient permissions'))) {
           throw new Error('🔐 Gmail API: Permissões insuficientes. Clique no botão "Reautenticar" abaixo ou faça logout e login novamente para conceder permissões de envio de e-mail.');
+        }
+        
+        // Se for erro 401 (Unauthorized), fornecer instruções específicas
+        if (error instanceof Error && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+          throw new Error('🔐 Gmail API: Token inválido ou expirado. Clique no botão "Reautenticar" abaixo para obter novas permissões.');
         }
         
         // Se for erro de configuração

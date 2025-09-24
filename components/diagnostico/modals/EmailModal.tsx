@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { XMarkIcon, CheckCircleIcon } from '../../ui/icons';
 import { FormInput } from '../../ui/Form';
-import { sendEmailViaGmail, forceGmailReauth, checkGmailSetup, diagnoseGmailIssue } from '../../../services/gmailService';
+import { sendEmailViaGmail, forceGmailReauth, checkGmailSetup, diagnoseGmailIssue, getAccessToken, testGmailPermissions } from '../../../services/gmailService';
 import { createPublicReport } from '../../../services/supabaseService';
 import { LOGO_URLS } from '../../../config/logos';
 import { CompanyData } from '../../../types';
@@ -29,9 +29,37 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
     const checkGmailStatus = async () => {
         try {
             const status = await checkGmailSetup();
-            setGmailStatus(status.configured ? 'configured' : 'not-configured');
+            
+            // Verificar se está realmente funcionando (não apenas configurado)
+            if (status.configured) {
+                try {
+                    // Testar se consegue obter um token válido
+                    const token = await getAccessToken();
+                    
+                    // Testar se o token funciona
+                    const hasPermissions = await testGmailPermissions(token);
+                    
+                    if (hasPermissions) {
+                        setGmailStatus('configured');
+                        setNeedsReauth(false);
+                        console.log('✅ EMAIL_MODAL - Gmail funcionando corretamente');
+                    } else {
+                        setGmailStatus('not-configured');
+                        setNeedsReauth(true);
+                        console.log('⚠️ EMAIL_MODAL - Gmail configurado mas sem permissões válidas');
+                    }
+                } catch (error) {
+                    setGmailStatus('not-configured');
+                    setNeedsReauth(true);
+                    console.log('❌ EMAIL_MODAL - Erro ao verificar token Gmail:', error);
+                }
+            } else {
+                setGmailStatus('not-configured');
+                setNeedsReauth(true);
+            }
         } catch {
             setGmailStatus('not-configured');
+            setNeedsReauth(true);
         }
     };
 
@@ -53,6 +81,8 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             const baseUrl = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
             
             let publicUrl = baseUrl;
+            let reportToken = undefined;
+            
             if (reportData) {
                 console.log('📧 EMAIL_MODAL - Criando relatório público...');
                 
@@ -77,6 +107,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                     const secureToken = dealId ? generateSecureToken(dealId) : undefined;
                     const { token } = await createPublicReport(reportData, email, undefined, dealId, secureToken);
                     publicUrl = `${baseUrl}/r/${token}`;
+                    reportToken = token;
                     console.log('✅ EMAIL_MODAL - Relatório público criado:', token);
                 } catch (reportError) {
                     console.warn('⚠️ EMAIL_MODAL - Erro ao criar relatório público (usando URL base):', reportError);
@@ -254,7 +285,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                 html,
                 dealId: dealId || 'unknown',
                 companyName: companyData.companyName,
-                reportToken: reportData ? (await createPublicReport(reportData, email, undefined, dealId, secureToken))?.token : undefined,
+                reportToken: reportToken,
                 reportUrl: publicUrl
             });
             
@@ -264,6 +295,8 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             console.log('📧 EMAIL_MODAL - E-mail enviado para:', email);
             console.log('📝 EMAIL_LOG - Log de envio criado no banco de dados');
             
+            // E-mail enviado com sucesso, não precisa de reautenticação
+            setNeedsReauth(false);
             setIsSent(true);
             setTimeout(() => onClose(), 3000); // Aumentado para 3 segundos
         } catch (err: any) {
@@ -303,6 +336,9 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             } else if (errorMessage.includes('Falha após múltiplas tentativas') || errorMessage.includes('após 3 tentativas') || errorMessage.includes('Sistema de retry falhou')) {
                 setError('📧 Sistema de retry falhou. Clique em "Reautenticar Gmail" abaixo para resolver o problema.');
                 setNeedsReauth(true);
+            } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('permission denied')) {
+                setError('🔐 Problema de autenticação detectado. Clique em "Reautenticar Gmail" abaixo para resolver.');
+                setNeedsReauth(true);
             } else {
                 // Mostrar erro original mas com emoji para melhor UX
                 setError(`❌ ${errorMessage}`);
@@ -329,6 +365,9 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             
             console.log('✅ EMAIL_MODAL - Reautenticação OAuth concluída');
             setError('✅ Reautenticação OAuth concluída com sucesso! Agora você pode enviar o e-mail.');
+            
+            // Reautenticação bem-sucedida, esconder botão
+            setNeedsReauth(false);
             
         } catch (err: any) {
             console.error('❌ EMAIL_MODAL - Erro na reautenticação OAuth:', err);
@@ -401,8 +440,8 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                         <div className="flex justify-end gap-4 mt-6">
                             <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-bold py-2 px-5 rounded-lg hover:bg-slate-300 transition-colors">Cancelar</button>
                             
-                            {/* Botão de reautenticação se houver erro de permissão ou retry falhou */}
-                            {needsReauth || error.includes('insufficient authentication scopes') || error.includes('insufficient permissions') || error.includes('Sistema de retry falhou') || error.includes('Reautenticar Gmail') ? (
+                            {/* Botão de reautenticação apenas quando necessário */}
+                            {(needsReauth || gmailStatus === 'not-configured' || error.includes('insufficient authentication scopes') || error.includes('insufficient permissions') || error.includes('Sistema de retry falhou') || error.includes('Reautenticar Gmail') || error.includes('401') || error.includes('Unauthorized') || error.includes('permission denied')) ? (
                                 <button 
                                     type="button" 
                                     onClick={handleReauth} 
@@ -415,7 +454,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
                                 <>
                                     <button 
                                         type="submit" 
-                                        disabled={loading || gmailStatus === 'not-configured'} 
+                                        disabled={loading || gmailStatus !== 'configured'} 
                                         className="bg-blue-900 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-60"
                                     >
                                         {loading ? 'Enviando...' : 'Enviar'}

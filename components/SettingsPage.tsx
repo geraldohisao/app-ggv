@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { UserRole, Module } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
 import { CpuChipIcon, ChartBarIcon, BookOpenIcon, ExclamationTriangleIcon, KeyIcon, CheckCircleIcon, PhotoIcon } from './ui/icons';
+import { EnvelopeIcon } from './ui/icons';
 import { DiagnosticSettingsModal } from './settings/DiagnosticSettingsModal';
 import { AssistantSettingsModal } from './settings/AssistantSettingsModal';
 import { KnowledgeSettingsModal } from './settings/KnowledgeSettingsModal';
@@ -11,6 +12,7 @@ import { ServerKeyManagerModal } from './settings/ServerKeyManagerModal';
 import { ResetCacheModal } from './settings/ResetCacheModal';
 import { UserManagerModal } from './settings/UserManagerModal';
 import { SectorSyncPanel } from './settings/SectorSyncPanel';
+import { EmailLogsPage } from './admin/EmailLogsPage';
 import Breadcrumb from './common/Breadcrumb';
 import InternalLink from './common/InternalLink';
 const Preferences = React.lazy(() => import('./settings/Preferences'));
@@ -116,6 +118,13 @@ const SettingsPage: React.FC = () => {
                 icon: <KeyIcon className="w-6 h-6 text-slate-700"/>,
                 kbd: 'Alt+9',
             } : null,
+            canManageApis ? {
+                id: 'emailLogs',
+                title: 'Logs de E-mail',
+                description: 'Rastreamento completo de envios de e-mail do diagnóstico.',
+                icon: <EnvelopeIcon className="w-6 h-6 text-blue-600"/>,
+                kbd: 'Alt+E',
+            } : null,
         ].filter(Boolean) as Array<{ id: string; title: string; description: string; icon: React.ReactNode; kbd?: string }>;
         if (!query.trim()) return all;
         const q = query.toLowerCase();
@@ -136,7 +145,7 @@ const SettingsPage: React.FC = () => {
                 searchRef.current?.focus();
                 return;
             }
-            // Abrir modais via Alt+1..9
+            // Abrir modais via Alt+1..9 e Alt+E
             if (e.altKey && !e.metaKey && !e.ctrlKey) {
                 const map: Record<string, string> = {
                     '1': 'diagnostic',
@@ -148,6 +157,8 @@ const SettingsPage: React.FC = () => {
                     '7': 'serverKeyManager',
                     '8': 'apiKeyManager',
                     '9': 'resetCache',
+                    'e': 'emailLogs',
+                    'E': 'emailLogs',
                 };
                 const id = map[e.key];
                 if (id) {
@@ -258,7 +269,7 @@ const SettingsPage: React.FC = () => {
                     {canManageApis && (
                         <SettingsSection title="Sistema e Administração">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {cards.filter(c => ['apiStatus','userManager','serverKeyManager','apiKeyManager','resetCache'].includes(c.id)).map(c => (
+                                {cards.filter(c => ['apiStatus','userManager','serverKeyManager','apiKeyManager','resetCache','emailLogs'].includes(c.id)).map(c => (
                                     <SettingsCard key={c.id} icon={c.icon} title={c.title} description={c.description} onClick={() => setActiveModal(c.id)} />
                                 ))}
                             </div>
@@ -276,6 +287,7 @@ const SettingsPage: React.FC = () => {
             
             {activeModal === 'serverKeyManager' && <ServerKeyManagerModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'userManager' && <UserManagerModal onClose={() => setActiveModal(null)} />}
+            {activeModal === 'emailLogs' && <EmailLogsPage />}
             {activeModal === 'preferences' && (
                 <Suspense fallback={<div className="p-6 text-sm text-slate-500">Carregando Preferências...</div>}>
                     <Preferences onClose={() => setActiveModal(null)} />
