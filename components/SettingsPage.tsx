@@ -287,7 +287,7 @@ const SettingsPage: React.FC = () => {
             
             {activeModal === 'serverKeyManager' && <ServerKeyManagerModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'userManager' && <UserManagerModal onClose={() => setActiveModal(null)} />}
-            {activeModal === 'emailLogs' && <EmailLogsPage />}
+            {activeModal === 'emailLogs' && <EmailLogsPage onClose={() => setActiveModal(null)} />}
             {activeModal === 'preferences' && (
                 <Suspense fallback={<div className="p-6 text-sm text-slate-500">Carregando Preferências...</div>}>
                     <Preferences onClose={() => setActiveModal(null)} />

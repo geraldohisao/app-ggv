@@ -13,7 +13,11 @@ import {
 // 📧 INTERFACE DE LOGS DE E-MAIL - DIAGNÓSTICO GGV
 // Página para visualizar e gerenciar logs de envio de e-mail
 
-export const EmailLogsPage: React.FC = () => {
+interface EmailLogsPageProps {
+  onClose?: () => void;
+}
+
+export const EmailLogsPage: React.FC<EmailLogsPageProps> = ({ onClose }) => {
   const [logs, setLogs] = useState<EmailLogData[]>([]);
   const [stats, setStats] = useState<EmailLogStats[]>([]);
   const [errors, setErrors] = useState<EmailLogError[]>([]);
@@ -114,10 +118,25 @@ export const EmailLogsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">📧 Logs de E-mail</h1>
-          <p className="mt-2 text-gray-600">
-            Sistema de rastreamento de envios de e-mail do diagnóstico
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">📧 Logs de E-mail</h1>
+              <p className="mt-2 text-gray-600">
+                Sistema de rastreamento de envios de e-mail do diagnóstico
+              </p>
+            </div>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Voltar às Configurações
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
