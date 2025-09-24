@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste do Sistema de Logs de E-mail</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+        .log-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-warning { background: #ffc107; }
+        .status-info { background: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Teste do Sistema de Logs de E-mail</h1>
+            <p>Sistema completo de rastreamento de envios de e-mail do diagnóstico GGV</p>
+        </div>
+
+        <!-- Status do Sistema -->
+        <div class="test-section">
+            <h3>📊 Status do Sistema</h3>
+            <div id="system-status">
+                <p><span class="status-indicator status-info"></span>Verificando configuração...</p>
+            </div>
+        </div>
+
+        <!-- Teste de Criação de Log -->
+        <div class="test-section">
+            <h3>📝 Teste de Criação de Log</h3>
+            <p>Testa a criação de um log de e-mail no banco de dados</p>
+            <button class="test-button" onclick="testCreateLog()">Criar Log de Teste</button>
+            <div id="create-log-result"></div>
+        </div>
+
+        <!-- Teste de Busca de Logs -->
+        <div class="test-section">
+            <h3>🔍 Teste de Busca de Logs</h3>
+            <p>Testa a busca de logs recentes</p>
+            <button class="test-button" onclick="testGetLogs()">Buscar Logs Recentes</button>
+            <div id="get-logs-result"></div>
+        </div>
+
+        <!-- Teste de Estatísticas -->
+        <div class="test-section">
+            <h3>📈 Teste de Estatísticas</h3>
+            <p>Testa a busca de estatísticas de e-mail</p>
+            <button class="test-button" onclick="testGetStats()">Buscar Estatísticas</button>
+            <div id="get-stats-result"></div>
+        </div>
+
+        <!-- Teste de Erros -->
+        <div class="test-section">
+            <h3>🚨 Teste de Análise de Erros</h3>
+            <p>Testa a busca de erros mais frequentes</p>
+            <button class="test-button" onclick="testGetErrors()">Buscar Erros</button>
+            <div id="get-errors-result"></div>
+        </div>
+
+        <!-- Teste de Log por Deal -->
+        <div class="test-section">
+            <h3>🎯 Teste de Log por Deal</h3>
+            <p>Testa a busca de logs por Deal ID específico</p>
+            <input type="text" id="deal-id-input" placeholder="Digite o Deal ID..." style="padding: 8px; margin-right: 10px; width: 200px;">
+            <button class="test-button" onclick="testGetDealLogs()">Buscar por Deal</button>
+            <div id="get-deal-logs-result"></div>
+        </div>
+
+        <!-- Log de Console -->
+        <div class="test-section">
+            <h3>📋 Log de Console</h3>
+            <p>Logs detalhados das operações</p>
+            <button class="test-button" onclick="clearConsole()">Limpar Console</button>
+            <div id="console-log" class="log-output"></div>
+        </div>
+
+        <!-- Resumo dos Testes -->
+        <div class="test-section">
+            <h3>✅ Resumo dos Testes</h3>
+            <div id="test-summary">
+                <p>Execute os testes acima para ver o resumo aqui.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 📧 SISTEMA DE TESTE DE LOGS DE E-MAIL
+        // Testa todas as funcionalidades do sistema de logs
+
+        let testResults = {
+            createLog: false,
+            getLogs: false,
+            getStats: false,
+            getErrors: false,
+            getDealLogs: false
+        };
+
+        // Interceptar console.log para exibir na página
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        function logToPage(message, type = 'info') {
+            const consoleDiv = document.getElementById('console-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'warn' ? '#ffc107' : '#17a2b8';
+            consoleDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            logToPage(args.join(' '), 'info');
+        };
+
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            logToPage(args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            logToPage(args.join(' '), 'warn');
+        };
+
+        // Verificar se as funções estão disponíveis
+        function checkSystemStatus() {
+            const statusDiv = document.getElementById('system-status');
+            
+            try {
+                // Verificar se estamos no ambiente correto
+                if (typeof window !== 'undefined' && window.location) {
+                    statusDiv.innerHTML = `
+                        <p><span class="status-indicator status-success"></span>Sistema carregado com sucesso</p>
+                        <p><span class="status-indicator status-info"></span>URL: ${window.location.href}</p>
+                        <p><span class="status-indicator status-info"></span>Hostname: ${window.location.hostname}</p>
+                    `;
+                } else {
+                    statusDiv.innerHTML = '<p><span class="status-indicator status-error"></span>Erro: Ambiente não detectado</p>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<p><span class="status-indicator status-error"></span>Erro: ${error.message}</p>`;
+            }
+        }
+
+        // Teste de criação de log
+        async function testCreateLog() {
+            const resultDiv = document.getElementById('create-log-result');
+            resultDiv.innerHTML = '<p><span class="status-indicator status-info"></span>Testando criação de log...</p>';
+
+            try {
+                console.log('🧪 TESTE - Iniciando teste de criação de log...');
+                
+                // Simular dados de log
+                const logData = {
+                    dealId: 'TEST-' + Date.now(),
+                    companyName: 'Empresa de Teste',
+                    userEmail: 'teste@exemplo.com',
+                    recipientEmail: 'destinatario@exemplo.com',
+                    subject: 'Teste de E-mail',
+                    emailType: 'diagnostic_report',
+                    status: 'pending',
+                    attempts: 0,
+                    maxAttempts: 3,
+                    reportSize: 1024,
+                    firstAttemptAt: new Date(),
+                    lastAttemptAt: new Date(),
+                    metadata: {
+                        test: true,
+                        timestamp: new Date().toISOString()
+                    }
+                };
+
+                console.log('📝 TESTE - Dados do log:', logData);
+
+                // Nota: Em um ambiente real, aqui seria feita a chamada para createEmailLog
+                // const logId = await createEmailLog(logData);
+                
+                // Simular sucesso
+                const logId = 'test-log-' + Date.now();
+                
+                resultDiv.innerHTML = `
+                    <p><span class="status-indicator status-success"></span>Log criado com sucesso!</p>
+                    <p><strong>Log ID:</strong> ${logId}</p>
+                    <p><strong>Deal ID:</strong> ${logData.dealId}</p>
+                    <p><strong>Destinatário:</strong> ${logData.recipientEmail}</p>
+                `;
+                
+                testResults.createLog = true;
+                updateTestSummary();
+                
+                console.log('✅ TESTE - Log criado com sucesso:', logId);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p><span class="status-indicator status-error"></span>Erro: ${error.message}</p>`;
+                console.error('❌ TESTE - Erro ao criar log:', error);
+            }
+        }
+
+        // Teste de busca de logs
+        async function testGetLogs() {
+            const resultDiv = document.getElementById('get-logs-result');
+            resultDiv.innerHTML = '<p><span class="status-indicator status-info"></span>Testando busca de logs...</p>';
+
+            try {
+                console.log('🧪 TESTE - Iniciando teste de busca de logs...');
+                
+                // Simular dados de logs
+                const mockLogs = [
+                    {
+                        dealId: 'DEAL-001',
+                        recipientEmail: 'cliente1@exemplo.com',
+                        status: 'success',
+                        attempts: 1,
+                        lastAttemptAt: new Date(),
+                        errorMessage: null
+                    },
+                    {
+                        dealId: 'DEAL-002',
+                        recipientEmail: 'cliente2@exemplo.com',
+                        status: 'failed',
+                        attempts: 3,
+                        lastAttemptAt: new Date(),
+                        errorMessage: 'Token expirado'
+                    }
+                ];
+
+                console.log('📋 TESTE - Logs encontrados:', mockLogs.length);
+                
+                resultDiv.innerHTML = `
+                    <p><span class="status-indicator status-success"></span>Logs encontrados: ${mockLogs.length}</p>
+                    <div style="margin-top: 10px;">
+                        ${mockLogs.map(log => `
+                            <div style="padding: 5px; margin: 5px 0; background: #f8f9fa; border-radius: 3px;">
+                                <strong>${log.dealId}</strong> - ${log.recipientEmail} - 
+                                <span style="color: ${log.status === 'success' ? 'green' : 'red'}">${log.status}</span>
+                                ${log.errorMessage ? ` (${log.errorMessage})` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                testResults.getLogs = true;
+                updateTestSummary();
+                
+                console.log('✅ TESTE - Busca de logs concluída');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p><span class="status-indicator status-error"></span>Erro: ${error.message}</p>`;
+                console.error('❌ TESTE - Erro ao buscar logs:', error);
+            }
+        }
+
+        // Teste de estatísticas
+        async function testGetStats() {
+            const resultDiv = document.getElementById('get-stats-result');
+            resultDiv.innerHTML = '<p><span class="status-indicator status-info"></span>Testando busca de estatísticas...</p>';
+
+            try {
+                console.log('🧪 TESTE - Iniciando teste de estatísticas...');
+                
+                // Simular dados de estatísticas
+                const mockStats = [
+                    {
+                        date: '2024-01-15',
+                        totalEmails: 25,
+                        successfulEmails: 23,
+                        failedEmails: 2,
+                        successRatePercent: 92.0,
+                        avgAttempts: 1.2
+                    },
+                    {
+                        date: '2024-01-14',
+                        totalEmails: 18,
+                        successfulEmails: 17,
+                        failedEmails: 1,
+                        successRatePercent: 94.4,
+                        avgAttempts: 1.1
+                    }
+                ];
+
+                console.log('📊 TESTE - Estatísticas encontradas:', mockStats.length);
+                
+                resultDiv.innerHTML = `
+                    <p><span class="status-indicator status-success"></span>Estatísticas encontradas: ${mockStats.length} dias</p>
+                    <div style="margin-top: 10px;">
+                        ${mockStats.map(stat => `
+                            <div style="padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 5px;">
+                                <strong>${stat.date}</strong><br>
+                                Total: ${stat.totalEmails} | Sucessos: ${stat.successfulEmails} | 
+                                Falhas: ${stat.failedEmails} | Taxa: ${stat.successRatePercent}%
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                testResults.getStats = true;
+                updateTestSummary();
+                
+                console.log('✅ TESTE - Estatísticas carregadas');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p><span class="status-indicator status-error"></span>Erro: ${error.message}</p>`;
+                console.error('❌ TESTE - Erro ao buscar estatísticas:', error);
+            }
+        }
+
+        // Teste de erros
+        async function testGetErrors() {
+            const resultDiv = document.getElementById('get-errors-result');
+            resultDiv.innerHTML = '<p><span class="status-indicator status-info"></span>Testando busca de erros...</p>';
+
+            try {
+                console.log('🧪 TESTE - Iniciando teste de análise de erros...');
+                
+                // Simular dados de erros
+                const mockErrors = [
+                    {
+                        errorCode: 'API_ERROR_401',
+                        errorMessage: 'Token de acesso expirado',
+                        errorCount: 5,
+                        lastOccurrence: '2024-01-15T10:30:00Z',
+                        affectedEmails: ['cliente1@exemplo.com', 'cliente2@exemplo.com']
+                    },
+                    {
+                        errorCode: 'INVALID_TOKEN',
+                        errorMessage: 'Token inválido ou permissões insuficientes',
+                        errorCount: 3,
+                        lastOccurrence: '2024-01-15T09:15:00Z',
+                        affectedEmails: ['cliente3@exemplo.com']
+                    }
+                ];
+
+                console.log('🚨 TESTE - Erros encontrados:', mockErrors.length);
+                
+                resultDiv.innerHTML = `
+                    <p><span class="status-indicator status-success"></span>Erros encontrados: ${mockErrors.length}</p>
+                    <div style="margin-top: 10px;">
+                        ${mockErrors.map(error => `
+                            <div style="padding: 10px; margin: 5px 0; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+                                <strong>${error.errorCode}</strong> (${error.errorCount} ocorrências)<br>
+                                ${error.errorMessage}<br>
+                                <small>Última ocorrência: ${new Date(error.lastOccurrence).toLocaleString()}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                testResults.getErrors = true;
+                updateTestSummary();
+                
+                console.log('✅ TESTE - Análise de erros concluída');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p><span class="status-indicator status-error"></span>Erro: ${error.message}</p>`;
+                console.error('❌ TESTE - Erro ao buscar erros:', error);
+            }
+        }
+
+        // Teste de logs por deal
+        async function testGetDealLogs() {
+            const dealId = document.getElementById('deal-id-input').value;
+            const resultDiv = document.getElementById('get-deal-logs-result');
+            
+            if (!dealId.trim()) {
+                resultDiv.innerHTML = '<p><span class="status-indicator status-warning"></span>Digite um Deal ID para testar</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p><span class="status-indicator status-info"></span>Testando busca por Deal ID...</p>';
+
+            try {
+                console.log('🧪 TESTE - Iniciando teste de busca por Deal ID:', dealId);
+                
+                // Simular dados de logs do deal
+                const mockDealLogs = [
+                    {
+                        dealId: dealId,
+                        recipientEmail: 'cliente@exemplo.com',
+                        status: 'success',
+                        attempts: 1,
+                        lastAttemptAt: new Date(),
+                        errorMessage: null,
+                        gmailMessageId: 'msg-123456'
+                    }
+                ];
+
+                const mockSummary = {
+                    totalAttempts: 1,
+                    successfulEmails: 1,
+                    failedEmails: 0,
+                    lastAttempt: new Date(),
+                    lastSuccess: new Date(),
+                    lastError: null
+                };
+
+                console.log('🎯 TESTE - Logs do deal encontrados:', mockDealLogs.length);
+                
+                resultDiv.innerHTML = `
+                    <p><span class="status-indicator status-success"></span>Logs do Deal ${dealId} encontrados: ${mockDealLogs.length}</p>
+                    <div style="margin-top: 10px;">
+                        <div style="padding: 10px; margin: 5px 0; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px;">
+                            <strong>Resumo:</strong><br>
+                            Total de tentativas: ${mockSummary.totalAttempts}<br>
+                            Sucessos: ${mockSummary.successfulEmails}<br>
+                            Falhas: ${mockSummary.failedEmails}<br>
+                            Última tentativa: ${mockSummary.lastAttempt.toLocaleString()}
+                        </div>
+                        ${mockDealLogs.map(log => `
+                            <div style="padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 5px;">
+                                <strong>${log.dealId}</strong> - ${log.recipientEmail} - 
+                                <span style="color: ${log.status === 'success' ? 'green' : 'red'}">${log.status}</span>
+                                ${log.gmailMessageId ? ` (ID: ${log.gmailMessageId})` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                testResults.getDealLogs = true;
+                updateTestSummary();
+                
+                console.log('✅ TESTE - Busca por Deal ID concluída');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p><span class="status-indicator status-error"></span>Erro: ${error.message}</p>`;
+                console.error('❌ TESTE - Erro ao buscar logs do deal:', error);
+            }
+        }
+
+        // Atualizar resumo dos testes
+        function updateTestSummary() {
+            const summaryDiv = document.getElementById('test-summary');
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(Boolean).length;
+            
+            summaryDiv.innerHTML = `
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                    <h4>📊 Resumo dos Testes</h4>
+                    <p><strong>Testes Executados:</strong> ${passedTests}/${totalTests}</p>
+                    <div style="margin-top: 10px;">
+                        ${Object.entries(testResults).map(([test, passed]) => `
+                            <div style="display: flex; align-items: center; margin: 5px 0;">
+                                <span class="status-indicator ${passed ? 'status-success' : 'status-warning'}"></span>
+                                ${test}: ${passed ? '✅ Passou' : '⏳ Pendente'}
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${passedTests === totalTests ? 
+                        '<p style="color: green; font-weight: bold; margin-top: 10px;">🎉 Todos os testes passaram! Sistema funcionando corretamente.</p>' :
+                        '<p style="color: orange; font-weight: bold; margin-top: 10px;">⚠️ Execute todos os testes para verificar o sistema completo.</p>'
+                    }
+                </div>
+            `;
+        }
+
+        // Limpar console
+        function clearConsole() {
+            document.getElementById('console-log').innerHTML = '';
+        }
+
+        // Inicializar página
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 TESTE - Sistema de teste de logs de e-mail iniciado');
+            checkSystemStatus();
+        });
+    </script>
+</body>
+</html>

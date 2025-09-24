@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { getAppSetting } from './supabaseService';
+import { createEmailLog, updateEmailLog, EmailLogData } from './emailLogService';
 
 let gisLoaded = false;
 let tokenClient: any = null;
@@ -396,38 +397,161 @@ async function testGmailPermissions(token: string): Promise<boolean> {
   }
 }
 
-export async function sendEmailViaGmail({ to, subject, html }: { to: string; subject: string; html: string; }): Promise<boolean> {
+export async function sendEmailViaGmail({ 
+  to, 
+  subject, 
+  html, 
+  dealId, 
+  companyName, 
+  reportToken, 
+  reportUrl 
+}: { 
+  to: string; 
+  subject: string; 
+  html: string; 
+  dealId?: string;
+  companyName?: string;
+  reportToken?: string;
+  reportUrl?: string;
+}): Promise<boolean> {
   let retryCount = 0;
   const maxRetries = 3; // Aumentando para 3 tentativas
+  let emailLogId: string | null = null;
   
   console.log('📧 GMAIL - Iniciando processo de envio de e-mail...', {
     destinatario: to,
     assunto: subject.substring(0, 50) + '...',
     tamanhoHtml: html.length,
+    dealId: dealId || 'unknown',
     timestamp: new Date().toISOString()
   });
+
+  // 📝 Criar log inicial
+  try {
+    const logData: EmailLogData = {
+      dealId: dealId || 'unknown',
+      companyName,
+      recipientEmail: to,
+      subject,
+      emailType: 'diagnostic_report',
+      status: 'pending',
+      attempts: 0,
+      maxAttempts: maxRetries + 1,
+      reportToken,
+      reportUrl,
+      reportSize: html.length,
+      firstAttemptAt: new Date(),
+      lastAttemptAt: new Date(),
+      metadata: {
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+        htmlSize: html.length
+      }
+    };
+
+    emailLogId = await createEmailLog(logData);
+    console.log('📝 EMAIL_LOG - Log inicial criado:', emailLogId);
+  } catch (logError) {
+    console.warn('⚠️ EMAIL_LOG - Erro ao criar log inicial:', logError);
+    // Continuar mesmo se o log falhar
+  }
   
   while (retryCount <= maxRetries) {
     try {
       console.log(`📧 GMAIL - Tentativa ${retryCount + 1} de ${maxRetries + 1}...`);
       
+      // 📝 Atualizar log com status de envio
+      if (emailLogId) {
+        try {
+          await updateEmailLog(emailLogId, {
+            status: 'sending',
+            attempts: retryCount + 1,
+            lastAttemptAt: new Date()
+          });
+        } catch (logError) {
+          console.warn('⚠️ EMAIL_LOG - Erro ao atualizar log:', logError);
+        }
+      }
+      
       // Verificar configuração do Client ID antes de tentar obter token
       try {
         const clientId = await getGoogleClientId();
         console.log('✅ GMAIL - Client ID configurado:', clientId.substring(0, 20) + '...');
+        
+        // 📝 Atualizar log com Client ID usado
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              clientIdUsed: clientId.substring(0, 20) + '...'
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao atualizar Client ID:', logError);
+          }
+        }
       } catch (configError) {
         console.error('❌ GMAIL - Erro de configuração:', configError);
+        
+        // 📝 Log do erro de configuração
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              status: 'failed',
+              errorMessage: `Configuração Gmail inválida: ${configError instanceof Error ? configError.message : 'Erro desconhecido'}`,
+              errorCode: 'CONFIG_ERROR',
+              errorDetails: { configError: configError instanceof Error ? configError.message : String(configError) }
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao logar erro de configuração:', logError);
+          }
+        }
+        
         throw new Error(`Configuração Gmail inválida: ${configError instanceof Error ? configError.message : 'Erro desconhecido'}`);
       }
       
       const token = await getAccessToken();
       console.log('✅ GMAIL - Token obtido:', token.substring(0, 20) + '...');
       
+      // 📝 Atualizar log com token source
+      if (emailLogId) {
+        try {
+          const cacheStr = localStorage.getItem(TOKEN_CACHE_KEY);
+          let tokenSource = 'unknown';
+          if (cacheStr) {
+            try {
+              const cache: TokenCache = JSON.parse(cacheStr);
+              tokenSource = cache.source;
+            } catch {}
+          }
+          await updateEmailLog(emailLogId, {
+            tokenSource: tokenSource as 'supabase' | 'oauth' | 'manual'
+          });
+        } catch (logError) {
+          console.warn('⚠️ EMAIL_LOG - Erro ao atualizar token source:', logError);
+        }
+      }
+      
       // Testar permissões antes de tentar enviar
       console.log('🔍 GMAIL - Testando permissões...');
       const hasPermissions = await testGmailPermissions(token);
       if (!hasPermissions) {
         console.log('⚠️ GMAIL - Token inválido ou permissões insuficientes');
+        
+        // 📝 Log do erro de permissões
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              status: 'retry',
+              errorMessage: 'Token inválido ou permissões insuficientes',
+              errorCode: 'INVALID_TOKEN',
+              errorDetails: { 
+                hasPermissions: false,
+                tokenPrefix: token.substring(0, 20) + '...'
+              }
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao logar erro de permissões:', logError);
+          }
+        }
         
         // Verificar se era um token do Supabase
         const cacheStr = localStorage.getItem(TOKEN_CACHE_KEY);
@@ -484,15 +608,55 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
         destinatario: to
       });
       
+      // 📝 Log da resposta da API
+      if (emailLogId) {
+        try {
+          await updateEmailLog(emailLogId, {
+            metadata: {
+              ...(emailLogId ? {} : {}),
+              apiResponse: {
+                status: res.status,
+                statusText: res.statusText,
+                ok: res.ok,
+                timestamp: new Date().toISOString()
+              }
+            }
+          });
+        } catch (logError) {
+          console.warn('⚠️ EMAIL_LOG - Erro ao logar resposta da API:', logError);
+        }
+      }
+      
       if (!res.ok) {
         let details = '';
         let errorData = null;
+        let parseError: any = null;
         try { 
           errorData = await res.json(); 
           details = errorData?.error?.message || JSON.stringify(errorData); 
           console.log('❌ GMAIL - Detalhes do erro completo:', errorData);
-        } catch (parseError) {
-          console.warn('⚠️ GMAIL - Erro ao fazer parse da resposta de erro:', parseError);
+        } catch (err) {
+          parseError = err;
+          console.warn('⚠️ GMAIL - Erro ao fazer parse da resposta de erro:', err);
+        }
+        
+        // 📝 Log do erro da API
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              status: 'failed',
+              errorMessage: `Gmail API falhou: ${res.status} ${res.statusText}${details ? ' - ' + details : ''}`,
+              errorCode: `API_ERROR_${res.status}`,
+              errorDetails: {
+                status: res.status,
+                statusText: res.statusText,
+                errorData,
+                parseError: parseError instanceof Error ? parseError.message : String(parseError)
+              }
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao logar erro da API:', logError);
+          }
         }
         
         // Diagnóstico específico para erro 401
@@ -548,8 +712,44 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
         console.log('✅ GMAIL - Resposta de sucesso completa:', responseData);
         console.log('📧 GMAIL - Message ID:', responseData?.id);
         console.log('📧 GMAIL - Thread ID:', responseData?.threadId);
+        
+        // 📝 Log do sucesso
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              status: 'success',
+              gmailMessageId: responseData?.id,
+              gmailThreadId: responseData?.threadId,
+              successAt: new Date(),
+              metadata: {
+                ...(emailLogId ? {} : {}),
+                successResponse: responseData,
+                finalAttempt: retryCount + 1
+              }
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao logar sucesso:', logError);
+          }
+        }
       } catch (e) {
         console.warn('⚠️ GMAIL - Não foi possível ler resposta JSON:', e);
+        
+        // 📝 Log do sucesso mesmo sem resposta JSON
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              status: 'success',
+              successAt: new Date(),
+              metadata: {
+                ...(emailLogId ? {} : {}),
+                jsonParseError: e instanceof Error ? e.message : String(e),
+                finalAttempt: retryCount + 1
+              }
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao logar sucesso (sem JSON):', logError);
+          }
+        }
       }
       
       console.log('✅ GMAIL - E-mail enviado com sucesso para:', to);
@@ -558,6 +758,25 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
     } catch (error) {
       console.error(`❌ GMAIL - Erro na tentativa ${retryCount + 1}:`, error);
       
+      // 📝 Log do erro da tentativa
+      if (emailLogId) {
+        try {
+          await updateEmailLog(emailLogId, {
+            status: retryCount >= maxRetries ? 'failed' : 'retry',
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorCode: 'TRIAL_ERROR',
+            errorDetails: {
+              attempt: retryCount + 1,
+              maxAttempts: maxRetries + 1,
+              error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined
+            }
+          });
+        } catch (logError) {
+          console.warn('⚠️ EMAIL_LOG - Erro ao logar erro da tentativa:', logError);
+        }
+      }
+      
       if (retryCount >= maxRetries) {
         // Executar diagnóstico completo antes de falhar
         console.log('🩺 GMAIL - Executando diagnóstico final...');
@@ -565,6 +784,23 @@ export async function sendEmailViaGmail({ to, subject, html }: { to: string; sub
           await diagnoseGmailIssue();
         } catch (diagError) {
           console.warn('⚠️ GMAIL - Erro no diagnóstico:', diagError);
+        }
+        
+        // 📝 Log final de falha
+        if (emailLogId) {
+          try {
+            await updateEmailLog(emailLogId, {
+              status: 'failed',
+              errorMessage: 'Falha após todas as tentativas',
+              errorCode: 'FINAL_FAILURE',
+              errorDetails: {
+                totalAttempts: retryCount + 1,
+                finalError: error instanceof Error ? error.message : String(error)
+              }
+            });
+          } catch (logError) {
+            console.warn('⚠️ EMAIL_LOG - Erro ao logar falha final:', logError);
+          }
         }
         
         // Se for erro de permissão, fornecer instruções específicas

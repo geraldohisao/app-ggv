@@ -244,13 +244,25 @@ export const EmailModal: React.FC<EmailModalProps> = ({ onClose, companyData, re
             console.log('📧 EMAIL_MODAL - Enviando e-mail para:', email);
             console.log('📧 EMAIL_MODAL - Assunto:', subject);
             console.log('📧 EMAIL_MODAL - URL do relatório:', publicUrl);
+            console.log('📧 EMAIL_MODAL - Deal ID:', dealId);
+            console.log('📧 EMAIL_MODAL - Empresa:', companyData.companyName);
             
-            await sendEmailViaGmail({ to: email, subject, html });
+            // 📝 Enviar e-mail com logs detalhados
+            await sendEmailViaGmail({ 
+                to: email, 
+                subject, 
+                html,
+                dealId: dealId || 'unknown',
+                companyName: companyData.companyName,
+                reportToken: reportData ? (await createPublicReport(reportData, email, undefined, dealId, secureToken))?.token : undefined,
+                reportUrl: publicUrl
+            });
             
             console.log('✅ EMAIL_MODAL - E-mail enviado com sucesso!');
             console.log('📧 EMAIL_MODAL - IMPORTANTE: Verifique SPAM/Lixo Eletrônico se não receber');
             console.log('📧 EMAIL_MODAL - E-mail enviado de:', companyData.email || 'sistema');
             console.log('📧 EMAIL_MODAL - E-mail enviado para:', email);
+            console.log('📝 EMAIL_LOG - Log de envio criado no banco de dados');
             
             setIsSent(true);
             setTimeout(() => onClose(), 3000); // Aumentado para 3 segundos

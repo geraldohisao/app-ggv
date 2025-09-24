@@ -117,8 +117,9 @@ const ReactivacaoHistoryPage: React.FC = () => {
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      timeZone: 'UTC' // Força UTC para manter consistência com o banco
+    }) + ' UTC';
   };
 
   // Função para obter ícone do status

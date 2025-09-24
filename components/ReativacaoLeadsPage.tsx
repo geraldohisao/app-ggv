@@ -269,15 +269,16 @@ const ReativacaoLeadsPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [showHistory, history, currentPage]);
 
-  // Função para formatar data
+  // Função para formatar data (mantém horário UTC como no banco)
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      timeZone: 'UTC' // Força UTC para manter consistência com o banco
+    }) + ' UTC';
   };
 
   // Controlar toggle do details por item
