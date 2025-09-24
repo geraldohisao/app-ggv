@@ -10,6 +10,7 @@ import { AudioQualityDashboard } from '../components/AudioStatusIndicator';
 import { processCallAnalysis, getCallAnalysisFromDatabase } from '../services/callAnalysisBackendService';
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
 import UnifiedBatchAnalysisPanel from '../components/UnifiedBatchAnalysisPanel';
+import AdminPermissionsDebug from '../../components/debug/AdminPermissionsDebug';
 
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
@@ -411,6 +412,9 @@ export default function CallsPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Debug de Permissões (temporário) */}
+      <AdminPermissionsDebug />
+      
       {/* Painel de Análise IA em Lote */}
       <UnifiedBatchAnalysisPanel />
 
