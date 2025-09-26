@@ -26,7 +26,7 @@
 GEMINI_API_KEY=AIzaSyBT-Bj73STyadLiv9Fip7K6tDR0wJXry4k
 
 # Variável 2: Chave do DeepSeek (já configurada no banco)
-DEEPSEEK_API_KEY=sk-a6f8ed8b9eb24eb5b59aae512dc36c28
+DEEPSEEK_API_KEY=***CHAVE_REMOVIDA_POR_SEGURANCA***
 
 # Variável 3: Supabase Service Role (para webhooks)
 SUPABASE_SERVICE_ROLE_KEY=eyJ...sua_service_role_key_aqui
