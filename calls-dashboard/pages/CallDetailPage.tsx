@@ -265,8 +265,13 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
       
       if (existingAnalysis) {
         // Análise encontrada no banco - usar dados persistidos
-        setAiNote(existingAnalysis.final_grade.toFixed(1));
-        setAiScore(existingAnalysis.final_grade);
+        if (existingAnalysis.final_grade !== null && existingAnalysis.final_grade !== undefined) {
+          setAiNote(existingAnalysis.final_grade.toFixed(1));
+          setAiScore(existingAnalysis.final_grade);
+        } else {
+          setAiNote('Não analisado');
+          setAiScore(null);
+        }
         console.log('✅ Análise IA carregada do banco (PERSISTIDA):', {
           final_grade: existingAnalysis.final_grade,
           scorecard: existingAnalysis.scorecard_used?.name,
@@ -351,18 +356,33 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
     }
   };
 
-  const updateCallScore = async (callId: string, score: number) => {
+  const updateCallScore = async (callId: string, score: number | null) => {
     try {
-      const { error } = await supabase
-        .from('calls')
-        .update({ 
-          scorecard: { final_score: score }, // Escala 0-10
-          ai_status: 'completed'
-        })
-        .eq('id', callId);
-        
-      if (error) {
-        console.warn('⚠️ Erro ao atualizar score na tabela calls:', error);
+      // Só atualizar se o score não for null
+      if (score !== null && score !== undefined) {
+        const { error } = await supabase
+          .from('calls')
+          .update({ 
+            scorecard: { final_score: score }, // Escala 0-10
+            ai_status: 'completed'
+          })
+          .eq('id', callId);
+          
+        if (error) {
+          console.warn('⚠️ Erro ao atualizar score na tabela calls:', error);
+        }
+      } else {
+        // Para scores null, marcar como erro na análise
+        const { error } = await supabase
+          .from('calls')
+          .update({ 
+            ai_status: 'failed'
+          })
+          .eq('id', callId);
+          
+        if (error) {
+          console.warn('⚠️ Erro ao atualizar status da análise:', error);
+        }
       }
     } catch (error) {
       console.warn('⚠️ Erro ao atualizar score:', error);
@@ -399,6 +419,13 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           <p className="text-sm text-slate-600">{call.company} • {call.dealCode}</p>
           {call.person_name && (
             <p className="text-sm text-slate-500">Contato: {call.person_name}</p>
+          )}
+          {call.call_type && (
+            <p className="text-sm text-slate-500">
+              Etapa: <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCallTypeColor(call.call_type)}`}>
+                {formatCallType(call.call_type)}
+              </span>
+            </p>
           )}
         </div>
         <a href="#/calls" className="text-sm text-slate-600 hover:text-slate-900">Voltar</a>
@@ -617,9 +644,14 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           <ScorecardAnalysis 
             call={call} 
             onAnalysisComplete={(analysis) => {
-              setAiNote(analysis.final_grade.toFixed(1));
-              setAiScore(analysis.final_grade);
-              updateCallScore(call.id, analysis.final_grade);
+              if (analysis.final_grade !== null && analysis.final_grade !== undefined) {
+                setAiNote(analysis.final_grade.toFixed(1));
+                setAiScore(analysis.final_grade);
+                updateCallScore(call.id, analysis.final_grade);
+              } else {
+                setAiNote('Não analisado');
+                setAiScore(null);
+              }
             }}
           />
           

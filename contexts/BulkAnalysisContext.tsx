@@ -108,12 +108,12 @@ export const BulkAnalysisProvider: React.FC<{ children: ReactNode }> = ({ childr
       id: analysisId,
       status: 'starting',
       progress: 0,
-      message: 'Iniciando análise em massa...',
-      details: 'Preparando dados e conectando com o N8N',
+      message: `Análise em massa iniciada para ${data.proprietario}!`,
+      details: `Processando ${data.numero_negocio} leads em background...`,
       leadsProcessed: 0,
       totalLeads: data.numero_negocio,
       startTime: now,
-      estimatedTime: 30000, // 30 segundos estimados
+      estimatedTime: 0, // Não estimamos tempo
     };
 
     setCurrentAnalysis(newAnalysis);
@@ -121,42 +121,18 @@ export const BulkAnalysisProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     console.log('🚀 BULK ANALYSIS - Iniciando análise:', data);
 
-    // Simular progresso da análise (em produção, isso viria do N8N)
-    simulateAnalysisProgress(analysisId, data);
-  };
-
-  // Função para simular progresso da análise
-  const simulateAnalysisProgress = async (analysisId: string, data: any) => {
-    const stages = [
-      { status: 'starting', progress: 10, message: 'Conectando com N8N...', details: 'Estabelecendo conexão segura', delay: 2000 },
-      { status: 'processing', progress: 25, message: 'Buscando leads...', details: 'Consultando base de dados do Pipedrive', delay: 3000 },
-      { status: 'fetching', progress: 50, message: 'Processando leads...', details: 'Aplicando filtros e cadência', delay: 4000 },
-      { status: 'processing', progress: 75, message: 'Enviando para SDRs...', details: 'Distribuindo leads para as equipes', delay: 3000 },
-      { status: 'finalizing', progress: 90, message: 'Finalizando...', details: 'Salvando resultados e gerando relatório', delay: 2000 },
-      { status: 'completed', progress: 100, message: 'Análise concluída!', details: 'Todos os leads foram processados com sucesso', delay: 1000 },
-    ];
-
-    for (const stage of stages) {
-      if (currentAnalysis?.id !== analysisId) {
-        console.log('🛑 BULK ANALYSIS - Análise cancelada ou substituída');
-        return;
-      }
-
+    // Simular apenas o início e depois marcar como concluída após um delay
+    setTimeout(() => {
       updateProgress({
-        status: stage.status as any,
-        progress: stage.progress,
-        message: stage.message,
-        details: stage.details,
-        leadsProcessed: Math.floor((stage.progress / 100) * data.numero_negocio),
+        status: 'completed',
+        progress: 100,
+        message: 'Reativação iniciada com sucesso!',
+        details: 'Verifique o histórico em alguns minutos para ver os resultados.',
+        leadsProcessed: data.numero_negocio,
       });
-
-      await new Promise(resolve => setTimeout(resolve, stage.delay));
-    }
-
-    // Marcar como concluída
-    setIsRunning(false);
-    console.log('✅ BULK ANALYSIS - Análise concluída');
+    }, 2000); // 2 segundos para mostrar a notificação de início
   };
+
 
   // Função para atualizar progresso
   const updateProgress = (updates: Partial<BulkAnalysisState>) => {

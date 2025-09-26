@@ -29,7 +29,7 @@ const getGeminiApiKey = async (): Promise<string | null> => {
 
 // Função para fazer chamada direta à API do Gemini
 const callGeminiAPI = async (prompt: string, apiKey: string): Promise<string> => {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${apiKey}`;
   const cfg = await SupabaseService.getLLMGenerationConfig();
   const body = {
     contents: [
@@ -488,19 +488,36 @@ ${diagnosticQuestions.map(q => `- Área: ${q.area} | Pergunta: "${q.text}" | Res
 
 // ---- Robustez: chamada com tentativas e fallback de modelo ----
 async function callGeminiJson(prompt: string, schema: any): Promise<any> {
-  const { GoogleGenerativeAI } = await import('@google/generative-ai');
   const apiKey = await getGeminiApiKey();
   if (!apiKey) throw new Error('Gemini API Key não configurada');
-  const ai = new GoogleGenerativeAI(apiKey);
-  const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-flash-latest'];
+  
+  // Usar API direta ao invés do SDK para evitar problemas com Vertex AI
+  const models = ['gemini-1.5-flash-8b', 'gemini-1.5-pro', 'gemini-1.5-flash'];
 
   const tryOnce = async (modelName: string) => {
-    const model = ai.getGenerativeModel({ model: modelName });
-    const { response } = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }]}],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: schema } as any
-    } as any);
-    return JSON.parse(response.text() || '{}');
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+        generationConfig: { 
+          responseMimeType: 'application/json',
+          responseSchema: schema
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erro na API Gemini (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return JSON.parse(text || '{}');
   };
 
   let lastErr: any = null;

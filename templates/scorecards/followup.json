@@ -1,0 +1,12 @@
+{
+  "templateKey": "followup",
+  "items": [
+    { "key": "abertura_followup", "weight": 1 },
+    { "key": "reconexao_rapport", "weight": 2 },
+    { "key": "revisao_necessidades", "weight": 3 },
+    { "key": "apresentacao_proposta", "weight": 3 },
+    { "key": "tratamento_objeccoes", "weight": 2 },
+    { "key": "fechamento_acao", "weight": 2 },
+    { "key": "proximos_passos", "weight": 1 }
+  ]
+}

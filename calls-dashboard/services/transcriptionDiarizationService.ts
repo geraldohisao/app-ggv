@@ -26,7 +26,7 @@ async function callGeminiAPI(prompt: string): Promise<string> {
       throw new Error('Chave da API Gemini não encontrada. Configure em Settings → Gerenciar Chaves de API');
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${apiKey}`;
     
     const response = await fetch(endpoint, {
       method: 'POST',

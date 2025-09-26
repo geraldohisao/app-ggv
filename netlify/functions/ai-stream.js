@@ -38,11 +38,44 @@ ${history.slice(-8).map(h => `${h.role === 'user' ? 'Usuário' : 'Assistente'}: 
 PERGUNTA DO USUÁRIO:
 ${message}`;
 
-    // Provider selection: start with DeepSeek if key is available; else fallback to simple echo
+    // Provider selection: start with Gemini if key is available; else fallback to DeepSeek
+    const geminiKey = process.env.GEMINI_API_KEY || '';
     const deepseekKey = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_KEY || process.env.DEEPSEEK || '';
 
     // Prepare stream in NDJSON lines: {type: 'text'|'meta'|'done', data}
     const encoder = new TextEncoder();
+
+    async function streamGemini() {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${geminiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 4000 }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro na API Gemini (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Resposta não disponível';
+      
+      // Simular streaming palavra por palavra
+      const words = text.split(' ');
+      const chunks = [];
+      let full = '';
+      
+      for (const word of words) {
+        chunks.push({ type: 'text', data: word + ' ' });
+        full += word + ' ';
+      }
+      
+      return { chunks, full };
+    }
 
     async function streamDeepseek() {
       const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -99,7 +132,50 @@ ${message}`;
 
     let resultChunks = [];
     let fullText = '';
-    if (deepseekKey) {
+    
+    // Try Gemini first if key is available
+    if (geminiKey) {
+      try {
+        const { chunks, full } = await streamGemini();
+        resultChunks = chunks;
+        fullText = full;
+      } catch (e) {
+        console.log('Gemini failed, trying DeepSeek fallback:', e.message);
+        // Fallback to DeepSeek if Gemini fails
+        if (deepseekKey) {
+          try {
+            const { chunks, full } = await streamDeepseek();
+            resultChunks = chunks;
+            fullText = full;
+          } catch (e2) {
+            // DeepSeek also failed, try simple one-shot
+            const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${deepseekKey}`,
+              },
+              body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: [
+                  { role: 'system', content: 'Você é um assistente da GGV. Responda em Português do Brasil, em Markdown.' },
+                  { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.7
+              })
+            });
+            const j = await r.json().catch(() => ({}));
+            const text = j.choices?.[0]?.message?.content || 'Falha ao obter resposta da IA.';
+            fullText = text;
+            resultChunks = [{ type: 'text', data: text }];
+          }
+        } else {
+          fullText = 'Erro: Gemini falhou e DeepSeek não configurado.';
+          resultChunks = [{ type: 'text', data: fullText }];
+        }
+      }
+    } else if (deepseekKey) {
+      // No Gemini key, try DeepSeek directly
       try {
         const { chunks, full } = await streamDeepseek();
         resultChunks = chunks;
@@ -127,8 +203,8 @@ ${message}`;
         resultChunks = [{ type: 'text', data: text }];
       }
     } else {
-      // No key configured, minimal echo fallback to avoid breaking UI
-      fullText = 'Configuração ausente: DeepSeek API key. Configure nas variáveis do Netlify (DEEPSEEK_API_KEY).';
+      // No keys configured
+      fullText = 'Configuração ausente: Configure GEMINI_API_KEY ou DEEPSEEK_API_KEY nas variáveis do Netlify.';
       resultChunks = [{ type: 'text', data: fullText }];
     }
 

@@ -132,7 +132,8 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
     }
   };
 
-  const getGradeColor = (grade: number) => {
+  const getGradeColor = (grade: number | null) => {
+    if (grade === null) return 'text-gray-600 bg-gray-50 border-gray-200';
     if (grade >= 8) return 'text-green-600 bg-green-50 border-green-200';
     if (grade >= 6) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
     return 'text-red-600 bg-red-50 border-red-200';
@@ -223,7 +224,7 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
               <h4 className="font-medium">📊 Nota Geral</h4>
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold">
-                  {analysis.final_grade.toFixed(1)}/10
+                  {analysis.final_grade !== null ? `${analysis.final_grade.toFixed(1)}/10` : 'Não analisado'}
                 </div>
                 {analysis.confidence && (
                   <div className="text-xs text-slate-500">

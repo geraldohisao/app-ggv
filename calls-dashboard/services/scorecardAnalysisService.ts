@@ -43,7 +43,7 @@ export interface ScorecardAnalysisResult {
   };
   overall_score: number;
   max_possible_score: number;
-  final_grade: number; // 0-10
+  final_grade: number | null; // 0-10 ou null se análise falhou
   criteria_analysis: CriterionAnalysis[];
   general_feedback: string;
   strengths: string[];
@@ -71,55 +71,113 @@ const getGeminiApiKey = async (): Promise<string | null> => {
   return null;
 };
 
-// Função para chamar Gemini API
-async function callGeminiAPI(prompt: string): Promise<string> {
-  const apiKey = await getGeminiApiKey();
-  
-  if (!apiKey) {
-    throw new Error('Chave da API Gemini não encontrada. Configure em Settings → Gerenciar Chaves de API');
-  }
+// Função para chamar IA com prioridade DeepSeek e fallback Gemini
+async function callAIAPI(prompt: string): Promise<string> {
+  // 1. Tentar DeepSeek primeiro (mais confiável)
+  try {
+    const deepseekKey = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_KEY || process.env.DEEPSEEK;
+    if (deepseekKey) {
+      console.log('🤖 Tentando DeepSeek...');
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${deepseekKey}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: 'Você é um especialista em análise de vendas. Responda APENAS com JSON válido no formato solicitado.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 4000
+        })
+      });
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-  
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        temperature: 0.2, // Baixa temperatura para análise consistente
-        maxOutputTokens: 4000,
+      if (response.ok) {
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content;
+        if (text) {
+          console.log('✅ DeepSeek funcionou!');
+          return text;
+        }
+      } else {
+        console.warn('⚠️ DeepSeek falhou:', response.status, response.statusText);
       }
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Erro na API Gemini (${response.status}): ${errorText}`);
+    }
+  } catch (error) {
+    console.warn('⚠️ Erro com DeepSeek:', error);
   }
 
-  const data = await response.json();
-  
-  if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-    throw new Error('Resposta inválida da API Gemini');
+  // 2. Fallback para Gemini
+  try {
+    const apiKey = await getGeminiApiKey();
+    if (apiKey) {
+      console.log('🤖 Tentando Gemini...');
+      const validModels = ['gemini-1.5-flash-8b', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+      
+      for (const model of validModels) {
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: prompt }]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 4000,
+              }
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+              console.log(`✅ Gemini ${model} funcionou!`);
+              return data.candidates[0].content.parts[0].text;
+            }
+          } else {
+            console.warn(`⚠️ Modelo ${model} falhou:`, response.status, response.statusText);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Erro com modelo ${model}:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Erro com Gemini:', error);
   }
 
-  return data.candidates[0].content.parts[0].text;
+  throw new Error('Todas as APIs de IA falharam. Verifique as configurações.');
 }
 
 // Tentar extrair e reparar JSON retornado pelo modelo
 function extractJson(text: string): any {
+  console.log('🔍 Tentando extrair JSON da resposta:', text.substring(0, 200) + '...');
+  
   const tryParse = (s: string): any => {
-    try { return JSON.parse(s); } catch { return null; }
+    try { 
+      const parsed = JSON.parse(s);
+      console.log('✅ JSON válido encontrado!');
+      return parsed;
+    } catch (e) { 
+      console.log('❌ JSON inválido:', e.message);
+      return null; 
+    }
   };
 
   // 1) Bloco ```json ... ```
   const fenced = text.match(/```json\s*([\s\S]*?)\s*```/i) || text.match(/```\s*([\s\S]*?)\s*```/i);
   if (fenced && fenced[1]) {
+    console.log('🔍 Tentando bloco fenced JSON...');
     const parsed = tryParse(fenced[1].trim());
     if (parsed) return parsed;
   }
@@ -127,6 +185,7 @@ function extractJson(text: string): any {
   // 2) Encontrar primeiro objeto JSON equilibrado
   const start = text.indexOf('{');
   if (start !== -1) {
+    console.log('🔍 Tentando encontrar objeto JSON...');
     let depth = 0;
     for (let i = start; i < text.length; i++) {
       const ch = text[i];
@@ -135,12 +194,16 @@ function extractJson(text: string): any {
         depth--;
         if (depth === 0) {
           const candidate = text.slice(start, i + 1);
+          console.log('🔍 Candidato JSON:', candidate.substring(0, 100) + '...');
           const parsed = tryParse(candidate);
           if (parsed) return parsed;
+          
           // 2b) Reparos simples: remover vírgulas finais
           const repaired = candidate
             .replace(/,\s*([}\]])/g, '$1')
-            .replace(/\t/g, ' ');
+            .replace(/\t/g, ' ')
+            .replace(/\n\s*\n/g, '\n');
+          console.log('🔍 JSON reparado:', repaired.substring(0, 100) + '...');
           const parsedRepaired = tryParse(repaired);
           if (parsedRepaired) return parsedRepaired;
           break;
@@ -150,11 +213,21 @@ function extractJson(text: string): any {
   }
 
   // 3) Tentativa final: remover linhas de comentário acidentais
-  const noComments = text.replace(/^\s*\/\/.*$/gm, '');
+  const noComments = text.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*#.*$/gm, '');
+  console.log('🔍 Tentando sem comentários...');
   const parsedNoComments = tryParse(noComments);
   if (parsedNoComments) return parsedNoComments;
 
-  throw new Error('Não foi possível extrair JSON da resposta do Gemini');
+  // 4) Fallback: criar JSON básico se nada funcionar
+  console.log('⚠️ Criando JSON de fallback...');
+  return {
+    criteria_analysis: [],
+    general_feedback: 'Análise automática indisponível. Resposta do modelo não pôde ser processada.',
+    strengths: ['Chamada realizada com sucesso'],
+    improvements: ['Revisar configuração do modelo de IA'],
+    confidence: 0.3,
+    analysis_failed: true // Flag para indicar que a análise falhou
+  };
 }
 
 // Buscar scorecard inteligente baseado nos dados da chamada
@@ -252,7 +325,9 @@ INSTRUÇÕES:
 4. Forneça análise detalhada e sugestões de melhoria
 5. Identifique pontos fortes e oportunidades gerais
 
-RESPONDA APENAS COM JSON no seguinte formato:
+IMPORTANTE: RESPONDA APENAS COM JSON VÁLIDO. NÃO INCLUA TEXTO ADICIONAL, EXPLICAÇÕES OU COMENTÁRIOS.
+
+Formato JSON obrigatório:
 {
   "criteria_analysis": [
     {
@@ -269,7 +344,12 @@ RESPONDA APENAS COM JSON no seguinte formato:
   "confidence": 0.85
 }
 
-Seja específico, objetivo e construtivo. Use evidências da transcrição para justificar as pontuações.
+REGRAS:
+1. Responda APENAS com o JSON acima
+2. NÃO inclua markdown ou blocos de código
+3. NÃO inclua texto antes ou depois do JSON
+4. Use evidências da transcrição para justificar as pontuações
+5. Seja específico, objetivo e construtivo
 `;
 }
 
@@ -306,7 +386,7 @@ export async function analyzeScorecardWithAI(
   const prompt = createAnalysisPrompt(transcription, scorecard, criteria);
   
   try {
-    const response = await callGeminiAPI(prompt);
+    const response = await callAIAPI(prompt);
     const parsed = extractJson(response);
     
     // Processar resultado
@@ -335,10 +415,21 @@ export async function analyzeScorecardWithAI(
       };
     });
 
-    // Calcular pontuações
-    const totalScore = criteriaAnalysis.reduce((sum, c) => sum + c.achieved_score, 0);
-    const maxPossibleScore = criteriaAnalysis.reduce((sum, c) => sum + c.max_score, 0);
-    const finalGrade = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) / 10 : 0;
+    // Verificar se a análise falhou
+    const analysisFailed = parsed.analysis_failed === true;
+    
+    // Calcular pontuações apenas se a análise não falhou
+    let totalScore = 0;
+    let maxPossibleScore = 0;
+    let finalGrade = 0;
+    
+    if (!analysisFailed) {
+      totalScore = criteriaAnalysis.reduce((sum, c) => sum + c.achieved_score, 0);
+      maxPossibleScore = criteriaAnalysis.reduce((sum, c) => sum + c.max_score, 0);
+      finalGrade = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) / 10 : 0;
+    } else {
+      console.log('⚠️ Análise falhou - não calculando nota');
+    }
 
     const result: ScorecardAnalysisResult = {
       scorecard_used: {
@@ -348,12 +439,12 @@ export async function analyzeScorecardWithAI(
       },
       overall_score: totalScore,
       max_possible_score: maxPossibleScore,
-      final_grade: finalGrade,
+      final_grade: analysisFailed ? null : finalGrade, // null quando análise falha
       criteria_analysis: criteriaAnalysis,
-      general_feedback: parsed.general_feedback || 'Análise concluída com sucesso',
+      general_feedback: parsed.general_feedback || (analysisFailed ? 'Análise automática indisponível' : 'Análise concluída com sucesso'),
       strengths: parsed.strengths || [],
       improvements: parsed.improvements || [],
-      confidence: Math.min(Math.max(0, parsed.confidence || 0.7), 1)
+      confidence: analysisFailed ? 0 : Math.min(Math.max(0, parsed.confidence || 0.7), 1)
     };
 
     console.log('✅ Análise concluída:', {
@@ -390,9 +481,9 @@ export async function analyzeScorecardWithAI(
         name: scorecard.name,
         description: scorecard.description
       },
-      overall_score: totalScore,
-      max_possible_score: maxPossibleScore,
-      final_grade: 6.0,
+      overall_score: 0,
+      max_possible_score: 0,
+      final_grade: null, // Sem nota quando análise falha
       criteria_analysis: fallbackAnalysis,
       general_feedback: 'Análise automática indisponível. Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'),
       strengths: ['Chamada realizada com sucesso'],

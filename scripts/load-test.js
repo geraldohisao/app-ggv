@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
   Simple load generator for Gemini calls.
-  Usage: node -r dotenv/config scripts/load-test.js --n=30 --concurrency=5 --model=gemini-1.5-flash-latest
+  Usage: node -r dotenv/config scripts/load-test.js --n=30 --concurrency=5 --model=gemini-1.5-flash
 */
 const { performance } = require('perf_hooks');
 
@@ -12,7 +12,7 @@ const args = Object.fromEntries(process.argv.slice(2).map(a => {
 
 const N = parseInt(args.n || '20', 10);
 const CONC = parseInt(args.concurrency || '5', 10);
-const MODEL = args.model || process.env.MODEL || 'gemini-1.5-flash-latest';
+const MODEL = args.model || process.env.MODEL || 'gemini-1.5-flash';
 const QUESTION = process.env.QUESTION || 'Explique rapidamente como qualificar leads B2B.';
 const API_KEY = process.env.GEMINI_API_KEY;
 

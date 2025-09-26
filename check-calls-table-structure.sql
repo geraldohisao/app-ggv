@@ -1,42 +1,47 @@
--- Script para verificar a estrutura real da tabela calls
--- Execute este script no Supabase SQL Editor
+-- 🔍 VERIFICAR: Estrutura real da tabela calls
+-- Este script verifica quais colunas existem na tabela calls
 
 -- 1. Verificar todas as colunas da tabela calls
+SELECT 'Estrutura da tabela calls:' as info;
 SELECT 
     column_name,
     data_type,
     is_nullable,
     column_default
 FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND table_name = 'calls'
+WHERE table_name = 'calls' 
+AND table_schema = 'public'
 ORDER BY ordinal_position;
 
--- 2. Verificar se existem colunas relacionadas a usuários
+-- 2. Verificar dados de exemplo de uma ligação
+SELECT 'Dados de exemplo de uma ligação:' as info;
 SELECT 
-    column_name,
-    data_type
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND table_name = 'calls'
-AND (
-    column_name LIKE '%sdr%' OR 
-    column_name LIKE '%agent%' OR 
-    column_name LIKE '%user%' OR
-    column_name LIKE '%name%'
-)
-ORDER BY column_name;
+    id,
+    status,
+    status_voip,
+    call_type,
+    duration,
+    created_at
+FROM calls 
+ORDER BY created_at DESC 
+LIMIT 3;
 
--- 3. Verificar dados de exemplo da tabela calls
-SELECT * FROM public.calls LIMIT 3;
-
--- 4. Verificar se há colunas com nomes de usuários
+-- 3. Verificar valores únicos de status_voip
+SELECT 'Valores únicos de status_voip:' as info;
 SELECT 
-    column_name,
-    data_type,
-    is_nullable
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND table_name = 'calls'
-AND column_name IN ('agent_id', 'sdr_id', 'sdr_name', 'agent_name', 'user_id', 'user_name')
-ORDER BY column_name;
+    status_voip,
+    COUNT(*) as total
+FROM calls 
+WHERE status_voip IS NOT NULL
+GROUP BY status_voip
+ORDER BY total DESC;
+
+-- 4. Verificar valores únicos de status
+SELECT 'Valores únicos de status:' as info;
+SELECT 
+    status,
+    COUNT(*) as total
+FROM calls 
+WHERE status IS NOT NULL
+GROUP BY status
+ORDER BY total DESC;
