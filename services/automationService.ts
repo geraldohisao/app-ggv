@@ -53,8 +53,8 @@ export async function triggerReativacao(input: ReativacaoPayload): Promise<any> 
         status: 'pending',
         count_leads: 0, // Será atualizado pelo callback
         cadence: input.cadencia,
-        workflow_id: result.workflowId,
-        execution_id: result.runId,
+        workflow_id: 'Reativação de Leads', // Usar nome fixo para matching
+        execution_id: result.runId || `run_${Date.now()}`,
         n8n_data: result.n8nResponse || {},
         error_message: null
       });
