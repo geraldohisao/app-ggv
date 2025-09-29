@@ -275,7 +275,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
         console.log('✅ Análise IA carregada do banco (PERSISTIDA):', {
           final_grade: existingAnalysis.final_grade,
           scorecard: existingAnalysis.scorecard_used?.name,
-          created_at: existingAnalysis.analysis_created_at
+          created_at: existingAnalysis.created_at
         });
         
         // Garantir que o score está atualizado na tabela calls

@@ -141,10 +141,11 @@ export default function CallsPage() {
           max_duration_type: typeof (maxDuration ? parseInt(maxDuration) : undefined)
         });
         
-        // USAR A RPC COM FILTROS E ORDENAÇÃO (get_calls_with_filters)
-        console.log('🔍 CALLS PAGE - Usando get_calls_with_filters (com filtros e ordenação)');
+        // ✅ USAR A RPC get_calls_with_filters (corrigida)
+        console.log('🔍 CALLS PAGE - Usando get_calls_with_filters (RPC corrigida)');
         const offset = (currentPage - 1) * itemsPerPage;
-        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+        // 🔍 DEBUG: Verificar filtros enviados
+        const rpcParams = {
           p_sdr: sdr || null,
           p_status: status || null,
           p_type: type || null,
@@ -156,8 +157,13 @@ export default function CallsPage() {
           p_min_duration: minDuration ? parseInt(minDuration) : null,
           p_max_duration: maxDuration ? parseInt(maxDuration) : null,
           p_min_score: minScore ? parseFloat(minScore) : null,
-          p_search_query: query.trim() || null  // NOVO: filtro de empresa/deal no backend
-        });
+          p_search_query: query.trim() || null
+        };
+        
+        console.log('🔍 CALLS PAGE - Parâmetros enviados para RPC:', rpcParams);
+        console.log('🔍 CALLS PAGE - minDuration original:', minDuration, 'convertido:', minDuration ? parseInt(minDuration) : null);
+        
+        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', rpcParams);
         
         if (callsError) {
           throw new Error(`Erro ao buscar calls: ${callsError.message}`);
@@ -203,8 +209,8 @@ export default function CallsPage() {
             from_number: call.from_number,
             to_number: call.to_number,
             direction: call.direction,
-            // SCORE: usar calculated_score da RPC (já vem do banco)
-            score: call.calculated_score > 0 ? call.calculated_score : null,
+            // ✅ SCORE: usar score da RPC corrigida
+            score: call.score,
             // Campos extras para debug
             enterprise_debug: call.enterprise,
             deal_id_debug: call.deal_id,

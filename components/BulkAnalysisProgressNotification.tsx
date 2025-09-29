@@ -14,6 +14,12 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
 
   // Auto-hide para notificações de início (3 segundos)
   useEffect(() => {
+    // Limpar timer anterior se existir
+    if (autoHideTimer) {
+      clearTimeout(autoHideTimer);
+      setAutoHideTimer(null);
+    }
+
     if (currentAnalysis.status === 'starting' && isRunning) {
       setShowNotification(true);
       // Auto-hide após 3 segundos
@@ -26,7 +32,10 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
       // Auto-hide após 5 segundos para notificações de fim
       const timer = setTimeout(() => {
         setShowNotification(false);
-        clearAnalysis();
+        // Usar setTimeout para evitar dependência circular
+        setTimeout(() => {
+          clearAnalysis();
+        }, 100);
       }, 5000);
       setAutoHideTimer(timer);
     }
@@ -36,7 +45,7 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
         clearTimeout(autoHideTimer);
       }
     };
-  }, [currentAnalysis.status, isRunning, clearAnalysis]);
+  }, [currentAnalysis?.status, isRunning]); // Removida dependência clearAnalysis
 
   // Não mostrar se a notificação foi escondida
   if (!showNotification) {
