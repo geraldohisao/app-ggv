@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient';
 const N8N_CONFIG = {
   WEBHOOK_URL: 'https://api-test.ggvinteligencia.com.br/webhook/reativacao-leads',
   TIMEOUT: 45000, // 45 segundos - aumentado para volumes maiores
-  CALLBACK_URL: 'https://app.grupoggv.com/.netlify/functions/n8n-callback' // Netlify Function endpoint
+  CALLBACK_URL: 'https://app.grupoggv.com/.netlify/functions/reativacao-webhook' // Webhook específico para reativação
 };
 
 /**
@@ -22,7 +22,15 @@ export async function triggerReativacao(input: ReativacaoPayload): Promise<any> 
     const payload = {
       ...input,
       callback_url: N8N_CONFIG.CALLBACK_URL,
-      timestamp: new Date().toISOString()
+      webhook_callback_url: 'https://app.grupoggv.com/.netlify/functions/reativacao-webhook',
+      timestamp: new Date().toISOString(),
+      // Instruções para o N8N
+      instructions: {
+        callback_required: true,
+        callback_method: 'POST',
+        callback_format: 'json',
+        required_fields: ['workflowId', 'status', 'message', 'leadsProcessed']
+      }
     };
     
     console.log('📤 AUTOMATION - Payload completo:', payload);
