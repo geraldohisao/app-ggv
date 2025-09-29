@@ -307,14 +307,27 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Função para formatar data (mantém horário UTC como no banco)
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'UTC' // Força UTC para manter consistência com o banco
-    }) + ' UTC';
+    // Extrair data/hora diretamente do timestamp sem conversões
+    // Formato: 2025-09-29T18:58:00+00:00 → 29/09/2025, 18:58 UTC
+    try {
+      const timestamp = dateString.replace('T', ' ').replace(/\+.*$/, '').replace(/Z$/, '');
+      const [datePart, timePart] = timestamp.split(' ');
+      const [year, month, day] = datePart.split('-');
+      const [hour, minute] = timePart.split(':');
+      
+      return `${day}/${month}/${year}, ${hour}:${minute} UTC`;
+    } catch (error) {
+      // Fallback para caso de erro
+      console.warn('⚠️ Erro ao formatar data:', dateString, error);
+      return new Date(dateString).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',  
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC'
+      }) + ' UTC';
+    }
   };
 
   // Controlar toggle do details por item
