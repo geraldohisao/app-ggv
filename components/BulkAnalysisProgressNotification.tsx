@@ -109,7 +109,7 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-lg">{config.icon}</span>
             <div>
-              <h3 className="font-semibold text-sm">Reativação de Leads</h3>
+              <h3 className="font-semibold text-sm">Reativação de Leads em Massa</h3>
               <p className="text-xs opacity-80">{config.label}</p>
             </div>
           </div>
@@ -140,14 +140,14 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
         {isCompleted && (
           <div className="flex items-center gap-2 text-green-600 text-sm">
             <CheckCircleIcon className="w-4 h-4" />
-            <span>Reativação iniciada com sucesso! Verifique o histórico em alguns minutos.</span>
+            <span>Reativação de leads em massa iniciada com sucesso! Verifique o histórico em alguns minutos.</span>
           </div>
         )}
         
         {isFailed && (
           <div className="flex items-center gap-2 text-red-600 text-sm">
             <ExclamationTriangleIcon className="w-4 h-4" />
-            <span>Falha na reativação. Tente novamente.</span>
+            <span>Falha na reativação de leads em massa. Tente novamente.</span>
           </div>
         )}
 

@@ -108,7 +108,7 @@ export const BulkAnalysisProvider: React.FC<{ children: ReactNode }> = ({ childr
       id: analysisId,
       status: 'starting',
       progress: 0,
-      message: `Análise em massa iniciada para ${data.proprietario}!`,
+      message: `Reativação de leads em massa iniciada para ${data.proprietario}!`,
       details: `Processando ${data.numero_negocio} leads em background...`,
       leadsProcessed: 0,
       totalLeads: data.numero_negocio,
@@ -126,7 +126,7 @@ export const BulkAnalysisProvider: React.FC<{ children: ReactNode }> = ({ childr
       updateProgress({
         status: 'completed',
         progress: 100,
-        message: 'Reativação iniciada com sucesso!',
+        message: 'Reativação de leads em massa iniciada com sucesso!',
         details: 'Verifique o histórico em alguns minutos para ver os resultados.',
         leadsProcessed: data.numero_negocio,
       });

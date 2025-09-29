@@ -151,7 +151,7 @@ const ReativacaoLeadsPage: React.FC = () => {
       // ✅ FEEDBACK IMEDIATO - Mostrar que foi iniciado
       setResult({
         success: true,
-        message: `🚀 Análise em massa iniciada para ${validatedData.proprietario}! Processando ${validatedData.numero_negocio} leads em background...`,
+        message: `🚀 Reativação de leads em massa iniciada para ${validatedData.proprietario}! Processando ${validatedData.numero_negocio} leads em background...`,
         data: { status: 'starting', immediate: true, real: true, persistent: true }
       });
 
