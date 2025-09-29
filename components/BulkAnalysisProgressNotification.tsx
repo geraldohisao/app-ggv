@@ -7,13 +7,14 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [autoHideTimer, setAutoHideTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Não mostrar se não há análise ativa
-  if (!currentAnalysis || (!isRunning && currentAnalysis.status === 'idle')) {
-    return null;
-  }
-
   // Auto-hide para notificações de início (3 segundos)
   useEffect(() => {
+    // Verificar se há análise ativa
+    if (!currentAnalysis || (!isRunning && currentAnalysis.status === 'idle')) {
+      setShowNotification(false);
+      return;
+    }
+
     // Limpar timer anterior se existir
     if (autoHideTimer) {
       clearTimeout(autoHideTimer);
@@ -45,10 +46,10 @@ export const BulkAnalysisProgressNotification: React.FC = () => {
         clearTimeout(autoHideTimer);
       }
     };
-  }, [currentAnalysis?.status, isRunning]); // Removida dependência clearAnalysis
+  }, [currentAnalysis?.status, isRunning, currentAnalysis]); // Removida dependência clearAnalysis
 
-  // Não mostrar se a notificação foi escondida
-  if (!showNotification) {
+  // Não mostrar se não há análise ativa ou notificação foi escondida
+  if (!currentAnalysis || (!isRunning && currentAnalysis.status === 'idle') || !showNotification) {
     return null;
   }
 
