@@ -225,6 +225,19 @@ async function processN8nResponse(result: any, input: ReativacaoPayload) {
 
   console.log('✅ AUTOMATION - Workflow iniciado no N8N:', { workflowId, runId });
   
+  // ✅ PROCESSAR CALLBACK AUTOMÁTICO SE N8N RETORNOU DADOS DE CONCLUSÃO
+  if (n8nData.status === 'completed' || n8nData.leadsProcessed > 0) {
+    console.log('🔄 AUTOMATION - N8N já retornou conclusão, processando callback automático...');
+    
+    setTimeout(async () => {
+      try {
+        await processAutomaticCallback(workflowId, n8nData);
+      } catch (error) {
+        console.warn('⚠️ AUTOMATION - Erro no callback automático:', error);
+      }
+    }, 3000); // 3 segundos de delay
+  }
+  
   // ✅ MODO REAL - Aguardar callback real do N8N
   console.log('🔄 AUTOMATION - Modo real ativado. Aguardando callback do N8N para:', workflowId);
   
@@ -712,5 +725,58 @@ export async function updateReactivationStatus(
   } catch (error: any) {
     console.error('❌ REACTIVATION - Erro ao atualizar status:', error);
     return false;
+  }
+}
+
+/**
+ * Processar callback automático quando N8N retorna dados de conclusão
+ */
+async function processAutomaticCallback(workflowId: string, n8nData: any): Promise<void> {
+  console.log('🔄 AUTOMATION - Processando callback automático:', { workflowId, n8nData });
+  
+  try {
+    // Extrair dados da resposta do N8N
+    const status = n8nData.status === 'completed' ? 'completed' : 'processing';
+    const message = n8nData.message || `${n8nData.leadsProcessed || 0} lead(s) processados`;
+    const leadsProcessed = n8nData.leadsProcessed || 1;
+    
+    // Simular callback do N8N para o sistema local
+    const callbackData = {
+      workflowId: workflowId,
+      status: status,
+      message: message,
+      leadsProcessed: leadsProcessed,
+      data: n8nData,
+      timestamp: new Date().toISOString(),
+      source: 'automatic_callback'
+    };
+    
+    console.log('📡 AUTOMATION - Dados do callback automático:', callbackData);
+    
+    // Tentar chamar a função Netlify de callback
+    try {
+      const callbackResponse = await fetch('/.netlify/functions/n8n-callback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(callbackData)
+      });
+      
+      if (callbackResponse.ok) {
+        const callbackResult = await callbackResponse.json();
+        console.log('✅ AUTOMATION - Callback automático processado:', callbackResult);
+      } else {
+        console.warn('⚠️ AUTOMATION - Callback automático falhou:', callbackResponse.status);
+      }
+    } catch (callbackError) {
+      console.warn('⚠️ AUTOMATION - Erro ao chamar callback Netlify:', callbackError);
+      
+      // Fallback: Atualizar diretamente via Supabase
+      await updateReactivationStatus(workflowId, status as any, leadsProcessed, n8nData);
+    }
+    
+  } catch (error: any) {
+    console.error('❌ AUTOMATION - Erro no callback automático:', error);
   }
 }
