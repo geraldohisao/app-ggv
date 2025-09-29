@@ -307,15 +307,25 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Função para formatar data (mantém horário UTC como no banco)
   const formatDate = (dateString: string) => {
-    // Extrair data/hora diretamente do timestamp sem conversões
-    // Formato: 2025-09-29T18:58:00+00:00 → 29/09/2025, 18:58 UTC
+    // Mostrar horário exatamente como está no banco (UTC)
+    // Problema: 16h10 local → 19h10 UTC no banco → deve mostrar 19h10 UTC
     try {
-      const timestamp = dateString.replace('T', ' ').replace(/\+.*$/, '').replace(/Z$/, '');
-      const [datePart, timePart] = timestamp.split(' ');
-      const [year, month, day] = datePart.split('-');
-      const [hour, minute] = timePart.split(':');
+      console.log('🕐 FORMAT DATE - Input:', dateString);
       
-      return `${day}/${month}/${year}, ${hour}:${minute} UTC`;
+      // Garantir que interpretamos como UTC
+      const utcDate = new Date(dateString.endsWith('Z') ? dateString : dateString + 'Z');
+      
+      // Extrair componentes diretamente
+      const year = utcDate.getUTCFullYear();
+      const month = String(utcDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(utcDate.getUTCDate()).padStart(2, '0');
+      const hour = String(utcDate.getUTCHours()).padStart(2, '0');
+      const minute = String(utcDate.getUTCMinutes()).padStart(2, '0');
+      
+      const formatted = `${day}/${month}/${year}, ${hour}:${minute} UTC`;
+      console.log('🕐 FORMAT DATE - Output:', formatted);
+      
+      return formatted;
     } catch (error) {
       // Fallback para caso de erro
       console.warn('⚠️ Erro ao formatar data:', dateString, error);
