@@ -11,6 +11,7 @@ import {
   ReactivatedLeadHistoryItem
 } from '../services/automationService';
 import { listProfiles } from '../services/supabaseService';
+import { canUserExecuteAutomation, startAutomationWithQueue } from '../services/automationQueueService';
 
 // Tipo para o estado do formulário (permite valores temporários durante digitação)
 type FormData = Omit<ReativacaoPayload, 'numero_negocio'> & {
@@ -102,6 +103,41 @@ const ReativacaoLeadsPage: React.FC = () => {
       // Log no debug panel
       if ((window as any).debugLog) {
         (window as any).debugLog("reativacao:submit", "info", "AUTOMATION", validatedData);
+      }
+
+      // ✅ VERIFICAR SE PODE EXECUTAR AUTOMAÇÃO
+      console.log('🔍 QUEUE - Verificando permissão para:', validatedData.proprietario);
+      const permission = await canUserExecuteAutomation(validatedData.proprietario);
+      
+      if (!permission.can_execute) {
+        setResult({
+          success: false,
+          message: `❌ ${permission.message}`,
+          data: { 
+            blocked: true, 
+            reason: permission.message,
+            lastExecution: permission.last_execution,
+            status: permission.status 
+          }
+        });
+        return;
+      }
+
+      // ✅ INICIAR AUTOMAÇÃO COM CONTROLE DE FILA
+      console.log('🚀 QUEUE - Iniciando automação controlada...');
+      const automationStart = await startAutomationWithQueue(
+        validatedData.proprietario,
+        validatedData.filtro,
+        validatedData.cadencia
+      );
+
+      if (!automationStart.success) {
+        setResult({
+          success: false,
+          message: `❌ ${automationStart.message}`,
+          data: { blocked: true, reason: automationStart.message }
+        });
+        return;
       }
 
       // 🚀 NOVO: Usar sistema de análise em massa persistente
