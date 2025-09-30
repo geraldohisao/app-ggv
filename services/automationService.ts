@@ -59,7 +59,7 @@ export async function triggerReativacao(input: ReativacaoPayload): Promise<any> 
         sdr: input.proprietario,
         filter: input.filtro,
         status: 'pending',
-        count_leads: input.numero_negocio, // 🔧 CORRIGIDO: Salvar quantidade real inicial
+        count_leads: input.numero_negocio, // 🔧 CORRIGIDO: Salvar quantidade real inicial - FORCE REBUILD v2
         cadence: input.cadencia,
         workflow_id: 'Reativação de Leads', // Usar nome fixo para matching
         execution_id: result.runId || `run_${Date.now()}`,
