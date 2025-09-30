@@ -843,45 +843,6 @@ const ReativacaoLeadsPage: React.FC = () => {
                     🔄
                   </button>
                   <button
-                    onClick={async () => {
-                      if (confirm('Simular callback do N8N para resolver pendentes?')) {
-                        try {
-                          const callbackData = {
-                            workflowId: 'Reativação de Leads',
-                            status: 'completed',
-                            message: '1 lead(s) processados',
-                            leadsProcessed: 1,
-                            sdr: 'Andressa Habinoski',
-                            timestamp: new Date().toISOString(),
-                            source: 'emergency_callback'
-                          };
-                          
-                          const response = await fetch('/.netlify/functions/reativacao-webhook', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(callbackData)
-                          });
-                          
-                          if (response.ok) {
-                            const result = await response.json();
-                            console.log('✅ Callback simulado:', result);
-                            loadHistory(1);
-                            alert('Callback simulado com sucesso!');
-                          } else {
-                            throw new Error(`HTTP ${response.status}`);
-                          }
-                        } catch (error) {
-                          console.error('❌ Erro callback:', error);
-                          alert('Erro: ' + error.message);
-                        }
-                      }
-                    }}
-                    className="flex items-center gap-1 bg-purple-100 text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-200 transition-colors text-sm"
-                    title="Simular callback do N8N"
-                  >
-                    🔧
-                  </button>
-                  <button
                     onClick={handleResetHistory}
                     className="flex items-center gap-2 bg-orange-100 text-orange-700 font-semibold px-4 py-2 rounded-lg hover:bg-orange-200 transition-colors"
                     title="Reinicializar histórico com dados de teste"

@@ -520,77 +520,45 @@ export async function getReactivatedLeadsHistory(
     
     console.log('📊 REACTIVATION - Teste direto:', { directTest, directError });
     
-    // 🔍 SEGUNDO: Usar função RPC do Supabase para buscar histórico
-    console.log('🔍 REACTIVATION - Chamando função RPC...');
-    const { data, error } = await supabase.rpc('get_reactivated_leads_history', {
-      p_page: page,
-      p_limit: limit,
-      p_sdr: sdr || null,
-      p_status: status || null
-    });
+    // 🔍 BUSCA DIRETA NA TABELA (mais simples e confiável)
+    console.log('🔍 REACTIVATION - Buscando diretamente na tabela...');
+    
+    const offset = (page - 1) * limit;
+    
+    // Buscar dados com filtros
+    let query = supabase
+      .from('reactivated_leads')
+      .select('*', { count: 'exact' });
+    
+    if (sdr) {
+      query = query.eq('sdr', sdr);
+    }
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    console.log('📊 REACTIVATION - Resposta RPC:', { data, error, dataLength: data?.length });
+    console.log('📊 REACTIVATION - Busca direta:', { data: data?.length, error, count });
 
     if (error) {
-      console.error('❌ REACTIVATION - Erro ao buscar histórico:', error);
-      
-      // 🔍 FALLBACK: Tentar busca direta se RPC falhar
-      console.log('🔄 REACTIVATION - Tentando busca direta como fallback...');
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('reactivated_leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      
-      console.log('📊 REACTIVATION - Fallback:', { fallbackData, fallbackError });
-      
-      if (fallbackError) {
-        throw new Error(`Erro ao buscar histórico: ${error.message}`);
-      }
-      
-      if (!fallbackData || fallbackData.length === 0) {
-        console.log('📊 REACTIVATION - Nenhum registro encontrado (fallback)');
-        return {
-          data: [],
-          pagination: { page, limit, total: 0, pages: 0 }
-        };
-      }
-      
-      // Retornar dados do fallback
-      return {
-        data: fallbackData.map((item: any) => ({
-          id: item.id,
-          created_at: item.created_at,
-          sdr: item.sdr,
-          filter: item.filter,
-          status: item.status,
-          count_leads: item.count_leads || 0,
-          cadence: item.cadence,
-          workflow_id: item.workflow_id,
-          execution_id: item.execution_id,
-          n8n_data: item.n8n_data || {},
-          error_message: item.error_message,
-          updated_at: item.updated_at
-        })),
-        pagination: {
-          page,
-          limit,
-          total: fallbackData.length,
-          pages: 1
-        }
-      };
+      console.error('❌ REACTIVATION - Erro na busca direta:', error);
+      throw new Error(`Erro ao buscar histórico: ${error.message}`);
     }
 
     if (!data || data.length === 0) {
       console.log('📊 REACTIVATION - Nenhum registro encontrado');
       return {
         data: [],
-        pagination: { page, limit, total: 0, pages: 0 }
+        pagination: { page, limit, total: count || 0, pages: 0 }
       };
     }
 
-    // O primeiro registro contém o total_count
-    const totalCount = data[0]?.total_count || 0;
+    // Usar count real da consulta
+    const totalCount = count || 0;
     const totalPages = Math.ceil(totalCount / limit);
 
     console.log('✅ REACTIVATION - Histórico carregado:', {
@@ -602,17 +570,17 @@ export async function getReactivatedLeadsHistory(
     return {
       data: data.map((item: any) => ({
         id: item.id,
-        created_at: item.created_at,
-        sdr: item.sdr,
-        filter: item.filter,
-        status: item.status,
+        created_at: item.created_at || null,
+        sdr: item.sdr || '',
+        filter: item.filter || '',
+        status: item.status || 'pending',
         count_leads: item.count_leads || 0,
-        cadence: item.cadence,
-        workflow_id: item.workflow_id,
-        execution_id: item.execution_id,
+        cadence: item.cadence || '',
+        workflow_id: item.workflow_id || null,
+        execution_id: item.execution_id || null,
         n8n_data: item.n8n_data || {},
-        error_message: item.error_message,
-        updated_at: item.updated_at
+        error_message: item.error_message || null,
+        updated_at: item.updated_at || null
       })),
       pagination: {
         page,
