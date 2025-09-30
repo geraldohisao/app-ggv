@@ -59,11 +59,16 @@ export async function triggerReativacao(input: ReativacaoPayload): Promise<any> 
         sdr: input.proprietario,
         filter: input.filtro,
         status: 'pending',
-        count_leads: 0, // Será atualizado pelo callback
+        count_leads: input.numero_negocio, // 🔧 CORRIGIDO: Salvar quantidade real inicial
         cadence: input.cadencia,
         workflow_id: 'Reativação de Leads', // Usar nome fixo para matching
         execution_id: result.runId || `run_${Date.now()}`,
-        n8n_data: result.n8nResponse || {},
+        n8n_data: {
+          ...result.n8nResponse || {},
+          initial_leads_requested: input.numero_negocio, // Quantidade solicitada
+          status: 'started',
+          started_at: new Date().toISOString()
+        },
         error_message: null
       });
       

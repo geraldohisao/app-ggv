@@ -12,6 +12,7 @@ import {
 } from '../services/automationService';
 import { listProfiles } from '../services/supabaseService';
 import { canUserExecuteAutomation, startAutomationWithQueue } from '../services/automationQueueService';
+import { checkAndUpdateCompletedReactivations, startAutomationPolling } from '../services/n8nPollingService';
 
 // Tipo para o estado do formulário (permite valores temporários durante digitação)
 type FormData = Omit<ReativacaoPayload, 'numero_negocio'> & {
@@ -285,7 +286,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     }
   }, [showHistory]);
 
-  // Auto-refresh do histórico com frequência muito reduzida para evitar flicker
+  // Auto-refresh do histórico + polling do N8N
   useEffect(() => {
     if (!showHistory || !history) return;
 
@@ -296,13 +297,34 @@ const ReativacaoLeadsPage: React.FC = () => {
       )
     ));
 
-    // Frequência muito reduzida: 10s para ativos, 30s para inativos
-    const intervalMs = hasActive ? 10000 : 30000;
-    const interval = setInterval(() => {
-      loadHistory(currentPage);
-    }, intervalMs);
+    // Se há registros ativos, fazer polling mais agressivo
+    if (hasActive) {
+      console.log('🔄 REATIVACAO PAGE - Registros ativos detectados, iniciando polling do N8N...');
+      
+      // Verificar N8N a cada 15 segundos quando há pendentes
+      const pollingInterval = setInterval(async () => {
+        try {
+          const result = await checkAndUpdateCompletedReactivations();
+          if (result.updated > 0) {
+            console.log('🎉 REATIVACAO PAGE - Atualizações do N8N:', result.updated);
+            loadHistory(currentPage); // Recarregar histórico
+          }
+        } catch (error) {
+          console.warn('⚠️ REATIVACAO PAGE - Erro no polling:', error);
+        }
+      }, 15000);
 
-    return () => clearInterval(interval);
+      return () => {
+        clearInterval(pollingInterval);
+      };
+    } else {
+      // Refresh normal menos frequente se não há ativos
+      const interval = setInterval(() => {
+        loadHistory(currentPage);
+      }, 30000);
+
+      return () => clearInterval(interval);
+    }
   }, [showHistory, history, currentPage]);
 
   // Função para formatar data (mantém horário UTC como no banco)
@@ -878,11 +900,19 @@ const ReativacaoLeadsPage: React.FC = () => {
                           <p className="font-medium text-slate-900">{item.filter}</p>
                           <p className="text-sm text-slate-600">
                             SDR: {item.sdr} • {item.count_leads} leads
+                            {item.status === 'pending' && item.n8n_data?.initial_leads_requested && (
+                              <span className="text-blue-600"> (solicitados: {item.n8n_data.initial_leads_requested})</span>
+                            )}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-500">{formatDate(item.created_at)}</p>
+                        <p className="text-xs text-slate-500">
+                          {item.status === 'completed' && item.updated_at 
+                            ? formatDate(item.updated_at) + ' (Concluído)'
+                            : formatDate(item.created_at) + ' (Iniciado)'
+                          }
+                        </p>
                         <p className="text-xs text-slate-400">Reativação automática</p>
                       </div>
                     </div>
