@@ -511,14 +511,7 @@ export async function getReactivatedLeadsHistory(
   console.log('📊 REACTIVATION - Buscando histórico de reativação:', { page, limit, sdr, status });
   
   try {
-    // 🔍 PRIMEIRO: Testar acesso direto à tabela
-    console.log('🔍 REACTIVATION - Testando acesso direto à tabela...');
-    const { data: directTest, error: directError } = await supabase
-      .from('reactivated_leads')
-      .select('count(*)')
-      .single();
-    
-    console.log('📊 REACTIVATION - Teste direto:', { directTest, directError });
+    console.log('🔍 REACTIVATION - Buscando histórico diretamente da tabela...');
     
     // 🔍 BUSCA DIRETA NA TABELA (mais simples e confiável)
     console.log('🔍 REACTIVATION - Buscando diretamente na tabela...');
