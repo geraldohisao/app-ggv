@@ -330,19 +330,30 @@ const ReativacaoLeadsPage: React.FC = () => {
   // Função para formatar data (mantém horário UTC como no banco)
   const formatDate = (dateString: string) => {
     // Validar se dateString existe e não é vazio
-    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+    if (!dateString || dateString === 'null' || dateString === 'undefined' || dateString === null) {
       return '—';
     }
     
     try {
-      console.log('🕐 FORMAT DATE - Input:', dateString);
+      console.log('🕐 FORMAT DATE - Input:', dateString, typeof dateString);
       
-      // Garantir que interpretamos como UTC
-      const utcDate = new Date(dateString.endsWith('Z') ? dateString : dateString + 'Z');
+      // Tentar diferentes formatos de parsing
+      let utcDate: Date;
+      
+      if (dateString.includes('T')) {
+        // ISO format: 2025-09-29T19:10:07.856268+00:00
+        utcDate = new Date(dateString);
+      } else if (dateString.includes(' ')) {
+        // Postgres format: 2025-09-29 19:10:07+00
+        utcDate = new Date(dateString.replace(' ', 'T') + (dateString.includes('+') ? '' : 'Z'));
+      } else {
+        // Fallback
+        utcDate = new Date(dateString);
+      }
       
       // Verificar se a data é válida
       if (isNaN(utcDate.getTime())) {
-        console.warn('⚠️ Data inválida:', dateString);
+        console.warn('⚠️ Data inválida após parsing:', dateString, utcDate);
         return '—';
       }
       
