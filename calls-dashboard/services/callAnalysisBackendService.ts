@@ -93,12 +93,17 @@ async function saveAnalysisToDatabase(
     const processingTime = Date.now() - startTime;
 
     // Sanitizar dados antes de enviar para evitar overflow
+    const finalGrade = (analysis.final_grade === null || analysis.final_grade === undefined)
+      ? null
+      : Math.min(10, Math.max(0, analysis.final_grade));
+
     const sanitizedData = {
       p_call_id: callId,
       p_scorecard_id: analysis.scorecard_used?.id || null,
       p_overall_score: Math.min(1000, Math.max(0, analysis.overall_score || 0)),
       p_max_possible_score: Math.min(1000, Math.max(0, analysis.max_possible_score || 10)),
-      p_final_grade: Math.min(10, Math.max(0, analysis.final_grade || 0)),
+      // Importante: se a análise falhou, NÃO salvar 0; deixar NULL
+      p_final_grade: finalGrade,
       p_general_feedback: analysis.general_feedback || 'Análise processada com sucesso',
       p_strengths: analysis.strengths || [],
       p_improvements: analysis.improvements || [],

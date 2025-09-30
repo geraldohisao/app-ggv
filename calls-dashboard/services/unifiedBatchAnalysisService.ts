@@ -297,61 +297,103 @@ export async function processBatchAnalysisUnified(
   let successful = 0;
   let failed = 0;
 
-  console.log(`🚀 Iniciando análise em lote de ${calls.length} chamadas...`);
+  console.log(`🚀 Iniciando análise em lote PARALELA de ${calls.length} chamadas...`);
 
-  for (let i = 0; i < calls.length; i++) {
-    const call = calls[i];
-    
-    try {
-      // Callback de progresso - priorizar EMPRESA (enterprise) ao invés de SDR
-      const displayName = call.enterprise || call.company || call.person || `Chamada ${i + 1}`;
-      onProgress?.(i + 1, calls.length, displayName);
+  // ✅ MELHORIA: Análise em lote paralela com controle de concorrência
+  const BATCH_SIZE = 3; // Análises simultâneas para não sobrecarregar APIs
+  const batches: CallForAnalysis[][] = [];
+  
+  // Dividir chamadas em lotes
+  for (let i = 0; i < calls.length; i += BATCH_SIZE) {
+    batches.push(calls.slice(i, i + BATCH_SIZE));
+  }
 
-      console.log(`🔄 Analisando chamada ${i + 1}/${calls.length}: ${displayName} (${call.id.substring(0, 8)}...)`);
+  console.log(`📦 Dividido em ${batches.length} lotes de ${BATCH_SIZE} análises paralelas`);
 
-      // Usar a função REAL de análise (mesma do botão Reprocessar)
+  let processedCount = 0;
+
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex];
+    console.log(`🔄 Processando lote ${batchIndex + 1}/${batches.length} (${batch.length} chamadas)`);
+
+    // ✅ MELHORIA: Processar lote em paralelo
+    const batchPromises = batch.map(async (call, callIndex) => {
+      const globalIndex = processedCount + callIndex + 1;
+      const displayName = call.enterprise || call.company || call.person || `Chamada ${globalIndex}`;
+      
       try {
-        const analysisResult = await processCallAnalysis(
+        // Callback de progresso
+        onProgress?.(globalIndex, calls.length, displayName);
+
+        console.log(`🔄 Analisando chamada ${globalIndex}/${calls.length}: ${displayName} (${call.id.substring(0, 8)}...)`);
+
+        // ✅ MELHORIA: Timeout individual por análise (30s)
+        const analysisPromise = processCallAnalysis(
           call.id,
           call.transcription,
           call.sdr || call.enterprise || 'SDR',
           call.person || call.enterprise || 'Cliente',
-          true // FORÇAR reprocessamento para gerar análise REAL
+          true // FORÇAR reprocessamento
         );
 
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: Análise demorou mais de 30s')), 30000)
+        );
+
+        const analysisResult = await Promise.race([analysisPromise, timeoutPromise]) as any;
+
         if (analysisResult) {
-          successful++;
-          console.log(`✅ Análise ${i + 1} concluída - Score: ${analysisResult.final_grade}/10 - Scorecard: ${analysisResult.scorecard_used?.name}`);
-          results.push({
+          console.log(`✅ Análise ${globalIndex} concluída - Score: ${analysisResult.final_grade}/10 - Scorecard: ${analysisResult.scorecard_used?.name}`);
+          return {
             callId: call.id,
             success: true,
             score: analysisResult.final_grade,
             scorecard: analysisResult.scorecard_used?.name
-          });
+          };
         } else {
           throw new Error('Análise retornou null');
         }
-      } catch (analysisError) {
-        failed++;
-        console.error(`❌ Análise ${i + 1} falhou para ${call.id}:`, analysisError);
-        results.push({
+      } catch (error) {
+        console.error(`❌ Análise ${globalIndex} falhou para ${call.id}:`, error);
+        return {
           callId: call.id,
           success: false,
-          error: (analysisError as any)?.message || 'Erro na análise'
+          error: (error as any)?.message || 'Erro na análise'
+        };
+      }
+    });
+
+    // Aguardar conclusão do lote
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    // Processar resultados do lote
+    batchResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const analysisResult = result.value;
+        if (analysisResult.success) {
+          successful++;
+        } else {
+          failed++;
+        }
+        results.push(analysisResult);
+      } else {
+        failed++;
+        const globalIndex = processedCount + index + 1;
+        console.error(`💥 Erro no lote ${batchIndex + 1}, análise ${globalIndex}:`, result.reason);
+        results.push({
+          callId: batch[index].id,
+          success: false,
+          error: result.reason?.message || 'Erro desconhecido no lote'
         });
       }
+    });
 
-      // Pequena pausa para não sobrecarregar
-      await new Promise(resolve => setTimeout(resolve, 100));
+    processedCount += batch.length;
 
-    } catch (error) {
-      failed++;
-      console.error(`💥 Erro na análise ${i + 1}:`, error);
-      results.push({
-        callId: call.id,
-        success: false,
-        error: (error as any)?.message || 'Erro desconhecido'
-      });
+    // ✅ MELHORIA: Pausa entre lotes para não sobrecarregar
+    if (batchIndex < batches.length - 1) {
+      console.log(`⏱️ Pausa de 2s entre lotes para evitar sobrecarga...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
 

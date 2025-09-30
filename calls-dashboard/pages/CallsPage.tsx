@@ -10,6 +10,7 @@ import { AudioQualityDashboard } from '../components/AudioStatusIndicator';
 import { processCallAnalysis, getCallAnalysisFromDatabase } from '../services/callAnalysisBackendService';
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
 import UnifiedBatchAnalysisPanel from '../components/UnifiedBatchAnalysisPanel';
+import { startAutoAnalysis, getAutoAnalysisStats } from '../services/autoAnalysisWorker';
 
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
@@ -94,7 +95,19 @@ export default function CallsPage() {
         console.error('❌ CALLS PAGE - Erro ao carregar SDRs:', JSON.stringify(err, null, 2));
       }
     };
+    
+    const initAutoAnalysis = async () => {
+      try {
+        console.log('🤖 CALLS PAGE - Iniciando worker de análise automática...');
+        await startAutoAnalysis();
+        console.log('✅ CALLS PAGE - Worker automático iniciado');
+      } catch (err) {
+        console.warn('⚠️ CALLS PAGE - Falha ao iniciar worker automático:', err);
+      }
+    };
+    
     loadSdrs();
+    initAutoAnalysis();
   }, []);
 
   // Resetar página e limpar dados quando filtros mudarem

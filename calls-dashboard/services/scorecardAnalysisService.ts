@@ -115,7 +115,8 @@ async function callAIAPI(prompt: string): Promise<string> {
     const apiKey = await getGeminiApiKey();
     if (apiKey) {
       console.log('🤖 Tentando Gemini...');
-      const validModels = ['gemini-1.5-flash-8b', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+  // Ajuste: remover modelos que retornam 404 e manter apenas os válidos no projeto
+  const validModels = ['gemini-1.5-flash'];
       
       for (const model of validModels) {
         try {
@@ -156,12 +157,27 @@ async function callAIAPI(prompt: string): Promise<string> {
     console.warn('⚠️ Erro com Gemini:', error);
   }
 
-  throw new Error('Todas as APIs de IA falharam. Verifique as configurações.');
+    // Em caso de falha total, retornar estrutura com analysis_failed e final_grade null
+    return {
+      scorecard_used: { id: '', name: 'N/A', description: '' },
+      overall_score: 0,
+      max_possible_score: 10,
+      final_grade: null,
+      criteria_analysis: [],
+      general_feedback: 'Falha ao analisar: todas as APIs indisponíveis',
+      strengths: [],
+      improvements: [],
+      confidence: 0
+    } as any;
 }
 
 // Tentar extrair e reparar JSON retornado pelo modelo
 function extractJson(text: string): any {
-  console.log('🔍 Tentando extrair JSON da resposta:', text.substring(0, 200) + '...');
+  try {
+    console.log('🔍 Tentando extrair JSON da resposta:', (text || '').substring(0, 200) + '...');
+  } catch {
+    console.log('🔍 Tentando extrair JSON da resposta: [conteúdo indisponível]');
+  }
   
   const tryParse = (s: string): any => {
     try { 
@@ -194,7 +210,7 @@ function extractJson(text: string): any {
         depth--;
         if (depth === 0) {
           const candidate = text.slice(start, i + 1);
-          console.log('🔍 Candidato JSON:', candidate.substring(0, 100) + '...');
+          try { console.log('🔍 Candidato JSON:', (candidate || '').substring(0, 100) + '...'); } catch {}
           const parsed = tryParse(candidate);
           if (parsed) return parsed;
           
@@ -203,7 +219,7 @@ function extractJson(text: string): any {
             .replace(/,\s*([}\]])/g, '$1')
             .replace(/\t/g, ' ')
             .replace(/\n\s*\n/g, '\n');
-          console.log('🔍 JSON reparado:', repaired.substring(0, 100) + '...');
+          try { console.log('🔍 JSON reparado:', (repaired || '').substring(0, 100) + '...'); } catch {}
           const parsedRepaired = tryParse(repaired);
           if (parsedRepaired) return parsedRepaired;
           break;
@@ -302,54 +318,62 @@ function createAnalysisPrompt(
   criteria: ScorecardCriterion[]
 ): string {
   return `
-Você é um especialista em análise de vendas e deve avaliar esta transcrição de chamada comercial usando o scorecard "${scorecard.name}".
+Você é um especialista em análise de vendas B2B com 15+ anos de experiência. Analise esta transcrição de chamada comercial usando o scorecard "${scorecard.name}".
+
+CONTEXTO DA ANÁLISE:
+- Scorecard: ${scorecard.name}
+- Descrição: ${scorecard.description}
+- Objetivo: Avaliar performance da ligação comercial
 
 TRANSCRIÇÃO DA CHAMADA:
 """
 ${transcription}
 """
 
-SCORECARD: ${scorecard.name}
-DESCRIÇÃO: ${scorecard.description}
-
-CRITÉRIOS PARA AVALIAÇÃO:
+CRITÉRIOS DE AVALIAÇÃO (${criteria.length} critérios):
 ${criteria.map((c, i) => `
-${i + 1}. ${c.name} (Peso: ${c.weight}, Pontuação máxima: ${c.max_score})
-   Descrição: ${c.description}
+${i + 1}. 📊 ${c.name} (Peso: ${c.weight}/3, Pontuação máxima: ${c.max_score}/3)
+   🎯 Descrição: ${c.description}
+   💡 O que avaliar: Busque evidências concretas na transcrição
 `).join('')}
 
-INSTRUÇÕES:
-1. Analise a transcrição cuidadosamente
-2. Para cada critério, atribua uma pontuação de 0 até a pontuação máxima
-3. Identifique evidências específicas na transcrição
-4. Forneça análise detalhada e sugestões de melhoria
-5. Identifique pontos fortes e oportunidades gerais
+ESCALA DE PONTUAÇÃO:
+- 0 pontos: Critério não atendido ou não abordado
+- 1 ponto: Critério parcialmente atendido
+- 2 pontos: Critério bem atendido
+- 3 pontos: Critério excelentemente atendido (apenas quando excepcional)
 
-IMPORTANTE: RESPONDA APENAS COM JSON VÁLIDO. NÃO INCLUA TEXTO ADICIONAL, EXPLICAÇÕES OU COMENTÁRIOS.
+DIRETRIZES DE ANÁLISE:
+✅ SEJA RIGOROSO: Pontuações altas devem ser bem justificadas
+✅ USE EVIDÊNCIAS: Cite trechos específicos da transcrição
+✅ SEJA CONSTRUTIVO: Sugestões práticas e acionáveis
+✅ CONSIDERE CONTEXTO: Tipo de ligação, etapa do pipeline, perfil do cliente
+✅ AVALIE NATURALIDADE: Conversas forçadas devem ter pontuação menor
+
+IMPORTANTE: RESPONDA APENAS COM JSON VÁLIDO. SEM TEXTO ADICIONAL.
 
 Formato JSON obrigatório:
 {
   "criteria_analysis": [
     {
       "criterion_id": "id_do_criterio",
-      "achieved_score": 8,
-      "analysis": "Análise detalhada do que foi observado",
-      "evidence": ["Trecho específico da transcrição que comprova", "Outro trecho relevante"],
-      "suggestions": ["Sugestão específica de melhoria", "Outra sugestão"]
+      "achieved_score": 2,
+      "analysis": "Análise objetiva baseada em evidências da transcrição",
+      "evidence": ["'Trecho exato da transcrição que comprova'", "'Outro trecho relevante'"],
+      "suggestions": ["Sugestão específica e acionável", "Melhoria com exemplo prático"]
     }
   ],
-  "general_feedback": "Feedback geral sobre a performance na chamada",
-  "strengths": ["Ponto forte identificado", "Outro ponto forte"],
-  "improvements": ["Área de melhoria", "Outra oportunidade"],
+  "general_feedback": "Resumo executivo da performance: pontos fortes, principais gaps e próximos passos",
+  "strengths": ["Ponto forte específico com evidência", "Habilidade demonstrada na ligação"],
+  "improvements": ["Oportunidade de melhoria com ação específica", "Técnica para aplicar na próxima ligação"],
   "confidence": 0.85
 }
 
-REGRAS:
-1. Responda APENAS com o JSON acima
-2. NÃO inclua markdown ou blocos de código
-3. NÃO inclua texto antes ou depois do JSON
-4. Use evidências da transcrição para justificar as pontuações
-5. Seja específico, objetivo e construtivo
+VALIDAÇÃO OBRIGATÓRIA:
+- Todos os criterion_id devem corresponder aos critérios fornecidos
+- achieved_score deve estar entre 0 e max_score de cada critério
+- evidence deve conter trechos literais da transcrição
+- confidence deve refletir a qualidade da transcrição e clareza da análise
 `;
 }
 

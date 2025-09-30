@@ -1,14 +1,12 @@
--- 🔧 CRIAR FUNÇÃO get_sdr_metrics_with_analysis CORRETA
+-- 🔧 CORRIGIR FUNÇÃO get_sdr_metrics_with_analysis
 -- Execute este script no SQL Editor do Supabase
 
--- 1. Verificar se a função existe
-SELECT 'Verificando função get_sdr_metrics_with_analysis:' as info;
-SELECT routine_name, routine_type 
-FROM information_schema.routines 
-WHERE routine_name = 'get_sdr_metrics_with_analysis' 
-AND routine_schema = 'public';
+-- 1. Remover função existente
+SELECT 'Removendo função get_sdr_metrics_with_analysis existente...' as info;
+DROP FUNCTION IF EXISTS get_sdr_metrics_with_analysis(integer);
 
--- 2. Criar/substituir função get_sdr_metrics_with_analysis
+-- 2. Criar função correta
+SELECT 'Criando função get_sdr_metrics_with_analysis correta...' as info;
 CREATE OR REPLACE FUNCTION get_sdr_metrics_with_analysis(p_days INTEGER DEFAULT 30)
 RETURNS TABLE (
     sdr_id TEXT,
@@ -35,11 +33,15 @@ AS $$
     ORDER BY avg_score DESC;
 $$;
 
--- 3. Testar a função
-SELECT 'Testando get_sdr_metrics_with_analysis:' as info;
+-- 3. Conceder permissões
+GRANT EXECUTE ON FUNCTION get_sdr_metrics_with_analysis(INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_sdr_metrics_with_analysis(INTEGER) TO service_role;
+
+-- 4. Testar a função
+SELECT 'Testando função corrigida:' as info;
 SELECT * FROM get_sdr_metrics_with_analysis(99999) LIMIT 5;
 
--- 4. Comparar com dados reais
+-- 5. Comparar com dados reais
 SELECT 'Dados reais para comparação:' as info;
 SELECT 
     c.agent_id as sdr_name,

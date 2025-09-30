@@ -307,13 +307,22 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Função para formatar data (mantém horário UTC como no banco)
   const formatDate = (dateString: string) => {
-    // Mostrar horário exatamente como está no banco (UTC)
-    // Problema: 16h10 local → 19h10 UTC no banco → deve mostrar 19h10 UTC
+    // Validar se dateString existe e não é vazio
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+      return '—';
+    }
+    
     try {
       console.log('🕐 FORMAT DATE - Input:', dateString);
       
       // Garantir que interpretamos como UTC
       const utcDate = new Date(dateString.endsWith('Z') ? dateString : dateString + 'Z');
+      
+      // Verificar se a data é válida
+      if (isNaN(utcDate.getTime())) {
+        console.warn('⚠️ Data inválida:', dateString);
+        return '—';
+      }
       
       // Extrair componentes diretamente
       const year = utcDate.getUTCFullYear();
@@ -329,14 +338,7 @@ const ReativacaoLeadsPage: React.FC = () => {
     } catch (error) {
       // Fallback para caso de erro
       console.warn('⚠️ Erro ao formatar data:', dateString, error);
-      return new Date(dateString).toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',  
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'UTC'
-      }) + ' UTC';
+      return '—';
     }
   };
 
@@ -839,6 +841,45 @@ const ReativacaoLeadsPage: React.FC = () => {
                     title="Recarregar histórico"
                   >
                     🔄
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (confirm('Simular callback do N8N para resolver pendentes?')) {
+                        try {
+                          const callbackData = {
+                            workflowId: 'Reativação de Leads',
+                            status: 'completed',
+                            message: '1 lead(s) processados',
+                            leadsProcessed: 1,
+                            sdr: 'Andressa Habinoski',
+                            timestamp: new Date().toISOString(),
+                            source: 'emergency_callback'
+                          };
+                          
+                          const response = await fetch('/.netlify/functions/reativacao-webhook', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(callbackData)
+                          });
+                          
+                          if (response.ok) {
+                            const result = await response.json();
+                            console.log('✅ Callback simulado:', result);
+                            loadHistory(1);
+                            alert('Callback simulado com sucesso!');
+                          } else {
+                            throw new Error(`HTTP ${response.status}`);
+                          }
+                        } catch (error) {
+                          console.error('❌ Erro callback:', error);
+                          alert('Erro: ' + error.message);
+                        }
+                      }
+                    }}
+                    className="flex items-center gap-1 bg-purple-100 text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-200 transition-colors text-sm"
+                    title="Simular callback do N8N"
+                  >
+                    🔧
                   </button>
                   <button
                     onClick={handleResetHistory}
