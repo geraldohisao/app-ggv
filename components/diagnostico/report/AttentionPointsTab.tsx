@@ -1,23 +1,34 @@
 import React from 'react';
-import { DetailedAIAnalysis, SummaryInsights } from '../../../types';
+import { DetailedAIAnalysis, SummaryInsights, CompanyData, MaturityResult, MarketSegment } from '../../../types';
 import { DIAGNOSTIC_AREAS, BENCHMARK_DATA } from '../../../constants';
 import { DIAGNOSTIC_IMPLICATIONS, getAttentionPoints } from '../../../data/diagnosticImplications';
 import { DiagnosticArea } from '../../../types';
 import { LoadingSpinner } from '../../ui/Feedback';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
 import { ExclamationTriangleIcon, ChartBarIcon, LightBulbIcon, UserCircleIcon, DocumentCheckIcon, ComputerDesktopIcon, ChatBubbleBottomCenterTextIcon, UsersIcon, ClipboardDocumentListIcon, PresentationChartLineIcon, AcademicCapIcon, HeartIcon, MagnifyingGlassIcon, TrendingUpIcon } from '../../ui/icons';
+import { MaturityCoverSection } from './MaturityCoverSection';
 
 interface AttentionPointsTabProps {
+    companyData: CompanyData;
+    maturity: MaturityResult;
+    totalScore: number;
+    segment: MarketSegment;
     scoresByArea: Record<string, { score: number; count: number }>;
     detailedAnalysis: DetailedAIAnalysis | null;
     summaryInsights: SummaryInsights | null;
+    specialistName?: string;
     isLoading: boolean;
 }
 
 export const AttentionPointsTab: React.FC<AttentionPointsTabProps> = ({ 
+    companyData,
+    maturity,
+    totalScore,
+    segment,
     scoresByArea, 
     detailedAnalysis,
     summaryInsights,
+    specialistName,
     isLoading 
 }) => {
     // Função para determinar a cor baseada na porcentagem
@@ -45,6 +56,15 @@ export const AttentionPointsTab: React.FC<AttentionPointsTabProps> = ({
 
     return (
         <div className="space-y-8">
+            {/* Capa com Maturidade */}
+            <MaturityCoverSection 
+                companyData={companyData}
+                maturity={maturity}
+                totalScore={totalScore}
+                segment={segment}
+                specialistName={specialistName}
+            />
+
             <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold text-slate-800 mb-2">🎯 Pontos de Atenção</h1>
                 <p className="text-slate-600">Identificação e análise dos principais aspectos do seu comercial</p>
@@ -149,27 +169,15 @@ export const AttentionPointsTab: React.FC<AttentionPointsTabProps> = ({
 
             {/* Análise Completa do Especialista */}
             {summaryInsights && (
-                <>
-                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
-                        <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-3">
-                            <UserCircleIcon className="w-6 h-6 text-blue-600" />
-                            Análise Completa do Especialista GGV
-                        </h2>
-                        <div className="bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200 p-4 rounded-lg">
-                            <MarkdownRenderer text={summaryInsights.specialistInsight} />
-                        </div>
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-3">
+                        <UserCircleIcon className="w-6 h-6 text-blue-600" />
+                        Análise Completa do Especialista GGV
+                    </h2>
+                    <div className="bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200 p-4 rounded-lg">
+                        <MarkdownRenderer text={summaryInsights.specialistInsight} />
                     </div>
-
-                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
-                        <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-3">
-                            <ChartBarIcon className="w-6 h-6 text-slate-600" />
-                            Comparativo de Mercado
-                        </h2>
-                        <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg">
-                            <MarkdownRenderer text={summaryInsights.marketBenchmark} />
-                        </div>
-                    </div>
-                </>
+                </div>
             )}
 
             <ReportFooter />

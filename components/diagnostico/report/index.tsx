@@ -5,3 +5,5 @@ export * from './SegmentedAnalysisTab';
 export * from './SalesBottlenecksTab';
 export * from './TextualDiagnosisTab';
 export * from './AIAnalysisTab';
+export * from './MarketComparisonTab';
+export * from './MaturityCoverSection';

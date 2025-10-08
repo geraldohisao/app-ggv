@@ -18,9 +18,8 @@ const PublicDiagnosticReport: React.FC = () => {
   const nextSteps = useMemo(() => (data?.detailedAnalysis?.nextSteps || []).slice(0, 3), [data?.detailedAnalysis]);
 
   // Lazy imports - devem estar sempre no mesmo lugar
-  const UnifiedCoverDashboardTab = React.lazy(() => import('./diagnostico/report/UnifiedCoverDashboardTab').then(m => ({ default: m.UnifiedCoverDashboardTab })));
   const SalesBottlenecksTab = React.lazy(() => import('./diagnostico/report/SalesBottlenecksTab').then(m => ({ default: m.SalesBottlenecksTab })));
-  const TextualDiagnosisTab = React.lazy(() => import('./diagnostico/report/TextualDiagnosisTab').then(m => ({ default: m.TextualDiagnosisTab })));
+  const MarketComparisonTab = React.lazy(() => import('./diagnostico/report/MarketComparisonTab').then(m => ({ default: m.MarketComparisonTab })));
   const AIAnalysisTab = React.lazy(() => import('./diagnostico/report/AIAnalysisTab').then(m => ({ default: m.AIAnalysisTab })));
 
   useEffect(() => {
@@ -247,12 +246,15 @@ const PublicDiagnosticReport: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
       <Suspense fallback={<div className="p-6 bg-white rounded-2xl shadow"><LoadingSpinner text="Carregando..." /></div>}>
+        {/* Pontos de Atenção - Inclui capa com maturidade + pontos de atenção */}
         <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
-          <UnifiedCoverDashboardTab companyData={companyData} maturity={maturity} totalScore={totalScore} segment={segment} scoresByArea={scoresByArea} specialistName={undefined} />
+          <SalesBottlenecksTab companyData={companyData} maturity={maturity} totalScore={totalScore} segment={segment} scoresByArea={scoresByArea} detailedAnalysis={detailedAnalysis} summaryInsights={summaryInsights} specialistName={undefined} isLoading={false} />
         </div>
+        {/* Comparativo de Mercado - Gráficos de benchmark e radar */}
         <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
-          <SalesBottlenecksTab scoresByArea={scoresByArea} detailedAnalysis={detailedAnalysis} summaryInsights={summaryInsights} isLoading={false} />
+          <MarketComparisonTab scoresByArea={scoresByArea} summaryInsights={summaryInsights} />
         </div>
+        {/* Análise IA */}
         <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200/50">
           <AIAnalysisTab detailedAnalysis={detailedAnalysis} isGenerating={false} />
         </div>
