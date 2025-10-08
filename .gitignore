@@ -94,3 +94,15 @@ docker-compose.override.yml
 .supabase/
 # Local Netlify folder
 .netlify
+
+# SQL helper files (podem conter chaves API)
+configure-*.sql
+debug-*.sql
+test-*.sql
+fix-*.sql
+check-*.sql
+clean-*.sql
+remove-*.sql
+reprocess-*.sql
+force-*.sql
+*.html
