@@ -113,6 +113,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
             const name = await getCurrentUserDisplayName();
             if (name) setSpecialistName(name);
         })();
+        
+        // Scroll para o topo ao abrir o resultado
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        console.log('📜 RESULTS_VIEW - Scroll para o topo executado');
     }, []);
     const [isLoadingSummary, setIsLoadingSummary] = useState(true);
     const [isLoadingDetailed, setIsLoadingDetailed] = useState(true);
@@ -127,24 +131,39 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
 
     useEffect(() => {
         const fetchInsights = async () => {
+            console.log('🎯 RESULTS_VIEW - Iniciando fetchInsights');
+            console.log('📊 RESULTS_VIEW - CompanyData:', companyData?.companyName);
+            console.log('📋 RESULTS_VIEW - Answers count:', Object.keys(answers || {}).length);
+            console.log('🎯 RESULTS_VIEW - Total score:', totalScore);
+            console.log('🏢 RESULTS_VIEW - Segment:', segment?.name);
+            
             setIsLoadingSummary(true);
             setIsLoadingDetailed(true);
             setApiError(null);
             try {
+                console.log('🚀 RESULTS_VIEW - Chamando getSummaryInsights...');
                 // Buscar resumo e detalhado em paralelo, porém o detalhado depende do resumo -> usamos fallback local se o resumo atrasar
                 const summaryPromise = getSummaryInsights(companyData, answers, totalScore, segment);
-                const detailedPromise = summaryPromise.then(s => getDetailedAIAnalysis(companyData, answers, totalScore, s, segment));
+                const detailedPromise = summaryPromise.then(s => {
+                    console.log('🚀 RESULTS_VIEW - Chamando getDetailedAIAnalysis...');
+                    return getDetailedAIAnalysis(companyData, answers, totalScore, s, segment);
+                });
 
+                console.log('⏳ RESULTS_VIEW - Aguardando summaryPromise...');
                 const summary = await summaryPromise;
+                console.log('✅ RESULTS_VIEW - Summary recebido:', summary);
                 setSummaryInsights(summary);
                 setIsLoadingSummary(false);
 
+                console.log('⏳ RESULTS_VIEW - Aguardando detailedPromise...');
                 const detailed = await detailedPromise;
+                console.log('✅ RESULTS_VIEW - Detailed recebido:', detailed);
                 setDetailedAnalysis(detailed);
             } catch (err: any) {
-                console.error("Failed to get AI analysis:", err);
+                console.error("❌ RESULTS_VIEW - Failed to get AI analysis:", err);
                 setApiError(err.message || "Falha ao obter análise da IA.");
             } finally {
+                console.log('🏁 RESULTS_VIEW - Finalizando fetchInsights');
                 setIsLoadingSummary(false);
                 setIsLoadingDetailed(false);
             }
@@ -152,14 +171,14 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ companyData, segment, 
         fetchInsights();
     }, [companyData, answers, totalScore, segment]);
 
-    // 🚀 MELHORIA: Timeout mais inteligente
+    // 🚀 MELHORIA: Timeout mais inteligente - ajustado para aguardar Gemini 2.5
     useEffect(() => {
         const timer = setTimeout(() => {
             if (webhookStatus.sent || webhookStatus.sending) return; // Já processado
             if (summaryInsights && detailedAnalysis) return; // IA ok
-            console.warn('⏰ TIMEOUT: Forçando envio após 20s sem IA completa');
+            console.warn('⏰ TIMEOUT: Forçando envio após 60s sem IA completa');
             setEmergencyTimeout(true);
-        }, 20000); // Reduzido para 20 segundos
+        }, 60000); // Aumentado para 60 segundos para aguardar Gemini 2.5
         return () => clearTimeout(timer);
     }, [webhookStatus.sent, webhookStatus.sending, summaryInsights, detailedAnalysis]);
 

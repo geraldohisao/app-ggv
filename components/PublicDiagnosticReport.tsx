@@ -23,6 +23,9 @@ const PublicDiagnosticReport: React.FC = () => {
   const AIAnalysisTab = React.lazy(() => import('./diagnostico/report/AIAnalysisTab').then(m => ({ default: m.AIAnalysisTab })));
 
   useEffect(() => {
+    // Scroll para o topo ao abrir relatório público
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     (async () => {
       try {
         console.log('🔍 PUBLIC_REPORT - Carregando relatório com token:', token);
