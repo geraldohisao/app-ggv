@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient';
 // Configuração real do N8N
 const N8N_CONFIG = {
   WEBHOOK_URL: 'https://api-test.ggvinteligencia.com.br/webhook/reativacao-leads',
-  TIMEOUT: 45000, // 45 segundos - aumentado para volumes maiores
+  TIMEOUT: 300000, // 5 minutos (300 segundos) - permite processar volumes maiores sem timeout
   CALLBACK_URL: 'https://app.grupoggv.com/.netlify/functions/reativacao-webhook' // Webhook específico para reativação
 };
 
@@ -747,7 +747,10 @@ async function processAutomaticCallback(workflowId: string, n8nData: any): Promi
       console.warn('⚠️ AUTOMATION - Erro ao chamar callback Netlify:', callbackError);
       
       // Fallback: Atualizar diretamente via Supabase
-      await updateReactivationStatus(workflowId, status as any, leadsProcessed, n8nData);
+      await updateReactivationStatus(workflowId, status as any, {
+        count_leads: leadsProcessed,
+        n8n_data: n8nData
+      });
     }
     
   } catch (error: any) {
