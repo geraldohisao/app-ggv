@@ -112,6 +112,24 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           const callItem = convertToCallItem(callDetail);
           setCall(callItem);
           
+          // 🔎 Diagnóstico de áudio em produção: testar HEAD para CORS/expiração
+          try {
+            const testUrl = callItem.recording_url;
+            if (testUrl) {
+              const res = await fetch(testUrl, { method: 'HEAD', mode: 'cors' as RequestMode });
+              console.log('🔎 HEAD audio check:', {
+                ok: res.ok,
+                status: res.status,
+                contentType: res.headers.get('content-type'),
+                acceptRanges: res.headers.get('accept-ranges'),
+                contentLength: res.headers.get('content-length'),
+                cors: res.headers.get('access-control-allow-origin')
+              });
+            }
+          } catch (e) {
+            console.warn('⚠️ HEAD audio check falhou:', e);
+          }
+          
           // Carregar análise IA existente (sem processamento automático)
           await loadExistingAIAnalysis(callItem);
         } else {
@@ -525,6 +543,17 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                   controls 
                   className="w-full" 
                   preload="metadata"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    const el = e.currentTarget as HTMLAudioElement;
+                    console.error('❌ Erro no player de áudio', {
+                      src: el.currentSrc || call.recording_url,
+                      networkState: el.networkState,
+                      readyState: el.readyState
+                    });
+                    const hint = 'Se estiver em produção, verifique CORS e expiração da URL.';
+                    console.error('💡 Dica:', hint);
+                  }}
                   onLoadedMetadata={async (e) => {
                     const audioElement = e.currentTarget;
                     const realDuration = Math.floor(audioElement.duration);
