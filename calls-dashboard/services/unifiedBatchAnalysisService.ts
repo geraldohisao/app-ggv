@@ -234,7 +234,26 @@ export async function getCallsNeedingAnalysisUnified(
     }
 
     // Filtrar chamadas elegíveis usando CRITÉRIOS FLEXÍVEIS PARA TESTE
+    console.log(`🔍 Iniciando filtro de ${allCalls.length} chamadas...`);
+    console.log(`🔍 Análises já existentes: ${analyzedCallIds.size}`);
+    console.log(`🔍 ForceReprocess: ${forceReprocess}`);
+    
+    let debugCount = 0;
     const eligibleCalls = allCalls.filter(call => {
+      // DEBUG: Logar primeira chamada completa
+      if (debugCount < 3) {
+        console.log(`\n🔍 DEBUG Chamada ${debugCount + 1}:`, {
+          id: call.id?.substring(0, 8),
+          enterprise: call.enterprise || call.company_name,
+          duration: call.duration,
+          duration_formated: call.duration_formated,
+          transcription_length: call.transcription?.length || 0,
+          has_transcription: !!call.transcription,
+          segments: call.transcription?.split('.').length || 0
+        });
+        debugCount++;
+      }
+      
       // 1. CRITÉRIO FLEXÍVEL: Qualquer chamada com duração > 0
       const isAnswered = call.duration > 0;
       
@@ -254,13 +273,23 @@ export async function getCallsNeedingAnalysisUnified(
       const isEligible = isAnswered && hasTranscription && isOver3Min && hasMinSegments && needsAnalysis;
 
       if (isEligible) {
-        console.log(`✅ Chamada elegível: ${call.id} - ${translateCallStatus(call.status_voip)} - ${realDuration}s - ${call.transcription?.split('.').length || 0} segmentos`);
+        console.log(`✅ Elegível: ${call.enterprise || call.company_name || 'N/A'} - ${realDuration}s - ${call.transcription?.split('.').length || 0} segmentos`);
       }
 
       return isEligible;
     }).slice(0, limit); // Limitar quantidade
 
-    console.log(`🎯 Chamadas elegíveis para análise: ${eligibleCalls.length}`);
+    console.log(`🎯 Total de ${eligibleCalls.length} chamadas elegíveis para análise`);
+    
+    if (eligibleCalls.length > 0) {
+      console.log(`📋 Primeira chamada elegível:`, {
+        id: eligibleCalls[0].id,
+        company: eligibleCalls[0].company_name || eligibleCalls[0].enterprise,
+        person: eligibleCalls[0].person_name || eligibleCalls[0].person,
+        sdr: eligibleCalls[0].sdr_name || eligibleCalls[0].agent_id,
+        transcription_length: eligibleCalls[0].transcription?.length
+      });
+    }
 
     return eligibleCalls.map(call => ({
       id: call.id,
@@ -270,9 +299,9 @@ export async function getCallsNeedingAnalysisUnified(
       call_type: call.call_type,
       pipeline: call.pipeline,
       cadence: call.cadence,
-      enterprise: call.enterprise,
-      person: call.person,
-      sdr: call.sdr
+      enterprise: call.company_name || call.enterprise,
+      person: call.person_name || call.person,
+      sdr: call.sdr_name || call.agent_id || 'SDR'
     }));
 
   } catch (error) {
@@ -319,7 +348,7 @@ export async function processBatchAnalysisUnified(
     // ✅ MELHORIA: Processar lote em paralelo
     const batchPromises = batch.map(async (call, callIndex) => {
       const globalIndex = processedCount + callIndex + 1;
-      const displayName = call.enterprise || call.company || call.person || `Chamada ${globalIndex}`;
+      const displayName = call.enterprise || call.person || `Chamada ${globalIndex}`;
       
       try {
         // Callback de progresso
@@ -331,8 +360,8 @@ export async function processBatchAnalysisUnified(
         const analysisPromise = processCallAnalysis(
           call.id,
           call.transcription,
-          call.sdr || call.enterprise || 'SDR',
-          call.person || call.enterprise || 'Cliente',
+          call.sdr || 'SDR',
+          call.person || 'Cliente',
           true // FORÇAR reprocessamento
         );
 

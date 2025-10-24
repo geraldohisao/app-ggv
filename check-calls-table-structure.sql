@@ -1,8 +1,7 @@
--- 🔍 VERIFICAR: Estrutura real da tabela calls
--- Este script verifica quais colunas existem na tabela calls
+-- 🔍 VERIFICAR ESTRUTURA DA TABELA CALLS
+-- Descobrir todas as colunas relacionadas a duração
 
--- 1. Verificar todas as colunas da tabela calls
-SELECT 'Estrutura da tabela calls:' as info;
+-- 1. Ver todas as colunas da tabela calls
 SELECT 
     column_name,
     data_type,
@@ -10,38 +9,21 @@ SELECT
     column_default
 FROM information_schema.columns 
 WHERE table_name = 'calls' 
-AND table_schema = 'public'
+  AND table_schema = 'public'
+  AND column_name ILIKE '%duration%'
+ORDER BY column_name;
+
+-- 2. Ver TODAS as colunas da tabela calls para identificar campos relacionados
+SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'calls' 
+  AND table_schema = 'public'
 ORDER BY ordinal_position;
 
--- 2. Verificar dados de exemplo de uma ligação
-SELECT 'Dados de exemplo de uma ligação:' as info;
-SELECT 
-    id,
-    status,
-    status_voip,
-    call_type,
-    duration,
-    created_at
+-- 3. Verificar dados da chamada específica em TODOS os campos
+SELECT *
 FROM calls 
-ORDER BY created_at DESC 
-LIMIT 3;
-
--- 3. Verificar valores únicos de status_voip
-SELECT 'Valores únicos de status_voip:' as info;
-SELECT 
-    status_voip,
-    COUNT(*) as total
-FROM calls 
-WHERE status_voip IS NOT NULL
-GROUP BY status_voip
-ORDER BY total DESC;
-
--- 4. Verificar valores únicos de status
-SELECT 'Valores únicos de status:' as info;
-SELECT 
-    status,
-    COUNT(*) as total
-FROM calls 
-WHERE status IS NOT NULL
-GROUP BY status
-ORDER BY total DESC;
+WHERE id = '13867f2f-4df6-4679-a160-e0c294d32544';

@@ -7,6 +7,7 @@ import { supabase } from '../../services/supabaseClient';
 import { processCallAnalysis } from './callAnalysisBackendService';
 import { shouldAnalyzeTranscription } from './transcriptionValidator';
 import { retryAnalysis } from './retryService';
+import { getCallsNeedingAnalysisUnified, processBatchAnalysisUnified } from './unifiedBatchAnalysisService';
 
 interface AutoAnalysisConfig {
   enabled: boolean;
@@ -118,33 +119,35 @@ class AutoAnalysisWorker {
 
   /**
    * Buscar ligações elegíveis para análise
+   * ✅ AGORA USA A MESMA LÓGICA DO PAINEL!
    */
   private async getEligibleCalls(): Promise<any[]> {
-    const { data, error } = await supabase.rpc('get_calls_for_auto_analysis', {
-      p_limit: this.config.batchSize * 2, // Buscar um pouco mais para filtrar
-      p_min_duration_seconds: this.config.minDuration
-    });
+    try {
+      // ✅ Usar a mesma função que o painel usa
+      const calls = await getCallsNeedingAnalysisUnified(false, this.config.batchSize * 2);
+      
+      console.log(`🤖 AUTO ANALYSIS - ${calls.length} ligações encontradas pelo unifiedBatchAnalysisService`);
+      
+      // Filtrar ligações com transcrição de qualidade (validação extra)
+      const filtered = calls.filter((call: any) => {
+        if (!call.transcription) return false;
+        
+        const { should, reason } = shouldAnalyzeTranscription(call.transcription);
+        if (!should) {
+          console.log(`🤖 AUTO ANALYSIS - Ligação ${call.id} rejeitada: ${reason}`);
+          return false;
+        }
+        
+        return true;
+      });
 
-    if (error) {
+      console.log(`🤖 AUTO ANALYSIS - ${filtered.length}/${calls.length} ligações passaram na validação de qualidade`);
+      return filtered;
+      
+    } catch (error) {
       console.error('🤖 AUTO ANALYSIS - Erro ao buscar ligações elegíveis:', error);
       return [];
     }
-
-    // Filtrar ligações com transcrição de qualidade
-    const filtered = (data || []).filter((call: any) => {
-      if (!call.transcription) return false;
-      
-      const { should, reason } = shouldAnalyzeTranscription(call.transcription);
-      if (!should) {
-        console.log(`🤖 AUTO ANALYSIS - Ligação ${call.id} rejeitada: ${reason}`);
-        return false;
-      }
-      
-      return true;
-    });
-
-    console.log(`🤖 AUTO ANALYSIS - ${filtered.length}/${data?.length || 0} ligações passaram na validação de qualidade`);
-    return filtered;
   }
 
   /**

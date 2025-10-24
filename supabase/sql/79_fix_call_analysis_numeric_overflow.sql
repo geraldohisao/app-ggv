@@ -120,6 +120,11 @@ BEGIN
             'last_analyzed', NOW()
         ),
         ai_status = 'completed',
+        insights = COALESCE(insights, '{}'::jsonb) || jsonb_build_object(
+            'analysis_summary', COALESCE(p_general_feedback, 'Análise processada com sucesso'),
+            'analysis_confidence', safe_confidence,
+            'analysis_processed_at', NOW()
+        ),
         updated_at = NOW()
     WHERE id = p_call_id;
 

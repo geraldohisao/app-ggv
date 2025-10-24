@@ -50,6 +50,9 @@ export interface CallWithDetails {
   // Campos extras para detalhes
   comments?: any;
   detailed_scores?: any;
+  analysis_summary?: string;
+  analysis_confidence?: number;
+  analysis_processed_at?: string;
 }
 
 export interface CallsFilters {
@@ -583,7 +586,10 @@ export async function fetchCallDetail(callId: string): Promise<CallWithDetails |
       sdr_name: callData.agent_id,
       sdr_email: callData.sdr_email || callData.agent_id,
       sdr_avatar_url: `https://i.pravatar.cc/64?u=${callData.agent_id}`,
-      audio_url: callData.recording_url || ''
+      audio_url: callData.recording_url || '',
+      analysis_summary: callData.insights?.analysis_summary,
+      analysis_confidence: callData.insights?.analysis_confidence,
+      analysis_processed_at: callData.insights?.analysis_processed_at
     };
 
     console.log('✅ CALLS SERVICE - Detalhes da call encontrados');
@@ -642,8 +648,24 @@ export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
  */
 export function convertToCallItem(call: any): CallItem {
   // Converter duration_formated para segundos
-  let durationInSeconds = call.duration || 0;
+  // ✅ PRIORIDADE: duration_formated (fonte confiável) > duration_seconds > duration
+  let durationInSeconds = 0;
   
+  // Garantir que insights esteja em formato objeto
+  const insights = (() => {
+    if (!call || !call.insights) return {};
+    if (typeof call.insights === 'string') {
+      try {
+        return JSON.parse(call.insights);
+      } catch (error) {
+        console.warn('⚠️ Não foi possível parsear insights para JSON:', call.insights);
+        return {};
+      }
+    }
+    return call.insights;
+  })();
+
+  // 1️⃣ SEMPRE tentar duration_formated primeiro (mais confiável)
   if (call.duration_formated && call.duration_formated !== '00:00:00') {
     try {
       const parts = call.duration_formated.split(':');
@@ -651,11 +673,14 @@ export function convertToCallItem(call: any): CallItem {
       const minutes = parseInt(parts[1]) || 0;
       const seconds = parseInt(parts[2]) || 0;
       durationInSeconds = hours * 3600 + minutes * 60 + seconds;
-      
-      // Debug removido para evitar poluição no console
     } catch (error) {
       console.warn('Erro ao converter duration_formated:', call.duration_formated);
     }
+  }
+  
+  // 2️⃣ Fallback: duration_seconds ou duration (menos confiáveis)
+  if (!durationInSeconds || durationInSeconds <= 0) {
+    durationInSeconds = call.duration_seconds || call.duration || 0;
   }
 
   // Helper para converter qualquer valor em número válido (0-10)
@@ -669,9 +694,15 @@ export function convertToCallItem(call: any): CallItem {
     return undefined;
   };
 
-  // Priorizar scorecard > call_analysis (não há coluna score na tabela calls)
+  // Priorizar score que já vem da RPC > scorecard > call_analysis
   const finalScore = (() => {
-    // Primeiro: scorecard JSONB
+    // 🎯 PRIMEIRO: Se call.score já existe (vindo da RPC com LEFT JOIN), usar direto!
+    if (call.score !== undefined && call.score !== null) {
+      const fromRPC = toScoreNumber(call.score);
+      if (fromRPC !== undefined) return fromRPC;
+    }
+    
+    // Segundo: scorecard JSONB (fallback)
     if (call.scorecard) {
       const sc = call.scorecard;
       const fromFinal = toScoreNumber(sc.final_score);
@@ -681,48 +712,59 @@ export function convertToCallItem(call: any): CallItem {
       const fromScore = toScoreNumber(sc.score);
       if (fromScore !== undefined) return fromScore;
     }
-    // Segundo: call_analysis join (array)
+    
+    // Terceiro: call_analysis join (array) (fallback)
     if (call.call_analysis && Array.isArray(call.call_analysis) && call.call_analysis.length > 0) {
-      const analysis = call.call_analysis[0]; // Primeiro resultado
+      const analysis = call.call_analysis[0];
       const fromCA = toScoreNumber(analysis?.final_grade);
       if (fromCA !== undefined) return fromCA;
     }
-    // Terceiro: call_analysis como objeto direto
+    
+    // Quarto: call_analysis como objeto direto (fallback)
     if (call.call_analysis && !Array.isArray(call.call_analysis)) {
       const fromCAObj = toScoreNumber(call.call_analysis.final_grade);
       if (fromCAObj !== undefined) return fromCAObj;
     }
+    
     return undefined;
   })();
 
   return {
     id: call.id,
-    company: call.enterprise || call.company_name || 'Empresa não informada',
-    dealCode: call.deal_id || 'N/A',
+    // ✅ PRIORIZAR company_name que vem da RPC get_calls_with_filters
+    company: call.company_name || call.company || call.enterprise || insights.company || insights.enterprise || 'Empresa não informada',
+    dealCode: call.deal_id || call.deal_code || insights.deal_id || insights.deal_code || insights.deal || 'N/A',
     sdr: {
-      id: call.agent_id || call.sdr_id,
-      name: call.agent_id || call.sdr_name || 'SDR não identificado',
-      email: call.sdr_email || '',
-      avatarUrl: `https://i.pravatar.cc/64?u=${call.agent_id || call.sdr_id || 'default'}`
+      id: call.sdr_id || call.agent_id || insights.sdr_id || insights.agent_id || 'desconhecido',
+      // ✅ PRIORIZAR sdr_name que vem da RPC
+      name: call.sdr_name || call.agent_name || insights.sdr_name || insights.agent_name || call.agent_id || 'SDR',
+      email: call.sdr_email || insights.sdr_email || insights.agent_email,
+      avatarUrl: call.sdr_avatar_url || (call.agent_id ? `https://i.pravatar.cc/64?u=${call.agent_id}` : undefined)
     },
     date: call.created_at,
     created_at: call.created_at,
     durationSec: durationInSeconds,
     duration_formated: call.duration_formated,
-    status: call.status as any,
+    status: (call.status as CallItem['status']) || 'received',
     status_voip: call.status_voip,
     status_voip_friendly: call.status_voip_friendly,
     score: finalScore,
-    // Campos extras para detalhes
-    audio_url: call.audio_url,
-    recording_url: call.recording_url,
+    audio_url: call.audio_url || call.recording_url,
+    recording_url: call.recording_url || call.audio_url,
     transcription: call.transcription,
-    person_name: call.person || call.person_name,
-    person_email: call.person_email,
-    to_number: call.to_number,
-    from_number: call.from_number,
+    // ✅ PRIORIZAR person_name que vem da RPC
+    person_name: call.person_name || call.person || call.contact_name || insights.person || insights.person_name || insights.customer_name,
+    person_email: call.person_email || insights.person_email || insights.customer_email,
+    to_number: call.to_number || insights.to_number || insights.phone || insights.person_phone,
+    from_number: call.from_number || insights.from_number || insights.agent_phone,
     call_type: call.call_type,
-    direction: call.direction
+    direction: call.direction,
+    analysis_summary: call.analysis_summary,
+    analysis_confidence: call.analysis_confidence,
+    analysis_processed_at: call.analysis_processed_at,
+    // ✅ Manter campos brutos também para compatibilidade
+    enterprise: call.company_name || call.enterprise || call.company || insights.company || insights.enterprise,
+    deal_id: call.deal_id || call.deal_code || insights.deal_id || insights.deal_code || null
   };
 }
 

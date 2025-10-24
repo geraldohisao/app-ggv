@@ -1,9 +1,10 @@
 /**
- * Serviço de Análise de Scorecard com Gemini AI
+ * Serviço de Análise de Scorecard com OpenAI GPT
  * Analisa transcrições de chamadas usando critérios de scorecard
  */
 
 import { supabase } from '../../services/supabaseClient';
+import { callOpenAI } from './openaiService';
 
 // Interfaces
 interface ScorecardCriterion {
@@ -51,124 +52,18 @@ export interface ScorecardAnalysisResult {
   confidence: number; // 0-1
 }
 
-// Função para obter chave da API Gemini (DB -> env -> local)
-const getGeminiApiKey = async (): Promise<string | null> => {
-  try {
-    // 1) Banco (app_settings.gemini_api_key)
-    const { getAppSetting } = await import('../../services/supabaseService');
-    const dbKey = await getAppSetting('gemini_api_key');
-    if (typeof dbKey === 'string' && dbKey.trim()) return dbKey.trim();
-  } catch {}
-
-  // 2) Variáveis de ambiente do bundle
-  const envKey = process.env.VITE_GEMINI_API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
-  if (envKey) return envKey as string;
-
-  // 3) Config local (fallback de desenvolvimento)
-  const local: any = (globalThis as any).APP_CONFIG_LOCAL;
-  if (local && typeof local.GEMINI_API_KEY === 'string') return local.GEMINI_API_KEY as string;
-
-  return null;
-};
-
-// Função para chamar IA com prioridade DeepSeek e fallback Gemini
+// Função para chamar IA (agora usando OpenAI GPT)
 async function callAIAPI(prompt: string): Promise<string> {
-  // 1. Tentar DeepSeek primeiro (mais confiável)
+  console.log('🤖 Iniciando chamada para OpenAI GPT...');
+  
   try {
-    const deepseekKey = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_KEY || process.env.DEEPSEEK;
-    if (deepseekKey) {
-      console.log('🤖 Tentando DeepSeek...');
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${deepseekKey}`,
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: 'Você é um especialista em análise de vendas. Responda APENAS com JSON válido no formato solicitado.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.2,
-          max_tokens: 4000
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content;
-        if (text) {
-          console.log('✅ DeepSeek funcionou!');
-          return text;
-        }
-      } else {
-        console.warn('⚠️ DeepSeek falhou:', response.status, response.statusText);
-      }
-    }
+    const response = await callOpenAI(prompt);
+    console.log('✅ OpenAI GPT respondeu com sucesso!');
+    return response;
   } catch (error) {
-    console.warn('⚠️ Erro com DeepSeek:', error);
+    console.error('❌ Erro ao chamar OpenAI:', error);
+    throw new Error('API OpenAI indisponível. Verifique a configuração da chave em app_settings.');
   }
-
-  // 2. Fallback para Gemini
-  try {
-    const apiKey = await getGeminiApiKey();
-    if (apiKey) {
-      console.log('🤖 Tentando Gemini...');
-  // Ajuste: remover modelos que retornam 404 e manter apenas os válidos no projeto
-  const validModels = ['gemini-1.5-flash'];
-      
-      for (const model of validModels) {
-        try {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-          
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: prompt }]
-              }],
-              generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 4000,
-              }
-            })
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            
-            if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-              console.log(`✅ Gemini ${model} funcionou!`);
-              return data.candidates[0].content.parts[0].text;
-            }
-          } else {
-            console.warn(`⚠️ Modelo ${model} falhou:`, response.status, response.statusText);
-          }
-        } catch (error) {
-          console.warn(`⚠️ Erro com modelo ${model}:`, error);
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('⚠️ Erro com Gemini:', error);
-  }
-
-    // Em caso de falha total, retornar estrutura com analysis_failed e final_grade null
-    return {
-      scorecard_used: { id: '', name: 'N/A', description: '' },
-      overall_score: 0,
-      max_possible_score: 10,
-      final_grade: null,
-      criteria_analysis: [],
-      general_feedback: 'Falha ao analisar: todas as APIs indisponíveis',
-      strengths: [],
-      improvements: [],
-      confidence: 0
-    } as any;
 }
 
 // Tentar extrair e reparar JSON retornado pelo modelo
@@ -406,7 +301,7 @@ export async function analyzeScorecardWithAI(
 
   console.log('📋 Scorecard encontrado:', scorecard.name, 'com', criteria.length, 'critérios');
 
-  // Criar prompt e chamar Gemini
+  // Criar prompt e chamar OpenAI GPT
   const prompt = createAnalysisPrompt(transcription, scorecard, criteria);
   
   try {
@@ -448,9 +343,27 @@ export async function analyzeScorecardWithAI(
     let finalGrade = 0;
     
     if (!analysisFailed) {
-      totalScore = criteriaAnalysis.reduce((sum, c) => sum + c.achieved_score, 0);
-      maxPossibleScore = criteriaAnalysis.reduce((sum, c) => sum + c.max_score, 0);
+      // ✅ CALCULAR COM PESOS: score ponderado pela importância de cada critério
+      totalScore = criteriaAnalysis.reduce((sum, c, index) => {
+        const criterion = criteria[index];
+        const weightedScore = c.achieved_score * (criterion.weight || 1);
+        return sum + weightedScore;
+      }, 0);
+      
+      maxPossibleScore = criteriaAnalysis.reduce((sum, c, index) => {
+        const criterion = criteria[index];
+        const weightedMaxScore = c.max_score * (criterion.weight || 1);
+        return sum + weightedMaxScore;
+      }, 0);
+      
       finalGrade = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) / 10 : 0;
+      
+      console.log('📊 Cálculo com pesos:', {
+        totalScore,
+        maxPossibleScore, 
+        finalGrade,
+        criteriaCount: criteria.length
+      });
     } else {
       console.log('⚠️ Análise falhou - não calculando nota');
     }
@@ -481,7 +394,7 @@ export async function analyzeScorecardWithAI(
     return result;
 
   } catch (error) {
-    console.error('❌ Erro na análise com Gemini:', error);
+    console.error('❌ Erro na análise com OpenAI GPT:', error);
     
     // Fallback: análise básica sem IA
     const fallbackAnalysis: CriterionAnalysis[] = criteria.map(criterion => ({
@@ -505,14 +418,15 @@ export async function analyzeScorecardWithAI(
         name: scorecard.name,
         description: scorecard.description
       },
-      overall_score: 0,
-      max_possible_score: 0,
+      overall_score: null, // ✅ NULL ao invés de 0
+      max_possible_score: null, // ✅ NULL ao invés de 0
       final_grade: null, // Sem nota quando análise falha
       criteria_analysis: fallbackAnalysis,
       general_feedback: 'Análise automática indisponível. Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'),
       strengths: ['Chamada realizada com sucesso'],
-      improvements: ['Configurar chave da API Gemini para análise detalhada'],
-      confidence: 0.3
+      improvements: ['Configurar chave da API OpenAI para análise detalhada'],
+      confidence: 0.3,
+      analysis_failed: true // ✅ Flag para indicar falha
     };
   }
 }

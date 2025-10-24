@@ -79,6 +79,17 @@ async function saveAnalysisToDatabase(
   try {
     const startTime = Date.now();
     
+    // ✅ VERIFICAR SE A ANÁLISE FALHOU - NÃO SALVAR SE FALHOU
+    const analysisFailed = (analysis as any).analysis_failed === true || 
+                          analysis.final_grade === null ||
+                          analysis.overall_score === null ||
+                          analysis.max_possible_score === null;
+    
+    if (analysisFailed) {
+      console.log('⚠️ Análise falhou - NÃO salvando no banco para evitar nota zero:', callId);
+      return null; // Não salvar análises que falharam
+    }
+    
     // Preparar dados dos critérios para o banco
     const criteriaData = analysis.criteria_analysis.map(criterion => ({
       criterion_id: criterion.criterion_id,
@@ -93,17 +104,14 @@ async function saveAnalysisToDatabase(
     const processingTime = Date.now() - startTime;
 
     // Sanitizar dados antes de enviar para evitar overflow
-    const finalGrade = (analysis.final_grade === null || analysis.final_grade === undefined)
-      ? null
-      : Math.min(10, Math.max(0, analysis.final_grade));
+    const finalGrade = Math.min(10, Math.max(0, analysis.final_grade));
 
     const sanitizedData = {
       p_call_id: callId,
       p_scorecard_id: analysis.scorecard_used?.id || null,
-      p_overall_score: Math.min(1000, Math.max(0, analysis.overall_score || 0)),
-      p_max_possible_score: Math.min(1000, Math.max(0, analysis.max_possible_score || 10)),
-      // Importante: se a análise falhou, NÃO salvar 0; deixar NULL
-      p_final_grade: finalGrade,
+      p_overall_score: Math.min(1000, Math.max(0, analysis.overall_score)),
+      p_max_possible_score: Math.min(1000, Math.max(0, analysis.max_possible_score)),
+      p_final_grade: finalGrade, // Só chega aqui se não falhou
       p_general_feedback: analysis.general_feedback || 'Análise processada com sucesso',
       p_strengths: analysis.strengths || [],
       p_improvements: analysis.improvements || [],
@@ -192,13 +200,18 @@ export async function processCallAnalysis(
 
       console.log('✅ Análise IA concluída, salvando no banco...');
 
-      // Salvar no banco
+      // Salvar no banco APENAS se a análise foi bem-sucedida
       const analysisId = await saveAnalysisToDatabase(callId, analysis);
       
       if (analysisId) {
         console.log('✅ Análise completa salva:', analysisId);
       } else {
-        console.warn('⚠️ Análise processada mas não salva no banco');
+        const analysisFailed = (analysis as any).analysis_failed === true;
+        if (analysisFailed) {
+          console.log('ℹ️ Análise falhou - não foi salva no banco (correto)');
+        } else {
+          console.warn('⚠️ Análise processada mas não salva no banco (erro)');
+        }
       }
 
       return analysis;

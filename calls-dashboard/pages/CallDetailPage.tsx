@@ -13,6 +13,7 @@ import { getCallAnalysisFromDatabase, processCallAnalysis } from '../services/ca
 import { supabase } from '../../services/supabaseClient';
 import { getCurrentUserDisplayName } from '../../services/supabaseService';
 import CallAIAssistantChat from '../../components/Calls/CallAIAssistantChat';
+import type { ScorecardAnalysisResult } from '../services/scorecardAnalysisService';
 // import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
 
 // Funções auxiliares para dados do usuário
@@ -82,6 +83,8 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [aiNote, setAiNote] = useState<string>('N/A');
   const [aiScore, setAiScore] = useState<number | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<ScorecardAnalysisResult | null | undefined>(undefined);
+  const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
   const [feedback, setFeedback] = useState('');
   const [feedbacks, setFeedbacks] = useState<Array<{
     id: string,
@@ -113,6 +116,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           await loadExistingAIAnalysis(callItem);
         } else {
           setError('Chamada não encontrada.');
+          setAnalysisResult(null);
         }
       } catch (err) {
         console.error('Erro ao carregar detalhes da call:', err);
@@ -268,9 +272,11 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
         if (existingAnalysis.final_grade !== null && existingAnalysis.final_grade !== undefined) {
           setAiNote(existingAnalysis.final_grade.toFixed(1));
           setAiScore(existingAnalysis.final_grade);
+          setAnalysisResult(existingAnalysis);
         } else {
           setAiNote('Não analisado');
           setAiScore(null);
+          setAnalysisResult(null);
         }
         console.log('✅ Análise IA carregada do banco (PERSISTIDA):', {
           final_grade: existingAnalysis.final_grade,
@@ -283,14 +289,14 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
       } else {
         // Nenhuma análise persistida encontrada
         console.log('ℹ️ Nenhuma análise persistida encontrada para:', callItem.id);
-        setAiNote('N/A');
-        setAiScore(null);
+        setAnalysisResult(null);
       }
       
     } catch (error) {
       console.error('❌ Erro ao carregar análise IA:', error);
       setAiNote('N/A');
       setAiScore(null);
+      setAnalysisResult(null);
     }
   };
 
@@ -389,6 +395,13 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
     }
   };
 
+  const getGradeColor = (grade: number | null) => {
+    if (grade === null) return 'bg-gray-500';
+    if (grade >= 8) return 'bg-green-100 text-green-800';
+    if (grade >= 6) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-red-100 text-red-800';
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -466,7 +479,29 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                     call.status_voip_friendly === 'Numero mudou' ? 'bg-orange-100 text-orange-800' :
                     'bg-slate-100 text-slate-800'
                   }`}>
-                    {call.status_voip_friendly || call.status}
+                    {(() => {
+                      // ✅ Traduzir status inline se necessário
+                      const status = call.status_voip_friendly || call.status_voip || call.status;
+                      if (!status) return 'Status desconhecido';
+                      
+                      const normalized = status.toLowerCase();
+                      switch (normalized) {
+                        case 'normal_clearing':
+                        case 'completed': return 'Atendida';
+                        case 'no_answer': return 'Não atendida';
+                        case 'originator_cancel': return 'Cancelada pela SDR';
+                        case 'number_changed': return 'Numero mudou';
+                        case 'busy': return 'Ocupado';
+                        case 'failed': return 'Falhou';
+                        case 'received': return 'Recebida';
+                        default: 
+                          // Se já está em português, retornar
+                          if (status.includes('tendida') || status.includes('Cancelada')) {
+                            return status;
+                          }
+                          return status;
+                      }
+                    })()}
                   </span>
                 </div>
               </div>
@@ -486,7 +521,51 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
             <div className="mb-3 font-medium text-slate-800">Áudio da Chamada</div>
             {hasValidAudio(call.recording_url) ? (
               <div className="space-y-2">
-                <audio controls className="w-full" preload="metadata">
+                <audio 
+                  controls 
+                  className="w-full" 
+                  preload="metadata"
+                  onLoadedMetadata={async (e) => {
+                    const audioElement = e.currentTarget;
+                    const realDuration = Math.floor(audioElement.duration);
+                    
+                    if (realDuration && realDuration > 0 && call) {
+                      console.log('🎵 Duração real do áudio detectada:', realDuration, 'segundos');
+                      
+                      // Verificar se é muito diferente da duração armazenada
+                      const storedDuration = call.durationSec || 0;
+                      const difference = Math.abs(realDuration - storedDuration);
+                      
+                      if (difference > 10) {  // Diferença maior que 10 segundos
+                        console.log('⚠️ Inconsistência detectada!', {
+                          armazenado: storedDuration,
+                          real: realDuration,
+                          diferenca: difference
+                        });
+                        
+                        try {
+                          // Atualizar duração no banco automaticamente
+                          const { data, error } = await supabase.rpc('update_audio_duration', {
+                            p_call_id: call.id,
+                            p_duration_sec: realDuration
+                          });
+                          
+                          if (error) {
+                            console.error('❌ Erro ao atualizar duração:', error);
+                          } else {
+                            console.log('✅ Duração sincronizada automaticamente:', realDuration);
+                            // Recarregar chamada para atualizar UI
+                            window.location.reload();
+                          }
+                        } catch (err) {
+                          console.error('❌ Erro ao sincronizar duração:', err);
+                        }
+                      } else {
+                        console.log('✅ Duração já está correta (diferença:', difference, 'segundos)');
+                      }
+                    }
+                  }}
+                >
                   <source src={call.recording_url} type="audio/mpeg" />
                   <source src={call.recording_url} type="audio/wav" />
                   <source src={call.recording_url} type="audio/ogg" />
@@ -643,20 +722,16 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           <AudioStatusIndicator call={call} />
           <ScorecardAnalysis 
             call={call} 
-            onAnalysisComplete={(analysis) => {
-              if (analysis.final_grade !== null && analysis.final_grade !== undefined) {
-                setAiNote(analysis.final_grade.toFixed(1));
-                setAiScore(analysis.final_grade);
-                updateCallScore(call.id, analysis.final_grade);
-              } else {
-                setAiNote('Não analisado');
-                setAiScore(null);
-              }
+            onAnalysisComplete={(result) => {
+              setAnalysisResult(result);
+              // Notificar componente pai
+              // onAnalysisComplete?.(result); // This prop is not passed to ScorecardAnalysis
             }}
+            onProcessingChange={setAnalysisLoading}
           />
           
           
-          <AiAssistant call={call} />
+          <AiAssistant call={call} analysis={analysisResult} loading={analysisLoading} />
         </div>
       </div>
 

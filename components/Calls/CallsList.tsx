@@ -17,6 +17,8 @@ interface Call {
   status_voip?: string;
   status_voip_friendly?: string;
   duration: number;
+  duration_seconds?: number;
+  duration_formated?: string;
   call_type?: string;
   direction?: string;
   created_at: string;
@@ -146,6 +148,8 @@ export default function CallsList() {
           status_voip: call.status_voip,
           status_voip_friendly: call.status_voip_friendly || call.status,
           duration: call.duration || 0,
+          duration_seconds: call.duration_seconds || call.duration || 0,
+          duration_formated: call.duration_formated,
           call_type: call.call_type,
           direction: call.direction,
           created_at: call.created_at,
@@ -287,14 +291,21 @@ export default function CallsList() {
                       </td>
                       <td className="p-4">
                         <span className="text-sm font-medium text-slate-600">
-                          {call.duration > 0 ? `${Math.floor(call.duration / 60)}m ${call.duration % 60}s` : '-'}
+                          {call.duration_formated && call.duration_formated !== '00:00:00'
+                            ? call.duration_formated
+                            : call.duration_seconds > 0
+                              ? `${Math.floor(call.duration_seconds / 60)}:${(call.duration_seconds % 60).toString().padStart(2, '0')}`
+                              : '-'}
                         </span>
                         <div className="text-xs text-slate-500">⚡</div>
                       </td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           call.status_voip_friendly === 'Atendida' ? 'bg-green-100 text-green-800' :
-                          call.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                          call.status_voip_friendly === 'Não atendida' ? 'bg-red-100 text-red-800' :
+                          call.status_voip_friendly === 'Ocupado' ? 'bg-yellow-100 text-yellow-800' :
+                          call.status_voip_friendly === 'Cancelada pela SDR' ? 'bg-orange-100 text-orange-800' :
+                          call.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                           call.status === 'failed' ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>

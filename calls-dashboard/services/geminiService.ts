@@ -334,10 +334,10 @@ function processOptimizedAnalysis(result: AIAnalysisResult): AiInsight[] {
 
   // Insight principal com score
   insights.push({
-    title: `Análise IA - Score: ${result.overall_score}/10`,
+    title: `Análise IA - Score: ${result.final_grade || 0}/10`,
     content: result.general_comment || 'Análise concluída com sucesso.',
-    severity: result.overall_score && result.overall_score >= 7 ? 'success' : 
-              result.overall_score && result.overall_score >= 5 ? 'warning' : 'error'
+    severity: result.final_grade && result.final_grade >= 7 ? 'success' : 
+              result.final_grade && result.final_grade >= 5 ? 'warning' : 'error'
   });
 
   // Scorecard utilizado

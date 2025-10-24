@@ -14,9 +14,10 @@ import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 interface ScorecardAnalysisProps {
   call: CallItem;
   onAnalysisComplete?: (analysis: ScorecardAnalysisResult) => void;
+  onProcessingChange?: (isProcessing: boolean) => void;
 }
 
-export default function ScorecardAnalysis({ call, onAnalysisComplete }: ScorecardAnalysisProps) {
+export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessingChange }: ScorecardAnalysisProps) {
   const [analysis, setAnalysis] = useState<ScorecardAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,45 +31,41 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
   React.useEffect(() => {
     const checkExistingAnalysis = async () => {
       try {
-        console.log('🔄 Verificando análise existente para chamada:', call.id);
-        
         const existing = await getCallAnalysisFromDatabase(call.id);
         if (existing) {
-          setAnalysis(existing);
-          setHasExisting(true);
-          console.log('✅ Análise carregada do banco (PERSISTIDA):', {
-            final_grade: existing.final_grade,
-            scorecard: existing.scorecard_used?.name,
-            criteria_analysis: existing.criteria_analysis,
-            strengths: existing.strengths,
-            improvements: existing.improvements,
-            general_feedback: existing.general_feedback,
-            dados_completos: existing
-          });
+          // ✅ VALIDAR se a análise é realmente válida antes de mostrar
+          const isValidAnalysis = (
+            existing.final_grade !== null &&
+            existing.final_grade !== undefined &&
+            existing.overall_score !== null &&
+            existing.max_possible_score !== null &&
+            existing.max_possible_score > 0 &&
+            // ✅ VALIDAÇÃO RIGOROSA: overall_score não pode ser maior que max_possible_score
+            existing.overall_score <= existing.max_possible_score &&
+            // ✅ max_possible_score deve ser razoável (entre 10 e 500)
+            existing.max_possible_score >= 10 &&
+            existing.max_possible_score < 500 &&
+            // ✅ Deve ter critérios analisados
+            existing.criteria_analysis &&
+            existing.criteria_analysis.length > 0
+          );
           
-          // Notificar componente pai SEMPRE
-          onAnalysisComplete?.(existing);
+          if (isValidAnalysis) {
+            setAnalysis(existing);
+            setHasExisting(true);
+            onAnalysisComplete?.(existing);
+          } else {
+            setAnalysis(null);
+            setHasExisting(false);
+          }
 
           // 🚀 Auto-reprocessar análises parciais (somente uma vez)
-          const isPartial = (
-            (!existing.criteria_analysis || existing.criteria_analysis.length === 0) &&
-            (!existing.strengths || existing.strengths.length === 0) &&
-            (!existing.improvements || existing.improvements.length === 0)
-          );
-          const hasGoodTranscription = !!call.transcription && call.transcription.trim().length > 100;
-          if (isPartial && hasGoodTranscription && !autoReprocessed) {
-            console.log('⚠️ Análise parcial detectada. Reprocessando automaticamente...');
-            setAutoReprocessed(true);
-            // Executar reprocessamento em background
-            handleAnalyze();
-          }
+          // Auto-reprocessamento desabilitado para evitar loops
         } else {
-          console.log('ℹ️ Nenhuma análise persistida encontrada para:', call.id);
           setAnalysis(null);
           setHasExisting(false);
         }
       } catch (err) {
-        console.warn('⚠️ Erro ao verificar análise existente:', err);
         setAnalysis(null);
         setHasExisting(false);
       }
@@ -100,6 +97,7 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
     }
 
     setLoading(true);
+    onProcessingChange?.(true);
     setError(null);
 
     try {
@@ -129,6 +127,7 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete }: Scorecar
       setError(err instanceof Error ? err.message : 'Erro desconhecido na análise');
     } finally {
       setLoading(false);
+      onProcessingChange?.(false);
     }
   };
 

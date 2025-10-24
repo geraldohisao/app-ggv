@@ -31,6 +31,9 @@ export interface CallItem {
   from_number?: string; // Número de origem
   call_type?: string; // Tipo de ligação
   direction?: string; // Direção da ligação
+  analysis_summary?: string;
+  analysis_confidence?: number;
+  analysis_processed_at?: string;
 }
 
 export interface ScorecardCriterion {

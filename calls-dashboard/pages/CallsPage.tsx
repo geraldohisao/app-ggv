@@ -57,6 +57,62 @@ function formatPhoneNumber(phone: string | null | undefined): string {
   return phone;
 }
 
+// Função para obter telefone correto baseado na direção da chamada
+function getDisplayPhone(call: any): string {
+  // Prioridade: to_number > from_number > insights
+  if (call.to_number && call.to_number !== 'api4com') {
+    return call.to_number;
+  }
+  
+  if (call.from_number && call.from_number !== 'api4com') {
+    return call.from_number;
+  }
+  
+  // Tentar extrair de insights se existir
+  if (call.insights) {
+    if (call.insights.to_number) return call.insights.to_number;
+    if (call.insights.from_number) return call.insights.from_number;
+    if (call.insights.phone) return call.insights.phone;
+    if (call.insights.person_phone) return call.insights.person_phone;
+  }
+  
+  return '';
+}
+
+// Função para traduzir status VOIP para português
+function translateStatus(status: string | null | undefined): string {
+  if (!status) return 'Status desconhecido';
+  
+  // Normalizar para minúsculas para comparação
+  const normalized = status.toLowerCase();
+  
+  switch (normalized) {
+    case 'normal_clearing':
+    case 'completed':
+      return 'Atendida';
+    case 'no_answer':
+      return 'Não atendida';
+    case 'originator_cancel':
+      return 'Cancelada pela SDR';
+    case 'number_changed':
+      return 'Numero mudou';
+    case 'recovery_on_timer_expire':
+      return 'Tempo esgotado';
+    case 'unallocated_number':
+      return 'Número não encontrado';
+    case 'busy':
+      return 'Ocupado';
+    case 'failed':
+      return 'Falhou';
+    default:
+      // Se já está em português, retornar como está
+      if (status.includes('tendida') || status.includes('Cancelada') || status.includes('mudou')) {
+        return status;
+      }
+      return status;
+  }
+}
+
 export default function CallsPage() {
   const [query, setQuery] = useState('');
   const [sdr, setSdr] = useState('');
@@ -182,71 +238,60 @@ export default function CallsPage() {
           throw new Error(`Erro ao buscar calls: ${callsError.message}`);
         }
         
-        console.log('🔍 DADOS BRUTOS DO SUPABASE:');
-        console.log('Enterprise:', callsData?.[0]?.enterprise);
-        console.log('Deal ID:', callsData?.[0]?.deal_id);
-        console.log('Person:', callsData?.[0]?.person);
-        console.log('Agent ID:', callsData?.[0]?.agent_id);
-        console.log('SDR Email:', callsData?.[0]?.sdr_email);
-        console.log('Primeiro registro completo:', callsData?.[0]);
+        // ✅ Log simples
+        console.log(`✅ Dados recebidos: ${callsData?.length || 0} chamadas | Sort: ${sortBy} | Página: ${currentPage}`);
+        console.log('DEBUG-DURATION:', callsData?.slice(0, 5).map((c: any) => c.duration));
+        console.log('DEBUG-FORMATTED:', callsData?.slice(0, 5).map((c: any) => c.duration_formated));
         
-        // Mapear dados completos da tabela calls
+        // ✅ MAPEAMENTO DEFINITIVO: Usar EXATAMENTE os nomes que a RPC retorna
         const response = {
           calls: (callsData || []).map((call: any) => ({
             id: call.id,
-            // Empresa: usar EXCLUSIVAMENTE o campo enterprise retornado pela RPC
-            company: call.enterprise,
-            dealCode: call.deal_id || 'N/A', // ✅ DEAL_ID
+            // ✅ RPC retorna: company_name, person_name, deal_id, sdr_name, etc.
+            company: call.company_name || call.enterprise || 'Empresa não informada',
+            dealCode: call.deal_id || 'N/A',
             sdr: {
-              id: call.agent_id || 'N/A', // ✅ AGENT_ID
-              // SDR: usar EXCLUSIVAMENTE agent_id como nome exibido
-              name: call.agent_id || 'SDR não identificado',
-              email: call.sdr_email || '',
-              avatarUrl: `https://i.pravatar.cc/64?u=${call.agent_id || 'default'}`
+              id: call.sdr_id || call.agent_id || 'desconhecido',
+              name: call.sdr_name || call.agent_id || 'SDR',
+              email: call.sdr_email || undefined,
+              avatarUrl: call.sdr_avatar_url || undefined
             },
             date: call.created_at,
             created_at: call.created_at,
-            duration_formated: call.duration_formated || '00:00:00',
-            durationSec: 0,
+            durationSec: call.duration_seconds || call.duration || 0,
+            duration_formated: call.duration_formated,
             status: call.status,
             status_voip: call.status_voip,
-            // Usar friendly do backend; fallback para status_voip; por fim, status processual
             status_voip_friendly: call.status_voip_friendly || call.status_voip || call.status,
             call_type: call.call_type,
-            recording_url: call.recording_url,
+            recording_url: call.recording_url || call.audio_url,
             transcription: call.transcription,
-            // Contato: usar EXCLUSIVAMENTE o campo person
-            person_name: call.person,
+            person_name: call.person_name || call.person,
+            person_email: call.person_email,
             cadence: call.cadence,
             pipeline: call.pipeline,
             from_number: call.from_number,
             to_number: call.to_number,
             direction: call.direction,
-            // ✅ SCORE: usar score da RPC corrigida
             score: call.score,
-            // Campos extras para debug
-            enterprise_debug: call.enterprise,
-            deal_id_debug: call.deal_id,
-            person_debug: call.person,
-            agent_id_debug: call.agent_id
+            insights: call.insights,
+            // ✅ Campos adicionais para compatibilidade com convertToCallItem
+            enterprise: call.company_name || call.enterprise,
+            person: call.person_name || call.person,
+            deal_id: call.deal_id,
+            agent_id: call.agent_id
           })),
-          totalCount: callsData?.[0]?.total_count || 0, // Total real da query
+          totalCount: callsData?.[0]?.total_count || 0,
           hasMore: offset + itemsPerPage < (callsData?.[0]?.total_count || 0)
         };
 
-        console.log('✅ Calls carregadas:', response.calls.length);
-
-        // USAR OS DADOS DIRETAMENTE (sem convertToCallItem que está estragando)
+        // ✅ CONVERTER para CallItem (garante campos corretos)
+        const callItems = response.calls.map(convertToCallItem);
+        
         // Usar total_count da função RPC para paginação correta
         const totalFromRpc = callsData?.[0]?.total_count || callsData?.length || 0;
-        setCalls(response.calls);
+        setCalls(callItems);
         setTotalCount(totalFromRpc);
-        
-        console.log('📊 DADOS FINAIS ENVIADOS PARA A LISTA:');
-        console.log('Primeira chamada final:', response.calls[0]);
-        console.log('Company final:', response.calls[0]?.company);
-        console.log('SDR final:', response.calls[0]?.sdr);
-        console.log('Deal final:', response.calls[0]?.dealCode);
       } catch (err: any) {
         console.error('Erro ao carregar calls:', JSON.stringify(err, null, 2));
         
@@ -347,82 +392,11 @@ export default function CallsPage() {
   const ITEMS_PER_PAGE = 50;
   // REMOVIDO: isScoreSort - agora toda ordenação é feita no backend
   
-  // Filtros locais combinados
+  // ✅ TODOS os filtros e ordenação são 100% NO BACKEND
+  // Frontend apenas exibe os dados como vieram, sem filtrar ou ordenar
   const filtered = useMemo(() => {
-    let result = calls;
-    
-    // REMOVIDO: Filtro por query (empresa/deal) - agora é feito no backend
-    
-    // Filtro por duração mínima (em segundos) - usando duração real
-    if (minDuration.trim()) {
-      const minDurationSec = parseInt(minDuration);
-      if (!isNaN(minDurationSec)) {
-        result = result.filter((c) => getRealDuration(c) >= minDurationSec);
-      }
-    }
-    
-    // Filtro por duração máxima (em segundos) - usando duração real
-    if (maxDuration.trim()) {
-      const maxDurationSec = parseInt(maxDuration);
-      if (!isNaN(maxDurationSec)) {
-        result = result.filter((c) => getRealDuration(c) <= maxDurationSec);
-      }
-    }
-    
-    // Filtro por score mínimo agora é feito no backend via get_calls_with_filters
-    
-    // REMOVIDO: searchTerm - usar apenas o filtro "Empresa ou Deal ID" que já funciona no backend
-    
-    // Aplicar ordenação local se necessário (fallback)
-    switch (sortBy) {
-      case 'duration':
-        result = result.sort((a, b) => getRealDuration(b) - getRealDuration(a));
-        break;
-      case 'score': {
-        // Helper para converter score para número válido
-        const getScoreValue = (call: any): number => {
-          if (call.score === null || call.score === undefined) return -1;
-          if (typeof call.score === 'number') return call.score;
-          if (typeof call.score === 'string') {
-            const parsed = parseFloat(call.score);
-            return isNaN(parsed) ? -1 : parsed;
-          }
-          return -1;
-        };
-        
-        const withScore = result
-          .filter(c => getScoreValue(c) >= 0)
-          .sort((a, b) => getScoreValue(b) - getScoreValue(a));
-        const withoutScore = result.filter(c => getScoreValue(c) < 0);
-        result = [...withScore, ...withoutScore];
-        break;
-      }
-      case 'score_asc': {
-        // Helper para converter score para número válido
-        const getScoreValue = (call: any): number => {
-          if (call.score === null || call.score === undefined) return -1;
-          if (typeof call.score === 'number') return call.score;
-          if (typeof call.score === 'string') {
-            const parsed = parseFloat(call.score);
-            return isNaN(parsed) ? -1 : parsed;
-          }
-          return -1;
-        };
-        
-        const withScore = result
-          .filter(c => getScoreValue(c) >= 0)
-          .sort((a, b) => getScoreValue(a) - getScoreValue(b));
-        const withoutScore = result.filter(c => getScoreValue(c) < 0);
-        result = [...withScore, ...withoutScore];
-        break;
-      }
-      default: // created_at
-        result = result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        break;
-    }
-    
-    return result;
-  }, [calls, query, minDuration, maxDuration, minScore, sortBy]);
+    return calls;  // Dados já vêm filtrados, ordenados e paginados do backend
+  }, [calls]);
 
   // Paginação: toda ordenação é feita no backend, usar dados direto da RPC
   const paginatedCalls = filtered;
@@ -608,8 +582,8 @@ export default function CallsPage() {
                     end: end || undefined,
                     min_duration: minDuration ? parseInt(minDuration) : undefined,
                     max_duration: maxDuration ? parseInt(maxDuration) : undefined,
-                    limit: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 1000 : itemsPerPage,
-                    offset: (sortBy === 'duration' || minDuration.trim() || maxDuration.trim()) ? 0 : (currentPage - 1) * itemsPerPage,
+                    limit: itemsPerPage,  // ✅ Sempre usar paginação normal
+                    offset: (currentPage - 1) * itemsPerPage,  // ✅ Sempre usar offset correto
                     sortBy: sortBy
                   });
                   const callItems = response.calls.map(convertToCallItem);
@@ -710,7 +684,7 @@ export default function CallsPage() {
                     <td className="p-4">
                       <div className="text-sm text-slate-700">{call.person_name || 'N/A'}</div>
                       <div className="text-xs text-slate-500">
-                        📞 {formatPhoneNumber(call.to_number)}
+                        📞 {formatPhoneNumber(getDisplayPhone(call))}
                       </div>
                     </td>
                     <td className="p-4">
@@ -782,7 +756,7 @@ export default function CallsPage() {
                         call.status_voip_friendly === 'Numero mudou' ? 'bg-orange-100 text-orange-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {call.status_voip_friendly || call.status}
+                        {translateStatus(call.status_voip_friendly || call.status_voip || call.status)}
                       </span>
                     </td>
                     <td className="p-4 text-sm font-semibold">
