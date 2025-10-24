@@ -184,15 +184,38 @@ const OpportunityFeedbackPage: React.FC = () => {
     console.log(JSON.stringify(surveyMonkeyFormat, null, 2));
     
     try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(surveyMonkeyFormat)
-      });
+      console.log('🌐 WEBHOOK - URL destino:', webhookUrl);
+      console.log('⏳ WEBHOOK - Iniciando requisição com timeout de 30s...');
+      console.log('📦 WEBHOOK - Tamanho do payload:', JSON.stringify(surveyMonkeyFormat).length, 'bytes');
+      
+      const startTime = Date.now();
+      
+      // Criar timeout de 30 segundos
+      const fetchWithTimeout = Promise.race([
+        fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(surveyMonkeyFormat),
+          mode: 'cors', // Explicitamente definir CORS
+        }).then(response => {
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ WEBHOOK - Resposta recebida em ${elapsed}ms`);
+          return response;
+        }).catch(error => {
+          const elapsed = Date.now() - startTime;
+          console.error(`❌ WEBHOOK - Erro no fetch após ${elapsed}ms:`, error);
+          throw error;
+        }),
+        new Promise<Response>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: requisição excedeu 30 segundos')), 30000)
+        )
+      ]);
 
-      console.log('📊 WEBHOOK - Status:', response.status);
+      const response = await fetchWithTimeout;
+      console.log('📊 WEBHOOK - Status da resposta:', response.status);
+      console.log('📊 WEBHOOK - Headers da resposta:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         // Tentar obter corpo de erro para diagnosticar
@@ -236,6 +259,13 @@ const OpportunityFeedbackPage: React.FC = () => {
       return result;
     } catch (error) {
       console.error('❌ WEBHOOK - Falha na requisição:', error);
+      console.error('❌ WEBHOOK - Tipo do erro:', typeof error);
+      console.error('❌ WEBHOOK - Detalhes:', {
+        message: (error as any)?.message,
+        name: (error as any)?.name,
+        stack: (error as any)?.stack
+      });
+      
       try {
         await postCriticalAlert({
           title: 'Falha ao enviar Feedback de Oportunidade',
@@ -243,10 +273,14 @@ const OpportunityFeedbackPage: React.FC = () => {
           context: {
             url: webhookUrl,
             user: { email: user?.email, role: user?.role },
+            errorType: typeof error,
+            errorName: (error as any)?.name,
             stack: (error as any)?.stack || ''
           }
         });
-      } catch {}
+      } catch (alertError) {
+        console.error('❌ Falha ao enviar alerta crítico:', alertError);
+      }
       throw error;
     }
   };
@@ -279,10 +313,15 @@ const OpportunityFeedbackPage: React.FC = () => {
       setDone(true);
     } catch (err: any) {
       console.error('❌ WEBHOOK - Erro completo:', err);
-      console.error('❌ Stack trace:', err.stack);
-      alert(`Erro ao enviar: ${err.message || 'Falha na comunicação'}`);
+      console.error('❌ Stack trace:', err?.stack);
+      console.error('❌ Mensagem do erro:', err?.message);
+      
+      const errorMessage = err?.message || 'Falha na comunicação com o servidor';
+      alert(`❌ Erro ao enviar feedback:\n\n${errorMessage}\n\nTente novamente ou contate o suporte.`);
+      console.log('🔄 isSubmitting resetado para false - botão deve voltar a funcionar');
     } finally {
       setIsSubmitting(false);
+      console.log('✅ Finally executado - isSubmitting = false');
     }
   };
 
@@ -346,7 +385,7 @@ const OpportunityFeedbackPage: React.FC = () => {
               <ToggleYesNo value={data.meeting_happened} onChange={(v) => setData({ ...data, meeting_happened: v })} />
             </div>
             <div>
-              <label className={formLabelClass}>2. Observações</label>
+              <label className={formLabelClass}>2. Próximos passos <span className="text-red-600">*</span></label>
               <textarea
                 className={formTextareaClass}
                 rows={5}
@@ -354,12 +393,12 @@ const OpportunityFeedbackPage: React.FC = () => {
                 onChange={(e) => setData({ ...data, notes: e.target.value })}
                 placeholder="Resumo da conversa, próximos passos e objeções relevantes..."
               />
-              <p className="text-xs text-slate-500 mt-1">Opcional. Sugestão: registre objeções, responsáveis e prazos.</p>
+              <p className="text-xs text-slate-500 mt-1">Obrigatório. Sugestão: registre objeções, responsáveis e prazos.</p>
             </div>
             <div className="flex justify-end pt-2">
               <button
                 className="bg-blue-900 text-white px-6 py-2 rounded-md font-semibold shadow-sm disabled:opacity-50"
-                disabled={data.meeting_happened === undefined || isSubmitting}
+                disabled={data.meeting_happened === undefined || !data.notes?.trim() || isSubmitting}
                 onClick={() => (data.meeting_happened ? setStep(2) : handleSubmit())}
               >
                 {data.meeting_happened ? 'Continuar' : 'Concluir'}
@@ -389,7 +428,7 @@ const OpportunityFeedbackPage: React.FC = () => {
                 <ToggleYesNo value={data.has_budget ?? null} onChange={(v) => setData({ ...data, has_budget: v })} />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <p className="font-semibold text-slate-900">7. Falou com o decisor? <span className="text-red-600">*</span></p>
+                <p className="font-semibold text-slate-900">7. Falou com todos os decisores? <span className="text-red-600">*</span></p>
                 <ToggleYesNo value={data.talked_to_decision_maker ?? null} onChange={(v) => setData({ ...data, talked_to_decision_maker: v })} />
               </div>
             </div>
@@ -397,7 +436,7 @@ const OpportunityFeedbackPage: React.FC = () => {
               <p className="text-xs text-slate-500">Progresso: {answeredStep2}/{totalQuestionsStep2}</p>
               <div className="flex gap-3">
                 <button className="px-5 py-2 rounded-md border font-semibold" onClick={() => setStep(1)} disabled={isSubmitting}>Voltar</button>
-                <button className="px-6 py-2 rounded-md bg-blue-900 text-white font-semibold shadow-sm disabled:opacity-50" onClick={handleSubmit} disabled={isSubmitting}>Concluir</button>
+                <button className="px-6 py-2 rounded-md bg-blue-900 text-white font-semibold shadow-sm disabled:opacity-50" onClick={handleSubmit} disabled={answeredStep2 < totalQuestionsStep2 || isSubmitting}>Concluir</button>
               </div>
             </div>
           </>
