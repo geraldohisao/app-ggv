@@ -58,9 +58,14 @@ const CalculadoraOTE: React.FC = () => {
         if (user.role === UserRole.SuperAdmin || user.role === UserRole.Admin) return 'ALL';
         
         if (user.email === 'geraldo@grupoggv.com') return 'ALL';
-        // ler tabela user_functions para esse usuário (sincronamente não dá; usar mem cache simples)
+        
+        // Usar a função comercial carregada do banco de dados pelo contexto
+        if (user.user_function) {
+            return user.user_function as OTEProfile;
+        }
+        
         // fallback: SDR
-        return (window as any).__USER_FUNCTION__ || OTEProfile.SDR;
+        return OTEProfile.SDR;
     }, [user]);
 
     const handleProfileChange = (newProfile: OTEProfile) => {
