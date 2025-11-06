@@ -33,28 +33,39 @@ LIMIT 20;
 
 -- 3. VERIFICAR POR FAIXA DE DURAÇÃO
 SELECT 
-    CASE 
-        WHEN c.duration < 60 THEN '< 1 min'
-        WHEN c.duration < 120 THEN '1-2 min'
-        WHEN c.duration < 180 THEN '2-3 min'
-    END as faixa_duracao,
-    COUNT(*) as total,
-    AVG(ca.final_grade)::numeric(3,1) as nota_media
-FROM calls c
-INNER JOIN call_analysis ca ON ca.call_id = c.id
-WHERE c.duration < 180
-GROUP BY 
-    CASE 
-        WHEN c.duration < 60 THEN '< 1 min'
-        WHEN c.duration < 120 THEN '1-2 min'
-        WHEN c.duration < 180 THEN '2-3 min'
-    END
-ORDER BY 
-    CASE 
-        WHEN c.duration < 60 THEN 1
-        WHEN c.duration < 120 THEN 2
-        WHEN c.duration < 180 THEN 3
-    END;
+    faixa_duracao,
+    total,
+    nota_media
+FROM (
+    SELECT 
+        CASE 
+            WHEN c.duration < 60 THEN '< 1 min'
+            WHEN c.duration < 120 THEN '1-2 min'
+            WHEN c.duration < 180 THEN '2-3 min'
+        END as faixa_duracao,
+        CASE 
+            WHEN c.duration < 60 THEN 1
+            WHEN c.duration < 120 THEN 2
+            WHEN c.duration < 180 THEN 3
+        END as ordem,
+        COUNT(*) as total,
+        AVG(ca.final_grade)::numeric(3,1) as nota_media
+    FROM calls c
+    INNER JOIN call_analysis ca ON ca.call_id = c.id
+    WHERE c.duration < 180
+    GROUP BY 
+        CASE 
+            WHEN c.duration < 60 THEN '< 1 min'
+            WHEN c.duration < 120 THEN '1-2 min'
+            WHEN c.duration < 180 THEN '2-3 min'
+        END,
+        CASE 
+            WHEN c.duration < 60 THEN 1
+            WHEN c.duration < 120 THEN 2
+            WHEN c.duration < 180 THEN 3
+        END
+) subquery
+ORDER BY ordem;
 
 -- ========================================
 -- ⚠️ BACKUP ANTES DE DELETAR!
