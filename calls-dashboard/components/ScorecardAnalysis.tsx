@@ -31,6 +31,24 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
   React.useEffect(() => {
     const checkExistingAnalysis = async () => {
       try {
+        // ✅ VALIDAR DURAÇÃO ATUAL DA CHAMADA PRIMEIRO
+        let realDuration = call.durationSec;
+        if (call.duration_formated && call.duration_formated !== '00:00:00') {
+          const parts = call.duration_formated.split(':');
+          const hours = parseInt(parts[0]) || 0;
+          const minutes = parseInt(parts[1]) || 0;
+          const seconds = parseInt(parts[2]) || 0;
+          realDuration = hours * 3600 + minutes * 60 + seconds;
+        }
+
+        // ⚠️ CRÍTICO: Não carregar análise se chamada for muito curta
+        if (realDuration < 60) {
+          console.log('⚠️ Chamada muito curta (', realDuration, 's) - análise existente será ignorada');
+          setAnalysis(null);
+          setHasExisting(false);
+          return; // Não buscar análise do banco
+        }
+
         const existing = await getCallAnalysisFromDatabase(call.id);
         if (existing) {
           // ✅ VALIDAR se a análise é realmente válida antes de mostrar
@@ -51,10 +69,12 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
           );
           
           if (isValidAnalysis) {
+            console.log('✅ Análise válida encontrada para chamada de', realDuration, 's');
             setAnalysis(existing);
             setHasExisting(true);
             onAnalysisComplete?.(existing);
           } else {
+            console.log('⚠️ Análise inválida detectada - será ignorada');
             setAnalysis(null);
             setHasExisting(false);
           }
@@ -66,6 +86,7 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
           setHasExisting(false);
         }
       } catch (err) {
+        console.error('❌ Erro ao verificar análise:', err);
         setAnalysis(null);
         setHasExisting(false);
       }
@@ -144,6 +165,23 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
     return 'bg-red-500';
   };
 
+  // ✅ Calcular duração real para validação de UI
+  const getRealDuration = () => {
+    let realDuration = call.durationSec;
+    if (call.duration_formated && call.duration_formated !== '00:00:00') {
+      const parts = call.duration_formated.split(':');
+      const hours = parseInt(parts[0]) || 0;
+      const minutes = parseInt(parts[1]) || 0;
+      const seconds = parseInt(parts[2]) || 0;
+      realDuration = hours * 3600 + minutes * 60 + seconds;
+    }
+    return realDuration;
+  };
+
+  const realDuration = getRealDuration();
+  const isTooShort = realDuration < 60;
+  const canAnalyze = !loading && call.transcription?.trim() && !isTooShort;
+
   return (
     <div className="space-y-4">
       {/* Cabeçalho */}
@@ -159,7 +197,8 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
           {!analysis && (
             <button
               onClick={handleAnalyze}
-              disabled={loading || !call.transcription?.trim()}
+              disabled={!canAnalyze}
+              title={isTooShort ? `Chamada muito curta (${realDuration}s). Mínimo: 60s` : !call.transcription?.trim() ? 'Sem transcrição' : ''}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {loading ? (
@@ -206,6 +245,14 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
           )}
         </div>
       </div>
+
+      {/* Aviso: Chamada muito curta */}
+      {isTooShort && !analysis && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg">
+          <strong>⚠️ Chamada muito curta:</strong> Esta chamada tem apenas {realDuration} segundos. 
+          É necessário no mínimo 60 segundos para análise de scorecard.
+        </div>
+      )}
 
       {/* Erro */}
       {error && (

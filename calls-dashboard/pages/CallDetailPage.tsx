@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DATE_FORMATTER, TIME_FORMATTER, secondsToHuman } from '../constants';
 import { fetchCallDetail, convertToCallItem } from '../services/callsService';
 import { CallItem } from '../types';
@@ -63,6 +63,19 @@ const getAuthorColor = (authorId: string | null | undefined): string => {
   return colors[Math.abs(hash) % colors.length];
 };
 
+// Função para formatar segundos em HH:MM:SS
+function formatSecondsToHHMMSS(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  return [
+    hours.toString().padStart(2, '0'),
+    minutes.toString().padStart(2, '0'),
+    secs.toString().padStart(2, '0')
+  ].join(':');
+}
+
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
   if (!recording_url) return false;
@@ -98,6 +111,11 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   const [fbError, setFbError] = useState<string | null>(null);
   const [editingFeedback, setEditingFeedback] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+
+  // ✅ CORREÇÃO: useCallback para evitar loop infinito no ScorecardAnalysis
+  const handleAnalysisComplete = useCallback((result: ScorecardAnalysisResult) => {
+    setAnalysisResult(result);
+  }, []); // Função estável, não muda entre renders
 
   useEffect(() => {
     const loadCallDetail = async () => {
@@ -583,8 +601,14 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                             console.error('❌ Erro ao atualizar duração:', error);
                           } else {
                             console.log('✅ Duração sincronizada automaticamente:', realDuration);
-                            // Recarregar chamada para atualizar UI
-                            window.location.reload();
+                            // ✅ Atualizar estado local ao invés de reload (mais suave)
+                            setCall(prev => prev ? ({
+                              ...prev,
+                              durationSec: realDuration,
+                              duration: realDuration,
+                              duration_formated: formatSecondsToHHMMSS(realDuration)
+                            }) : null);
+                            console.log('✅ UI atualizada sem reload');
                           }
                         } catch (err) {
                           console.error('❌ Erro ao sincronizar duração:', err);
@@ -751,11 +775,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
           <AudioStatusIndicator call={call} />
           <ScorecardAnalysis 
             call={call} 
-            onAnalysisComplete={(result) => {
-              setAnalysisResult(result);
-              // Notificar componente pai
-              // onAnalysisComplete?.(result); // This prop is not passed to ScorecardAnalysis
-            }}
+            onAnalysisComplete={handleAnalysisComplete}
             onProcessingChange={setAnalysisLoading}
           />
           
