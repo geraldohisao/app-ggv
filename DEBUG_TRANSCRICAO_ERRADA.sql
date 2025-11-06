@@ -5,7 +5,7 @@ SELECT
     id,
     enterprise,
     person,
-    sdr_name,
+    agent_id,
     duration,
     duration_formated,
     LEFT(transcription, 200) as transcription_preview,
@@ -32,7 +32,7 @@ SELECT
     id,
     enterprise,
     person,
-    sdr_name,
+    agent_id,
     duration,
     LEFT(transcription, 200) as transcription_preview
 FROM calls 
