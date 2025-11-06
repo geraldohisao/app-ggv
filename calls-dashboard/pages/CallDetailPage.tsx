@@ -118,6 +118,14 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   }, []); // Função estável, não muda entre renders
 
   useEffect(() => {
+    // ⚠️ CRÍTICO: Limpar estado anterior ao trocar de chamada
+    setCall(null);
+    setAnalysisResult(null);
+    setAiNote('N/A');
+    setAiScore(null);
+    setFeedbacks([]);
+    setFeedback('');
+    
     const loadCallDetail = async () => {
       if (!callId) return;
       
@@ -299,11 +307,23 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   const loadExistingAIAnalysis = async (callItem: CallItem) => {
     try {
       console.log('🔍 Carregando análise IA persistida para:', callItem.id);
+      console.log('🔍 DEBUG - Call atual:', {
+        id: callItem.id,
+        enterprise: callItem.company_name,
+        person: callItem.person_name,
+        transcription_preview: callItem.transcription?.substring(0, 100)
+      });
       
       // SEMPRE tentar carregar análise do banco (PERSISTÊNCIA GARANTIDA)
       const existingAnalysis = await getCallAnalysisFromDatabase(callItem.id);
       
       if (existingAnalysis) {
+        console.log('🔍 DEBUG - Análise retornada:', {
+          scorecard: existingAnalysis.scorecard_used?.name,
+          final_grade: existingAnalysis.final_grade,
+          criteria_count: existingAnalysis.criteria_analysis?.length
+        });
+        
         // Análise encontrada no banco - usar dados persistidos
         if (existingAnalysis.final_grade !== null && existingAnalysis.final_grade !== undefined) {
           setAiNote(existingAnalysis.final_grade.toFixed(1));

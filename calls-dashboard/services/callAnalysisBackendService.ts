@@ -55,9 +55,20 @@ export async function hasExistingAnalysis(callId: string): Promise<CallAnalysisR
     if (analysis) {
       console.log('✅ Análise encontrada no banco:', {
         id: analysis.id,
+        call_id: analysis.call_id,  // ⚠️ VERIFICAR se bate com callId
         final_grade: analysis.final_grade,
         created_at: analysis.analysis_created_at
       });
+      
+      // ⚠️ VALIDAÇÃO CRÍTICA: Verificar se call_id da análise bate com callId solicitado
+      if (analysis.call_id !== callId) {
+        console.error('🚨 BUG CRÍTICO: Análise retornada pertence a OUTRA chamada!', {
+          solicitado: callId,
+          retornado: analysis.call_id,
+          scorecard: analysis.scorecard_name
+        });
+        return null; // Não retornar análise errada
+      }
     } else {
       console.log('ℹ️ Nenhuma análise encontrada para esta chamada');
     }
