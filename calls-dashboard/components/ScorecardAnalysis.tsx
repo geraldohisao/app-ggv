@@ -42,8 +42,9 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
         }
 
         // ⚠️ CRÍTICO: Não carregar análise se chamada for muito curta
-        if (realDuration < 60) {
-          console.log('⚠️ Chamada muito curta (', realDuration, 's) - análise existente será ignorada');
+        // Mínimo de 3 minutos (180s) para análise de qualidade
+        if (realDuration < 180) {
+          console.log('⚠️ Chamada muito curta (', realDuration, 's) - análise existente será ignorada. Mínimo: 180s');
           setAnalysis(null);
           setHasExisting(false);
           return; // Não buscar análise do banco
@@ -112,8 +113,8 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
       realDuration = hours * 3600 + minutes * 60 + seconds;
     }
 
-    if (realDuration < 60) {
-      setError('Chamada muito curta para análise (mínimo 1 minuto)');
+    if (realDuration < 180) {
+      setError('Chamada muito curta para análise (mínimo 3 minutos)');
       return;
     }
 
@@ -179,7 +180,7 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
   };
 
   const realDuration = getRealDuration();
-  const isTooShort = realDuration < 60;
+  const isTooShort = realDuration < 180; // 3 minutos mínimo
   const canAnalyze = !loading && call.transcription?.trim() && !isTooShort;
 
   return (
@@ -198,7 +199,7 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
             <button
               onClick={handleAnalyze}
               disabled={!canAnalyze}
-              title={isTooShort ? `Chamada muito curta (${realDuration}s). Mínimo: 60s` : !call.transcription?.trim() ? 'Sem transcrição' : ''}
+              title={isTooShort ? `Chamada muito curta (${realDuration}s). Mínimo: 180s (3 min)` : !call.transcription?.trim() ? 'Sem transcrição' : ''}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {loading ? (
@@ -249,8 +250,8 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
       {/* Aviso: Chamada muito curta */}
       {isTooShort && !analysis && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg">
-          <strong>⚠️ Chamada muito curta:</strong> Esta chamada tem apenas {realDuration} segundos. 
-          É necessário no mínimo 60 segundos para análise de scorecard.
+          <strong>⚠️ Chamada muito curta:</strong> Esta chamada tem apenas {Math.floor(realDuration / 60)} minuto(s) e {realDuration % 60} segundos. 
+          É necessário no mínimo 3 minutos (180 segundos) para análise de scorecard de qualidade.
         </div>
       )}
 
