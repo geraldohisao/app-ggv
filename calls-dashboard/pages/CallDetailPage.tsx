@@ -608,6 +608,17 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                               duration: realDuration,
                               duration_formated: formatSecondsToHHMMSS(realDuration)
                             }) : null);
+                            
+                            // ⚠️ CRÍTICO: Se duração real < 180s, limpar análise inválida
+                            if (realDuration < 180) {
+                              console.log('🚨 DURAÇÃO CORRIGIDA < 180s - Limpando análise inválida!');
+                              setAnalysisResult(null);
+                              // Forçar re-render do ScorecardAnalysis para esconder análise
+                              window.dispatchEvent(new CustomEvent('duration-corrected', {
+                                detail: { callId: call.id, duration: realDuration }
+                              }));
+                            }
+                            
                             console.log('✅ UI atualizada sem reload');
                           }
                         } catch (err) {

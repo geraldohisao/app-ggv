@@ -95,7 +95,26 @@ export default function ScorecardAnalysis({ call, onAnalysisComplete, onProcessi
 
     // SEMPRE verificar, mesmo sem transcrição (pode ter análise salva)
     checkExistingAnalysis();
-  }, [call.id, onAnalysisComplete]); // Remover dependência de transcription
+  }, [call.id, call.durationSec, call.duration_formated, onAnalysisComplete]); // ✅ Re-validar quando duração mudar
+
+  // ⚠️ CRÍTICO: Re-validar quando duração for corrigida após carregar áudio
+  React.useEffect(() => {
+    const handleDurationCorrected = (event: CustomEvent) => {
+      const { callId, duration } = event.detail;
+      
+      if (callId === call.id && duration < 180) {
+        console.log('🚨 Evento de correção de duração recebido - Escondendo análise inválida');
+        setAnalysis(null);
+        setHasExisting(false);
+      }
+    };
+
+    window.addEventListener('duration-corrected', handleDurationCorrected as EventListener);
+    
+    return () => {
+      window.removeEventListener('duration-corrected', handleDurationCorrected as EventListener);
+    };
+  }, [call.id]);
 
   const handleAnalyze = async () => {
     if (!call.transcription?.trim()) {
