@@ -1,0 +1,10 @@
+Deploy triggered at: 2025-11-10
+Commits included:
+- affd5e2: SQL debug simplificado
+- 56557a7: Limpeza de estado + validação
+- d6700be: Bug de timing corrigido
+- 6534418: Limite 180s
+- cd4db6e: Loop infinito + reload
+
+All bug fixes applied and ready for production.
+
