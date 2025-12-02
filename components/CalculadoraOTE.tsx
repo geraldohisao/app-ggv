@@ -4,8 +4,8 @@ import React, { useMemo, useState } from 'react';
 import { OTEProfile, Module, UserRole } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
-import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION, COORDENADOR_REMUNERATION } from '../constants';
-import { useOteCalculator, SdrInputs as SdrInputType, CloserInputs as CloserInputType, CoordenadorInputs as CoordenadorInputType } from '../hooks/useOteCalculator';
+import { OTE_TOOLTIP_TEXT, SDR_REMUNERATION, CLOSER_REMUNERATION, COORDENADOR_REMUNERATION, ANALISTA_MARKETING_REMUNERATION } from '../constants';
+import { useOteCalculator, SdrInputs as SdrInputType, CloserInputs as CloserInputType, CoordenadorInputs as CoordenadorInputType, AnalistaMarketingInputs as AnalistaMarketingInputType } from '../hooks/useOteCalculator';
 import Tooltip from './ui/Tooltip';
 import ProgressBar from './ui/ProgressBar';
 import { QuestionMarkCircleIcon, CalculatorIcon, CheckCircleIcon, XCircleIcon } from './ui/icons';
@@ -37,6 +37,16 @@ const initialCoordenadorInputs: CoordenadorInputType = {
     mesesDeCasa: '',
 };
 
+const initialAnalistaMarketingInputs: AnalistaMarketingInputType = {
+    perfil: OTEProfile.AnalistaMarketing,
+    nivel: 'Nível 1',
+    metaVendasMes: '', vendasRealizadasMes: '',
+    metaMqlMes: '', mqlRealizadoMes: '',
+    leadsDoTrimestre: '', mqlDoTrimestre: '',
+    metaAnualMql: '', mqlRealizadoAno: '',
+    mesesDeCasa: '',
+};
+
 const initialCloserBonuses = {
     campaign: { ticketMedio: false, pagamentoVista: false, leadProspeccao: false, entrada50: false },
     product: { pesquisasAcima25k: false, valuationAcima15k: false, treinamentosAcima10k: false, maisDe6Modulos: false }
@@ -44,7 +54,7 @@ const initialCloserBonuses = {
 
 const CalculadoraOTE: React.FC = () => {
     const { user } = useUser();
-    const [inputs, setInputs] = useState<SdrInputType | CloserInputType | CoordenadorInputType>(initialSdrInputs);
+    const [inputs, setInputs] = useState<SdrInputType | CloserInputType | CoordenadorInputType | AnalistaMarketingInputType>(initialSdrInputs);
     const [closerBonuses, setCloserBonuses] = useState(initialCloserBonuses);
     const [includeQuarterlyBonus, setIncludeQuarterlyBonus] = useState(false);
     const [includeAnnualBonus, setIncludeAnnualBonus] = useState(false);
@@ -75,6 +85,8 @@ const CalculadoraOTE: React.FC = () => {
             setInputs(initialCloserInputs);
         } else if (newProfile === OTEProfile.Coordenador) {
             setInputs(initialCoordenadorInputs);
+        } else if (newProfile === OTEProfile.AnalistaMarketing) {
+            setInputs(initialAnalistaMarketingInputs);
         }
         setCloserBonuses(initialCloserBonuses);
         setIncludeQuarterlyBonus(false);
@@ -130,6 +142,7 @@ const CalculadoraOTE: React.FC = () => {
                                       <option value={OTEProfile.SDR}>SDR</option>
                                       <option value={OTEProfile.Closer}>Closer</option>
                                       <option value={OTEProfile.Coordenador}>Coordenador</option>
+                                      <option value={OTEProfile.AnalistaMarketing}>Analista de Marketing</option>
                                   </SelectField>
                                 ) : (
                                   <div>
@@ -138,7 +151,8 @@ const CalculadoraOTE: React.FC = () => {
                                   </div>
                                 )}
                                 <SelectField label="Nível" name="nivel" id="nivel" value={inputs.nivel} onChange={handleInputChange}>
-                                    <option>Nível 1</option><option>Nível 2</option><option>Nível 3</option><option>Nível 4</option>
+                                    <option>Nível 1</option><option>Nível 2</option><option>Nível 3</option>
+                                    {(allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) !== OTEProfile.AnalistaMarketing && <option>Nível 4</option>}
                                 </SelectField>
                             </div>
                         </Section>
@@ -146,6 +160,8 @@ const CalculadoraOTE: React.FC = () => {
                           <SdrInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as SdrInputType) : { ...(inputs as any), perfil: OTEProfile.SDR }} onChange={handleInputChange} />
                         ) : (allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.Coordenador ? (
                           <CoordenadorInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as CoordenadorInputType) : { ...(inputs as any), perfil: OTEProfile.Coordenador }} onChange={handleInputChange} />
+                        ) : (allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.AnalistaMarketing ? (
+                          <AnalistaMarketingInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as AnalistaMarketingInputType) : { ...(inputs as any), perfil: OTEProfile.AnalistaMarketing }} onChange={handleInputChange} />
                         ) : (
                           <CloserInputsComponent inputs={allowedProfile === 'ALL' ? (inputs as CloserInputType) : { ...(inputs as any), perfil: OTEProfile.Closer }} onChange={handleInputChange} bonuses={closerBonuses} onBonusChange={handleCloserBonusChange} formatCurrency={formatCurrency} />
                         )}
@@ -157,6 +173,8 @@ const CalculadoraOTE: React.FC = () => {
                               <SdrResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />
                             ) : (allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.Coordenador ? (
                               <CoordenadorResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />
+                            ) : (allowedProfile === 'ALL' ? inputs.perfil : allowedProfile) === OTEProfile.AnalistaMarketing ? (
+                              <AnalistaMarketingResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} nivel={inputs.nivel} />
                             ) : (
                               <CloserResults results={results} includeQuarterly={includeQuarterlyBonus} setIncludeQuarterly={setIncludeQuarterlyBonus} includeAnnual={includeAnnualBonus} setIncludeAnnual={setIncludeAnnualBonus} formatCurrency={formatCurrency} />
                             )}
@@ -456,6 +474,229 @@ const CoordenadorResults: React.FC<{ results: any, includeQuarterly: boolean, se
         </div>
         <div className="space-y-3 pt-4">
             <h4 className="font-semibold text-slate-700">Simulação de Cenários (Fixo + Premiação Coletiva)</h4>
+            <div className="grid grid-cols-3 gap-3 text-center">
+                <ScenarioBox label="🔻 Baixo (75%)" value={formatCurrency(results.oteBaixo)} color="red" />
+                <ScenarioBox label="🎯 Alvo (100%)" value={formatCurrency(results.oteAlvo)} color="blue" />
+                <ScenarioBox label="🔼 Alto (150%)" value={formatCurrency(results.oteAlto)} color="green" />
+            </div>
+        </div>
+    </div>
+);
+
+// --- Analista de Marketing Components ---
+const AnalistaMarketingInputsComponent: React.FC<{ inputs: any, onChange: any }> = ({ inputs, onChange }) => {
+    const nivelKey = ANALISTA_MARKETING_REMUNERATION.levels[inputs.nivel as keyof typeof ANALISTA_MARKETING_REMUNERATION.levels] || 'level1';
+    const quarterlyRule = ANALISTA_MARKETING_REMUNERATION.quarterlyMqlLeadBonus[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.quarterlyMqlLeadBonus];
+    const thresholdText = quarterlyRule ? `Meta para ${inputs.nivel}: Atingir ${(quarterlyRule.threshold * 100).toFixed(1)}% de conversão MQL/LEAD para ganhar ${quarterlyRule.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.` : '';
+
+    return (
+    <>
+        <Section title="Premiação Coletiva / Meta Global">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormattedInputField 
+                    id="metaVendasMes" 
+                    label="Meta de Vendas do Mês" 
+                    name="metaVendasMes" 
+                    value={inputs.metaVendasMes} 
+                    onChange={onChange} 
+                    placeholder="Ex: 500.000" 
+                    formatType="currency"
+                />
+                <FormattedInputField 
+                    id="vendasRealizadasMes" 
+                    label="Vendas Realizadas no Mês" 
+                    name="vendasRealizadasMes" 
+                    value={inputs.vendasRealizadasMes} 
+                    onChange={onChange} 
+                    placeholder="Ex: 450.000" 
+                    formatType="currency"
+                />
+            </div>
+        </Section>
+        <Section title="Premiação Individual MQL">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField 
+                    id="metaMqlMes" 
+                    label="Meta de MQL (Mês)" 
+                    name="metaMqlMes" 
+                    value={inputs.metaMqlMes} 
+                    onChange={onChange} 
+                    placeholder="Ex: 1000" 
+                    type="number" 
+                />
+                <InputField 
+                    id="mqlRealizadoMes" 
+                    label="MQL Realizado no Mês" 
+                    name="mqlRealizadoMes" 
+                    value={inputs.mqlRealizadoMes} 
+                    onChange={onChange} 
+                    placeholder="Ex: 850" 
+                    type="number" 
+                />
+            </div>
+        </Section>
+        <Section title="Premiação Trimestral % MQL/LEAD">
+            <div className="bg-slate-50 p-3 rounded-lg text-xs text-slate-600 space-y-1 mb-4">
+                <p className='font-semibold'>{thresholdText}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField 
+                    id="leadsDoTrimestre" 
+                    label="Leads do Trimestre (quantidade)" 
+                    name="leadsDoTrimestre" 
+                    value={inputs.leadsDoTrimestre} 
+                    onChange={onChange} 
+                    placeholder="Ex: 1000" 
+                    type="number" 
+                />
+                <InputField 
+                    id="mqlDoTrimestre" 
+                    label="MQL do Trimestre (quantidade)" 
+                    name="mqlDoTrimestre" 
+                    value={inputs.mqlDoTrimestre} 
+                    onChange={onChange} 
+                    placeholder="Ex: 470" 
+                    type="number" 
+                />
+            </div>
+        </Section>
+        <Section title="Bônus Anual">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField 
+                    id="metaAnualMql" 
+                    label="Meta Anual de MQL" 
+                    name="metaAnualMql" 
+                    value={inputs.metaAnualMql} 
+                    onChange={onChange} 
+                    placeholder="Ex: 10000" 
+                    type="number" 
+                />
+                <InputField 
+                    id="mqlRealizadoAno" 
+                    label="MQL Realizado no Ano" 
+                    name="mqlRealizadoAno" 
+                    value={inputs.mqlRealizadoAno} 
+                    onChange={onChange} 
+                    placeholder="Ex: 10500" 
+                    type="number" 
+                />
+                <InputField 
+                    id="mesesDeCasa" 
+                    label="Meses de GGV no ano" 
+                    name="mesesDeCasa" 
+                    value={inputs.mesesDeCasa} 
+                    onChange={onChange} 
+                    placeholder="Ex: 12" 
+                    type="number" 
+                    max="12" 
+                    min="1" 
+                />
+            </div>
+        </Section>
+    </>
+)};
+
+
+const MqlLeadGauge: React.FC<{ percentage: number, nivel: string }> = ({ percentage, nivel }) => {
+    // Definir thresholds por nível
+    const thresholds = {
+        'Nível 1': { min: 47, label: '47%', color: 'green' },
+        'Nível 2': { min: 47.1, max: 60, label: '47,1% - 60%', color: 'green' },
+        'Nível 3': { min: 60, label: '> 60%', color: 'green' },
+    };
+    const threshold = thresholds[nivel as keyof typeof thresholds] || thresholds['Nível 1'];
+    const isAchieved = percentage >= threshold.min;
+    
+    return (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+            <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-slate-600">% MQL/LEAD Trimestral</span>
+                <span className={`text-lg font-bold ${isAchieved ? 'text-green-600' : 'text-orange-500'}`}>
+                    {percentage.toFixed(1)}%
+                </span>
+            </div>
+            
+            {/* Visualização de Faixas */}
+            <div className="relative h-8 bg-slate-200 rounded-full overflow-hidden">
+                {/* Faixa Vermelha: 0-47% */}
+                <div className="absolute left-0 top-0 h-full bg-red-300" style={{ width: '47%' }}></div>
+                {/* Faixa Amarela: 47-60% */}
+                <div className="absolute top-0 h-full bg-yellow-300" style={{ left: '47%', width: '13%' }}></div>
+                {/* Faixa Verde: 60%+ */}
+                <div className="absolute top-0 h-full bg-green-300" style={{ left: '60%', width: '40%' }}></div>
+                
+                {/* Marcador do valor atual */}
+                <div 
+                    className="absolute top-0 h-full w-1 bg-slate-800 z-10"
+                    style={{ left: `${Math.min(percentage, 100)}%`, transform: 'translateX(-50%)' }}
+                >
+                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-slate-800 rounded-full"></div>
+                </div>
+            </div>
+            
+            {/* Legenda das faixas */}
+            <div className="flex justify-between mt-2 text-xs">
+                <span className="text-red-600 font-medium">0%</span>
+                <span className="text-yellow-600 font-medium">47%</span>
+                <span className="text-green-600 font-medium">60%</span>
+                <span className="text-green-700 font-medium">100%</span>
+            </div>
+            
+            {/* Status por nível */}
+            <div className={`mt-3 p-2 rounded-lg text-center text-sm font-semibold ${
+                isAchieved 
+                    ? 'bg-green-100 text-green-700 border border-green-200' 
+                    : 'bg-orange-100 text-orange-700 border border-orange-200'
+            }`}>
+                {isAchieved ? (
+                    <span>✅ Meta atingida para {nivel}! (threshold: {threshold.label})</span>
+                ) : (
+                    <span>⏳ Falta atingir {threshold.label} para {nivel} (atual: {percentage.toFixed(1)}%)</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// v2.0 - Atualização da visualização % MQL/LEAD
+const AnalistaMarketingResults: React.FC<{ results: any, includeQuarterly: boolean, setIncludeQuarterly: (c: boolean) => void, includeAnnual: boolean, setIncludeAnnual: (c: boolean) => void, formatCurrency: (v: number) => string, nivel?: string }> = ({ results, includeQuarterly, setIncludeQuarterly, includeAnnual, setIncludeAnnual, formatCurrency, nivel = 'Nível 1' }) => (
+    <div className="space-y-6">
+        <div className="space-y-3">
+            <h4 className="font-semibold text-slate-700 text-base">Progresso das Metas Mensais</h4>
+            <ProgressItem label="Meta Global" percentage={results.progressoColetiva} />
+            <ProgressItem label="MQL Mensal" percentage={results.progressoMql} />
+            <ProgressItem label="MQL Anual" percentage={results.progressoAnual} />
+        </div>
+        
+        {/* Indicador Especial para % MQL/LEAD - Visualização por Faixas */}
+        <MqlLeadGauge percentage={results.progressoTrimestral} nivel={nivel} />
+        <div className="space-y-1">
+            <h4 className="font-semibold text-slate-700 text-base mb-2">Detalhamento Variável</h4>
+            <DetailRow label="Fixo" value={formatCurrency(results.salarioFixo)} />
+            <DetailRow label="Premiação Coletiva / Meta Global" value={formatCurrency(results.premiacaoColetiva)} />
+            <DetailRow label="Premiação Individual MQL" value={formatCurrency(results.premiacaoIndividualMql)} />
+            {results.metaTrimestralAtingida && <CheckboxRow id="includeQuarterlyMarketing" label="Premiação Trimestral % MQL/LEAD" value={results.bonusTrimestralPotencial} checked={includeQuarterly} onChange={setIncludeQuarterly} formatCurrency={formatCurrency} color="yellow" />}
+            {!results.metaTrimestralAtingida && results.progressoTrimestral > 0 && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                        <strong>Premiação Trimestral:</strong> Necessário atingir o threshold específico do seu nível de % MQL/LEAD.
+                        Atual: {results.progressoTrimestral.toFixed(1)}%
+                    </p>
+                </div>
+            )}
+            {results.metaAnualAtingida && <CheckboxRow id="includeAnnualMarketing" label="Bônus Anual (100% Meta MQL + Tempo GGV)" value={results.bonusAnualPotencial} checked={includeAnnual} onChange={setIncludeAnnual} formatCurrency={formatCurrency} color="blue" />}
+            {!results.metaAnualAtingida && results.progressoAnual > 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                        <strong>Bônus Anual:</strong> Necessário atingir 100% da meta anual de MQL para liberar o bônus.
+                        Atual: {results.progressoAnual.toFixed(1)}%
+                    </p>
+                </div>
+            )}
+            <DetailRow label="Total OTE Calculado" value={formatCurrency(results.totalOte)} isTotal />
+        </div>
+        <div className="space-y-3 pt-4">
+            <h4 className="font-semibold text-slate-700">Simulação de Cenários (Fixo + Premiações)</h4>
             <div className="grid grid-cols-3 gap-3 text-center">
                 <ScenarioBox label="🔻 Baixo (75%)" value={formatCurrency(results.oteBaixo)} color="red" />
                 <ScenarioBox label="🎯 Alvo (100%)" value={formatCurrency(results.oteAlvo)} color="blue" />

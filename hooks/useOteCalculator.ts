@@ -1,7 +1,7 @@
 
 import { useMemo } from 'react';
 import { OTEProfile } from '../types';
-import { SDR_REMUNERATION, CLOSER_REMUNERATION, COORDENADOR_REMUNERATION } from '../constants';
+import { SDR_REMUNERATION, CLOSER_REMUNERATION, COORDENADOR_REMUNERATION, ANALISTA_MARKETING_REMUNERATION } from '../constants';
 
 // Define types for inputs to ensure type safety
 export type SdrInputs = {
@@ -43,12 +43,30 @@ export type CoordenadorInputs = {
     mesesDeCasa: string;
 };
 
+export type AnalistaMarketingInputs = {
+    perfil: OTEProfile.AnalistaMarketing;
+    nivel: string;
+    // Premiação Coletiva / Meta Global
+    metaVendasMes: string;            // Meta de vendas do mês (R$)
+    vendasRealizadasMes: string;      // Vendas realizadas no mês (R$)
+    // Premiação Individual MQL
+    metaMqlMes: string;               // Meta de MQL do mês (quantidade)
+    mqlRealizadoMes: string;          // MQL realizado no mês (quantidade)
+    // Premiação Trimestral % MQL/LEAD
+    leadsDoTrimestre: string;         // Quantidade de leads no trimestre
+    mqlDoTrimestre: string;           // Quantidade de MQL no trimestre
+    // Bônus Anual
+    metaAnualMql: string;             // Meta anual de MQL (quantidade)
+    mqlRealizadoAno: string;          // MQL realizado no ano (quantidade)
+    mesesDeCasa: string;              // Meses de casa para cálculo proporcional do bônus anual
+};
+
 type CloserBonuses = {
     campaign: { [key: string]: boolean };
     product: { [key: string]: boolean };
 };
 
-type OTEInputs = SdrInputs | CloserInputs | CoordenadorInputs;
+type OTEInputs = SdrInputs | CloserInputs | CoordenadorInputs | AnalistaMarketingInputs;
 
 // Helper function for tiered values
 const getTieredValue = (achievement: number, tiers: { threshold: number }[], values: number[]) => {
@@ -168,6 +186,90 @@ export const useOteCalculator = (
                 oteAlvo: calculateScenarioOTE(1.0),
                 oteAlto: calculateScenarioOTE(1.5),
                 metaTrimestralAtingida,
+                bonusTrimestralPotencial,
+                metaAnualAtingida,
+                bonusAnualPotencial,
+            };
+
+        } else if (inputs.perfil === OTEProfile.AnalistaMarketing) {
+            const analistaInputs = inputs as AnalistaMarketingInputs;
+            const nivelKey = ANALISTA_MARKETING_REMUNERATION.levels[analistaInputs.nivel as keyof typeof ANALISTA_MARKETING_REMUNERATION.levels] || 'level1';
+            
+            // Parse inputs
+            const metaVendasMes = parseFloat(analistaInputs.metaVendasMes || '0');
+            const vendasRealizadasMes = parseFloat(analistaInputs.vendasRealizadasMes || '0');
+            const metaMqlMes = parseFloat(analistaInputs.metaMqlMes || '0');
+            const mqlRealizadoMes = parseFloat(analistaInputs.mqlRealizadoMes || '0');
+            const leadsDoTrimestre = parseFloat(analistaInputs.leadsDoTrimestre || '0');
+            const mqlDoTrimestre = parseFloat(analistaInputs.mqlDoTrimestre || '0');
+            const metaAnualMql = parseFloat(analistaInputs.metaAnualMql || '0');
+            const mqlRealizadoAno = parseFloat(analistaInputs.mqlRealizadoAno || '0');
+            const mesesDeCasa = Math.max(1, Math.min(12, parseInt(analistaInputs.mesesDeCasa || '12', 10)));
+
+            const salarioFixo = ANALISTA_MARKETING_REMUNERATION.fixedSalary[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.fixedSalary];
+            
+            // 1. Premiação Coletiva / Meta Global (baseado em vendas)
+            const progressoColetiva = metaVendasMes > 0 ? (vendasRealizadasMes / metaVendasMes) : 0;
+            const premiacaoColetiva = getTieredValue(
+                progressoColetiva,
+                ANALISTA_MARKETING_REMUNERATION.collectiveBonus.tiers,
+                ANALISTA_MARKETING_REMUNERATION.collectiveBonus.values[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.collectiveBonus.values]
+            );
+
+            // 2. Premiação Individual MQL (baseado em quantidade de MQL)
+            const progressoMql = metaMqlMes > 0 ? (mqlRealizadoMes / metaMqlMes) : 0;
+            const premiacaoIndividualMql = getTieredValue(
+                progressoMql,
+                ANALISTA_MARKETING_REMUNERATION.individualMqlBonus.tiers,
+                ANALISTA_MARKETING_REMUNERATION.individualMqlBonus.values[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.individualMqlBonus.values]
+            );
+
+            // 3. Premiação Trimestral - % MQL/LEAD (threshold específico por nível)
+            const percentualMqlLead = leadsDoTrimestre > 0 ? (mqlDoTrimestre / leadsDoTrimestre) : 0;
+            const quarterlyRule = ANALISTA_MARKETING_REMUNERATION.quarterlyMqlLeadBonus[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.quarterlyMqlLeadBonus];
+            const canEarnQuarterlyBonus = percentualMqlLead >= quarterlyRule.threshold;
+            const bonusTrimestralPotencial = canEarnQuarterlyBonus ? quarterlyRule.value : 0;
+            const bonusTrimestral = includeQuarterlyBonus ? bonusTrimestralPotencial : 0;
+
+            // 4. Bônus Anual (100% da meta MQL anual + proporcional ao tempo de casa)
+            const progressoAnual = metaAnualMql > 0 ? (mqlRealizadoAno / metaAnualMql) : 0;
+            const metaAnualAtingida = progressoAnual >= 1.0; // Precisa atingir 100%
+            // Bônus = salário fixo × (meses de casa ÷ 12) SE atingir 100%
+            const bonusAnualPotencial = metaAnualAtingida ? (salarioFixo / 12) * mesesDeCasa : 0;
+            const bonusAnual = includeAnnualBonus ? bonusAnualPotencial : 0;
+
+            const totalOte = salarioFixo + premiacaoColetiva + premiacaoIndividualMql + bonusTrimestral + bonusAnual;
+
+            // Cenários: considerar apenas premiação coletiva + individual MQL
+            const calculateScenarioOTE = (achievement: number) => {
+                const scenarioCollectiveBonus = getTieredValue(
+                    achievement,
+                    ANALISTA_MARKETING_REMUNERATION.collectiveBonus.tiers,
+                    ANALISTA_MARKETING_REMUNERATION.collectiveBonus.values[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.collectiveBonus.values]
+                );
+                const scenarioMqlBonus = getTieredValue(
+                    achievement,
+                    ANALISTA_MARKETING_REMUNERATION.individualMqlBonus.tiers,
+                    ANALISTA_MARKETING_REMUNERATION.individualMqlBonus.values[nivelKey as keyof typeof ANALISTA_MARKETING_REMUNERATION.individualMqlBonus.values]
+                );
+                return salarioFixo + scenarioCollectiveBonus + scenarioMqlBonus;
+            };
+
+            return {
+                salarioFixo,
+                premiacaoColetiva,
+                premiacaoIndividualMql,
+                bonusTrimestral,
+                bonusAnual,
+                totalOte,
+                progressoColetiva: progressoColetiva * 100,
+                progressoMql: progressoMql * 100,
+                progressoTrimestral: percentualMqlLead * 100,
+                progressoAnual: progressoAnual * 100,
+                oteBaixo: calculateScenarioOTE(0.75),
+                oteAlvo: calculateScenarioOTE(1.0),
+                oteAlto: calculateScenarioOTE(1.5),
+                metaTrimestralAtingida: canEarnQuarterlyBonus,
                 bonusTrimestralPotencial,
                 metaAnualAtingida,
                 bonusAnualPotencial,

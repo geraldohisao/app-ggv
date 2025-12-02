@@ -1092,3 +1092,58 @@ export const COORDENADOR_REMUNERATION = {
     basedOnFixedSalary: true, // Indica que é baseado no salário fixo do nível
   }
 };
+
+export const ANALISTA_MARKETING_REMUNERATION = {
+  levels: {
+    'Nível 1': 'level1',
+    'Nível 2': 'level2',
+    'Nível 3': 'level3',
+  },
+  fixedSalary: {
+    level1: 5000.00,  // R$ 5.000,00
+    level2: 5500.00,  // R$ 5.500,00
+    level3: 6000.00,  // R$ 6.000,00
+  },
+  // Premiação Coletiva / Meta Global (baseado em % de vendas realizadas vs meta)
+  collectiveBonus: {
+    tiers: [
+      { threshold: 1.5, label: 'Acima de 150%' },
+      { threshold: 1.3, label: '130% a 149,99%' },
+      { threshold: 1.0, label: '100% a 129,99%' },
+      { threshold: 0.85, label: '85% a 99,99%' },
+      { threshold: 0.75, label: '75% a 84,99%' },
+    ],
+    values: {
+      level1: [2000.00, 1500.00, 750.00, 500.00, 250.00],
+      level2: [2500.00, 1750.00, 1000.00, 750.00, 500.00],
+      level3: [3000.00, 2000.00, 1250.00, 1000.00, 750.00],
+    }
+  },
+  // Premiação Individual MQL (baseado em quantidade de MQLs gerados vs meta)
+  individualMqlBonus: {
+    tiers: [
+      { threshold: 1.5, label: 'Acima de 150%' },
+      { threshold: 1.3, label: '130% a 149,99%' },
+      { threshold: 1.0, label: '100% a 129,99%' },
+      { threshold: 0.85, label: '85% a 99,99%' },
+      { threshold: 0.75, label: '75% a 84,99%' },
+    ],
+    values: {
+      level1: [2500.00, 2000.00, 1500.00, 750.00, 500.00],
+      level2: [2750.00, 2250.00, 1750.00, 1250.00, 1000.00],
+      level3: [3000.00, 2500.00, 2000.00, 1500.00, 1250.00],
+    }
+  },
+  // Premiação Trimestral - % de MQL / LEAD (threshold específico por nível)
+  quarterlyMqlLeadBonus: {
+    level1: { threshold: 0.47, value: 3000.00 },   // 47% = R$ 3.000
+    level2: { threshold: 0.471, value: 4000.00 },  // 47,1% a 60% = R$ 4.000
+    level3: { threshold: 0.60, value: 5000.00 },   // Acima de 60% = R$ 5.000
+  },
+  // Bônus Anual (100% da meta MQL anual + proporcional ao tempo de casa)
+  annualBonus: {
+    // Bônus = salário fixo do nível × (meses de casa ÷ 12) SE atingir 100% da meta
+    basedOnFixedSalary: true,
+    requiresFullGoal: true, // Precisa atingir 100% da meta anual
+  }
+};

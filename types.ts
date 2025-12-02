@@ -33,7 +33,7 @@ export interface User {
   name: string;
   initials: string;
   role: UserRole;
-  user_function?: 'SDR' | 'Closer' | 'Gestor'; // Função comercial do usuário
+  user_function?: 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing'; // Função comercial do usuário
 }
 
 export interface CompanyData {
@@ -147,6 +147,7 @@ export enum OTEProfile {
     SDR = 'SDR',
     Closer = 'Closer',
     Coordenador = 'Coordenador',
+    AnalistaMarketing = 'Analista de Marketing',
 }
 
 export interface SummaryInsights {
