@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UserRole } from '../types';
 import { listProfiles, setUserFunction, setUserRole } from '../services/supabaseService';
 
-export type UserFunction = 'SDR' | 'Closer' | 'Gestor' | '-';
+export type UserFunction = 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | '-';
 export interface UiUser { id: string; name: string; email: string; role: UserRole; func: UserFunction; }
 
 export function useUsersData() {

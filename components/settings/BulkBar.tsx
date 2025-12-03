@@ -26,6 +26,7 @@ export const BulkBar: React.FC<{
           <option value="SDR">SDR</option>
           <option value="Closer">Closer</option>
           <option value="Gestor">Gestor</option>
+          <option value="Analista de Marketing">Analista de Marketing</option>
         </select>
         <button onClick={apply} disabled={!canEdit} className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 transition disabled:opacity-60">Aplicar</button>
       </div>

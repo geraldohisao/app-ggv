@@ -38,6 +38,7 @@ export const UserRow: React.FC<{
           <option value="SDR">SDR</option>
           <option value="Closer">Closer</option>
           <option value="Gestor">Gestor</option>
+          <option value="Analista de Marketing">Analista de Marketing</option>
         </select>
       </td>
     </tr>

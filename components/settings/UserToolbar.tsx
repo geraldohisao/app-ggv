@@ -33,6 +33,7 @@ export const UserToolbar: React.FC<Props> = ({ total, search, setSearch, roleFil
           <option value="SDR">SDR</option>
           <option value="Closer">Closer</option>
           <option value="Gestor">Gestor</option>
+          <option value="Analista de Marketing">Analista de Marketing</option>
         </select>
         <button onClick={onRefresh} className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 transition">Atualizar</button>
         <button onClick={onClear} className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 transition">Limpar filtros</button>
