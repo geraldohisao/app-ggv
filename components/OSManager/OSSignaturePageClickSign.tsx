@@ -99,36 +99,64 @@ const OSSignaturePageClickSign: React.FC = () => {
                 return;
             }
 
-            // Gerar URL pública do PDF
-            console.log('📄 Gerando URL do PDF:', orderData.file_path);
+            // Baixar PDF e criar blob URL local (evita CORS)
+            console.log('📄 Baixando PDF:', orderData.file_path);
             
-            const { data: urlData, error: urlError } = await supabase.storage
-                .from('service-orders')
-                .createSignedUrl(orderData.file_path, 3600); // Válido por 1 hora
-
-            if (urlError) {
-                console.error('❌ Erro ao gerar URL:', urlError);
-                // Tentar URL pública como fallback
-                const { data: publicUrlData } = supabase.storage
+            try {
+                const { data: pdfBlob, error: downloadError } = await supabase.storage
                     .from('service-orders')
-                    .getPublicUrl(orderData.file_path);
-                
-                if (publicUrlData?.publicUrl) {
-                    console.log('✅ Usando URL pública:', publicUrlData.publicUrl);
-                    setPdfUrl(publicUrlData.publicUrl);
+                    .download(orderData.file_path);
+
+                if (downloadError) {
+                    console.error('❌ Erro ao baixar PDF:', downloadError);
+                    throw downloadError;
                 }
-            } else if (urlData?.signedUrl) {
-                console.log('✅ URL assinada gerada:', urlData.signedUrl);
-                setPdfUrl(urlData.signedUrl);
+
+                // Criar blob URL local
+                const blobUrl = URL.createObjectURL(pdfBlob);
+                console.log('✅ Blob URL criado:', blobUrl);
+                setPdfUrl(blobUrl);
+
+                // Limpar blob URL ao desmontar componente
+                return () => {
+                    if (blobUrl) {
+                        URL.revokeObjectURL(blobUrl);
+                    }
+                };
+            } catch (pdfError) {
+                console.error('❌ Erro ao processar PDF:', pdfError);
+                // Fallback: tentar signed URL
+                const { data: urlData } = await supabase.storage
+                    .from('service-orders')
+                    .createSignedUrl(orderData.file_path, 3600);
+
+                if (urlData?.signedUrl) {
+                    console.log('⚠️ Usando signed URL como fallback');
+                    setPdfUrl(urlData.signedUrl);
+                }
             }
 
-            // Verificar se precisa de verificação de e-mail
-            if (!user) {
-                setNeedsEmailVerification(true);
-            } else if (user.email === signerData.email) {
+            // Verificar se já validou o e-mail nesta sessão
+            const alreadyVerified = sessionStorage.getItem(`email_verified_${signerData.email}`);
+            
+            if (alreadyVerified === 'true') {
+                // Já validou antes nesta sessão
                 setIsEmailVerified(true);
-            } else {
+                setNeedsEmailVerification(false);
+            } else if (!user) {
+                // Não está logado - precisa verificar
                 setNeedsEmailVerification(true);
+                setIsEmailVerified(false);
+            } else if (user.email === signerData.email) {
+                // Está logado com e-mail correto - não precisa verificar
+                setIsEmailVerified(true);
+                setNeedsEmailVerification(false);
+                // Salvar na sessão para não pedir novamente
+                sessionStorage.setItem(`email_verified_${signerData.email}`, 'true');
+            } else {
+                // Está logado mas e-mail diferente - precisa verificar
+                setNeedsEmailVerification(true);
+                setIsEmailVerified(false);
             }
 
         } catch (err: any) {

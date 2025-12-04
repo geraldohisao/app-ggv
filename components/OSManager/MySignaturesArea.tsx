@@ -113,6 +113,12 @@ const MySignaturesArea: React.FC = () => {
     };
 
     const handleViewDocument = (orderId: string, signerId: string) => {
+        // Persistir que o e-mail já foi verificado
+        if (signerEmail) {
+            const email = decodeURIComponent(signerEmail);
+            sessionStorage.setItem(`email_verified_${email}`, 'true');
+        }
+        // Navegar para página de assinatura individual
         navigate(`/assinar/${orderId}/${signerId}`);
     };
 

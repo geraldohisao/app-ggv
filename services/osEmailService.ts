@@ -365,12 +365,11 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <!-- Logo GGV em SVG inline para garantir exibição -->
-                            <svg width="180" height="60" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
-                                <text x="100" y="50" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
+                                <h1 style="margin: 0; color: #1a1a1a; font-size: 32px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
                                     GRUPO GGV
-                                </text>
-                            </svg>
+                                </h1>
+                            </div>
                         </td>
                     </tr>
 
@@ -528,12 +527,11 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <!-- Logo GGV em SVG inline para garantir exibição -->
-                            <svg width="180" height="60" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
-                                <text x="100" y="50" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
+                                <h1 style="margin: 0; color: #1a1a1a; font-size: 32px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
                                     GRUPO GGV
-                                </text>
-                            </svg>
+                                </h1>
+                            </div>
                         </td>
                     </tr>
 
