@@ -377,7 +377,7 @@ class OSEmailService {
                     <tr>
                         <td style="padding: 0 30px 30px 30px;">
                             <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3; text-align: center;">
-                                Solicitação de Assinatura de <span style="background-color: #fef3c7; padding: 2px 8px; border-radius: 4px;">Grupo GGV</span>
+                                Solicitação de Assinatura de Grupo GGV
                             </h1>
                         </td>
                     </tr>
