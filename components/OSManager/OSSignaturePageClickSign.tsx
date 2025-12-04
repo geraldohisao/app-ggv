@@ -187,11 +187,19 @@ const OSSignaturePageClickSign: React.FC = () => {
     return (
         <div className="min-h-screen bg-white flex flex-col">
             {/* Header */}
-            <header className="border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 bg-white z-10">
+            <header className="border-b border-slate-200 px-6 py-4 flex items-center justify-between bg-white z-10 shrink-0">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => window.history.back()}
-                        className="text-slate-600 hover:text-slate-900"
+                        onClick={() => {
+                            // Voltar para dashboard se tiver acesso, senão fecha a aba
+                            if (window.opener) {
+                                window.close();
+                            } else {
+                                window.location.href = '/';
+                            }
+                        }}
+                        className="text-slate-600 hover:text-slate-900 transition-colors"
+                        title="Voltar"
                     >
                         <ArrowLeftIcon className="w-5 h-5" />
                     </button>
@@ -206,7 +214,19 @@ const OSSignaturePageClickSign: React.FC = () => {
                     <span className="text-sm text-slate-600">
                         {signedCount}/{totalSigners} Assinaturas
                     </span>
-                    <button className="text-slate-600 hover:text-slate-900">
+                    <button 
+                        onClick={() => {
+                            if (confirm('Deseja realmente sair sem assinar?')) {
+                                if (window.opener) {
+                                    window.close();
+                                } else {
+                                    window.location.href = '/';
+                                }
+                            }
+                        }}
+                        className="text-slate-600 hover:text-slate-900 transition-colors"
+                        title="Fechar"
+                    >
                         <XMarkIcon className="w-6 h-6" />
                     </button>
                 </div>
@@ -259,23 +279,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                 </aside>
 
                 {/* PDF Viewer Area */}
-                <main className="flex-1 flex flex-col overflow-hidden">
-                    {/* PDF Toolbar */}
-                    <div className="border-b border-slate-200 px-4 py-2 flex items-center gap-2 bg-slate-50">
-                        <button className="p-2 hover:bg-slate-200 rounded" title="Zoom In">
-                            <span className="text-lg">+</span>
-                        </button>
-                        <button className="p-2 hover:bg-slate-200 rounded" title="Zoom Out">
-                            <span className="text-lg">−</span>
-                        </button>
-                        <button className="p-2 hover:bg-slate-200 rounded" title="Pesquisar">
-                            🔍
-                        </button>
-                        <div className="ml-auto text-sm text-slate-600">
-                            {order.file_name}
-                        </div>
-                    </div>
-
+                <main className="flex-1 flex flex-col overflow-hidden relative">
                     {/* PDF Viewer */}
                     <div className="flex-1 overflow-hidden">
                         {pdfUrl ? (
@@ -290,17 +294,17 @@ const OSSignaturePageClickSign: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Botão Assinar Fixo */}
-                    <div className="border-t border-slate-200 p-6 bg-white">
-                        <div className="max-w-md mx-auto">
+                    {/* Botão Assinar Fixo - Sobreposto */}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
+                        <div className="max-w-md mx-auto pointer-events-auto">
                             <button
                                 onClick={() => setShowSignatureModal(true)}
-                                className="w-full py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-lg transition-colors"
+                                className="w-full py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-lg transition-colors shadow-xl"
                             >
                                 Assinar
                             </button>
                             <p className="text-xs text-slate-500 text-center mt-3">
-                                🔒 Ambiente seguro ClickSign
+                                🔒 Ambiente seguro Clicksign
                             </p>
                         </div>
                     </div>
