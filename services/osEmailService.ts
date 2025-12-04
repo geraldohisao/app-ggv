@@ -81,7 +81,7 @@ class OSEmailService {
             await this.sendEmail({
                 to: signer.email,
                 toName: signer.name,
-                subject: `📋 Nova OS para sua Assinatura - ${order.title}`,
+                subject: `Solicitação de Assinatura - ${order.title}`,
                 html: emailHTML,
                 config
             });
@@ -148,7 +148,7 @@ class OSEmailService {
             await this.sendEmail({
                 to: signer.email,
                 toName: signer.name,
-                subject: `⏰ Lembrete: Assinatura Pendente - ${order.title}`,
+                subject: `Lembrete: Assinatura Pendente - ${order.title}`,
                 html: emailHTML,
                 config
             });
@@ -334,7 +334,7 @@ class OSEmailService {
     }
 
     /**
-     * Template HTML do e-mail de solicitação de assinatura
+     * Template HTML do e-mail - Design minimalista tipo ClickSign
      */
     private createEmailTemplate(params: {
         signerName: string;
@@ -345,122 +345,151 @@ class OSEmailService {
         totalSigners: number;
         signatureLink: string;
     }): string {
+        // Gerar lista de assinantes (se tiver acesso)
+        const signersListHTML = ''; // Será preenchido futuramente quando tivermos todos os signers
+        
         return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova OS para Assinatura</title>
+    <title>Solicitação de Assinatura</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; padding: 40px 20px;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; max-width: 600px;">
                     
-                    <!-- Header -->
+                    <!-- Logo -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 40px; text-align: center; border-radius: 12px 12px 0 0;">
-                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">
-                                🏢 GGV - Ordem de Serviço
+                        <td align="center" style="padding: 40px 0 30px 0;">
+                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
+                                 alt="Grupo GGV" 
+                                 width="180" 
+                                 height="auto"
+                                 style="display: block; border: 0; outline: none; max-width: 180px; height: auto;">
+                        </td>
+                    </tr>
+
+                    <!-- Título Principal -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3; text-align: center;">
+                                Solicitação de Assinatura de <span style="background-color: #fef3c7; padding: 2px 8px; border-radius: 4px;">Grupo GGV</span>
                             </h1>
-                            <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 16px;">
-                                Nova solicitação de assinatura
+                        </td>
+                    </tr>
+
+                    <!-- Subtítulo -->
+                    <tr>
+                        <td style="padding: 0 30px 40px 30px;">
+                            <p style="margin: 0; color: #4b5563; font-size: 16px; line-height: 1.6; text-align: center;">
+                                Facilite sua assinatura, revise o documento e assine digitalmente.
                             </p>
                         </td>
                     </tr>
 
-                    <!-- Content -->
+                    <!-- CTA Button -->
                     <tr>
-                        <td style="padding: 40px;">
-                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #1f2937;">
-                                Olá <strong>${params.signerName}</strong>,
+                        <td align="center" style="padding: 0 30px 40px 30px;">
+                            <a href="${params.signatureLink}" 
+                               style="display: inline-block; padding: 18px 60px; background-color: #1a1a1a; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.3px;">
+                                Visualizar para assinar
+                            </a>
+                        </td>
+                    </tr>
+
+                    <!-- Aviso de múltiplos documentos (se aplicável) -->
+                    ${params.totalSigners > 1 ? `
+                    <tr>
+                        <td style="padding: 0 30px 40px 30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-radius: 8px;">
+                                <tr>
+                                    <td style="padding: 16px 20px;">
+                                        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.5;">
+                                            <span style="font-size: 18px; margin-right: 8px;">⚠️</span>
+                                            <strong>Você tem outros documentos pendentes.</strong> 
+                                            Após assinar este, não esqueça de verificar os demais.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    ` : ''}
+
+                    <!-- Divisor -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <div style="height: 1px; background-color: #e5e7eb;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Seção: Documento -->
+                    <tr>
+                        <td style="padding: 40px 30px 30px 30px;">
+                            <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 22px; font-weight: 700;">
+                                Documento
+                            </h2>
+                            <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                                ${params.orderTitle}
                             </p>
-                            
-                            <p style="margin: 0 0 30px 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
-                                Você recebeu uma nova Ordem de Serviço para assinatura digital:
+                            ${params.orderDescription ? `
+                            <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                                ${params.orderDescription}
                             </p>
+                            ` : ''}
+                        </td>
+                    </tr>
 
-                            <!-- OS Info Box -->
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-left: 4px solid #3b82f6; border-radius: 8px; margin-bottom: 30px;">
-                                <tr>
-                                    <td style="padding: 20px;">
-                                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280;">
-                                            <strong style="color: #1f2937;">📄 Documento:</strong><br>
-                                            <span style="font-size: 18px; color: #1f2937;">${params.orderTitle}</span>
-                                        </p>
-                                        ${params.orderDescription ? `
-                                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #4b5563; line-height: 1.5;">
-                                            ${params.orderDescription}
-                                        </p>
-                                        ` : ''}
-                                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">
-                                            <strong style="color: #1f2937;">👤 Enviado por:</strong> ${params.createdByName}
-                                        </p>
-                                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">
-                                            <strong style="color: #1f2937;">📅 Válido até:</strong> ${params.expiresAt}
-                                        </p>
-                                        <p style="margin: 0; font-size: 14px; color: #6b7280;">
-                                            <strong style="color: #1f2937;">👥 Total de assinantes:</strong> ${params.totalSigners}
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
+                    <!-- Divisor -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <div style="height: 1px; background-color: #e5e7eb;"></div>
+                        </td>
+                    </tr>
 
-                            <!-- CTA Button -->
-                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px;">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${params.signatureLink}" 
-                                           style="display: inline-block; padding: 16px 40px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
-                                            📝 Visualizar e Assinar Documento
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
+                    <!-- Seção: Assinaturas Esperadas -->
+                    <tr>
+                        <td style="padding: 30px 30px 30px 30px;">
+                            <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 22px; font-weight: 700;">
+                                Assinaturas esperadas neste processo
+                            </h2>
+                            <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.8;">
+                                <strong style="text-decoration: underline;">${params.signerName}</strong>
+                            </p>
+                            <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 14px;">
+                                Total de ${params.totalSigners} assinante(s)
+                            </p>
+                        </td>
+                    </tr>
 
-                            <!-- Instructions -->
-                            <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e5e7eb; padding-top: 20px;">
-                                <tr>
-                                    <td>
-                                        <p style="margin: 0 0 15px 0; font-size: 16px; color: #1f2937; font-weight: 600;">
-                                            ✅ O que você precisa fazer:
-                                        </p>
-                                        <ol style="margin: 0; padding-left: 20px; color: #4b5563; font-size: 14px; line-height: 1.8;">
-                                            <li>Clique no botão acima</li>
-                                            <li>Revise o documento PDF com atenção</li>
-                                            <li>Assine digitalmente quando estiver pronto</li>
-                                        </ol>
-                                    </td>
-                                </tr>
-                            </table>
+                    <!-- Data Limite -->
+                    <tr>
+                        <td style="padding: 0 30px 40px 30px;">
+                            <p style="margin: 0; color: #374151; font-size: 16px;">
+                                Data limite para assinatura: <strong>${params.expiresAt}</strong>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Divisor -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <div style="height: 1px; background-color: #e5e7eb;"></div>
                         </td>
                     </tr>
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-radius: 0 0 12px 12px; border-top: 1px solid #e5e7eb;">
-                            <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">
-                                <strong>GGV - Sistema de Gestão de Documentos</strong>
-                            </p>
-                            <p style="margin: 0 0 15px 0; font-size: 12px; color: #9ca3af;">
-                                Este documento requer assinatura digital para ser válido.
+                        <td style="padding: 30px; text-align: center;">
+                            <p style="margin: 0 0 10px 0; font-size: 13px; color: #6b7280;">
+                                Enviado por <strong>${params.createdByName}</strong>
                             </p>
                             <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                                Dúvidas? Entre em contato conosco respondendo este e-mail.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-
-                <!-- Disclaimer -->
-                <table width="600" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
-                    <tr>
-                        <td align="center" style="padding: 20px;">
-                            <p style="margin: 0; font-size: 11px; color: #9ca3af; line-height: 1.5;">
-                                Este é um e-mail automático enviado por assinatura@grupoggv.com<br>
-                                © ${new Date().getFullYear()} GGV. Todos os direitos reservados.
+                                © ${new Date().getFullYear()} Grupo GGV. Todos os direitos reservados.
                             </p>
                         </td>
                     </tr>
@@ -474,7 +503,7 @@ class OSEmailService {
     }
 
     /**
-     * Template HTML do e-mail de lembrete
+     * Template HTML do e-mail de lembrete - Design minimalista
      */
     private createReminderTemplate(params: {
         signerName: string;
@@ -489,65 +518,90 @@ class OSEmailService {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lembrete de Assinatura</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; padding: 40px 20px;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; max-width: 600px;">
                     
-                    <!-- Header -->
+                    <!-- Logo -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); padding: 40px; text-align: center; border-radius: 12px 12px 0 0;">
-                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">
-                                ⏰ Lembrete de Assinatura
+                        <td align="center" style="padding: 40px 0 30px 0;">
+                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
+                                 alt="Grupo GGV" 
+                                 width="180" 
+                                 height="auto"
+                                 style="display: block; border: 0; outline: none; max-width: 180px; height: auto;">
+                        </td>
+                    </tr>
+
+                    <!-- Título -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3; text-align: center;">
+                                Lembrete: Assinatura Pendente
                             </h1>
                         </td>
                     </tr>
 
-                    <!-- Content -->
+                    <!-- Mensagem -->
                     <tr>
-                        <td style="padding: 40px;">
-                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #1f2937;">
+                        <td style="padding: 0 30px 30px 30px;">
+                            <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6; text-align: center;">
                                 Olá <strong>${params.signerName}</strong>,
                             </p>
-                            
-                            <p style="margin: 0 0 30px 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
-                                Este é um lembrete amigável de que ainda há uma Ordem de Serviço aguardando sua assinatura:
+                            <p style="margin: 0; color: #4b5563; font-size: 16px; line-height: 1.6; text-align: center;">
+                                Você ainda tem um documento aguardando sua assinatura:
                             </p>
+                        </td>
+                    </tr>
 
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin-bottom: 30px;">
+                    <!-- Documento -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-radius: 8px;">
                                 <tr>
-                                    <td style="padding: 20px;">
-                                        <p style="margin: 0; font-size: 18px; color: #1f2937; font-weight: 600;">
-                                            📄 ${params.orderTitle}
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="margin: 0; font-size: 18px; color: #1a1a1a; font-weight: 600;">
+                                            ${params.orderTitle}
                                         </p>
                                     </td>
                                 </tr>
                             </table>
+                        </td>
+                    </tr>
 
-                            <!-- CTA Button -->
-                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px;">
-                                <tr>
-                                    <td align="center">
-                                        <a href="${params.signatureLink}" 
-                                           style="display: inline-block; padding: 16px 40px; background-color: #f59e0b; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);">
-                                            📝 Assinar Agora
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
+                    <!-- CTA Button -->
+                    <tr>
+                        <td align="center" style="padding: 0 30px 40px 30px;">
+                            <a href="${params.signatureLink}" 
+                               style="display: inline-block; padding: 18px 60px; background-color: #1a1a1a; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.3px;">
+                                Visualizar para assinar
+                            </a>
+                        </td>
+                    </tr>
 
-                            <p style="margin: 0; font-size: 14px; color: #6b7280; text-align: center;">
-                                Seu tempo é valioso. A assinatura leva apenas alguns minutos!
+                    <!-- Mensagem final -->
+                    <tr>
+                        <td style="padding: 0 30px 40px 30px;">
+                            <p style="margin: 0; font-size: 14px; color: #6b7280; text-align: center; line-height: 1.6;">
+                                Por favor, assine o documento o quanto antes para darmos continuidade ao processo.
                             </p>
+                        </td>
+                    </tr>
+
+                    <!-- Divisor -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <div style="height: 1px; background-color: #e5e7eb;"></div>
                         </td>
                     </tr>
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-radius: 0 0 12px 12px; border-top: 1px solid #e5e7eb;">
+                        <td style="padding: 30px; text-align: center;">
                             <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                                GGV - Sistema de Gestão de Documentos
+                                © ${new Date().getFullYear()} Grupo GGV. Todos os direitos reservados.
                             </p>
                         </td>
                     </tr>
