@@ -54,8 +54,8 @@ class OSEmailService {
         try {
             const config = await this.loadConfig();
 
-            // Gerar link único para assinatura (futura implementação)
-            const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
+            // Link para área de assinaturas do assinante (lista todos os documentos)
+            const signatureLink = `${config.os_base_url}/minhas-assinaturas/${encodeURIComponent(signer.email)}`;
 
             // Formatar data de expiração
             const expiresAt = order.expires_at 
@@ -137,7 +137,7 @@ class OSEmailService {
     async sendReminder(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
+            const signatureLink = `${config.os_base_url}/minhas-assinaturas/${encodeURIComponent(signer.email)}`;
 
             const emailHTML = this.createReminderTemplate({
                 signerName: signer.name,
