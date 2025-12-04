@@ -365,11 +365,12 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
-                                 alt="Grupo GGV" 
-                                 width="180" 
-                                 height="auto"
-                                 style="display: block; border: 0; outline: none; max-width: 180px; height: auto;">
+                            <!-- Logo GGV em SVG inline para garantir exibição -->
+                            <svg width="180" height="60" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
+                                <text x="100" y="50" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+                                    GRUPO GGV
+                                </text>
+                            </svg>
                         </td>
                     </tr>
 
@@ -527,11 +528,12 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" 
-                                 alt="Grupo GGV" 
-                                 width="180" 
-                                 height="auto"
-                                 style="display: block; border: 0; outline: none; max-width: 180px; height: auto;">
+                            <!-- Logo GGV em SVG inline para garantir exibição -->
+                            <svg width="180" height="60" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
+                                <text x="100" y="50" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+                                    GRUPO GGV
+                                </text>
+                            </svg>
                         </td>
                     </tr>
 
