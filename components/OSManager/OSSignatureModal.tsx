@@ -273,7 +273,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
 
                 {/* Footer */}
                 <p className="text-xs text-slate-500 text-center mt-4">
-                    🔒 Ambiente seguro Clicksign
+                    🔒 Ambiente seguro Grupo GGV
                 </p>
             </div>
         </div>

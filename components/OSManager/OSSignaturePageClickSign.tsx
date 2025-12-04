@@ -100,11 +100,25 @@ const OSSignaturePageClickSign: React.FC = () => {
             }
 
             // Gerar URL pública do PDF
-            const { data: urlData } = await supabase.storage
+            console.log('📄 Gerando URL do PDF:', orderData.file_path);
+            
+            const { data: urlData, error: urlError } = await supabase.storage
                 .from('service-orders')
                 .createSignedUrl(orderData.file_path, 3600); // Válido por 1 hora
 
-            if (urlData?.signedUrl) {
+            if (urlError) {
+                console.error('❌ Erro ao gerar URL:', urlError);
+                // Tentar URL pública como fallback
+                const { data: publicUrlData } = supabase.storage
+                    .from('service-orders')
+                    .getPublicUrl(orderData.file_path);
+                
+                if (publicUrlData?.publicUrl) {
+                    console.log('✅ Usando URL pública:', publicUrlData.publicUrl);
+                    setPdfUrl(publicUrlData.publicUrl);
+                }
+            } else if (urlData?.signedUrl) {
+                console.log('✅ URL assinada gerada:', urlData.signedUrl);
                 setPdfUrl(urlData.signedUrl);
             }
 
@@ -304,7 +318,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                                 Assinar
                             </button>
                             <p className="text-xs text-slate-500 text-center mt-3">
-                                🔒 Ambiente seguro Clicksign
+                                🔒 Ambiente seguro Grupo GGV
                             </p>
                         </div>
                     </div>

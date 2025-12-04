@@ -458,7 +458,7 @@ const OSBatchSignatureModal: React.FC<OSBatchSignatureModalProps> = ({
                 {(step === 'form' || step === 'token') && (
                     <div className="border-t border-slate-200 px-8 py-4 bg-slate-50">
                         <p className="text-xs text-slate-500 text-center">
-                            🔒 Ambiente seguro Clicksign
+                            🔒 Ambiente seguro Grupo GGV
                         </p>
                     </div>
                 )}

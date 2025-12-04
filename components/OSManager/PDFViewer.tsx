@@ -21,7 +21,20 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, fileName }) => {
         setZoom(prev => Math.max(prev - 25, 50));
     };
 
-    if (error || !pdfUrl) {
+    // Se não tem URL, mostrar loading
+    if (!pdfUrl) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                    <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-slate-600">Carregando PDF...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Se deu erro, mostrar opção de download
+    if (error) {
         return (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                 <div className="bg-slate-100 rounded-full p-6 mb-4">
@@ -30,14 +43,16 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, fileName }) => {
                     </svg>
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                    Não foi possível visualizar o PDF
+                    Visualização não disponível
                 </h3>
                 <p className="text-sm text-slate-600 mb-6">
-                    Faça o download do documento para visualizá-lo.
+                    Baixe o documento para visualizá-lo no seu computador.
                 </p>
                 <a
                     href={pdfUrl}
                     download={fileName}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                 >
                     Baixar Documento
@@ -82,25 +97,22 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, fileName }) => {
             {/* PDF Container */}
             <div className="flex-1 overflow-auto bg-slate-100 p-4">
                 <div 
-                    className="mx-auto bg-white shadow-lg"
+                    className="mx-auto bg-white shadow-lg rounded"
                     style={{ 
                         width: `${zoom}%`,
                         minHeight: '100%'
                     }}
                 >
-                    <object
-                        data={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
-                        type="application/pdf"
-                        className="w-full h-full min-h-screen"
-                        onError={() => setError(true)}
-                    >
-                        <embed
-                            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
-                            type="application/pdf"
-                            className="w-full h-full min-h-screen"
-                            onError={() => setError(true)}
-                        />
-                    </object>
+                    {/* Tenta múltiplas formas de renderizar o PDF */}
+                    <iframe
+                        src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                        className="w-full min-h-screen border-0"
+                        title={fileName}
+                        onError={() => {
+                            console.warn('Iframe falhou, tentando object/embed');
+                            setError(true);
+                        }}
+                    />
                 </div>
             </div>
         </div>
