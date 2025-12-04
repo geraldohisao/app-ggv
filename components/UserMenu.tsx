@@ -5,7 +5,8 @@ import {
     Cog6ToothIcon,
     FlagIcon,
     BoltIcon,
-    ChatBubbleLeftRightIcon
+    ChatBubbleLeftRightIcon,
+    DocumentSignatureIcon
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
@@ -116,6 +117,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                         )}
                         {canSeeSettings && (
                             <>
+                                <MenuItem 
+                                    icon={<DocumentSignatureIcon className="w-5 h-5"/>} 
+                                    text="Gerenciar OS" 
+                                    isActive={activeModule === Module.OSManager}
+                                    onClick={() => handleSelectModule(Module.OSManager)}
+                                />
                                 <MenuItem 
                                     icon={<BoltIcon className="w-5 h-5"/>} 
                                     text="Reativação de Leads (N8N)" 

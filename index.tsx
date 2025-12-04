@@ -26,6 +26,7 @@ root.render(
         <Route path="/configuracoes" element={<App />} />
         <Route path="/feedback" element={<App />} />
         <Route path="/reativacao" element={<App />} />
+        <Route path="/ordens-servico" element={<App />} />
         <Route path="/resultado-diagnostico" element={<App />} />
         <Route path="/*" element={<App />} />
       </Routes>

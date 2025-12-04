@@ -19,6 +19,7 @@ export enum Module {
   OpportunityFeedback = 'OPPORTUNITY_FEEDBACK',
   Calls = 'CALLS',
   ReativacaoLeads = 'REATIVACAO_LEADS',
+  OSManager = 'OS_MANAGER',
 }
 
 export enum UserRole {
@@ -191,4 +192,68 @@ export interface MaturityResult {
     color: string;
     bgColor: string;
     description: string;
+}
+
+// ========================================
+// TYPES PARA OS (ORDEM DE SERVIÇO) MANAGER
+// ========================================
+
+export enum OSStatus {
+    Draft = 'DRAFT',               // Rascunho (não enviado)
+    Pending = 'PENDING',           // Aguardando assinaturas
+    PartialSigned = 'PARTIAL_SIGNED', // Parcialmente assinado
+    Completed = 'COMPLETED',       // Todos assinaram
+    Cancelled = 'CANCELLED',       // Cancelado
+    Expired = 'EXPIRED',           // Expirado
+}
+
+export enum SignerStatus {
+    Pending = 'PENDING',           // Aguardando assinatura
+    Signed = 'SIGNED',             // Assinado
+    Refused = 'REFUSED',           // Recusado
+    Expired = 'EXPIRED',           // Expirado
+}
+
+export interface OSSigner {
+    id?: string;
+    os_id?: string;
+    name: string;
+    email: string;
+    role: string;                  // Ex: "Colaborador", "Gestor", "Testemunha"
+    status: SignerStatus;
+    signed_at?: string;
+    ip_address?: string;
+    user_agent?: string;
+    signature_hash?: string;       // Hash da assinatura
+    order: number;                 // Ordem de assinatura
+    created_at?: string;
+}
+
+export interface ServiceOrder {
+    id?: string;
+    title: string;
+    description?: string;
+    file_name: string;
+    file_path: string;             // Caminho no storage do Supabase
+    file_size?: number;
+    file_url?: string;             // URL pública (se aplicável)
+    status: OSStatus;
+    created_by: string;            // ID do usuário que criou
+    created_by_name?: string;
+    signers?: OSSigner[];
+    total_signers?: number;
+    signed_count?: number;
+    expires_at?: string;
+    completed_at?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface OSFilters {
+    status?: OSStatus | 'ALL';
+    dateFrom?: string;
+    dateTo?: string;
+    signerId?: string;
+    createdBy?: string;
+    search?: string;
 }

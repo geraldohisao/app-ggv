@@ -16,6 +16,7 @@ import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
 import PublicDiagnosticReport from './components/PublicDiagnosticReport';
+import OSManagerPage from './components/OSManager/OSManagerPage';
 import { UserProvider, useUser } from './contexts/DirectUserContext';
 import { BulkAnalysisProvider } from './contexts/BulkAnalysisContext';
 import { BulkAnalysisProgressNotification } from './components/BulkAnalysisProgressNotification';
@@ -285,6 +286,9 @@ const AppContent: React.FC = () => {
       case Module.ReativacaoLeads:
         console.log('🔄 APP - Renderizando Reativação');
         return <ReativacaoLeadsPage />;
+      case Module.OSManager:
+        console.log('📋 APP - Renderizando OS Manager');
+        return <OSManagerPage />;
       default:
         console.log('🏠 APP - Renderizando Default (Diagnóstico)');
         return <DiagnosticoComercial />;

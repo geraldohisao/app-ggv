@@ -10,6 +10,7 @@ export const moduleRoutes: Record<string, Module> = {
     '/configuracoes': Module.Settings,
     '/feedback': Module.OpportunityFeedback,
     '/reativacao': Module.ReativacaoLeads,
+    '/ordens-servico': Module.OSManager,
 };
 
 // Mapeamento reverso: módulo para URL
@@ -22,6 +23,7 @@ export const routeModules: Record<Module, string> = {
     [Module.Settings]: '/configuracoes',
     [Module.OpportunityFeedback]: '/feedback',
     [Module.ReativacaoLeads]: '/reativacao',
+    [Module.OSManager]: '/ordens-servico',
 };
 
 // Função para obter o módulo baseado na URL atual
