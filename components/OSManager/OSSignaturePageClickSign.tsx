@@ -5,6 +5,7 @@ import { supabase } from '../../services/supabaseClient';
 import { useUser } from '../../contexts/DirectUserContext';
 import OSSignatureModal from './OSSignatureModal';
 import OSEmailVerification from './OSEmailVerification';
+import PDFViewer from './PDFViewer';
 import {
     CheckCircleIcon,
     ExclamationTriangleIcon,
@@ -276,16 +277,15 @@ const OSSignaturePageClickSign: React.FC = () => {
                     </div>
 
                     {/* PDF Viewer */}
-                    <div className="flex-1 overflow-auto bg-slate-100 p-8">
+                    <div className="flex-1 overflow-hidden">
                         {pdfUrl ? (
-                            <iframe
-                                src={pdfUrl}
-                                className="w-full h-full min-h-[800px] bg-white shadow-lg rounded"
-                                title="Documento PDF"
-                            />
+                            <PDFViewer pdfUrl={pdfUrl} fileName={order.file_name} />
                         ) : (
                             <div className="flex items-center justify-center h-full">
-                                <p className="text-slate-600">Carregando PDF...</p>
+                                <div className="text-center">
+                                    <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                                    <p className="text-slate-600">Carregando PDF...</p>
+                                </div>
                             </div>
                         )}
                     </div>
