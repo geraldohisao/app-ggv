@@ -181,3 +181,4 @@ SELECT cron.schedule(
 3. ✅ Hiara poderá executar normalmente
 4. 🔧 Configure callback no N8N para solução definitiva
 
+

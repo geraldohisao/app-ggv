@@ -105,3 +105,4 @@ SELECT '📊 Análises fake removidas, banco pronto para reprocessamento REAL' a
 SELECT '⚡ Agora use "Re-analisar Todas" para análise completa com IA' as proximos_passos;
 
 
+

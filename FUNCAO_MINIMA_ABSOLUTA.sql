@@ -81,3 +81,4 @@ SELECT perform_simple_batch_analysis('1315a30f-60ad-4ba8-b2e8-7efe45076088'::UUI
 SELECT '🔧 FUNÇÃO ABSOLUTAMENTE MÍNIMA!' as status;
 
 
+

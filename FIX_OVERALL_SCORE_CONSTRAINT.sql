@@ -179,3 +179,4 @@ SELECT '📊 Agora teste a análise em massa novamente' as resultado;
 SELECT '⚡ Deve funcionar sem erros de NULL constraint' as proximos_passos;
 
 
+

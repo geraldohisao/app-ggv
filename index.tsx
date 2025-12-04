@@ -5,6 +5,7 @@ import App from './App';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import PublicDiagnosticReport from './components/PublicDiagnosticReport';
 import DiagnosticStandalonePage from './components/DiagnosticStandalonePage';
+import OSSignaturePage from './components/OSManager/OSSignaturePage';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -19,6 +20,7 @@ root.render(
         <Route path="/r/:token" element={<PublicDiagnosticReport />} />
         <Route path="/diagnostico" element={<DiagnosticStandalonePage />} />
         <Route path="/diagnostico/*" element={<DiagnosticStandalonePage />} />
+        <Route path="/assinar/:orderId/:signerId" element={<OSSignaturePage />} />
         <Route path="/" element={<App />} />
         <Route path="/assistente" element={<App />} />
         <Route path="/calculadora" element={<App />} />

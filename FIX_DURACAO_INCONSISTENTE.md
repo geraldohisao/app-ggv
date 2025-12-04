@@ -290,3 +290,4 @@ Fornecer:
 - 🗄️ SQL: `fix-duration-function-only.sql`
 - 📚 Docs: `SUCESSO-CORREÇÃO-DURAÇÃO.md`
 
+

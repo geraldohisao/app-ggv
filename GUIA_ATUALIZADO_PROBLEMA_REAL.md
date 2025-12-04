@@ -250,3 +250,4 @@ WHERE table_schema = 'public'
 **Status:** 🔍 Investigação Necessária  
 **Prioridade:** 🔴 Alta
 
+

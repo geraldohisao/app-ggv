@@ -52,3 +52,4 @@ Se Query 3 retornar ID diferente de '9671164a...':
 → Confirmação que existe outra chamada com "Intercom"
 */
 
+

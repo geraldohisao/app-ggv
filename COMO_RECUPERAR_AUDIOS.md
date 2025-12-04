@@ -244,3 +244,4 @@ ORDER BY ca.final_grade DESC NULLS LAST, c.created_at DESC;
 
 **📁 SQL criado:** `GERAR_LISTA_PARA_REIMPORTAR.sql`  
 **Aguardando:** Sua decisão sobre priorização! 🎯
+

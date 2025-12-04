@@ -168,3 +168,4 @@ SELECT * FROM can_user_execute_automation('Hiara Saienne');
 **Risco:** 🟢 ZERO (apenas marca como 'failed', não deleta dados)  
 **Tempo:** ⚡ ~3 segundos
 
+

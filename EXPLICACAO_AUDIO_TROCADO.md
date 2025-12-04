@@ -257,3 +257,4 @@ Transcrição: permanece correta no banco
 **Correções de código funcionam normalmente.** ✅  
 **Áudios precisam ser re-importados da API4COM.** ⏳
 
+

@@ -276,3 +276,4 @@ grep "TIMEOUT:" services/automationService.ts
 - ✅ Banco de dados (estrutura)
 - ✅ Permissões/RLS
 
+

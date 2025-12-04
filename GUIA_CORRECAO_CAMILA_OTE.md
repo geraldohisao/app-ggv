@@ -214,3 +214,4 @@ Essa correção resolve definitivamente o problema de:
 - `FIX_CAMILA_CLOSER_PROFILE.sql` (correção do banco)
 - `GUIA_CORRECAO_CAMILA_OTE.md` (este guia)
 
+

@@ -224,3 +224,4 @@ SELECT '🚨 CORREÇÃO EMERGENCIAL APLICADA!' as status;
 SELECT '📊 Testando: paginação, nomes de empresa, scores, RPCs' as areas_corrigidas;
 
 
+

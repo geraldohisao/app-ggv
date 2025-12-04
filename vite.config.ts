@@ -19,7 +19,8 @@ function cspProdOnly(): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+    // Carregar apenas variáveis VITE_ (ignora .env) para evitar problemas de permissões
+    const env = loadEnv(mode, '.', 'VITE_');
     
     // Determinar URL base da API baseado no ambiente
     const isProduction = mode === 'production';

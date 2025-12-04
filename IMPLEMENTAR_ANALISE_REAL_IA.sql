@@ -274,3 +274,4 @@ SELECT '📊 Agora as chamadas serão analisadas com base na transcrição real'
 SELECT '⚡ Scores variarão baseado na qualidade da conversa' as diferencial;
 
 
+

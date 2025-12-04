@@ -265,3 +265,4 @@ if (!call.durationSec || call.durationSec < 180) { // ✅ Já usava 180s
 **Status:** ✅ PUSHED  
 **Aguardando:** Deploy + Limpeza do banco
 
+

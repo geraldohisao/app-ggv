@@ -101,3 +101,4 @@ GRANT EXECUTE ON FUNCTION public.perform_ultra_fast_ai_analysis(UUID) TO authent
 
 
 
+

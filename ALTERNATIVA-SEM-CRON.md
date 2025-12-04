@@ -248,3 +248,4 @@ END $$;
 
 **Pronto!** Agora a cada nova automação criada, o sistema limpa automaticamente as órfãs antigas. 🎉
 
+

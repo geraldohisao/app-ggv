@@ -66,3 +66,4 @@ LIMIT 20;
 -- Adicionar validação na hora de CARREGAR análise existente
 -- NÃO apenas na hora de CRIAR nova análise
 
+

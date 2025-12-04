@@ -209,3 +209,4 @@ git push origin main --force
 
 Aguarde o deploy automático ou execute o build/deploy manual conforme seu processo.
 
+

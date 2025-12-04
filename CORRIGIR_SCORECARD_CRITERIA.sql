@@ -358,3 +358,4 @@ SELECT '🔧 FUNÇÃO CORRIGIDA SEM COLUNA CRITERIA!' as status;
 SELECT '📊 Agora teste a análise - deve funcionar sem erros' as resultado;
 
 
+

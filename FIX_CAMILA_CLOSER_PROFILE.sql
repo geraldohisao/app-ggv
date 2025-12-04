@@ -140,3 +140,4 @@ ORDER BY p.name;
 -- - Verificar se a visão de Closer está disponível no OTE
 -- ============================================
 
+

@@ -148,3 +148,4 @@ SELECT '📊 Agora teste o painel - deve mostrar chamadas elegíveis' as resulta
 SELECT '⚡ Se funcionar, podemos ajustar os critérios gradualmente' as proximos_passos;
 
 
+

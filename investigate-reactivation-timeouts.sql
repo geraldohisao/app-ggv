@@ -179,3 +179,4 @@ FROM public.reactivated_leads
 WHERE status = 'pending'
   AND created_at < NOW() - INTERVAL '30 minutes';
 
+

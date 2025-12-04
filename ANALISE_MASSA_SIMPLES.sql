@@ -211,3 +211,4 @@ SELECT '🔧 FUNÇÃO SIMPLES CRIADA!' as status;
 SELECT '📊 Agora atualize o frontend para usar perform_simple_batch_analysis' as proximo_passo;
 
 
+

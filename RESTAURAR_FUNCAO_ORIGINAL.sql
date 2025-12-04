@@ -111,3 +111,4 @@ SELECT '🔧 FUNÇÃO ORIGINAL RESTAURADA!' as status;
 SELECT '📊 Esta é a versão que funcionava antes' as resultado;
 
 
+

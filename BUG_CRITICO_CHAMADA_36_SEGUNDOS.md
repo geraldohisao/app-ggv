@@ -366,3 +366,4 @@ A chamada de 36 segundos com nota 9.3/10 era resultado de:
 **Risco:** 🟢 BAIXO (apenas esconde análises inválidas)  
 **Impacto:** 🟢 POSITIVO (melhora qualidade dos dados)
 
+

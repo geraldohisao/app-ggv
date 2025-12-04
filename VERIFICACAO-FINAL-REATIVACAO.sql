@@ -200,3 +200,4 @@ Avisar o desenvolvedor para corrigir primeiro.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ' as resultado;
 
+

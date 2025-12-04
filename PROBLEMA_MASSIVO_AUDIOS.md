@@ -230,3 +230,4 @@ Isso vai:
 3. **Deixe SQL de limpeza para depois**, push só das correções
 
 **Recomendo opção 1:** Fazer push de tudo agora! 🎯
+

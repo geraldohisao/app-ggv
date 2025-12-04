@@ -517,3 +517,4 @@ Este era um bug sutil que só aparecia com dados inconsistentes no banco.
 **Status:** ✅ PUSHED  
 **Aguardando:** Deploy automático
 
+

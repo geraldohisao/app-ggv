@@ -127,3 +127,4 @@ ORDER BY cf.created_at DESC;
 
 SELECT '🎉 CORREÇÃO APLICADA! Recarregue a página para ver os nomes reais.' as resultado;
 
+
