@@ -103,13 +103,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, fileName }) => {
                         minHeight: '100%'
                     }}
                 >
-                    {/* Tenta múltiplas formas de renderizar o PDF */}
+                    {/* Usa Google Drive Viewer para contornar CSP */}
                     <iframe
-                        src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
                         className="w-full min-h-screen border-0"
                         title={fileName}
                         onError={() => {
-                            console.warn('Iframe falhou, tentando object/embed');
+                            console.warn('Google Viewer falhou');
                             setError(true);
                         }}
                     />

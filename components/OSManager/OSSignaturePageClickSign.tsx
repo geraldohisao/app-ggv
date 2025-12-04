@@ -99,41 +99,18 @@ const OSSignaturePageClickSign: React.FC = () => {
                 return;
             }
 
-            // Baixar PDF e criar blob URL local (evita CORS)
-            console.log('📄 Baixando PDF:', orderData.file_path);
+            // Gerar URL pública do PDF (bucket agora é público)
+            console.log('📄 Gerando URL pública do PDF:', orderData.file_path);
             
-            try {
-                const { data: pdfBlob, error: downloadError } = await supabase.storage
-                    .from('service-orders')
-                    .download(orderData.file_path);
+            const { data: publicUrlData } = supabase.storage
+                .from('service-orders')
+                .getPublicUrl(orderData.file_path);
 
-                if (downloadError) {
-                    console.error('❌ Erro ao baixar PDF:', downloadError);
-                    throw downloadError;
-                }
-
-                // Criar blob URL local
-                const blobUrl = URL.createObjectURL(pdfBlob);
-                console.log('✅ Blob URL criado:', blobUrl);
-                setPdfUrl(blobUrl);
-
-                // Limpar blob URL ao desmontar componente
-                return () => {
-                    if (blobUrl) {
-                        URL.revokeObjectURL(blobUrl);
-                    }
-                };
-            } catch (pdfError) {
-                console.error('❌ Erro ao processar PDF:', pdfError);
-                // Fallback: tentar signed URL
-                const { data: urlData } = await supabase.storage
-                    .from('service-orders')
-                    .createSignedUrl(orderData.file_path, 3600);
-
-                if (urlData?.signedUrl) {
-                    console.log('⚠️ Usando signed URL como fallback');
-                    setPdfUrl(urlData.signedUrl);
-                }
+            if (publicUrlData?.publicUrl) {
+                console.log('✅ URL pública gerada:', publicUrlData.publicUrl);
+                setPdfUrl(publicUrlData.publicUrl);
+            } else {
+                console.error('❌ Erro ao gerar URL pública');
             }
 
             // Verificar se já validou o e-mail nesta sessão
