@@ -88,11 +88,19 @@ const OSSignaturePage: React.FC = () => {
             }
 
             // Verificar se precisa de verificação de e-mail
-            // Se o usuário não está logado OU o email dele não bate com o do signer
-            if (!user || user.email !== signerData.email) {
+            // APENAS se o usuário NÃO está logado E o email não bate
+            if (!user) {
+                // Não está logado - precisa verificar e-mail
                 setNeedsEmailVerification(true);
-            } else {
+                setIsEmailVerified(false);
+            } else if (user.email === signerData.email) {
+                // Está logado E o e-mail bate - não precisa verificar
+                setNeedsEmailVerification(false);
                 setIsEmailVerified(true);
+            } else {
+                // Está logado mas com e-mail diferente - precisa verificar
+                setNeedsEmailVerification(true);
+                setIsEmailVerified(false);
             }
 
         } catch (err: any) {

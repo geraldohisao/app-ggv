@@ -148,11 +148,12 @@ const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
             <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <svg width="180" height="60" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-4">
-                        <text x="100" y="50" fontFamily="Arial, sans-serif" fontSize="36" fontWeight="bold" textAnchor="middle" fill="#1a1a1a">
-                            GRUPO GGV
-                        </text>
-                    </svg>
+                    <img 
+                        src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png"
+                        alt="Grupo GGV"
+                        className="mx-auto mb-4"
+                        style={{ width: '180px', height: 'auto' }}
+                    />
                 </div>
 
                 {step === 'send' ? (
