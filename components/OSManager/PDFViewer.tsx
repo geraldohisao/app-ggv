@@ -95,51 +95,19 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, fileName }) => {
             </div>
 
             {/* PDF Container */}
-            <div className="flex-1 overflow-auto bg-slate-100 p-4">
-                <div className="max-w-4xl mx-auto">
-                    {/* Abre PDF em nova aba - solução mais confiável */}
-                    <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-                        <svg className="w-24 h-24 text-blue-600 mx-auto mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        
-                        <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                            Documento PDF
-                        </h3>
-                        
-                        <p className="text-slate-600 mb-8">
-                            {fileName}
-                        </p>
-
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <a
-                                href={pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg transition-colors"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                Abrir PDF em Nova Aba
-                            </a>
-                            
-                            <a
-                                href={pdfUrl}
-                                download={fileName}
-                                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-semibold text-lg transition-colors"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                                Baixar PDF
-                            </a>
-                        </div>
-
-                        <p className="text-sm text-slate-500 mt-8">
-                            Clique para visualizar o documento em uma nova aba do navegador
-                        </p>
-                    </div>
+            <div className="flex-1 overflow-auto bg-slate-100">
+                <div className="h-full">
+                    {/* Embed direto do PDF - agora permitido pelo CSP */}
+                    <iframe
+                        src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH&zoom=${zoom}`}
+                        className="w-full h-full border-0"
+                        title={fileName}
+                        style={{ minHeight: '800px' }}
+                        onError={() => {
+                            console.error('Erro ao carregar PDF no iframe');
+                            setError(true);
+                        }}
+                    />
                 </div>
             </div>
         </div>
