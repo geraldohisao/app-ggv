@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ServiceOrder } from '../../types';
 import { supabase } from '../../services/supabaseClient';
-import PDFViewerCanvas from './PDFViewerCanvas';
+import PDFViewerSimple from './PDFViewerSimple';
 import { XMarkIcon, ArrowDownTrayIcon } from '../ui/icons';
 
 interface OSPreviewModalProps {
@@ -107,7 +107,7 @@ const OSPreviewModal: React.FC<OSPreviewModalProps> = ({ order, onClose }) => {
                             </div>
                         </div>
                     ) : pdfUrl ? (
-                        <PDFViewerCanvas pdfUrl={pdfUrl} fileName={order.file_name} />
+                        <PDFViewerSimple pdfUrl={pdfUrl} fileName={order.file_name} />
                     ) : (
                         <div className="flex items-center justify-center h-full">
                             <p className="text-slate-600">Erro ao carregar PDF</p>
