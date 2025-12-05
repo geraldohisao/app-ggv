@@ -206,8 +206,8 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-6">
                     <div className="flex items-start justify-between">
@@ -253,7 +253,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
 
                 {showPreview ? (
                     /* Preview inline no mesmo modal (sem modal empilhado) */
-                    <div className="flex-1 flex flex-col bg-slate-100">
+                    <div className="flex-1 flex flex-col bg-slate-100 min-h-[70vh]">
                         {/* Toolbar Preview */}
                         <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 shrink-0">
                             <button
@@ -276,7 +276,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                         </div>
 
                         {/* Viewer */}
-                        <div className="flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-auto">
                             {previewLoading ? (
                                 <div className="flex items-center justify-center h-full">
                                     <div className="text-center">
@@ -285,7 +285,9 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                                     </div>
                                 </div>
                             ) : previewUrl ? (
-                                <PDFViewerCanvas pdfUrl={previewUrl} fileName={order.file_name} />
+                                <div className="h-full">
+                                    <PDFViewerCanvas pdfUrl={previewUrl} fileName={order.file_name} />
+                                </div>
                             ) : (
                                 <div className="flex items-center justify-center h-full">
                                     <p className="text-slate-600">Erro ao carregar PDF</p>
