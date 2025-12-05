@@ -225,7 +225,8 @@ export const DocumentTextIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.644l7.5-10.5a1.012 1.012 0 0 1 1.623 0l7.5 10.5a1.012 1.012 0 0 1 0 .644l-7.5 10.5a1.012 1.012 0 0 1-1.623 0l-7.5-10.5Z" />
+        {/* Ícone clássico de visualização (olho) */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12c1.76-3.304 5.033-5.5 8.542-5.5s6.782 2.196 8.542 5.5c-1.76 3.304-5.033 5.5-8.542 5.5S4.218 15.304 2.458 12Z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
     </svg>
 );
