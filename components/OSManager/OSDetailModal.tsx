@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ServiceOrder, OSStatus, SignerStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { osEmailService } from '../../services/osEmailService';
+import OSPreviewModal from './OSPreviewModal';
 import {
     XMarkIcon,
     CheckCircleIcon,
@@ -12,7 +13,8 @@ import {
     EnvelopeIcon,
     CalendarDaysIcon,
     UsersIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    EyeIcon
 } from '../ui/icons';
 
 interface OSDetailModalProps {
@@ -24,6 +26,7 @@ interface OSDetailModalProps {
 const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'signers' | 'history'>('overview');
     const [loading, setLoading] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
 
     const handleDownload = async () => {
         try {
@@ -282,6 +285,13 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                     </div>
                     <div className="flex gap-2">
                         <button
+                            onClick={() => setShowPreview(true)}
+                            className="flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-semibold transition-colors"
+                        >
+                            <EyeIcon className="w-5 h-5" />
+                            Visualizar PDF
+                        </button>
+                        <button
                             onClick={handleDownload}
                             disabled={loading}
                             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 transition-colors"
@@ -297,6 +307,15 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {/* Modal de Preview */}
+            {showPreview && (
+                <OSPreviewModal
+                    order={order}
+                    onClose={() => setShowPreview(false)}
+                />
+            )}
             </div>
         </div>
     );
