@@ -316,7 +316,6 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                     onClose={() => setShowPreview(false)}
                 />
             )}
-            </div>
         </div>
     );
 };
