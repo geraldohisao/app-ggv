@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configurar worker do PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+// Configurar worker do PDF.js (tenta CDN e fallback para local)
+try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+    console.log('✅ [PDF.js] Worker configurado:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+} catch (err) {
+    console.error('❌ [PDF.js] Erro ao configurar worker:', err);
+}
 
 interface PDFViewerCanvasProps {
     pdfUrl: string;
@@ -42,18 +47,38 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
             setLoading(true);
             setError(false);
 
-            console.log('📄 [PDF.js] Carregando PDF:', pdfUrl);
+            console.log('📄 [PDF.js] Iniciando carregamento...');
+            console.log('📄 [PDF.js] URL:', pdfUrl);
+            console.log('📄 [PDF.js] Worker:', pdfjsLib.GlobalWorkerOptions.workerSrc);
 
-            const loadingTask = pdfjsLib.getDocument(pdfUrl);
+            // Adicionar CORS mode
+            const loadingTask = pdfjsLib.getDocument({
+                url: pdfUrl,
+                withCredentials: false,
+                isEvalSupported: false
+            });
+
+            // Log de progresso
+            loadingTask.onProgress = (progress: any) => {
+                const percent = Math.round((progress.loaded / progress.total) * 100);
+                console.log(`📄 [PDF.js] Carregando: ${percent}%`);
+            };
+
             const pdf = await loadingTask.promise;
 
-            console.log('✅ [PDF.js] PDF carregado! Páginas:', pdf.numPages);
+            console.log('✅ [PDF.js] PDF carregado com sucesso!');
+            console.log('✅ [PDF.js] Número de páginas:', pdf.numPages);
 
             setPdfDocument(pdf);
             setNumPages(pdf.numPages);
             setCurrentPage(1);
-        } catch (err) {
-            console.error('❌ [PDF.js] Erro ao carregar:', err);
+        } catch (err: any) {
+            console.error('❌ [PDF.js] Erro ao carregar PDF:', err);
+            console.error('❌ [PDF.js] Erro detalhado:', {
+                message: err.message,
+                name: err.name,
+                stack: err.stack
+            });
             setError(true);
         } finally {
             setLoading(false);
