@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ServiceOrder, OSStatus, SignerStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { osEmailService } from '../../services/osEmailService';
-import OSPreviewModal from './OSPreviewModal';
 import {
     XMarkIcon,
     CheckCircleIcon,
@@ -27,6 +26,8 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
     const [activeTab, setActiveTab] = useState<'overview' | 'signers' | 'history'>('overview');
     const [loading, setLoading] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [previewLoading, setPreviewLoading] = useState(false);
 
     const handleDownload = async () => {
         try {
@@ -182,9 +183,30 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
 
     const progress = order.total_signers ? (order.signed_count! / order.total_signers) * 100 : 0;
 
+    const openPreview = () => {
+        setShowPreview(true);
+        setPreviewLoading(true);
+        try {
+            const { data: publicUrlData } = supabase.storage
+                .from('service-orders')
+                .getPublicUrl(order.file_path);
+
+            if (publicUrlData?.publicUrl) {
+                setPreviewUrl(publicUrlData.publicUrl);
+            } else {
+                setPreviewUrl('');
+            }
+        } catch (err) {
+            console.error('Erro ao gerar URL pública do PDF:', err);
+            setPreviewUrl('');
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-6">
                     <div className="flex items-start justify-between">
@@ -228,94 +250,136 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="border-b border-slate-200 bg-slate-50">
-                    <div className="flex">
-                        <button
-                            onClick={() => setActiveTab('overview')}
-                            className={`px-6 py-3 font-semibold transition-colors ${
-                                activeTab === 'overview'
-                                    ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                                    : 'text-slate-600 hover:text-slate-800'
-                            }`}
-                        >
-                            Visão Geral
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('signers')}
-                            className={`px-6 py-3 font-semibold transition-colors ${
-                                activeTab === 'signers'
-                                    ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                                    : 'text-slate-600 hover:text-slate-800'
-                            }`}
-                        >
-                            Assinantes ({order.signers?.length || 0})
-                        </button>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    {activeTab === 'overview' && (
-                        <OverviewTab order={order} formatDate={formatDate} formatFileSize={formatFileSize} />
-                    )}
-                    {activeTab === 'signers' && (
-                        <SignersTab 
-                            order={order} 
-                            formatDate={formatDate} 
-                            getStatusBadge={getStatusBadge}
-                            onSendReminder={handleSendReminder}
-                            loading={loading}
-                        />
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="border-t bg-slate-50 p-6 flex justify-between">
-                    <div className="flex gap-2">
-                        {order.status !== OSStatus.Completed && order.status !== OSStatus.Cancelled && (
+                {showPreview ? (
+                    /* Preview inline no mesmo modal (sem modal empilhado) */
+                    <div className="flex-1 flex flex-col bg-slate-100">
+                        {/* Toolbar Preview */}
+                        <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 shrink-0">
                             <button
-                                onClick={handleCancelOS}
-                                disabled={loading}
-                                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                onClick={() => setShowPreview(false)}
+                                className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors"
                             >
-                                Cancelar OS
+                                ← Voltar
                             </button>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setShowPreview(true)}
-                            className="flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-semibold transition-colors"
-                        >
-                            <EyeIcon className="w-5 h-5" />
-                            Visualizar PDF
-                        </button>
-                        <button
-                            onClick={handleDownload}
-                            disabled={loading}
-                            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 transition-colors"
-                        >
-                            <ArrowDownTrayIcon className="w-5 h-5" />
-                            {loading ? 'Baixando...' : 'Baixar PDF'}
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 font-semibold transition-colors"
-                        >
-                            Fechar
-                        </button>
-                    </div>
-                </div>
-            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm text-slate-500 truncate">Visualizando</p>
+                                <p className="font-semibold text-slate-900 truncate">{order.file_name}</p>
+                            </div>
+                            <button
+                                onClick={handleDownload}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+                            >
+                                <ArrowDownTrayIcon className="w-4 h-4" />
+                                Baixar
+                            </button>
+                        </div>
 
-            {/* Modal de Preview */}
-            {showPreview && (
-                <OSPreviewModal
-                    order={order}
-                    onClose={() => setShowPreview(false)}
-                />
-            )}
+                        {/* Viewer */}
+                        <div className="flex-1 overflow-hidden">
+                            {previewLoading ? (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="text-center">
+                                        <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                                        <p className="text-slate-600">Carregando visualização...</p>
+                                    </div>
+                                </div>
+                            ) : previewUrl ? (
+                                <PDFViewerCanvas pdfUrl={previewUrl} fileName={order.file_name} />
+                            ) : (
+                                <div className="flex items-center justify-center h-full">
+                                    <p className="text-slate-600">Erro ao carregar PDF</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 text-xs text-slate-500 text-center shrink-0">
+                            Pré-visualização no mesmo modal — sem janelas sobrepostas.
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* Tabs */}
+                        <div className="border-b border-slate-200 bg-slate-50">
+                            <div className="flex">
+                                <button
+                                    onClick={() => setActiveTab('overview')}
+                                    className={`px-6 py-3 font-semibold transition-colors ${
+                                        activeTab === 'overview'
+                                            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                                            : 'text-slate-600 hover:text-slate-800'
+                                    }`}
+                                >
+                                    Visão Geral
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('signers')}
+                                    className={`px-6 py-3 font-semibold transition-colors ${
+                                        activeTab === 'signers'
+                                            ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                                            : 'text-slate-600 hover:text-slate-800'
+                                    }`}
+                                >
+                                    Assinantes ({order.signers?.length || 0})
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {activeTab === 'overview' && (
+                                <OverviewTab order={order} formatDate={formatDate} formatFileSize={formatFileSize} />
+                            )}
+                            {activeTab === 'signers' && (
+                                <SignersTab 
+                                    order={order} 
+                                    formatDate={formatDate} 
+                                    getStatusBadge={getStatusBadge}
+                                    onSendReminder={handleSendReminder}
+                                    loading={loading}
+                                />
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="border-t bg-slate-50 p-6 flex justify-between">
+                            <div className="flex gap-2">
+                                {order.status !== OSStatus.Completed && order.status !== OSStatus.Cancelled && (
+                                    <button
+                                        onClick={handleCancelOS}
+                                        disabled={loading}
+                                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                    >
+                                        Cancelar OS
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={openPreview}
+                                    className="flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-semibold transition-colors"
+                                >
+                                    <EyeIcon className="w-5 h-5" />
+                                    Visualizar PDF
+                                </button>
+                                <button
+                                    onClick={handleDownload}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 transition-colors"
+                                >
+                                    <ArrowDownTrayIcon className="w-5 h-5" />
+                                    {loading ? 'Baixando...' : 'Baixar PDF'}
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 font-semibold transition-colors"
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 };
