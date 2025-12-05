@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ServiceOrder, OSStatus, SignerStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { osEmailService } from '../../services/osEmailService';
+import PDFViewerCanvas from './PDFViewerCanvas';
 import {
     XMarkIcon,
     CheckCircleIcon,
