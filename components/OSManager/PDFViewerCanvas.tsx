@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configurar worker do PDF.js (tenta CDN e fallback para local)
-try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-    console.log('✅ [PDF.js] Worker configurado:', pdfjsLib.GlobalWorkerOptions.workerSrc);
-} catch (err) {
-    console.error('❌ [PDF.js] Erro ao configurar worker:', err);
-}
+// DESABILITAR worker para evitar problemas de CSP
+// @ts-ignore
+pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+console.log('📄 [PDF.js] Worker DESABILITADO (modo síncrono)');
 
 interface PDFViewerCanvasProps {
     pdfUrl: string;
@@ -51,11 +48,13 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
             console.log('📄 [PDF.js] URL:', pdfUrl);
             console.log('📄 [PDF.js] Worker:', pdfjsLib.GlobalWorkerOptions.workerSrc);
 
-            // Adicionar CORS mode
+            // Carregar sem worker (modo síncrono)
             const loadingTask = pdfjsLib.getDocument({
                 url: pdfUrl,
                 withCredentials: false,
-                isEvalSupported: false
+                isEvalSupported: false,
+                useWorkerFetch: false,
+                disableWorker: true
             });
 
             // Log de progresso
