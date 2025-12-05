@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-dist';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 interface PDFViewerCanvasProps {
     pdfUrl: string;
     fileName: string;
 }
 
+// Worker local para evitar bloqueio de CSP (usa script-src 'self')
+if (GlobalWorkerOptions.workerSrc !== workerSrc) {
+    GlobalWorkerOptions.workerSrc = workerSrc;
+}
+
 /**
- * Visualizador de PDF usando PDF.js
- * Renderiza PDF como Canvas - SEM iframe, SEM problemas de CSP!
+ * Visualizador de PDF usando PDF.js (canvas inline, com worker local)
  */
 const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -15,68 +21,59 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
     const [error, setError] = useState(false);
     const [numPages, setNumPages] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
-    const [scale, setScale] = useState(1.5);
-    const [pdfDocument, setPdfDocument] = useState<any>(null);
+    const [scale, setScale] = useState(1.25);
+    const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
 
     useEffect(() => {
+        let mounted = true;
+        let task: any;
+
+        const loadPDF = async () => {
+            try {
+                setLoading(true);
+                setError(false);
+
+                task = getDocument({
+                    url: pdfUrl,
+                    withCredentials: false,
+                    isEvalSupported: false,
+                    useWorkerFetch: true
+                });
+
+                const pdf = await task.promise;
+                if (!mounted) return;
+
+                setPdfDocument(pdf);
+                setNumPages(pdf.numPages);
+                setCurrentPage(1);
+            } catch (err: any) {
+                console.error('❌ [PDF.js] Erro ao carregar PDF:', err);
+                setError(true);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+
         loadPDF();
+
         return () => {
+            mounted = false;
+            if (task) {
+                task.destroy();
+            }
             if (pdfDocument) {
                 pdfDocument.destroy();
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pdfUrl]);
 
     useEffect(() => {
         if (pdfDocument) {
             renderPage(currentPage);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPage, scale, pdfDocument]);
-
-    const loadPDF = async () => {
-        try {
-            setLoading(true);
-            setError(false);
-
-            console.log('📄 [PDF.js] Iniciando carregamento...');
-            console.log('📄 [PDF.js] URL:', pdfUrl);
-            console.log('📄 [PDF.js] Worker:', pdfjsLib.GlobalWorkerOptions.workerSrc);
-
-            // Carregar sem worker (modo síncrono)
-            const loadingTask = pdfjsLib.getDocument({
-                url: pdfUrl,
-                withCredentials: false,
-                isEvalSupported: false,
-                useWorkerFetch: false,
-                disableWorker: true
-            });
-
-            // Log de progresso
-            loadingTask.onProgress = (progress: any) => {
-                const percent = Math.round((progress.loaded / progress.total) * 100);
-                console.log(`📄 [PDF.js] Carregando: ${percent}%`);
-            };
-
-            const pdf = await loadingTask.promise;
-
-            console.log('✅ [PDF.js] PDF carregado com sucesso!');
-            console.log('✅ [PDF.js] Número de páginas:', pdf.numPages);
-
-            setPdfDocument(pdf);
-            setNumPages(pdf.numPages);
-            setCurrentPage(1);
-        } catch (err: any) {
-            console.error('❌ [PDF.js] Erro ao carregar PDF:', err);
-            console.error('❌ [PDF.js] Erro detalhado:', {
-                message: err.message,
-                name: err.name,
-                stack: err.stack
-            });
-            setError(true);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const renderPage = async (pageNum: number) => {
         if (!pdfDocument || !canvasRef.current) return;
@@ -87,19 +84,17 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
 
             const canvas = canvasRef.current;
             const context = canvas.getContext('2d');
-
             if (!context) return;
 
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = viewport.width * dpr;
+            canvas.height = viewport.height * dpr;
+            canvas.style.width = `${viewport.width}px`;
+            canvas.style.height = `${viewport.height}px`;
 
-            const renderContext = {
-                canvasContext: context,
-                viewport: viewport
-            };
-
+            context.scale(dpr, dpr);
+            const renderContext = { canvasContext: context, viewport };
             await page.render(renderContext).promise;
-            console.log(`✅ [PDF.js] Página ${pageNum} renderizada`);
         } catch (err) {
             console.error('❌ [PDF.js] Erro ao renderizar página:', err);
         }
