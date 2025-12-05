@@ -1,10 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// DESABILITAR worker para evitar problemas de CSP
-// @ts-ignore
-pdfjsLib.GlobalWorkerOptions.workerSrc = false;
-console.log('📄 [PDF.js] Worker DESABILITADO (modo síncrono)');
+import React, { useState } from 'react';
 
 interface PDFViewerCanvasProps {
     pdfUrl: string;
