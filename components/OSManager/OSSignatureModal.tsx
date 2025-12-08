@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ServiceOrder, OSSigner, SignerStatus } from '../../types';
+import { ServiceOrder, OSSigner, SignerStatus, OSStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
+import { osEmailService } from '../../services/osEmailService';
 import {
     XMarkIcon,
     CheckCircleIcon,
@@ -215,6 +216,41 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                         signature_hash: signatureHash
                 }
             });
+
+            // Recalcular status da OS e disparar finalização automática se todos assinaram
+            const { data: allSigners } = await supabase
+                .from('os_signers')
+                .select('*')
+                .eq('os_id', order.id);
+
+            const total = allSigners?.length || order.total_signers || 0;
+            const signedCount = (allSigners || []).filter(s => s.status === SignerStatus.Signed).length;
+            const newStatus =
+                total > 0 && signedCount === total ? OSStatus.Completed :
+                signedCount > 0 ? OSStatus.PartialSigned : order.status;
+
+            await supabase
+                .from('service_orders')
+                .update({
+                    signed_count: signedCount,
+                    total_signers: total,
+                    status: newStatus,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', order.id);
+
+            if (newStatus === OSStatus.Completed) {
+                await supabase.rpc('log_os_event', {
+                    p_os_id: order.id,
+                    p_event_type: 'completed',
+                    p_event_description: 'OS finalizada automaticamente (todos assinaram)',
+                    p_metadata: {}
+                });
+
+                // Enviar e-mails com PDF anexado para todos que assinaram
+                const orderWithSigners = { ...order, status: newStatus, signers: allSigners || [], signed_count: signedCount, total_signers: total };
+                await osEmailService.sendFinalized(orderWithSigners as ServiceOrder, (allSigners || []) as OSSigner[]);
+            }
 
             onComplete();
         } catch (err: any) {
