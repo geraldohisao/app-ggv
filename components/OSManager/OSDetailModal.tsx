@@ -295,10 +295,21 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
 
     const progress = order.total_signers ? (order.signed_count! / order.total_signers) * 100 : 0;
 
-    const openPreview = () => {
+    const openPreview = async () => {
         setShowPreview(true);
         setPreviewLoading(true);
         try {
+            // Tentar URL assinada (bucket privado)
+            const { data: signed, error: signedError } = await supabase.storage
+                .from('service-orders')
+                .createSignedUrl(order.file_path, 3600);
+
+            if (!signedError && signed?.signedUrl) {
+                setPreviewUrl(signed.signedUrl);
+                return;
+            }
+
+            // Fallback para URL pública
             const { data: publicUrlData } = supabase.storage
                 .from('service-orders')
                 .getPublicUrl(order.file_path);
@@ -309,7 +320,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                 setPreviewUrl('');
             }
         } catch (err) {
-            console.error('Erro ao gerar URL pública do PDF:', err);
+            console.error('Erro ao gerar URL do PDF:', err);
             setPreviewUrl('');
         } finally {
             setPreviewLoading(false);

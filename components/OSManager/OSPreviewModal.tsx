@@ -24,15 +24,26 @@ const OSPreviewModal: React.FC<OSPreviewModalProps> = ({ order, onClose }) => {
     const loadPDF = async () => {
         try {
             setLoading(true);
-            console.log('📄 [PREVIEW] Gerando URL pública:', order.file_path);
+            console.log('📄 [PREVIEW] Gerando URL para preview:', order.file_path);
 
-            // Gerar URL pública (bucket é público)
+            // Tentar URL assinada (bucket privado)
+            const { data: signed, error: signedError } = await supabase.storage
+                .from('service-orders')
+                .createSignedUrl(order.file_path, 3600);
+
+            if (!signedError && signed?.signedUrl) {
+                console.log('✅ [PREVIEW] URL assinada gerada');
+                setPdfUrl(signed.signedUrl);
+                return;
+            }
+
+            // Fallback para URL pública
             const { data: publicUrlData } = supabase.storage
                 .from('service-orders')
                 .getPublicUrl(order.file_path);
 
             if (publicUrlData?.publicUrl) {
-                console.log('✅ [PREVIEW] URL gerada:', publicUrlData.publicUrl);
+                console.log('✅ [PREVIEW] URL pública gerada:', publicUrlData.publicUrl);
                 setPdfUrl(publicUrlData.publicUrl);
             }
         } catch (err) {
