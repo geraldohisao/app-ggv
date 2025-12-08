@@ -119,6 +119,43 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         return true;
     };
 
+    React.useEffect(() => {
+        // 1) Prefill com dados já presentes no signer (signature_data)
+        const sigData: any = (signer as any).signature_data;
+        if (sigData) {
+            if (sigData.fullName) setFullName(sigData.fullName);
+            if (sigData.cpf) setCpf(formatCPF(sigData.cpf));
+            if (sigData.birthDate) setBirthDate(formatDate(sigData.birthDate));
+            return;
+        }
+
+        // 2) Buscar último cadastro assinado desse e-mail para reaproveitar
+        const loadLastSignedData = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('os_signers')
+                    .select('signature_data')
+                    .eq('email', signer.email)
+                    .eq('status', SignerStatus.Signed)
+                    .order('signed_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (!error && data?.signature_data) {
+                    const prev: any = data.signature_data;
+                    if (prev.fullName) setFullName(prev.fullName);
+                    if (prev.cpf) setCpf(formatCPF(prev.cpf));
+                    if (prev.birthDate) setBirthDate(formatDate(prev.birthDate));
+                }
+            } catch (err) {
+                console.warn('Prefill signature data falhou (ignorado):', err);
+            }
+        };
+
+        loadLastSignedData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [signer.email]);
+
     const handleSubmit = async () => {
         if (!validateForm()) return;
 
