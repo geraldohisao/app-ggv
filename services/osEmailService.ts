@@ -433,11 +433,7 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
-                                <h1 style="margin: 0; color: #1a1a1a; font-size: 32px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
-                                    GRUPO GGV
-                                </h1>
-                            </div>
+                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; display:block;" />
                         </td>
                     </tr>
 
@@ -595,11 +591,7 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
-                                <h1 style="margin: 0; color: #1a1a1a; font-size: 32px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
-                                    GRUPO GGV
-                                </h1>
-                            </div>
+                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; display:block;" />
                         </td>
                     </tr>
 
