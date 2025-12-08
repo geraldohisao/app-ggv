@@ -110,6 +110,16 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                 p_event_description: 'OS finalizada manualmente',
                 p_metadata: {}
             });
+
+            // Enviar e-mail de finalização com PDF anexo para quem assinou
+            let currentSigners = order.signers;
+            if (!currentSigners || currentSigners.length === 0) {
+                const { data } = await supabase.from('os_signers').select('*').eq('os_id', order.id);
+                currentSigners = data || [];
+            }
+            const finalizedOrder = { ...order, status: OSStatus.Completed, signers: currentSigners };
+            await osEmailService.sendFinalized(finalizedOrder, currentSigners || []);
+
             alert('✅ OS finalizada.');
             onUpdate();
         } catch (error: any) {

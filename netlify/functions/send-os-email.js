@@ -29,7 +29,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { to, toName, subject, html } = JSON.parse(event.body);
+    const { to, toName, subject, html, attachments } = JSON.parse(event.body);
 
     console.log('📧 NETLIFY OS - Enviando e-mail de OS:', { to, subject });
 
@@ -52,7 +52,8 @@ exports.handler = async (event, context) => {
       to: toName ? [`${toName} <${to}>`] : [to],
       subject: subject,
       html: html,
-      reply_to: FROM_EMAIL
+      reply_to: FROM_EMAIL,
+      attachments: attachments || []
     };
 
     console.log('📧 Enviando via Resend API...');

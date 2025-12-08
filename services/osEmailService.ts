@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ServiceOrder, OSSigner } from '../types';
+import { format } from 'date-fns';
 
 interface EmailConfig {
     os_email_from: string;
@@ -177,6 +178,71 @@ class OSEmailService {
     }
 
     /**
+     * Envia e-mail de documento finalizado com o PDF em anexo
+     */
+    async sendFinalized(order: ServiceOrder, signers: OSSigner[]): Promise<void> {
+        const config = await this.loadConfig();
+
+        // Baixar PDF original
+        const { data, error } = await supabase.storage
+            .from('service-orders')
+            .download(order.file_path);
+        if (error) throw error;
+
+        const buffer = await data.arrayBuffer();
+        const pdfBase64 = Buffer.from(buffer).toString('base64');
+
+        const signed = signers.filter(s => s.status === 'SIGNED');
+        const listHTML = signed
+            .map(s => `<li><strong>${s.name || s.email}</strong> assinou</li>`)
+            .join('');
+
+        const emailHTML = `
+        <div style="font-family: Arial, sans-serif; color: #1f2937;">
+          <div style="text-align:center; padding:16px 0;">
+            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="Grupo GGV" style="height:48px;" />
+          </div>
+          <div style="background:#e7f7ec; padding:12px 16px; border-radius:8px; color:#166534; font-weight:600; text-align:center;">
+            Seu documento assinado está em anexo, lembre-se de baixá-lo.
+          </div>
+          <h2 style="margin-top:24px; font-size:22px;">Documento assinado e finalizado</h2>
+          <p style="font-size:15px; margin:8px 0 16px 0;"><strong>Documento:</strong> ${order.file_name}</p>
+          <p style="font-size:15px; margin:0 0 8px 0;"><strong>Título:</strong> ${order.title}</p>
+          <p style="font-size:15px; margin:0 0 8px 0;"><strong>Finalizado em:</strong> ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+          <hr style="margin:20px 0;" />
+          <h3 style="font-size:18px; margin-bottom:8px;">Assinaturas</h3>
+          <ul style="padding-left:18px; line-height:1.6;">${listHTML}</ul>
+        </div>`;
+
+        for (const signer of signed) {
+            await this.sendEmail({
+                to: signer.email,
+                toName: signer.name,
+                subject: `Documento finalizado - ${order.title}`,
+                html: emailHTML,
+                config,
+                attachments: [
+                    {
+                        filename: order.file_name,
+                        content: pdfBase64,
+                        type: 'application/pdf',
+                        disposition: 'attachment'
+                    }
+                ]
+            });
+
+            // Log
+            await supabase.rpc('log_os_event', {
+                p_os_id: order.id,
+                p_signer_id: signer.id,
+                p_event_type: 'email_sent_finalized',
+                p_event_description: `Documento finalizado enviado para ${signer.email}`,
+                p_metadata: { email: signer.email }
+            });
+        }
+    }
+
+    /**
      * Envia e-mail via Netlify Function (sem CORS!)
      */
     private async sendEmail(params: {
@@ -185,6 +251,7 @@ class OSEmailService {
         subject: string;
         html: string;
         config: EmailConfig;
+        attachments?: any[];
     }): Promise<void> {
         try {
             console.log('📧 Enviando e-mail via Netlify Function...');
@@ -203,7 +270,8 @@ class OSEmailService {
                     to: params.to,
                     toName: params.toName,
                     subject: params.subject,
-                    html: params.html
+                    html: params.html,
+                    attachments: params.attachments || []
                 })
             });
 
