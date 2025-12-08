@@ -10,7 +10,8 @@ import {
     EyeIcon,
     CalendarDaysIcon,
     UsersIcon,
-    DocumentTextIcon
+    DocumentTextIcon,
+    DocumentSignatureIcon
 } from '../ui/icons';
 
 interface OSListPanelProps {
