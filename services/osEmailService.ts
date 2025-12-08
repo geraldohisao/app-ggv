@@ -183,14 +183,38 @@ class OSEmailService {
     async sendFinalized(order: ServiceOrder, signers: OSSigner[]): Promise<void> {
         const config = await this.loadConfig();
 
-        // Baixar PDF original
-        const { data, error } = await supabase.storage
-            .from('service-orders')
-            .download(order.file_path);
-        if (error) throw error;
+        // Escolher PDF final (com termo, se existir)
+        const candidatePaths = [
+            (order as any).final_file_path,
+            `${order.file_path}.final.pdf`,
+            order.file_path
+        ].filter(Boolean);
 
-        const buffer = await data.arrayBuffer();
-        const pdfBase64 = Buffer.from(buffer).toString('base64');
+        let pdfBase64 = '';
+        let chosenPath = '';
+        let chosenName = order.file_name;
+
+        for (const path of candidatePaths) {
+            try {
+                const { data, error } = await supabase.storage
+                    .from('service-orders')
+                    .download(path as string);
+                if (error) continue;
+                const buffer = await data.arrayBuffer();
+                pdfBase64 = Buffer.from(buffer).toString('base64');
+                chosenPath = path as string;
+                if (path === `${order.file_path}.final.pdf`) {
+                    chosenName = order.file_name.replace(/\.pdf$/i, '') + '-assinado.pdf';
+                }
+                break;
+            } catch (e) {
+                console.warn('Falha ao baixar PDF para envio finalizado:', e);
+            }
+        }
+
+        if (!pdfBase64) {
+            throw new Error('Não foi possível obter o PDF para envio finalizado.');
+        }
 
         const signed = signers.filter(s => s.status === 'SIGNED');
         const listHTML = signed
@@ -223,7 +247,7 @@ class OSEmailService {
                 config,
                 attachments: [
                     {
-                        filename: order.file_name,
+                        filename: chosenName,
                         content: pdfBase64,
                         type: 'application/pdf',
                         disposition: 'attachment'

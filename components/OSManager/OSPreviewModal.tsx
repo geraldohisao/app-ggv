@@ -26,25 +26,24 @@ const OSPreviewModal: React.FC<OSPreviewModalProps> = ({ order, onClose }) => {
             setLoading(true);
             console.log('📄 [PREVIEW] Gerando URL para preview:', order.file_path);
 
-            // Tentar URL assinada (bucket privado)
-            const { data: signed, error: signedError } = await supabase.storage
-                .from('service-orders')
-                .createSignedUrl(order.file_path, 3600);
-
-            if (!signedError && signed?.signedUrl) {
-                console.log('✅ [PREVIEW] URL assinada gerada');
-                setPdfUrl(signed.signedUrl);
-                return;
-            }
-
-            // Fallback para URL pública
-            const { data: publicUrlData } = supabase.storage
-                .from('service-orders')
-                .getPublicUrl(order.file_path);
-
-            if (publicUrlData?.publicUrl) {
-                console.log('✅ [PREVIEW] URL pública gerada:', publicUrlData.publicUrl);
-                setPdfUrl(publicUrlData.publicUrl);
+            const paths = [`${order.file_path}.final.pdf`, order.file_path];
+            for (const path of paths) {
+                // URL assinada
+                const { data: signed, error: signedError } = await supabase.storage
+                    .from('service-orders')
+                    .createSignedUrl(path, 3600);
+                if (!signedError && signed?.signedUrl) {
+                    console.log('✅ [PREVIEW] URL assinada gerada');
+                    setPdfUrl(signed.signedUrl);
+                    return;
+                }
+                // Pública
+                const { data: pub } = supabase.storage.from('service-orders').getPublicUrl(path);
+                if (pub?.publicUrl) {
+                    console.log('✅ [PREVIEW] URL pública gerada:', pub.publicUrl);
+                    setPdfUrl(pub.publicUrl);
+                    return;
+                }
             }
         } catch (err) {
             console.error('❌ [PREVIEW] Erro ao carregar PDF:', err);

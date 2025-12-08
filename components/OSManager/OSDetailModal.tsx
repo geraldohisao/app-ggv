@@ -298,33 +298,31 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
     const openPreview = async () => {
         setShowPreview(true);
         setPreviewLoading(true);
-        try {
-            // Tentar URL assinada (bucket privado)
-            const { data: signed, error: signedError } = await supabase.storage
-                .from('service-orders')
-                .createSignedUrl(order.file_path, 3600);
-
-            if (!signedError && signed?.signedUrl) {
-                setPreviewUrl(signed.signedUrl);
-                return;
+        const paths = [`${order.file_path}.final.pdf`, order.file_path];
+        for (const path of paths) {
+            try {
+                const { data: signed, error: signedError } = await supabase.storage
+                    .from('service-orders')
+                    .createSignedUrl(path, 3600);
+                if (!signedError && signed?.signedUrl) {
+                    setPreviewUrl(signed.signedUrl);
+                    return;
+                }
+            } catch (e) {
+                console.warn('Preview signed URL falhou para', path, e);
             }
-
-            // Fallback para URL pública
-            const { data: publicUrlData } = supabase.storage
-                .from('service-orders')
-                .getPublicUrl(order.file_path);
-
-            if (publicUrlData?.publicUrl) {
-                setPreviewUrl(publicUrlData.publicUrl);
-            } else {
-                setPreviewUrl('');
+            try {
+                const { data: pub } = supabase.storage.from('service-orders').getPublicUrl(path);
+                if (pub?.publicUrl) {
+                    setPreviewUrl(pub.publicUrl);
+                    return;
+                }
+            } catch (e) {
+                console.warn('Preview public URL falhou para', path, e);
             }
-        } catch (err) {
-            console.error('Erro ao gerar URL do PDF:', err);
-            setPreviewUrl('');
-        } finally {
-            setPreviewLoading(false);
         }
+        setPreviewUrl('');
+        setPreviewLoading(false);
     };
 
     return (

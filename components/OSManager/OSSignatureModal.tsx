@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ServiceOrder, OSSigner, SignerStatus, OSStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { osEmailService } from '../../services/osEmailService';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import {
     XMarkIcon,
     CheckCircleIcon,
@@ -253,8 +254,24 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                     p_metadata: {}
                 });
 
+                // Gerar PDF final com termo de assinatura como última página
+                let finalPath: string | undefined;
+                try {
+                    finalPath = await generateFinalPdfWithTerm(order, allSigners || []);
+                } catch (genErr) {
+                    console.warn('⚠️ Falha ao gerar PDF final com termo (seguindo com original):', genErr);
+                }
+
+                const orderWithSigners = {
+                    ...order,
+                    status: newStatus,
+                    signers: allSigners || [],
+                    signed_count: signedCount,
+                    total_signers: total,
+                    final_file_path: finalPath
+                };
+
                 // Enviar e-mails com PDF anexado para todos que assinaram
-                const orderWithSigners = { ...order, status: newStatus, signers: allSigners || [], signed_count: signedCount, total_signers: total };
                 await osEmailService.sendFinalized(orderWithSigners as ServiceOrder, (allSigners || []) as OSSigner[]);
             }
 
@@ -265,6 +282,64 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         } finally {
             setLoading(false);
         }
+    };
+
+    const generateFinalPdfWithTerm = async (baseOrder: ServiceOrder, signersList: OSSigner[]): Promise<string> => {
+        // Baixar PDF original
+        const { data, error } = await supabase.storage
+            .from('service-orders')
+            .download(baseOrder.file_path);
+        if (error) throw error;
+
+        const originalBytes = await data.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(originalBytes);
+        const page = pdfDoc.addPage();
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+        const marginX = 40;
+        let cursorY = height - 50;
+
+        const write = (text: string, options: { bold?: boolean; size?: number } = {}) => {
+            const size = options.size || 12;
+            const usedFont = options.bold ? fontBold : font;
+            page.drawText(text, { x: marginX, y: cursorY, size, font: usedFont, color: undefined });
+            cursorY -= size + 6;
+        };
+
+        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 16 });
+        write(`Documento: ${baseOrder.file_name}`, { bold: true });
+        write(`Título: ${baseOrder.title}`);
+        write(`Hash (SHA-256) do documento original: ${baseOrder.file_hash || 'n/d'}`);
+        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`);
+        cursorY -= 4;
+        write('Assinaturas:', { bold: true });
+
+        signersList.forEach((s, idx) => {
+            write(`${idx + 1}. ${s.name || s.email}`);
+            write(`   E-mail: ${s.email}`);
+            write(`   CPF: ${s.cpf || 'n/d'}`);
+            write(`   Papel: ${s.role || 'n/d'}`);
+            write(`   Status: ${s.status}`);
+            write(`   Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'pendente'}`);
+            write(`   IP: ${s.ip_address || 'n/d'}`);
+            write(`   User Agent: ${s.user_agent || 'n/d'}`);
+            write(`   Hash da assinatura: ${s.signature_hash || 'n/d'}`);
+            cursorY -= 6;
+        });
+
+        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 11 });
+
+        const finalBytes = await pdfDoc.save();
+        const finalFile = new Blob([finalBytes], { type: 'application/pdf' });
+
+        const finalPath = `${baseOrder.file_path}.final.pdf`;
+        await supabase.storage
+            .from('service-orders')
+            .upload(finalPath, finalFile, { upsert: true, contentType: 'application/pdf' });
+
+        return finalPath;
     };
 
     return (
