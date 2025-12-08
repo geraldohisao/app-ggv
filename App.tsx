@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Module } from './types';
+import { Module, UserRole } from './types';
 import { DiagnosticoComercial } from './components/DiagnosticoComercial';
 import DealIdManager from './components/diagnostico/DealIdManager';
 import AssistenteIA from './components/AssistenteIA';
@@ -42,6 +42,11 @@ const DebugPanelWrapper: React.FC<{ user: any }> = ({ user }) => {
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useUser();
   const [activeModule, setActiveModule] = useState<Module>(() => getModuleFromPath(window.location.pathname));
+  const canAccessOSManager = user && (
+    user.role === UserRole.SuperAdmin ||
+    user.role === UserRole.Admin ||
+    user.user_function === 'Gestor'
+  );
 
   // Garantir que ao carregar a página, o módulo correto seja selecionado
   useEffect(() => {
@@ -288,6 +293,14 @@ const AppContent: React.FC = () => {
         return <ReativacaoLeadsPage />;
       case Module.OSManager:
         console.log('📋 APP - Renderizando OS Manager');
+        if (!canAccessOSManager) {
+          return (
+            <div className="p-8 text-center">
+              <p className="text-lg font-semibold text-slate-800">Acesso restrito</p>
+              <p className="text-slate-600 mt-2">Disponível apenas para Admin ou Gestor.</p>
+            </div>
+          );
+        }
         return <OSManagerPage />;
       default:
         console.log('🏠 APP - Renderizando Default (Diagnóstico)');

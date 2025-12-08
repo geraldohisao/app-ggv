@@ -71,6 +71,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
 
     const isGestor = user.user_function === 'Gestor';
     const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor;
+    const canSeeOSManager = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor || user.user_function === 'Gestor';
     const canSeeFeedback = user.role === UserRole.SuperAdmin || 
                           user.user_function === 'Closer' || 
                           user.user_function === 'Gestor';
@@ -116,7 +117,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                                 onClick={() => handleSelectModule(Module.OpportunityFeedback)}
                             />
                         )}
-                        {canSeeSettings && (
+                        {canSeeOSManager && (
                             <>
                                 <MenuItem 
                                     icon={<DocumentSignatureIcon className="w-5 h-5"/>} 
@@ -124,6 +125,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                                     isActive={activeModule === Module.OSManager}
                                     onClick={() => handleSelectModule(Module.OSManager)}
                                 />
+                            </>
+                        )}
+                        {canSeeSettings && (
+                            <>
                                 <MenuItem 
                                     icon={<BoltIcon className="w-5 h-5"/>} 
                                     text="Reativação de Leads (N8N)" 
