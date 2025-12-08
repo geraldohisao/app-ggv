@@ -92,6 +92,107 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
         }
     };
 
+    const handleFinalizeOS = async () => {
+        if ((order.signed_count || 0) !== (order.total_signers || 0)) {
+            alert('Só é possível finalizar quando todas as assinaturas estiverem concluídas.');
+            return;
+        }
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('service_orders')
+                .update({ status: OSStatus.Completed, updated_at: new Date().toISOString() })
+                .eq('id', order.id);
+            if (error) throw error;
+            await supabase.rpc('log_os_event', {
+                p_os_id: order.id,
+                p_event_type: 'completed',
+                p_event_description: 'OS finalizada manualmente',
+                p_metadata: {}
+            });
+            alert('✅ OS finalizada.');
+            onUpdate();
+        } catch (error: any) {
+            console.error('Erro ao finalizar OS:', error);
+            alert(`Erro ao finalizar OS: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteOS = async () => {
+        if (order.status !== OSStatus.Cancelled) {
+            alert('Primeiro cancele a OS para permitir exclusão.');
+            return;
+        }
+        if ((order.signed_count || 0) >= (order.total_signers || 0)) {
+            alert('Não é possível excluir documentos já concluídos.');
+            return;
+        }
+        if (!confirm('Excluir esta OS? Esta ação removerá o documento e registros pendentes.')) return;
+
+        try {
+            setLoading(true);
+            if (order.file_path) {
+                await supabase.storage.from('service-orders').remove([order.file_path]);
+            }
+            await supabase.from('os_signers').delete().eq('os_id', order.id);
+            await supabase.from('os_audit_log').delete().eq('os_id', order.id);
+            const { error } = await supabase.from('service_orders').delete().eq('id', order.id);
+            if (error) throw error;
+            alert('OS excluída com sucesso.');
+            onUpdate();
+            onClose();
+        } catch (error: any) {
+            console.error('Erro ao excluir OS:', error);
+            alert(`Erro ao excluir OS: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemovePendingSigner = async (signerId: string) => {
+        const target = order.signers?.find(s => s.id === signerId);
+        if (!target) return;
+        if (target.status !== SignerStatus.Pending) {
+            alert('Só é possível remover assinantes pendentes.');
+            return;
+        }
+        if (!confirm(`Remover o assinante ${target.name || target.email}?`)) return;
+        try {
+            setLoading(true);
+            await supabase.from('os_signers').delete().eq('id', signerId);
+
+            const newTotal = Math.max((order.total_signers || 0) - 1, 0);
+            const newStatus =
+                newTotal > 0 && (order.signed_count || 0) >= newTotal ? OSStatus.Completed : order.status;
+
+            await supabase
+                .from('service_orders')
+                .update({
+                    total_signers: newTotal,
+                    status: newStatus,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', order.id);
+
+            await supabase.rpc('log_os_event', {
+                p_os_id: order.id,
+                p_event_type: 'signer_removed',
+                p_event_description: `Assinante removido: ${target.email}`,
+                p_metadata: { signer: target.email }
+            });
+
+            alert('Assinante removido.');
+            onUpdate();
+        } catch (error: any) {
+            console.error('Erro ao remover assinante:', error);
+            alert(`Erro ao remover: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSendReminder = async (signerId: string, signerEmail: string) => {
         try {
             setLoading(true);
@@ -338,6 +439,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                                     formatDate={formatDate} 
                                     getStatusBadge={getStatusBadge}
                                     onSendReminder={handleSendReminder}
+                                    onRemovePending={handleRemovePendingSigner}
                                     loading={loading}
                                 />
                             )}
@@ -345,7 +447,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
 
                         {/* Footer */}
                         <div className="border-t bg-slate-50 p-6 flex justify-between">
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                                 {order.status !== OSStatus.Completed && order.status !== OSStatus.Cancelled && (
                                     <button
                                         onClick={handleCancelOS}
@@ -355,6 +457,27 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                                         Cancelar OS
                                     </button>
                                 )}
+                                {order.status !== OSStatus.Completed &&
+                                    order.status !== OSStatus.Cancelled &&
+                                    (order.signed_count || 0) === (order.total_signers || 0) && (
+                                        <button
+                                            onClick={handleFinalizeOS}
+                                            disabled={loading}
+                                            className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                        >
+                                            Finalizar OS
+                                        </button>
+                                    )}
+                                {order.status === OSStatus.Cancelled &&
+                                    (order.signed_count || 0) < (order.total_signers || 0) && (
+                                        <button
+                                            onClick={handleDeleteOS}
+                                            disabled={loading}
+                                            className="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                        >
+                                            Excluir OS
+                                        </button>
+                                    )}
                             </div>
                             <div className="flex gap-2">
                                 <button
@@ -485,8 +608,9 @@ const SignersTab: React.FC<{
     formatDate: (date?: string) => string;
     getStatusBadge: (status: any) => JSX.Element;
     onSendReminder: (signerId: string, signerEmail: string) => Promise<void>;
+    onRemovePending: (signerId: string) => Promise<void>;
     loading: boolean;
-}> = ({ order, formatDate, getStatusBadge, onSendReminder, loading }) => {
+}> = ({ order, formatDate, getStatusBadge, onSendReminder, onRemovePending, loading }) => {
     return (
         <div className="space-y-4">
             {order.signers && order.signers.length > 0 ? (
@@ -569,17 +693,28 @@ const SignersTab: React.FC<{
 
                                 {/* Actions for pending signers */}
                                 {signer.status === SignerStatus.Pending && (
-                                    <div className="mt-3">
-                                        <button
-                                            onClick={() => onSendReminder(signer.id!, signer.email)}
-                                            disabled={loading}
-                                            className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50"
-                                        >
-                                            <EnvelopeIcon className="w-4 h-4" />
-                                            Enviar Lembrete
-                                        </button>
+                                    <div className="mt-3 space-y-2">
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                onClick={() => onSendReminder(signer.id!, signer.email)}
+                                                disabled={loading}
+                                                className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50"
+                                            >
+                                                <EnvelopeIcon className="w-4 h-4" />
+                                                Enviar Lembrete
+                                            </button>
+                                            {order.status !== OSStatus.Cancelled && order.status !== OSStatus.Completed && (
+                                                <button
+                                                    onClick={() => onRemovePending(signer.id!)}
+                                                    disabled={loading}
+                                                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50"
+                                                >
+                                                    Remover assinante
+                                                </button>
+                                            )}
+                                        </div>
                                         {signer.last_reminder_sent_at && (
-                                            <p className="text-xs text-slate-500 mt-2">
+                                            <p className="text-xs text-slate-500 mt-1">
                                                 Último lembrete: {formatDate(signer.last_reminder_sent_at)}
                                             </p>
                                         )}
