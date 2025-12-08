@@ -164,9 +164,15 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
             setLoading(true);
             setError('');
 
-            // Coletar dados de prova
-            const ipResponse = await fetch('https://api.ipify.org?format=json');
-            const { ip } = await ipResponse.json();
+            // Coletar dados de prova (tolerante a bloqueios de rede/navegador)
+            let ip = '0.0.0.0';
+            try {
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipJson = await ipResponse.json();
+                if (ipJson?.ip) ip = ipJson.ip;
+            } catch (e) {
+                console.warn('⚠️ Falha ao obter IP (prosseguindo mesmo assim):', e);
+            }
             
             const signatureData = {
                 fullName: fullName.trim(),
