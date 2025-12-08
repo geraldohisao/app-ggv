@@ -52,9 +52,23 @@ const OSListPanel: React.FC<OSListPanelProps> = ({
             filters.status !== 'ALL' ||
             filters.dateFrom ||
             filters.dateTo ||
-            filters.search
+            filters.search ||
+            filters.signerEmail
         );
     };
+
+    // Lista de assinantes únicos (para filtro por e-mail)
+    const signerOptions = React.useMemo(() => {
+        const map = new Map<string, { email: string; name?: string }>();
+        orders.forEach(order => {
+            (order.signers || []).forEach(s => {
+                if (s.email && !map.has(s.email)) {
+                    map.set(s.email, { email: s.email, name: s.name || undefined });
+                }
+            });
+        });
+        return Array.from(map.values()).sort((a, b) => a.email.localeCompare(b.email));
+    }, [orders]);
 
     return (
         <div className="bg-white rounded-xl shadow-lg">
@@ -123,6 +137,25 @@ const OSListPanel: React.FC<OSListPanelProps> = ({
                                     <option value={OSStatus.Completed}>Concluído</option>
                                     <option value={OSStatus.Cancelled}>Cancelado</option>
                                     <option value={OSStatus.Expired}>Expirado</option>
+                                </select>
+                            </div>
+
+                            {/* Assinante (e-mail) */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Assinante (e-mail)
+                                </label>
+                                <select
+                                    value={filters.signerEmail || ''}
+                                    onChange={(e) => handleFilterChange('signerEmail', e.target.value || undefined)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="">Todos</option>
+                                    {signerOptions.map((s) => (
+                                        <option key={s.email} value={s.email}>
+                                            {s.name ? `${s.name} (${s.email})` : s.email}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 

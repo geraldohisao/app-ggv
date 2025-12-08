@@ -254,6 +254,7 @@ export interface OSFilters {
     dateFrom?: string;
     dateTo?: string;
     signerId?: string;
+    signerEmail?: string;
     createdBy?: string;
     search?: string;
 }

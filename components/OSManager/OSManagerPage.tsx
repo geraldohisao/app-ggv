@@ -24,6 +24,7 @@ const OSManagerPage: React.FC = () => {
         dateFrom: undefined,
         dateTo: undefined,
         signerId: undefined,
+        signerEmail: undefined,
         search: ''
     });
 
@@ -72,8 +73,18 @@ const OSManagerPage: React.FC = () => {
 
             if (error) throw error;
 
-            setOrders(data || []);
-            calculateStats(data || []);
+            let result = data || [];
+
+            // Filtro por e-mail do assinante (client-side para simplicidade)
+            if (filters.signerEmail) {
+                const term = filters.signerEmail.toLowerCase();
+                result = result.filter(o =>
+                    (o.signers || []).some(s => (s.email || '').toLowerCase().includes(term))
+                );
+            }
+
+            setOrders(result);
+            calculateStats(result);
         } catch (error) {
             console.error('Erro ao carregar OS:', error);
         } finally {
