@@ -33,6 +33,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 
     // Step 1: Upload e informações
     const [title, setTitle] = useState('');
+    const [osNumber, setOsNumber] = useState('');
     const [description, setDescription] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [dragActive, setDragActive] = useState(false);
@@ -140,6 +141,10 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
     const validateStep1 = () => {
         if (!title.trim()) {
             alert('Por favor, preencha o título da OS');
+            return false;
+        }
+        if (!osNumber.trim()) {
+            alert('Por favor, preencha o número da OS');
             return false;
         }
         if (!file) {
@@ -252,6 +257,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                 .from('service_orders')
                 .insert({
                     title: title.trim(),
+                    os_number: osNumber.trim(),
                     description: description.trim() || null,
                     file_name: file.name,
                     file_path: filePath,
@@ -377,7 +383,9 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                     {step === 1 ? (
                         <Step1Content
                             title={title}
+                        osNumber={osNumber}
                             setTitle={setTitle}
+                        setOsNumber={setOsNumber}
                             description={description}
                             setDescription={setDescription}
                             file={file}
@@ -426,7 +434,9 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 // Step 1: Upload e Informações
 interface Step1ContentProps {
     title: string;
+    osNumber: string;
     setTitle: (value: string) => void;
+    setOsNumber: (value: string) => void;
     description: string;
     setDescription: (value: string) => void;
     file: File | null;
@@ -438,7 +448,9 @@ interface Step1ContentProps {
 
 const Step1Content: React.FC<Step1ContentProps> = ({
     title,
+    osNumber,
     setTitle,
+    setOsNumber,
     description,
     setDescription,
     file,
@@ -449,6 +461,21 @@ const Step1Content: React.FC<Step1ContentProps> = ({
 }) => {
     return (
         <div className="space-y-6">
+            {/* Número da OS */}
+            <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Número da OS *
+                </label>
+                <input
+                    type="text"
+                    value={osNumber}
+                    onChange={(e) => setOsNumber(e.target.value)}
+                    placeholder="Ex: 2025-001, 12345 ou código interno"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    maxLength={120}
+                />
+            </div>
+
             {/* Título */}
             <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">

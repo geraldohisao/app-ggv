@@ -232,6 +232,7 @@ export interface OSSigner {
 export interface ServiceOrder {
     id?: string;
     title: string;
+    os_number?: string;
     description?: string;
     file_name: string;
     file_path: string;             // Caminho no storage do Supabase

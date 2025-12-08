@@ -544,6 +544,13 @@ const OverviewTab: React.FC<{
                     label="Criado em"
                     value={formatDate(order.created_at)}
                 />
+                {order.os_number && (
+                    <InfoCard
+                        icon={<DocumentTextIcon className="w-5 h-5" />}
+                        label="Número da OS"
+                        value={order.os_number}
+                    />
+                )}
                 <InfoCard
                     icon={<UsersIcon className="w-5 h-5" />}
                     label="Criado por"

@@ -327,6 +327,11 @@ const OSListItem: React.FC<OSListItemProps> = ({ order, onView }) => {
                             <p className="text-sm text-slate-500 truncate">
                                 {order.file_name}
                             </p>
+                            {order.os_number && (
+                                <p className="text-xs text-slate-600 mt-1">
+                                    OS nº <span className="font-semibold">{order.os_number}</span>
+                                </p>
+                            )}
                         </div>
                         <div className="shrink-0">
                             {getStatusBadge(order.status)}
