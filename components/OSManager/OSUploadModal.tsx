@@ -169,6 +169,13 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
         return true;
     };
 
+    const computeFileHash = async (file: File) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+
     const handleNext = () => {
         if (validateStep1()) {
             setStep(2);
@@ -215,7 +222,10 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                 }
             }
 
-            // 2. Criar registro da OS
+            // 2. Calcular hash do PDF (integridade)
+            const fileHash = await computeFileHash(file);
+
+            // 3. Criar registro da OS
             const expiresAt = new Date();
             expiresAt.setDate(expiresAt.getDate() + expiresIn);
 
@@ -227,6 +237,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                     file_name: file.name,
                     file_path: filePath,
                     file_size: file.size,
+                    file_hash: fileHash,
                     status: OSStatus.Pending,
                     created_by: user.id,
                     created_by_name: user.name,

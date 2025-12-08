@@ -514,7 +514,7 @@ const SignersTab: React.FC<{
 
                                 {/* Signature Info */}
                                 {signer.signed_at && (
-                                    <div className="mt-3 pt-3 border-t border-slate-300">
+                                    <div className="mt-3 pt-3 border-t border-slate-300 space-y-3">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                             <div>
                                                 <span className="text-slate-600">Assinado em:</span>
@@ -531,6 +531,39 @@ const SignersTab: React.FC<{
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Download comprovante */}
+                                        {signer.signature_data && (
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const payload = {
+                                                            signer: {
+                                                                name: signer.name,
+                                                                email: signer.email,
+                                                            },
+                                                            document: {
+                                                                id: order.id,
+                                                                title: order.title,
+                                                                file_name: order.file_name,
+                                                                file_hash: order.file_hash || null
+                                                            },
+                                                            signature: signer.signature_data
+                                                        };
+                                                        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `comprovante-${order.id}-${signer.id}.json`;
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium"
+                                                >
+                                                    Baixar comprovante (JSON)
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

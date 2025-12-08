@@ -175,7 +175,8 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 ipAddress: ip,
                 userAgent: navigator.userAgent,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                screenResolution: `${window.screen.width}x${window.screen.height}`
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                documentHash: order.file_hash || null
             };
 
             // Gerar hash SHA-256
@@ -195,7 +196,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                     ip_address: signatureData.ipAddress,
                     user_agent: signatureData.userAgent,
                     signature_hash: signatureHash,
-                    signature_data: signatureData
+                    signature_data: { ...signatureData, signatureHash }
                 })
                 .eq('id', signer.id);
 
@@ -209,7 +210,9 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 p_event_description: `Assinado por ${fullName}`,
                 p_metadata: {
                     cpf_partial: cpf.substring(0, 7) + '***',
-                    ip: ip
+                    ip: ip,
+                    document_hash: order.file_hash || null,
+                        signature_hash: signatureHash
                 }
             });
 
