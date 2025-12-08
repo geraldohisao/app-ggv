@@ -360,9 +360,11 @@ const OSListItem: React.FC<OSListItemProps> = ({ order, onView }) => {
                             e.stopPropagation();
                             onView(order);
                         }}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors font-semibold text-sm"
+                        title="Visualizar OS"
                     >
-                        <EyeIcon className="w-5 h-5" />
+                        <DocumentSignatureIcon className="w-5 h-5" />
+                        <span>Visualizar</span>
                     </button>
                 </div>
             </div>
