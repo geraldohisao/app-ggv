@@ -69,7 +69,8 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
         return null;
     }
 
-    const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin;
+    const isGestor = user.user_function === 'Gestor';
+    const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor;
     const canSeeFeedback = user.role === UserRole.SuperAdmin || 
                           user.user_function === 'Closer' || 
                           user.user_function === 'Gestor';
