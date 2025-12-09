@@ -25,14 +25,15 @@ interface OSDetailModalProps {
 
 const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'signers' | 'history'>('overview');
-    const [loading, setLoading] = useState(false);
+    const [downloadLoading, setDownloadLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
     const [previewLoading, setPreviewLoading] = useState(false);
 
     const handleDownload = async () => {
         try {
-            setLoading(true);
+            setDownloadLoading(true);
             
             const { data, error } = await supabase.storage
                 .from('service-orders')
@@ -53,7 +54,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
             console.error('Erro ao baixar arquivo:', error);
             alert(`Erro ao baixar arquivo: ${error.message}`);
         } finally {
-            setLoading(false);
+            setDownloadLoading(false);
         }
     };
 
@@ -63,7 +64,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
         }
 
         try {
-            setLoading(true);
+            setActionLoading(true);
 
             const { error } = await supabase
                 .from('service_orders')
@@ -98,7 +99,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
             console.error('Erro ao cancelar OS:', error);
             alert(`Erro ao cancelar OS: ${error.message}`);
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
@@ -218,7 +219,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
 
     const handleSendReminder = async (signerId: string, signerEmail: string) => {
         try {
-            setLoading(true);
+            setActionLoading(true);
 
             // Encontrar o assinante
             const signer = order.signers?.find(s => s.id === signerId);
@@ -235,7 +236,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
             console.error('Erro ao enviar lembrete:', error);
             alert(`Erro ao enviar lembrete: ${error.message}`);
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
@@ -484,7 +485,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                                     getStatusBadge={getStatusBadge}
                                     onSendReminder={handleSendReminder}
                                     onRemovePending={handleRemovePendingSigner}
-                                    loading={loading}
+                                    loading={actionLoading}
                                 />
                             )}
                         </div>
@@ -493,34 +494,34 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                         <div className="border-t bg-slate-50 p-4 flex justify-between">
                             <div className="flex gap-2 flex-wrap">
                                 {order.status !== OSStatus.Completed && order.status !== OSStatus.Cancelled && (
-                                    <button
-                                        onClick={handleCancelOS}
-                                        disabled={loading}
-                                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-semibold disabled:opacity-50 transition-colors"
-                                    >
-                                        Cancelar OS
-                                    </button>
+                                <button
+                                    onClick={handleCancelOS}
+                                    disabled={actionLoading}
+                                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                >
+                                    Cancelar OS
+                                </button>
                                 )}
                                 {order.status !== OSStatus.Completed &&
                                     order.status !== OSStatus.Cancelled &&
                                     (order.signed_count || 0) === (order.total_signers || 0) && (
-                                        <button
-                                            onClick={handleFinalizeOS}
-                                            disabled={loading}
-                                            className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg font-semibold disabled:opacity-50 transition-colors"
-                                        >
-                                            Finalizar OS
-                                        </button>
+                                    <button
+                                        onClick={handleFinalizeOS}
+                                        disabled={actionLoading}
+                                        className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                    >
+                                        Finalizar OS
+                                    </button>
                                     )}
                                 {order.status === OSStatus.Cancelled &&
                                     (order.signed_count || 0) < (order.total_signers || 0) && (
-                                        <button
-                                            onClick={handleDeleteOS}
-                                            disabled={loading}
-                                            className="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold disabled:opacity-50 transition-colors"
-                                        >
-                                            Excluir OS
-                                        </button>
+                                    <button
+                                        onClick={handleDeleteOS}
+                                        disabled={actionLoading}
+                                        className="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                                    >
+                                        Excluir OS
+                                    </button>
                                     )}
                             </div>
                             <div className="flex gap-2">
@@ -533,11 +534,11 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                                 </button>
                                 <button
                                     onClick={handleDownload}
-                                    disabled={loading}
+                                    disabled={downloadLoading}
                                     className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 transition-colors"
                                 >
                                     <ArrowDownTrayIcon className="w-5 h-5" />
-                                    {loading ? 'Baixando...' : 'Baixar PDF'}
+                                    {downloadLoading ? 'Baixando...' : 'Baixar PDF'}
                                 </button>
                                 <button
                                     onClick={onClose}
@@ -661,6 +662,7 @@ const SignersTab: React.FC<{
     onSendReminder: (signerId: string, signerEmail: string) => Promise<void>;
     onRemovePending: (signerId: string) => Promise<void>;
     loading: boolean;
+    loadingSignerId?: string;
 }> = ({ order, formatDate, getStatusBadge, onSendReminder, onRemovePending, loading }) => {
     return (
         <div className="space-y-4">
