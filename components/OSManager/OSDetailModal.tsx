@@ -305,8 +305,12 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                     .from('service-orders')
                     .createSignedUrl(path, 3600);
                 if (!signedError && signed?.signedUrl) {
-                    setPreviewUrl(signed.signedUrl);
-                    return;
+                    const head = await fetch(signed.signedUrl, { method: 'HEAD' });
+                    if (head.ok) {
+                        setPreviewUrl(signed.signedUrl);
+                        setPreviewLoading(false);
+                        return;
+                    }
                 }
             } catch (e) {
                 console.warn('Preview signed URL falhou para', path, e);
@@ -314,8 +318,12 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
             try {
                 const { data: pub } = supabase.storage.from('service-orders').getPublicUrl(path);
                 if (pub?.publicUrl) {
-                    setPreviewUrl(pub.publicUrl);
-                    return;
+                    const head = await fetch(pub.publicUrl, { method: 'HEAD' });
+                    if (head.ok) {
+                        setPreviewUrl(pub.publicUrl);
+                        setPreviewLoading(false);
+                        return;
+                    }
                 }
             } catch (e) {
                 console.warn('Preview public URL falhou para', path, e);

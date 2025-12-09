@@ -33,16 +33,24 @@ const OSPreviewModal: React.FC<OSPreviewModalProps> = ({ order, onClose }) => {
                     .from('service-orders')
                     .createSignedUrl(path, 3600);
                 if (!signedError && signed?.signedUrl) {
-                    console.log('✅ [PREVIEW] URL assinada gerada');
-                    setPdfUrl(signed.signedUrl);
-                    return;
+                    const head = await fetch(signed.signedUrl, { method: 'HEAD' });
+                    if (head.ok) {
+                        console.log('✅ [PREVIEW] URL assinada válida');
+                        setPdfUrl(signed.signedUrl);
+                        setLoading(false);
+                        return;
+                    }
                 }
                 // Pública
                 const { data: pub } = supabase.storage.from('service-orders').getPublicUrl(path);
                 if (pub?.publicUrl) {
-                    console.log('✅ [PREVIEW] URL pública gerada:', pub.publicUrl);
-                    setPdfUrl(pub.publicUrl);
-                    return;
+                    const head = await fetch(pub.publicUrl, { method: 'HEAD' });
+                    if (head.ok) {
+                        console.log('✅ [PREVIEW] URL pública válida:', pub.publicUrl);
+                        setPdfUrl(pub.publicUrl);
+                        setLoading(false);
+                        return;
+                    }
                 }
             }
         } catch (err) {
