@@ -82,6 +82,16 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                 p_event_description: 'OS cancelada pelo criador'
             });
 
+            // Notificar assinantes sobre cancelamento
+            let signersToNotify = order.signers;
+            if (!signersToNotify || signersToNotify.length === 0) {
+                const { data } = await supabase.from('os_signers').select('*').eq('os_id', order.id);
+                signersToNotify = data || [];
+            }
+            if (signersToNotify && signersToNotify.length > 0) {
+                await osEmailService.sendCancelled(order, signersToNotify);
+            }
+
             alert('✅ OS cancelada com sucesso');
             onUpdate();
         } catch (error: any) {
@@ -192,6 +202,9 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                 p_event_description: `Assinante removido: ${target.email}`,
                 p_metadata: { signer: target.email }
             });
+
+            // Notificar assinante removido
+            await osEmailService.sendCancelled(order, [target], 'Você foi removido deste processo de assinatura');
 
             alert('Assinante removido.');
             onUpdate();

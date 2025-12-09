@@ -178,6 +178,54 @@ class OSEmailService {
     }
 
     /**
+     * Envia e-mail de cancelamento de documento
+     */
+    async sendCancelled(order: ServiceOrder, signers: OSSigner[], reason: string = 'Documento cancelado'): Promise<void> {
+        const config = await this.loadConfig();
+
+        const emailHTML = `
+        <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
+          <div style="text-align:center; margin-bottom: 24px;">
+            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="Grupo GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0; outline:none; text-decoration:none;" />
+          </div>
+          <h2 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; text-align:center; color:#111827;">
+            Documento cancelado
+          </h2>
+          <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 1.6; text-align:center; color:#4b5563;">
+            ${reason}.
+          </p>
+          <div style="background:#f3f4f6; border-radius: 10px; padding:16px 20px; margin-bottom:16px;">
+            <p style="margin:0; font-size:15px; color:#111827;"><strong>Documento:</strong> ${order.file_name}</p>
+            <p style="margin:6px 0 0 0; font-size:14px; color:#4b5563;">${order.title || ''}</p>
+          </div>
+          <p style="margin: 0; font-size: 12px; color: #9ca3af; text-align:center; margin-top: 16px;">
+            Caso tenha dúvidas, contate o remetente.
+          </p>
+        </div>`;
+
+        for (const signer of signers) {
+            await this.sendEmail({
+                to: signer.email,
+                toName: signer.name,
+                subject: `Documento cancelado - ${order.title}`,
+                html: emailHTML,
+                config
+            });
+
+            // Log
+            if (order.id && signer.id) {
+                await supabase.rpc('log_os_event', {
+                    p_os_id: order.id,
+                    p_signer_id: signer.id,
+                    p_event_type: 'email_sent_cancelled',
+                    p_event_description: `Cancelamento enviado para ${signer.email}`,
+                    p_metadata: { email: signer.email }
+                });
+            }
+        }
+    }
+
+    /**
      * Envia e-mail de documento finalizado com o PDF em anexo
      */
     async sendFinalized(order: ServiceOrder, signers: OSSigner[]): Promise<void> {
@@ -459,7 +507,7 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; display:block;" />
+                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0;" />
                         </td>
                     </tr>
 
@@ -617,7 +665,7 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; display:block;" />
+                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0;" />
                         </td>
                     </tr>
 
