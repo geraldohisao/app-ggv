@@ -690,13 +690,18 @@ const Step2Content: React.FC<Step2ContentProps> = ({
                                             <option value="Aprovador">Aprovador</option>
                                         </select>
                                     </div>
-                                    <button
-                                        onClick={() => removeSigner(index)}
-                                        className="text-red-500 hover:text-red-700 p-2"
-                                    >
-                                        <TrashIcon className="w-5 h-5" />
-                                    </button>
+                                    {!(signer.email || '').toLowerCase().includes('financeiro@grupogg.com') && (
+                                        <button
+                                            onClick={() => removeSigner(index)}
+                                            className="text-red-500 hover:text-red-700 p-2"
+                                        >
+                                            <TrashIcon className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
+                                {(signer.email || '').toLowerCase().includes('financeiro@grupogg.com') && (
+                                    <p className="text-xs text-amber-600 mt-1">Adicionado automaticamente: financeiro@grupogg.com</p>
+                                )}
                             </div>
                         ))}
                     </div>
