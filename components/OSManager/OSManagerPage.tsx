@@ -40,6 +40,14 @@ const OSManagerPage: React.FC = () => {
         loadOrders();
     }, [filters]);
 
+  // Auto-refresh a cada 12s enquanto a página estiver aberta
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadOrders();
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [filters]);
+
     const loadOrders = async () => {
         try {
             setLoading(true);
