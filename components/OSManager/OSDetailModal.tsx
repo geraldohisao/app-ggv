@@ -298,7 +298,11 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
     const openPreview = async () => {
         setShowPreview(true);
         setPreviewLoading(true);
-        const paths = [`${order.file_path}.final.pdf`, order.file_path];
+        const paths = [
+            order.final_file_path,
+            `${order.file_path}.final.pdf`,
+            order.file_path
+        ].filter(Boolean) as string[];
         for (const path of paths) {
             try {
                 const { data: signed, error: signedError } = await supabase.storage

@@ -26,7 +26,11 @@ const OSPreviewModal: React.FC<OSPreviewModalProps> = ({ order, onClose }) => {
             setLoading(true);
             console.log('📄 [PREVIEW] Gerando URL para preview:', order.file_path);
 
-            const paths = [`${order.file_path}.final.pdf`, order.file_path];
+            const paths = [
+                order.final_file_path,
+                `${order.file_path}.final.pdf`,
+                order.file_path
+            ].filter(Boolean) as string[];
             for (const path of paths) {
                 // URL assinada
                 const { data: signed, error: signedError } = await supabase.storage

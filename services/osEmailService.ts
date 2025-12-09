@@ -192,7 +192,7 @@ class OSEmailService {
 
         let pdfBase64 = '';
         let chosenPath = '';
-        let chosenName = order.file_name;
+        let chosenName = (order as any).final_file_name || order.file_name;
 
         for (const path of candidatePaths) {
             try {
@@ -203,7 +203,9 @@ class OSEmailService {
                 const buffer = await data.arrayBuffer();
                 pdfBase64 = Buffer.from(buffer).toString('base64');
                 chosenPath = path as string;
-                if (path === `${order.file_path}.final.pdf`) {
+                if ((order as any).final_file_name) {
+                    chosenName = (order as any).final_file_name;
+                } else if (path === `${order.file_path}.final.pdf`) {
                     chosenName = order.file_name.replace(/\.pdf$/i, '') + '-assinado.pdf';
                 }
                 break;

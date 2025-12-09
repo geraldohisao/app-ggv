@@ -256,8 +256,13 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
 
                 // Gerar PDF final com termo de assinatura como última página
                 let finalPath: string | undefined;
+                let finalName: string | undefined;
+                let finalHash: string | undefined;
                 try {
-                    finalPath = await generateFinalPdfWithTerm(order, allSigners || []);
+                    const gen = await generateFinalPdfWithTerm(order, allSigners || []);
+                    finalPath = gen.path;
+                    finalName = gen.name;
+                    finalHash = gen.hash;
                 } catch (genErr) {
                     console.warn('⚠️ Falha ao gerar PDF final com termo (seguindo com original):', genErr);
                 }
@@ -268,7 +273,9 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                     signers: allSigners || [],
                     signed_count: signedCount,
                     total_signers: total,
-                    final_file_path: finalPath
+                    final_file_path: finalPath,
+                    final_file_name: finalName,
+                    final_file_hash: finalHash
                 };
 
                 // Enviar e-mails com PDF anexado para todos que assinaram
@@ -284,7 +291,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         }
     };
 
-    const generateFinalPdfWithTerm = async (baseOrder: ServiceOrder, signersList: OSSigner[]): Promise<string> => {
+    const generateFinalPdfWithTerm = async (baseOrder: ServiceOrder, signersList: OSSigner[]): Promise<{ path: string; name: string; hash: string }> => {
         // Baixar PDF original
         const { data, error } = await supabase.storage
             .from('service-orders')
@@ -332,14 +339,32 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 11 });
 
         const finalBytes = await pdfDoc.save();
+
+        // Calcular hash do PDF final
+        const hashBuffer = await crypto.subtle.digest('SHA-256', finalBytes);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const finalHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
         const finalFile = new Blob([finalBytes], { type: 'application/pdf' });
 
         const finalPath = `${baseOrder.file_path}.final.pdf`;
+        const finalName = baseOrder.file_name.replace(/\.pdf$/i, '') + '-assinado.pdf';
         await supabase.storage
             .from('service-orders')
             .upload(finalPath, finalFile, { upsert: true, contentType: 'application/pdf' });
 
-        return finalPath;
+        // Atualizar OS com caminho, nome e hash do final
+        await supabase
+            .from('service_orders')
+            .update({
+                final_file_path: finalPath,
+                final_file_name: finalName,
+                final_file_hash: finalHash,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', baseOrder.id);
+
+        return { path: finalPath, name: finalName, hash: finalHash };
     };
 
     return (

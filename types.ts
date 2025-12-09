@@ -238,6 +238,9 @@ export interface ServiceOrder {
     file_path: string;             // Caminho no storage do Supabase
     file_size?: number;
     file_url?: string;             // URL pública (se aplicável)
+    final_file_name?: string;      // PDF final com termo
+    final_file_path?: string;      // Caminho do PDF final no storage
+    final_file_hash?: string;
     status: OSStatus;
     created_by: string;            // ID do usuário que criou
     created_by_name?: string;
