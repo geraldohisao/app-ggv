@@ -249,7 +249,7 @@ class OSEmailService {
                     .download(path as string);
                 if (error) continue;
                 const buffer = await data.arrayBuffer();
-                pdfBase64 = Buffer.from(buffer).toString('base64');
+                pdfBase64 = this.arrayBufferToBase64(buffer);
                 chosenPath = path as string;
                 if ((order as any).final_file_name) {
                     chosenName = (order as any).final_file_name;
@@ -746,6 +746,16 @@ class OSEmailService {
 </body>
 </html>
         `.trim();
+    }
+
+    private arrayBufferToBase64(buffer: ArrayBuffer): string {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
     }
 }
 
