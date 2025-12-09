@@ -275,9 +275,17 @@ class OSEmailService {
 
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937;">
-          <div style="text-align:center; padding:16px 0;">
-            <img src="${this.inlineLogo}" alt="Grupo GGV" style="height:48px;" />
-          </div>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="padding:16px 0;">
+                <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
+                    <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
+                        GRUPO GGV
+                    </h1>
+                </div>
+              </td>
+            </tr>
+          </table>
           <div style="background:#e7f7ec; padding:12px 16px; border-radius:8px; color:#166534; font-weight:600; text-align:center;">
             Seu documento assinado está em anexo, lembre-se de baixá-lo.
           </div>
@@ -509,7 +517,11 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0;" />
+                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
+                                <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
+                                    GRUPO GGV
+                                </h1>
+                            </div>
                         </td>
                     </tr>
 
@@ -667,7 +679,11 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0;" />
+                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
+                                <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
+                                    GRUPO GGV
+                                </h1>
+                            </div>
                         </td>
                     </tr>
 

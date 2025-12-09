@@ -51,7 +51,11 @@ const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
                     html: `
                         <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 32px 20px; background: #ffffff;">
                             <div style="text-align:center; margin-bottom: 32px;">
-                                <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="Grupo GGV" style="height:48px; display:block; margin: 0 auto;" />
+                                <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
+                                    <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
+                                        GRUPO GGV
+                                    </h1>
+                                </div>
                             </div>
                             <h1 style="color: #111827; font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 24px;">
                                 Código de Verificação
