@@ -379,7 +379,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-5">
                     {step === 1 ? (
                         <Step1Content
                             title={title}
@@ -460,10 +460,10 @@ const Step1Content: React.FC<Step1ContentProps> = ({
     handleFileChange
 }) => {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Número da OS */}
             <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
                     Número da OS *
                 </label>
                 <input
@@ -478,7 +478,7 @@ const Step1Content: React.FC<Step1ContentProps> = ({
 
             {/* Título */}
             <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
                     Título da OS *
                 </label>
                 <input
@@ -493,7 +493,7 @@ const Step1Content: React.FC<Step1ContentProps> = ({
 
             {/* Descrição */}
             <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
                     Descrição (opcional)
                 </label>
                 <textarea
@@ -508,7 +508,7 @@ const Step1Content: React.FC<Step1ContentProps> = ({
 
             {/* Upload de Arquivo */}
             <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
                     Documento PDF *
                 </label>
                 <div
@@ -516,7 +516,7 @@ const Step1Content: React.FC<Step1ContentProps> = ({
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
-                    className={`relative border-2 border-dashed rounded-xl p-8 transition-colors ${
+                    className={`relative border-2 border-dashed rounded-xl p-6 transition-colors ${
                         dragActive
                             ? 'border-blue-500 bg-blue-50'
                             : file
