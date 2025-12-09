@@ -354,16 +354,16 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-6">
+                <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4">
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3 mb-1.5">
                                 <DocumentTextIcon className="w-8 h-8" />
-                                <h2 className="text-2xl font-bold">{order.title}</h2>
+                                <h2 className="text-xl font-bold">{order.title}</h2>
                             </div>
-                            <p className="text-slate-300 text-sm">{order.file_name}</p>
+                            <p className="text-slate-300 text-xs">{order.file_name}</p>
                             {order.description && (
-                                <p className="text-slate-300 mt-2">{order.description}</p>
+                                <p className="text-slate-300 mt-1 text-sm line-clamp-2">{order.description}</p>
                             )}
                         </div>
                         <button
@@ -375,10 +375,10 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                     </div>
 
                     {/* Status and Progress */}
-                    <div className="mt-4 flex items-center gap-4">
+                    <div className="mt-3 flex items-center gap-4">
                         {getStatusBadge(order.status)}
                         <div className="flex-1">
-                            <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
+                            <div className="flex items-center justify-between text-[11px] text-slate-200 mb-0.5">
                                 <span>Progresso</span>
                                 <span className="font-semibold">
                                     {order.signed_count} / {order.total_signers} assinaturas
@@ -400,7 +400,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                     /* Preview inline no mesmo modal (sem modal empilhado) */
                     <div className="flex-1 flex flex-col bg-slate-100 min-h-[70vh]">
                         {/* Toolbar Preview */}
-                        <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 shrink-0">
+                        <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 shrink-0">
                             <button
                                 onClick={() => setShowPreview(false)}
                                 className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors"
@@ -440,7 +440,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                             )}
                         </div>
 
-                        <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 text-xs text-slate-500 text-center shrink-0">
+                        <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 text-center shrink-0">
                             Pré-visualização no mesmo modal — sem janelas sobrepostas.
                         </div>
                     </div>
@@ -473,7 +473,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6">
+                        <div className="flex-1 overflow-y-auto p-4">
                             {activeTab === 'overview' && (
                                 <OverviewTab order={order} formatDate={formatDate} formatFileSize={formatFileSize} />
                             )}
@@ -490,7 +490,7 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                         </div>
 
                         {/* Footer */}
-                        <div className="border-t bg-slate-50 p-6 flex justify-between">
+                        <div className="border-t bg-slate-50 p-4 flex justify-between">
                             <div className="flex gap-2 flex-wrap">
                                 {order.status !== OSStatus.Completed && order.status !== OSStatus.Cancelled && (
                                     <button
@@ -561,9 +561,9 @@ const OverviewTab: React.FC<{
     formatFileSize: (bytes?: number) => string;
 }> = ({ order, formatDate, formatFileSize }) => {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Info Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <InfoCard
                     icon={<CalendarDaysIcon className="w-5 h-5" />}
                     label="Criado em"
@@ -594,9 +594,9 @@ const OverviewTab: React.FC<{
             </div>
 
             {/* Status Summary */}
-            <div className="bg-slate-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Resumo de Status</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-slate-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Resumo de Status</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <StatusSummaryCard
                         label="Total"
                         value={order.total_signers || 0}
@@ -787,19 +787,19 @@ const SignersTab: React.FC<{
 
 // Helper Components
 const InfoCard: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-    <div className="bg-slate-50 rounded-lg p-4">
+    <div className="bg-slate-50 rounded-lg p-3">
         <div className="flex items-center gap-2 text-slate-600 mb-1">
             {icon}
-            <span className="text-sm font-medium">{label}</span>
+            <span className="text-xs font-semibold">{label}</span>
         </div>
-        <p className="text-lg font-semibold text-slate-900">{value}</p>
+        <p className="text-sm font-semibold text-slate-900">{value}</p>
     </div>
 );
 
 const StatusSummaryCard: React.FC<{ label: string; value: number | string; color: string }> = ({ label, value, color }) => (
-    <div className={`rounded-lg p-4 ${color}`}>
-        <p className="text-sm font-medium mb-1">{label}</p>
-        <p className="text-2xl font-bold">{value}</p>
+    <div className={`rounded-lg p-3 ${color}`}>
+        <p className="text-xs font-semibold mb-1">{label}</p>
+        <p className="text-lg font-bold">{value}</p>
     </div>
 );
 
