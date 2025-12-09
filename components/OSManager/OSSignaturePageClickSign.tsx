@@ -27,6 +27,8 @@ const OSSignaturePageClickSign: React.FC = () => {
     const [allSigners, setAllSigners] = useState<OSSigner[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [pdfUrl, setPdfUrl] = useState<string>('');
+    const [alreadySigned, setAlreadySigned] = useState(false);
+    const [signedSuccess, setSignedSuccess] = useState(false);
     
     const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
     const [isEmailVerified, setIsEmailVerified] = useState(false);
@@ -94,10 +96,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                 return;
             }
 
-            if (signerData.status === 'SIGNED') {
-                setError('Você já assinou este documento.');
-                return;
-            }
+            setAlreadySigned(signerData.status === 'SIGNED');
 
             // Gerar URL pública do PDF (bucket agora é público)
             console.log('📄 Gerando URL pública do PDF:', orderData.file_path);
@@ -150,6 +149,7 @@ const OSSignaturePageClickSign: React.FC = () => {
     };
 
     const handleSignatureComplete = () => {
+        setSignedSuccess(true);
         loadSignatureData();
     };
 
@@ -162,6 +162,29 @@ const OSSignaturePageClickSign: React.FC = () => {
                 <div className="text-center">
                     <div className="animate-spin w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full mx-auto mb-4"></div>
                     <p className="text-slate-600">Carregando documento...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (alreadySigned || signedSuccess) {
+        return (
+            <div className="min-h-screen bg-white flex items-center justify-center p-4">
+                <div className="max-w-md w-full text-center">
+                    <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                        Documento Já Assinado
+                    </h1>
+                    <p className="text-slate-600 mb-6">
+                        Você já assinou este documento.
+                    </p>
+                    {signer?.signed_at && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
+                            <p className="text-sm text-green-800">
+                                Assinado em: {new Date(signer.signed_at!).toLocaleString('pt-BR')}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         );
