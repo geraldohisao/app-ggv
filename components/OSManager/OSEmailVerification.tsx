@@ -49,24 +49,27 @@ const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
                     toName: signerName,
                     subject: 'Código de Verificação - Assinatura de Documento',
                     html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-                            <h1 style="color: #1a1a1a; font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 30px;">
+                        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 32px 20px; background: #ffffff;">
+                            <div style="text-align:center; margin-bottom: 32px;">
+                                <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="Grupo GGV" style="height:48px; display:block; margin: 0 auto;" />
+                            </div>
+                            <h1 style="color: #111827; font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 24px;">
                                 Código de Verificação
                             </h1>
                             
-                            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 20px; text-align:center;">
                                 Olá <strong>${signerName}</strong>,
                             </p>
                             
-                            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 28px; text-align:center;">
                                 Para assinar o documento, utilize o código de verificação abaixo:
                             </p>
                             
-                            <div style="background-color: #f3f4f6; border-radius: 8px; padding: 30px; text-align: center; margin-bottom: 30px;">
-                                <p style="color: #6b7280; font-size: 14px; margin-bottom: 10px;">
+                            <div style="background-color: #f3f4f6; border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 28px;">
+                                <p style="color: #6b7280; font-size: 14px; margin-bottom: 12px;">
                                     Seu código de verificação:
                                 </p>
-                                <p style="color: #1a1a1a; font-size: 42px; font-weight: bold; letter-spacing: 8px; margin: 0; font-family: 'Courier New', monospace;">
+                                <p style="color: #111827; font-size: 42px; font-weight: 800; letter-spacing: 10px; margin: 0; font-family: 'Courier New', monospace;">
                                     ${verificationCode}
                                 </p>
                             </div>
@@ -75,7 +78,7 @@ const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
                                 Este código é válido por 10 minutos.
                             </p>
                             
-                            <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 40px;">
+                            <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 32px;">
                                 Se você não solicitou este código, ignore este e-mail.
                             </p>
                         </div>
