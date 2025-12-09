@@ -175,21 +175,6 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
         return true;
     };
 
-    const ensureFinancialSigner = (list: Partial<OSSigner>[]) => {
-        const exists = list.some(s => (s.email || '').toLowerCase() === FINANCIAL_EMAIL.toLowerCase());
-        if (exists) return list;
-        return [
-            {
-                name: 'Financeiro GGV',
-                email: FINANCIAL_EMAIL,
-                role: 'Financeiro',
-                status: SignerStatus.Pending,
-                order: list.length
-            },
-            ...list
-        ];
-    };
-
     const computeFileHash = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
         const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -199,7 +184,6 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 
     const handleNext = () => {
         if (validateStep1()) {
-            setSigners(prev => ensureFinancialSigner(prev));
             setStep(2);
         }
     };
@@ -212,7 +196,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 
             if (!file || !user) throw new Error('Dados incompletos');
 
-            const finalSigners = ensureFinancialSigner(signers);
+            const finalSigners = signers;
 
             // 1. Upload do arquivo para Supabase Storage
             const fileExt = file.name.split('.').pop();
