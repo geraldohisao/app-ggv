@@ -21,6 +21,8 @@ interface EmailConfig {
  */
 class OSEmailService {
     private config: EmailConfig | null = null;
+    private inlineLogo =
+        'data:image/png;base64,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';
 
     /**
      * Carrega configurações do banco
@@ -186,7 +188,7 @@ class OSEmailService {
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
           <div style="text-align:center; margin-bottom: 24px;">
-            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="Grupo GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0; outline:none; text-decoration:none;" />
+            <img src="${this.inlineLogo}" alt="Grupo GGV" style="height:48px; width:auto; display:block; margin:0 auto; background:#ffffff; border:0; outline:none; text-decoration:none;" />
           </div>
           <h2 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; text-align:center; color:#111827;">
             Documento cancelado
@@ -274,7 +276,7 @@ class OSEmailService {
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937;">
           <div style="text-align:center; padding:16px 0;">
-            <img src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png" alt="Grupo GGV" style="height:48px;" />
+            <img src="${this.inlineLogo}" alt="Grupo GGV" style="height:48px;" />
           </div>
           <div style="background:#e7f7ec; padding:12px 16px; border-radius:8px; color:#166534; font-weight:600; text-align:center;">
             Seu documento assinado está em anexo, lembre-se de baixá-lo.
