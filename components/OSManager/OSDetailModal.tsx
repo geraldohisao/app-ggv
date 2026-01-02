@@ -35,9 +35,15 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
         try {
             setDownloadLoading(true);
             
+            // Priorizar PDF final (com termo) se existir
+            const pathToDownload = (order as any).final_file_path || order.file_path;
+            const nameToDownload = (order as any).final_file_name || order.file_name;
+            
+            console.log('📥 Baixando PDF:', pathToDownload);
+            
             const { data, error } = await supabase.storage
                 .from('service-orders')
-                .download(order.file_path);
+                .download(pathToDownload);
 
             if (error) throw error;
 
@@ -45,13 +51,15 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
             const url = URL.createObjectURL(data);
             const a = document.createElement('a');
             a.href = url;
-            a.download = order.file_name;
+            a.download = nameToDownload;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            
+            console.log('✅ Download concluído:', nameToDownload);
         } catch (error: any) {
-            console.error('Erro ao baixar arquivo:', error);
+            console.error('❌ Erro ao baixar arquivo:', error);
             alert(`Erro ao baixar arquivo: ${error.message}`);
         } finally {
             setDownloadLoading(false);

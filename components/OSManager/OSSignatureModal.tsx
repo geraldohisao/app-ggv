@@ -247,6 +247,8 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 .eq('id', order.id);
 
             if (newStatus === OSStatus.Completed) {
+                console.log('🎉 OS FINALIZADA! Iniciando processo de conclusão...');
+                
                 await supabase.rpc('log_os_event', {
                     p_os_id: order.id,
                     p_event_type: 'completed',
@@ -259,12 +261,28 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 let finalName: string | undefined;
                 let finalHash: string | undefined;
                 try {
+                    console.log('📄 Gerando PDF final com termo de assinatura...');
                     const gen = await generateFinalPdfWithTerm(order, allSigners || []);
                     finalPath = gen.path;
                     finalName = gen.name;
                     finalHash = gen.hash;
+                    console.log('✅ PDF final gerado:', { path: finalPath, name: finalName, hash: finalHash });
                 } catch (genErr) {
-                    console.warn('⚠️ Falha ao gerar PDF final com termo (seguindo com original):', genErr);
+                    console.error('❌ ERRO ao gerar PDF final com termo:', genErr);
+                }
+
+                // Atualizar service_orders com dados do PDF final
+                if (finalPath && finalName && finalHash) {
+                    console.log('💾 Salvando dados do PDF final no banco...');
+                    await supabase
+                        .from('service_orders')
+                        .update({
+                            final_file_path: finalPath,
+                            final_file_name: finalName,
+                            final_file_hash: finalHash
+                        })
+                        .eq('id', order.id);
+                    console.log('✅ Dados do PDF final salvos no banco');
                 }
 
                 const orderWithSigners = {
@@ -279,7 +297,14 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 };
 
                 // Enviar e-mails com PDF anexado para todos que assinaram
-                await osEmailService.sendFinalized(orderWithSigners as ServiceOrder, (allSigners || []) as OSSigner[]);
+                try {
+                    console.log('📧 Enviando e-mails de finalização para todos que assinaram...');
+                    await osEmailService.sendFinalized(orderWithSigners as ServiceOrder, (allSigners || []) as OSSigner[]);
+                    console.log('✅ E-mails de finalização enviados com sucesso!');
+                } catch (emailErr) {
+                    console.error('❌ ERRO ao enviar e-mails de finalização:', emailErr);
+                    // Não bloqueia a assinatura, mas loga o erro
+                }
             }
 
             onComplete();
