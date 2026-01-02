@@ -330,38 +330,76 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        const marginX = 40;
-        let cursorY = height - 50;
+        const marginX = 50;
+        const marginY = 50;
+        let cursorY = height - 60;
+        const lineHeight = 14;
 
-        const write = (text: string, options: { bold?: boolean; size?: number } = {}) => {
-            const size = options.size || 12;
-            const usedFont = options.bold ? fontBold : font;
-            page.drawText(text, { x: marginX, y: cursorY, size, font: usedFont, color: undefined });
-            cursorY -= size + 6;
+        const drawBox = (x: number, y: number, w: number, h: number, color = { r: 0.95, g: 0.95, b: 0.95 }) => {
+            page.drawRectangle({ x, y, width: w, height: h, color, borderWidth: 1, borderColor: { r: 0.8, g: 0.8, b: 0.8 } });
         };
 
-        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 16 });
-        write(`Documento: ${baseOrder.file_name}`, { bold: true });
-        write(`Título: ${baseOrder.title}`);
-        write(`Hash (SHA-256) do documento original: ${baseOrder.file_hash || 'n/d'}`);
-        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`);
-        cursorY -= 4;
-        write('Assinaturas:', { bold: true });
+        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; color?: any } = {}) => {
+            const size = options.size || 11;
+            const usedFont = options.bold ? fontBold : font;
+            const xPos = options.x !== undefined ? options.x : marginX;
+            page.drawText(text, { 
+                x: xPos, 
+                y: cursorY, 
+                size, 
+                font: usedFont, 
+                color: options.color || { r: 0.2, g: 0.2, b: 0.2 }
+            });
+            cursorY -= size + lineHeight - size;
+        };
 
-        signersList.forEach((s, idx) => {
-            write(`${idx + 1}. ${s.name || s.email}`);
-            write(`   E-mail: ${s.email}`);
-            write(`   CPF: ${s.cpf || 'n/d'}`);
-            write(`   Papel: ${s.role || 'n/d'}`);
-            write(`   Status: ${s.status}`);
-            write(`   Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'pendente'}`);
-            write(`   IP: ${s.ip_address || 'n/d'}`);
-            write(`   User Agent: ${s.user_agent || 'n/d'}`);
-            write(`   Hash da assinatura: ${s.signature_hash || 'n/d'}`);
-            cursorY -= 6;
+        // Título
+        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 18, color: { r: 0, g: 0, b: 0 } });
+        cursorY -= 20;
+
+        // Documento
+        write(`Documento: ${baseOrder.file_name}`, { bold: true, size: 12 });
+        write(`Título: ${baseOrder.title}`, { size: 11 });
+        cursorY -= 8;
+
+        // Hash do documento original (destaque)
+        drawBox(marginX - 10, cursorY - 5, width - 2 * marginX + 20, 30);
+        cursorY += 5;
+        write(`Hash do documento original (SHA256):`, { bold: true, size: 10 });
+        const hashText = baseOrder.file_hash || 'Não disponível';
+        write(hashText.substring(0, 64), { size: 9, x: marginX + 10 });
+        if (hashText.length > 64) write(hashText.substring(64), { size: 9, x: marginX + 10 });
+        cursorY -= 20;
+
+        // Data de conclusão
+        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`, { size: 10 });
+        cursorY -= 25;
+
+        // Assinaturas
+        write('Assinaturas', { bold: true, size: 14, color: { r: 0, g: 0, b: 0 } });
+        cursorY -= 15;
+
+        signersList.filter(s => s.status === 'SIGNED').forEach((s, idx) => {
+            // Box para cada assinatura
+            const boxHeight = 120;
+            drawBox(marginX - 10, cursorY - boxHeight + 15, width - 2 * marginX + 20, boxHeight, { r: 0.98, g: 0.98, b: 0.98 });
+            
+            write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 11 });
+            write(`    E-mail: ${s.email}`, { size: 10 });
+            write(`    CPF: ${s.cpf || 'Não informado'}`, { size: 10 });
+            write(`    Papel: ${s.role || 'Colaborador'}`, { size: 10 });
+            write(`    Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10 });
+            write(`    IP: ${s.ip_address || 'Não disponível'}`, { size: 9 });
+            write(`    User Agent: ${(s.user_agent || '').substring(0, 80)}${s.user_agent && s.user_agent.length > 80 ? '...' : ''}`, { size: 8 });
+            write(`    Hash da assinatura: ${(s.signature_hash || 'Não disponível').substring(0, 60)}`, { size: 8 });
+            
+            cursorY -= 15;
         });
 
-        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 11 });
+        // Rodapé
+        cursorY = marginY + 20;
+        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 9, color: { r: 0.4, g: 0.4, b: 0.4 } });
+        write('Datas e horários em GMT -03:00 Brasília', { size: 8, color: { r: 0.5, g: 0.5, b: 0.5 } });
 
         const finalBytes = await pdfDoc.save();
 
