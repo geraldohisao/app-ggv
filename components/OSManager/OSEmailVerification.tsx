@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { getGGVLogoHTML } from '../../utils/brandLogoHelper';
 import {
     EnvelopeIcon,
     CheckCircleIcon,
@@ -40,6 +41,9 @@ const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
             const verificationCode = generateCode();
             setSentCode(verificationCode);
 
+            // Buscar logo do brand_logos
+            const logoHTML = await getGGVLogoHTML();
+
             // Enviar e-mail com código via Netlify Function
             const response = await fetch('/.netlify/functions/send-os-email', {
                 method: 'POST',
@@ -51,11 +55,7 @@ const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
                     html: `
                         <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 32px 20px; background: #ffffff;">
                             <div style="text-align:center; margin-bottom: 32px;">
-                                <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
-                                    <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
-                                        GRUPO GGV
-                                    </h1>
-                                </div>
+                                ${logoHTML}
                             </div>
                             <h1 style="color: #111827; font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 24px;">
                                 Código de Verificação

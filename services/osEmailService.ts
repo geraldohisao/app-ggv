@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ServiceOrder, OSSigner } from '../types';
 import { format } from 'date-fns';
+import { getGGVLogoHTML } from '../utils/brandLogoHelper';
 
 interface EmailConfig {
     os_email_from: string;
@@ -21,42 +22,6 @@ interface EmailConfig {
  */
 class OSEmailService {
     private config: EmailConfig | null = null;
-
-    /**
-     * Busca logo no brand_logos e usa a URL direta (exata). SEMPRE busca do banco (sem cache).
-     */
-    private async getLogoHTML(): Promise<string> {
-        try {
-            console.log('🔍 Buscando logo do brand_logos...');
-            const { data, error } = await supabase
-                .from('brand_logos')
-                .select('url')
-                .eq('key', 'grupo_ggv')
-                .single();
-
-            if (error) {
-                console.error('❌ Erro ao buscar logo do brand_logos:', error);
-                throw error;
-            }
-
-            const logoUrl = data?.url;
-            console.log('✅ URL do logo encontrada:', logoUrl);
-            
-            if (logoUrl) {
-                // Usa URL direta do brand_logos (exata, sem modificações)
-                return `<img src="${logoUrl}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
-            }
-        } catch (err) {
-            console.warn('⚠️ Erro ao buscar logo, usando fallback:', err);
-        }
-
-        // Fallback: SVG inline (apenas se falhar completamente)
-        console.log('⚠️ Usando fallback SVG');
-        const fallbackSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="64" viewBox="0 0 220 64" role="img" aria-label="GRUPO GGV"><rect x="0" y="0" width="220" height="64" rx="10" fill="#f8f9fa"/><text x="110" y="38" text-anchor="middle" fill="#111827" font-family="Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="2">GRUPO GGV</text></svg>'
-        );
-        return `<img src="${fallbackSvg}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
-    }
 
     /**
      * Carrega configurações do banco
@@ -90,7 +55,7 @@ class OSEmailService {
     async sendSignatureRequest(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoHTML = await this.getLogoHTML();
+            const logoHTML = await getGGVLogoHTML();
 
             // Link direto para este documento
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
@@ -176,7 +141,7 @@ class OSEmailService {
     async sendReminder(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoHTML = await this.getLogoHTML();
+            const logoHTML = await getGGVLogoHTML();
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
 
             const emailHTML = this.createReminderTemplate({
