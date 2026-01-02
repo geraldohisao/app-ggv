@@ -1,8 +1,21 @@
 import { supabase } from '../services/supabaseClient';
 
 /**
+ * Converte ArrayBuffer para base64 (compatível com browser)
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+/**
  * Busca o logo do Grupo GGV da tabela brand_logos
- * Retorna HTML da imagem pronto para usar em e-mails
+ * Converte para base64 inline para garantir que sempre apareça em e-mails
  */
 export async function getGGVLogoHTML(): Promise<string> {
     try {
@@ -22,10 +35,31 @@ export async function getGGVLogoHTML(): Promise<string> {
         console.log('✅ URL do logo:', logoUrl);
 
         if (logoUrl) {
-            return `<img src="${logoUrl}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
+            // Baixar imagem e converter para base64 inline
+            console.log('📥 Baixando imagem para converter em base64...');
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            
+            const response = await fetch(logoUrl, { 
+                signal: controller.signal,
+                mode: 'cors'
+            });
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const contentType = response.headers.get('content-type') || 'image/png';
+            const arrayBuffer = await response.arrayBuffer();
+            const base64 = arrayBufferToBase64(arrayBuffer);
+            
+            console.log('✅ Logo convertido para base64 inline (tamanho:', Math.round(base64.length / 1024), 'KB)');
+            
+            return `<img src="data:${contentType};base64,${base64}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
         }
     } catch (err) {
-        console.warn('⚠️ Falha ao buscar logo, usando fallback:', err);
+        console.warn('⚠️ Falha ao buscar/converter logo, usando fallback:', err);
     }
 
     // Fallback: SVG inline
