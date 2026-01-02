@@ -4,6 +4,7 @@ import { ServiceOrder, OSSigner, SignerStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import OSBatchSignatureModal from './OSBatchSignatureModal';
 import OSEmailVerification from './OSEmailVerification';
+import { useUser } from '../../contexts/DirectUserContext';
 import {
     DocumentTextIcon,
     CheckCircleIcon,
@@ -19,6 +20,7 @@ import {
 const MySignaturesArea: React.FC = () => {
     const { signerEmail } = useParams<{ signerEmail: string }>();
     const navigate = useNavigate();
+    const { user } = useUser();
 
     const [loading, setLoading] = useState(true);
     const [pendingOrders, setPendingOrders] = useState<Array<{order: ServiceOrder, signer: OSSigner}>>([]);
@@ -79,12 +81,18 @@ const MySignaturesArea: React.FC = () => {
                 setSignerName(orders[0].signer.name);
             }
 
-            // Verificar se e-mail já foi verificado nesta sessão
-            const verified = sessionStorage.getItem(`email_verified_${email}`);
-            if (verified) {
+            // Usuário logado pula verificação de e-mail
+            if (user) {
                 setIsEmailVerified(true);
+                setNeedsEmailVerification(false);
             } else {
-                setNeedsEmailVerification(true);
+                // Verificar se e-mail já foi verificado nesta sessão
+                const verified = sessionStorage.getItem(`email_verified_${email}`);
+                if (verified) {
+                    setIsEmailVerified(true);
+                } else {
+                    setNeedsEmailVerification(true);
+                }
             }
 
         } catch (err) {
