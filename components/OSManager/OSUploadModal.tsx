@@ -515,15 +515,24 @@ const Step1Content: React.FC<Step1ContentProps> = ({
                             <p className="text-sm text-slate-500">
                                 {(file.size / 1024 / 1024).toFixed(2)} MB
                             </p>
-                            <label className="mt-4 inline-block px-4 py-2 bg-slate-600 text-white rounded-lg cursor-pointer hover:bg-slate-700 transition-colors">
-                                Alterar Arquivo
-                                <input
-                                    type="file"
-                                    accept=".pdf"
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                />
-                            </label>
+                            <div className="mt-4 flex gap-3 justify-center">
+                                <label className="inline-block px-4 py-2 bg-slate-600 text-white rounded-lg cursor-pointer hover:bg-slate-700 transition-colors">
+                                    Alterar Arquivo
+                                    <input
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setFile(null)}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    Remover
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="text-center">
