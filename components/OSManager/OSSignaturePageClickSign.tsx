@@ -29,6 +29,7 @@ const OSSignaturePageClickSign: React.FC = () => {
     const [pdfUrl, setPdfUrl] = useState<string>('');
     const [alreadySigned, setAlreadySigned] = useState(false);
     const [signedSuccess, setSignedSuccess] = useState(false);
+    const [signedAtText, setSignedAtText] = useState<string | null>(null);
     
     const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
     const [isEmailVerified, setIsEmailVerified] = useState(false);
@@ -96,7 +97,12 @@ const OSSignaturePageClickSign: React.FC = () => {
                 return;
             }
 
-            setAlreadySigned(signerData.status === 'SIGNED');
+            const isSigned = signerData.status === 'SIGNED';
+            // Só setar alreadySigned se não foi um sucesso recente (evita sobrescrever mensagem de sucesso)
+            if (!signedSuccess) {
+                setAlreadySigned(isSigned);
+            }
+            setSignedAtText(isSigned && signerData.signed_at ? new Date(signerData.signed_at).toLocaleString('pt-BR') : null);
 
             // Gerar URL pública do PDF (bucket agora é público)
             console.log('📄 Gerando URL pública do PDF:', orderData.file_path);
@@ -115,7 +121,11 @@ const OSSignaturePageClickSign: React.FC = () => {
             // Verificar se já validou o e-mail nesta sessão
             const alreadyVerified = sessionStorage.getItem(`email_verified_${signerData.email}`);
             
-            if (alreadyVerified === 'true') {
+            if (isSigned) {
+                // Já assinado: não precisa seguir para verificação/código
+                setNeedsEmailVerification(false);
+                setIsEmailVerified(true);
+            } else if (alreadyVerified === 'true') {
                 // Já validou antes nesta sessão
                 setIsEmailVerified(true);
                 setNeedsEmailVerification(false);
@@ -150,7 +160,11 @@ const OSSignaturePageClickSign: React.FC = () => {
 
     const handleSignatureComplete = () => {
         setSignedSuccess(true);
-        loadSignatureData();
+        setAlreadySigned(false);
+        setSignedAtText(new Date().toLocaleString('pt-BR'));
+        setShowSignatureModal(false);
+        // Recarregar dados sem sobrescrever estado de sucesso
+        setTimeout(() => loadSignatureData(), 100);
     };
 
     const signedCount = allSigners.filter(s => s.status === 'SIGNED').length;
@@ -173,15 +187,15 @@ const OSSignaturePageClickSign: React.FC = () => {
                 <div className="max-w-md w-full text-center">
                     <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
                     <h1 className="text-2xl font-bold text-slate-900 mb-2">
-                        Documento Já Assinado
+                        {signedSuccess ? 'Documento assinado com sucesso' : 'Documento Já Assinado'}
                     </h1>
                     <p className="text-slate-600 mb-6">
-                        Você já assinou este documento.
+                        {signedSuccess ? 'Assinatura registrada.' : 'Você já assinou este documento.'}
                     </p>
-                    {signer?.signed_at && (
+                    {(signedAtText || signer?.signed_at) && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
                             <p className="text-sm text-green-800">
-                                Assinado em: {new Date(signer.signed_at!).toLocaleString('pt-BR')}
+                                Assinado em: {signedAtText || new Date(signer!.signed_at!).toLocaleString('pt-BR')}
                             </p>
                         </div>
                     )}
