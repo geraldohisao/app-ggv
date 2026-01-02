@@ -239,11 +239,20 @@ class OSEmailService {
         const logoHTML = await getGGVLogoHTML();
 
         // Escolher PDF final (com termo, se existir)
+        console.log('📄 Dados da OS para anexo:', {
+            final_file_path: (order as any).final_file_path,
+            final_file_name: (order as any).final_file_name,
+            file_path: order.file_path,
+            file_name: order.file_name
+        });
+
         const candidatePaths = [
             (order as any).final_file_path,
             `${order.file_path}.final.pdf`,
             order.file_path
         ].filter(Boolean);
+
+        console.log('🔍 Tentando baixar PDF nos caminhos:', candidatePaths);
 
         let pdfBase64 = '';
         let chosenPath = '';
@@ -251,10 +260,14 @@ class OSEmailService {
 
         for (const path of candidatePaths) {
             try {
+                console.log(`📥 Tentando baixar: ${path}`);
                 const { data, error } = await supabase.storage
                     .from('service-orders')
                     .download(path as string);
-                if (error) continue;
+                if (error) {
+                    console.warn(`❌ Falha em ${path}:`, error);
+                    continue;
+                }
                 const buffer = await data.arrayBuffer();
                 pdfBase64 = this.arrayBufferToBase64(buffer);
                 chosenPath = path as string;
@@ -263,9 +276,10 @@ class OSEmailService {
                 } else if (path === `${order.file_path}.final.pdf`) {
                     chosenName = order.file_name.replace(/\.pdf$/i, '') + '-assinado.pdf';
                 }
+                console.log(`✅ PDF encontrado e convertido: ${chosenPath} (${chosenName})`);
                 break;
             } catch (e) {
-                console.warn('Falha ao baixar PDF para envio finalizado:', e);
+                console.warn(`⚠️ Erro ao processar ${path}:`, e);
             }
         }
 

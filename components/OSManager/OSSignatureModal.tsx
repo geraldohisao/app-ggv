@@ -412,21 +412,20 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
 
         const finalPath = `${baseOrder.file_path}.final.pdf`;
         const finalName = baseOrder.file_name.replace(/\.pdf$/i, '') + '-assinado.pdf';
-        await supabase.storage
+        
+        console.log('📤 Fazendo upload do PDF final para storage:', finalPath);
+        const { error: uploadError } = await supabase.storage
             .from('service-orders')
             .upload(finalPath, finalFile, { upsert: true, contentType: 'application/pdf' });
+        
+        if (uploadError) {
+            console.error('❌ Erro ao fazer upload do PDF final:', uploadError);
+            throw uploadError;
+        }
+        
+        console.log('✅ Upload do PDF final concluído');
 
-        // Atualizar OS com caminho, nome e hash do final
-        await supabase
-            .from('service_orders')
-            .update({
-                final_file_path: finalPath,
-                final_file_name: finalName,
-                final_file_hash: finalHash,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', baseOrder.id);
-
+        // Retorna os dados para serem salvos no banco depois (evita duplicação)
         return { path: finalPath, name: finalName, hash: finalHash };
     };
 
