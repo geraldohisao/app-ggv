@@ -7,6 +7,7 @@ import PublicDiagnosticReport from './components/PublicDiagnosticReport';
 import DiagnosticStandalonePage from './components/DiagnosticStandalonePage';
 import OSSignaturePageClickSign from './components/OSManager/OSSignaturePageClickSign';
 import MySignaturesArea from './components/OSManager/MySignaturesArea';
+import { LogoTest } from './components/OSManager/LogoTest';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -23,6 +24,7 @@ root.render(
         <Route path="/diagnostico/*" element={<DiagnosticStandalonePage />} />
         <Route path="/assinar/:orderId/:signerId" element={<OSSignaturePageClickSign />} />
         <Route path="/minhas-assinaturas/:signerEmail" element={<MySignaturesArea />} />
+        <Route path="/logo-test" element={<LogoTest />} />
         <Route path="/" element={<App />} />
         <Route path="/assistente" element={<App />} />
         <Route path="/calculadora" element={<App />} />
