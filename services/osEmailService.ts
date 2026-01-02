@@ -29,7 +29,8 @@ class OSEmailService {
         );
 
     /**
-     * Busca logo do brand_logos e retorna HTML seguro (imagem base64). Se falhar, usa SVG inline.
+     * Busca logo no brand_logos e usa a URL direta (exata). Se falhar, usa SVG inline.
+     * Preferência: URL original para manter o logo idêntico ao armazenado.
      */
     private async getLogoHTML(): Promise<string> {
         if (this.logoHtmlCache) return this.logoHtmlCache;
@@ -45,17 +46,8 @@ class OSEmailService {
 
             const logoUrl = data?.url;
             if (logoUrl) {
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 8000);
-                const response = await fetch(logoUrl, { signal: controller.signal });
-                clearTimeout(timer);
-
-                if (!response.ok) throw new Error(`Falha ao baixar logo: HTTP ${response.status}`);
-
-                const contentType = response.headers.get('content-type') || 'image/png';
-                const buffer = await response.arrayBuffer();
-                const base64 = this.arrayBufferToBase64(buffer);
-                this.logoHtmlCache = `<img src="data:${contentType};base64,${base64}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
+                // Usa URL direta para evitar problemas de CORS/base64 em clientes
+                this.logoHtmlCache = `<img src="${logoUrl}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
                 return this.logoHtmlCache;
             }
         } catch (err) {
