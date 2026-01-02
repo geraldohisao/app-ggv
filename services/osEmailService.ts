@@ -21,56 +21,50 @@ interface EmailConfig {
  */
 class OSEmailService {
     private config: EmailConfig | null = null;
-    private inlineLogo =
-        'data:image/png;base64,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';
+    private logoHtmlCache: string | null = null;
+    private fallbackLogoDataUrl =
+        'data:image/svg+xml;utf8,' +
+        encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="64" viewBox="0 0 220 64" role="img" aria-label="GRUPO GGV"><rect x="0" y="0" width="220" height="64" rx="10" fill="#f8f9fa"/><text x="110" y="38" text-anchor="middle" fill="#111827" font-family="Arial, sans-serif" font-size="24" font-weight="800" letter-spacing="2">GRUPO GGV</text></svg>'
+        );
 
     /**
-     * Carrega logo do Grupo GGV da tabela brand_logos e converte para base64
+     * Busca logo do brand_logos e retorna HTML seguro (imagem base64). Se falhar, usa SVG inline.
      */
-    private async loadLogo(): Promise<string> {
-        if (this.logoBase64) return this.logoBase64;
+    private async getLogoHTML(): Promise<string> {
+        if (this.logoHtmlCache) return this.logoHtmlCache;
 
         try {
-            // Buscar URL do logo da tabela brand_logos
             const { data, error } = await supabase
                 .from('brand_logos')
                 .select('url')
                 .eq('key', 'grupo_ggv')
                 .single();
 
-            if (error || !data?.url) {
-                console.warn('Falha ao buscar logo do banco, usando fallback');
-                return this.getTextLogo();
+            if (error) throw error;
+
+            const logoUrl = data?.url;
+            if (logoUrl) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 8000);
+                const response = await fetch(logoUrl, { signal: controller.signal });
+                clearTimeout(timer);
+
+                if (!response.ok) throw new Error(`Falha ao baixar logo: HTTP ${response.status}`);
+
+                const contentType = response.headers.get('content-type') || 'image/png';
+                const buffer = await response.arrayBuffer();
+                const base64 = this.arrayBufferToBase64(buffer);
+                this.logoHtmlCache = `<img src="data:${contentType};base64,${base64}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
+                return this.logoHtmlCache;
             }
-
-            // Buscar a imagem e converter para base64
-            const response = await fetch(data.url);
-            if (!response.ok) throw new Error('Falha ao baixar logo');
-            
-            const blob = await response.blob();
-            const base64 = await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-            });
-
-            this.logoBase64 = base64;
-            return base64;
         } catch (err) {
-            console.warn('Erro ao carregar logo, usando fallback:', err);
-            return this.getTextLogo();
+            console.warn('Logo remoto indisponível, usando fallback inline:', err);
         }
-    }
 
-    /**
-     * Fallback: logo como texto estilizado
-     */
-    private getTextLogo(): string {
-        return `<div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
-            <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
-                GRUPO GGV
-            </h1>
-        </div>`;
+        // Fallback: SVG inline (sempre aparece)
+        this.logoHtmlCache = `<img src="${this.fallbackLogoDataUrl}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
+        return this.logoHtmlCache;
     }
 
     /**
@@ -537,17 +531,6 @@ class OSEmailService {
     }
 
     /**
-     * Retorna HTML do logo (imagem base64 ou fallback texto)
-     */
-    private async getLogoHTML(): Promise<string> {
-        const base64 = await this.loadLogo();
-        if (base64.startsWith('data:image')) {
-            return `<img src="${base64}" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;" />`;
-        }
-        return base64; // já é HTML de texto
-    }
-
-    /**
      * Template HTML do e-mail - Design minimalista tipo ClickSign
      */
     private createEmailTemplate(params: {
@@ -580,11 +563,7 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
-                                <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
-                                    GRUPO GGV
-                                </h1>
-                            </div>
+                            ${params.logoHTML}
                         </td>
                     </tr>
 
@@ -743,11 +722,7 @@ class OSEmailService {
                     <!-- Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 0 30px 0;">
-                            <div style="display: inline-block; padding: 12px 24px; background-color: #f8f9fa; border-radius: 8px;">
-                                <h1 style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 900; letter-spacing: 2px; font-family: Arial, sans-serif;">
-                                    GRUPO GGV
-                                </h1>
-                            </div>
+                            ${params.logoHTML}
                         </td>
                     </tr>
 
