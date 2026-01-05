@@ -151,32 +151,57 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
 
     const handleDeleteOS = async () => {
         if (order.status !== OSStatus.Cancelled) {
-            alert('Primeiro cancele a OS para permitir exclusão.');
+            alert('⚠️ Primeiro cancele a OS para permitir exclusão.');
             return;
         }
         if ((order.signed_count || 0) >= (order.total_signers || 0)) {
-            alert('Não é possível excluir documentos já concluídos.');
+            alert('⚠️ Não é possível excluir documentos totalmente assinados.');
             return;
         }
-        if (!confirm('Excluir esta OS? Esta ação removerá o documento e registros pendentes.')) return;
+        if (!confirm('⚠️ ATENÇÃO: Excluir esta OS?\n\nEsta ação removerá:\n• Documento original e final (se existir)\n• Todos os registros de assinantes\n• Todo o histórico de auditoria\n\nEsta ação NÃO pode ser desfeita!')) {
+            return;
+        }
 
         try {
-            setLoading(true);
-            if (order.file_path) {
-                await supabase.storage.from('service-orders').remove([order.file_path]);
+            setActionLoading(true);
+            
+            console.log('🗑️ Iniciando exclusão da OS...');
+            
+            // Remover arquivos do storage
+            const filesToRemove = [order.file_path];
+            if ((order as any).final_file_path) {
+                filesToRemove.push((order as any).final_file_path);
             }
+            
+            console.log('🗑️ Removendo arquivos do storage:', filesToRemove);
+            const { error: storageError } = await supabase.storage
+                .from('service-orders')
+                .remove(filesToRemove);
+            
+            if (storageError) {
+                console.warn('⚠️ Aviso ao remover do storage:', storageError);
+            }
+            
+            // Remover registros relacionados
+            console.log('🗑️ Removendo signers...');
             await supabase.from('os_signers').delete().eq('os_id', order.id);
+            
+            console.log('🗑️ Removendo audit log...');
             await supabase.from('os_audit_log').delete().eq('os_id', order.id);
+            
+            console.log('🗑️ Removendo OS...');
             const { error } = await supabase.from('service_orders').delete().eq('id', order.id);
             if (error) throw error;
-            alert('OS excluída com sucesso.');
+            
+            console.log('✅ OS excluída completamente');
+            alert('✅ OS excluída com sucesso');
             onUpdate();
             onClose();
         } catch (error: any) {
-            console.error('Erro ao excluir OS:', error);
-            alert(`Erro ao excluir OS: ${error.message}`);
+            console.error('❌ Erro ao excluir OS:', error);
+            alert(`❌ Erro ao excluir OS: ${error.message}`);
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
@@ -184,18 +209,24 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
         const target = order.signers?.find(s => s.id === signerId);
         if (!target) return;
         if (target.status !== SignerStatus.Pending) {
-            alert('Só é possível remover assinantes pendentes.');
+            alert('⚠️ Só é possível remover assinantes que ainda não assinaram.');
             return;
         }
-        if (!confirm(`Remover o assinante ${target.name || target.email}?`)) return;
+        if (!confirm(`Remover o assinante ${target.name || target.email}?\n\nEle será notificado por e-mail sobre a remoção.`)) {
+            return;
+        }
+        
         try {
-            setLoading(true);
+            setActionLoading(true);
+            
+            console.log('🗑️ Removendo assinante:', target.email);
             await supabase.from('os_signers').delete().eq('id', signerId);
 
             const newTotal = Math.max((order.total_signers || 0) - 1, 0);
             const newStatus =
                 newTotal > 0 && (order.signed_count || 0) >= newTotal ? OSStatus.Completed : order.status;
 
+            console.log('📝 Atualizando total de assinantes:', { newTotal, newStatus });
             await supabase
                 .from('service_orders')
                 .update({
@@ -209,16 +240,23 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
                 p_os_id: order.id,
                 p_event_type: 'signer_removed',
                 p_event_description: `Assinante removido: ${target.email}`,
-                p_metadata: { signer: target.email }
+                p_metadata: { signer: target.email, reason: 'removed_by_admin' }
             });
 
             // Notificar assinante removido
-            await osEmailService.sendCancelled(order, [target], 'Você foi removido deste processo de assinatura');
+            console.log('📧 Enviando e-mail de notificação para assinante removido...');
+            try {
+                await osEmailService.sendCancelled(order, [target], 'Você foi removido deste processo de assinatura');
+                console.log('✅ E-mail de remoção enviado');
+            } catch (emailErr) {
+                console.error('❌ Erro ao enviar e-mail de remoção:', emailErr);
+                // Não bloqueia a remoção
+            }
 
-            alert('Assinante removido.');
+            alert('✅ Assinante removido com sucesso');
             onUpdate();
         } catch (error: any) {
-            console.error('Erro ao remover assinante:', error);
+            console.error('❌ Erro ao remover assinante:', error);
             alert(`Erro ao remover: ${error.message}`);
         } finally {
             setLoading(false);
