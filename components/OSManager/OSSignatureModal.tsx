@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ServiceOrder, OSSigner, SignerStatus, OSStatus } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { osEmailService } from '../../services/osEmailService';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
     XMarkIcon,
     CheckCircleIcon,
@@ -367,26 +367,35 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         let cursorY = height - 60;
         const lineHeight = 14;
 
-        const drawBox = (x: number, y: number, w: number, h: number, color = { r: 0.95, g: 0.95, b: 0.95 }) => {
-            page.drawRectangle({ x, y, width: w, height: h, color, borderWidth: 1, borderColor: { r: 0.8, g: 0.8, b: 0.8 } });
+        const drawBox = (x: number, y: number, w: number, h: number, bgColor = rgb(0.95, 0.95, 0.95)) => {
+            page.drawRectangle({ 
+                x, 
+                y, 
+                width: w, 
+                height: h, 
+                color: bgColor, 
+                borderWidth: 1, 
+                borderColor: rgb(0.8, 0.8, 0.8) 
+            });
         };
 
-        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; color?: any } = {}) => {
+        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number] } = {}) => {
             const size = options.size || 11;
             const usedFont = options.bold ? fontBold : font;
             const xPos = options.x !== undefined ? options.x : marginX;
+            const textColor = options.colorRgb ? rgb(options.colorRgb[0], options.colorRgb[1], options.colorRgb[2]) : rgb(0.2, 0.2, 0.2);
             page.drawText(text, { 
                 x: xPos, 
                 y: cursorY, 
                 size, 
                 font: usedFont, 
-                color: options.color || { r: 0.2, g: 0.2, b: 0.2 }
+                color: textColor
             });
             cursorY -= size + lineHeight - size;
         };
 
         // Título
-        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 18, color: { r: 0, g: 0, b: 0 } });
+        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 18, colorRgb: [0, 0, 0] });
         cursorY -= 20;
 
         // Documento
@@ -408,13 +417,13 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         cursorY -= 25;
 
         // Assinaturas
-        write('Assinaturas', { bold: true, size: 14, color: { r: 0, g: 0, b: 0 } });
+        write('Assinaturas', { bold: true, size: 14, colorRgb: [0, 0, 0] });
         cursorY -= 15;
 
         signersList.filter(s => s.status === 'SIGNED').forEach((s, idx) => {
             // Box para cada assinatura
             const boxHeight = 120;
-            drawBox(marginX - 10, cursorY - boxHeight + 15, width - 2 * marginX + 20, boxHeight, { r: 0.98, g: 0.98, b: 0.98 });
+            drawBox(marginX - 10, cursorY - boxHeight + 15, width - 2 * marginX + 20, boxHeight, rgb(0.98, 0.98, 0.98));
             
             write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 11 });
             write(`    E-mail: ${s.email}`, { size: 10 });
@@ -430,8 +439,8 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
 
         // Rodapé
         cursorY = marginY + 20;
-        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 9, color: { r: 0.4, g: 0.4, b: 0.4 } });
-        write('Datas e horários em GMT -03:00 Brasília', { size: 8, color: { r: 0.5, g: 0.5, b: 0.5 } });
+        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 9, colorRgb: [0.4, 0.4, 0.4] });
+        write('Datas e horários em GMT -03:00 Brasília', { size: 8, colorRgb: [0.5, 0.5, 0.5] });
 
         const finalBytes = await pdfDoc.save();
 
