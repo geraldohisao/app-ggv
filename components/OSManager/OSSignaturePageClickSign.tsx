@@ -229,16 +229,29 @@ const OSSignaturePageClickSign: React.FC = () => {
 
     if (!order || !signer) return null;
 
-    // Verificação de e-mail para usuários externos
-    if (needsEmailVerification && !isEmailVerified) {
-        return (
-            <OSEmailVerification
-                signerEmail={signer.email}
-                signerName={signer.name}
-                onVerified={handleEmailVerified}
-            />
-        );
-    }
+    // Função para iniciar assinatura (com verificação se necessário)
+    const handleStartSignature = () => {
+        // Se for usuário logado, vai direto para assinatura
+        if (user) {
+            setShowSignatureModal(true);
+            return;
+        }
+        
+        // Se for externo e já verificou, vai direto
+        if (isEmailVerified) {
+            setShowSignatureModal(true);
+            return;
+        }
+        
+        // Se for externo e não verificou, pede verificação primeiro
+        if (needsEmailVerification && !isEmailVerified) {
+            setNeedsEmailVerification(true);
+            return;
+        }
+        
+        // Fallback: abrir modal de assinatura
+        setShowSignatureModal(true);
+    };
 
     return (
         <div className="min-h-screen bg-white flex flex-col">
@@ -354,7 +367,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                     <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
                         <div className="max-w-md mx-auto pointer-events-auto">
                             <button
-                                onClick={() => setShowSignatureModal(true)}
+                                onClick={handleStartSignature}
                                 className="w-full py-3 md:py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 active:bg-slate-950 font-semibold text-base md:text-lg transition-colors shadow-xl touch-manipulation"
                             >
                                 Assinar
@@ -366,6 +379,22 @@ const OSSignaturePageClickSign: React.FC = () => {
                     </div>
                 </main>
             </div>
+
+            {/* Modal de Verificação de E-mail (quando necessário) */}
+            {needsEmailVerification && !isEmailVerified && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                        <OSEmailVerification
+                            signerEmail={signer.email}
+                            signerName={signer.name}
+                            onVerified={() => {
+                                handleEmailVerified();
+                                setShowSignatureModal(true);
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Modal de Assinatura */}
             {showSignatureModal && (
