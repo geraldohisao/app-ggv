@@ -34,6 +34,7 @@ const OSSignaturePageClickSign: React.FC = () => {
     const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
     const [isEmailVerified, setIsEmailVerified] = useState(false);
     const [showSignatureModal, setShowSignatureModal] = useState(false);
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [currentStep, setCurrentStep] = useState<'review' | 'confirm' | 'token'>('review');
 
     useEffect(() => {
@@ -130,19 +131,22 @@ const OSSignaturePageClickSign: React.FC = () => {
                 setIsEmailVerified(true);
                 setNeedsEmailVerification(false);
             } else if (!user) {
-                // Não está logado - precisa verificar
+                // Não está logado - vai precisar verificar (mas não mostra modal ainda)
                 setNeedsEmailVerification(true);
                 setIsEmailVerified(false);
+                setShowVerificationModal(false); // Não mostrar ainda
             } else if (user.email === signerData.email) {
                 // Está logado com e-mail correto - não precisa verificar
                 setIsEmailVerified(true);
                 setNeedsEmailVerification(false);
+                setShowVerificationModal(false);
                 // Salvar na sessão para não pedir novamente
                 sessionStorage.setItem(`email_verified_${signerData.email}`, 'true');
             } else {
-                // Está logado mas e-mail diferente - precisa verificar
+                // Está logado mas e-mail diferente - vai precisar verificar
                 setNeedsEmailVerification(true);
                 setIsEmailVerified(false);
+                setShowVerificationModal(false); // Não mostrar ainda
             }
 
         } catch (err: any) {
@@ -231,25 +235,35 @@ const OSSignaturePageClickSign: React.FC = () => {
 
     // Função para iniciar assinatura (com verificação se necessário)
     const handleStartSignature = () => {
+        console.log('🖊️ Iniciando processo de assinatura...', { 
+            user: !!user, 
+            isEmailVerified, 
+            needsEmailVerification 
+        });
+        
         // Se for usuário logado, vai direto para assinatura
         if (user) {
+            console.log('✅ Usuário logado, pulando verificação');
             setShowSignatureModal(true);
             return;
         }
         
         // Se for externo e já verificou, vai direto
         if (isEmailVerified) {
+            console.log('✅ E-mail já verificado, abrindo modal de assinatura');
             setShowSignatureModal(true);
             return;
         }
         
-        // Se for externo e não verificou, pede verificação primeiro
+        // Se for externo e não verificou, MOSTRA modal de verificação AGORA
         if (needsEmailVerification && !isEmailVerified) {
-            setNeedsEmailVerification(true);
+            console.log('📧 Abrindo modal de verificação de e-mail');
+            setShowVerificationModal(true);
             return;
         }
         
         // Fallback: abrir modal de assinatura
+        console.log('⚠️ Fallback: abrindo modal de assinatura');
         setShowSignatureModal(true);
     };
 
@@ -380,8 +394,8 @@ const OSSignaturePageClickSign: React.FC = () => {
                 </main>
             </div>
 
-            {/* Modal de Verificação de E-mail (quando necessário) */}
-            {needsEmailVerification && !isEmailVerified && (
+            {/* Modal de Verificação de E-mail (SÓ quando clicar Assinar) */}
+            {showVerificationModal && needsEmailVerification && !isEmailVerified && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
                         <OSEmailVerification
@@ -389,6 +403,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                             signerName={signer.name}
                             onVerified={() => {
                                 handleEmailVerified();
+                                setShowVerificationModal(false);
                                 setShowSignatureModal(true);
                             }}
                         />
