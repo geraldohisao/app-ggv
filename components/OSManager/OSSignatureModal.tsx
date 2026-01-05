@@ -260,21 +260,37 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 let finalPath: string | undefined;
                 let finalName: string | undefined;
                 let finalHash: string | undefined;
+                
                 try {
                     console.log('📄 Gerando PDF final com termo de assinatura...');
+                    console.log('📄 Dados da OS:', {
+                        id: order.id,
+                        file_path: order.file_path,
+                        file_name: order.file_name,
+                        total_signers: allSigners?.length
+                    });
+                    
                     const gen = await generateFinalPdfWithTerm(order, allSigners || []);
                     finalPath = gen.path;
                     finalName = gen.name;
                     finalHash = gen.hash;
-                    console.log('✅ PDF final gerado:', { path: finalPath, name: finalName, hash: finalHash });
+                    
+                    console.log('✅ PDF final gerado com sucesso!', { 
+                        path: finalPath, 
+                        name: finalName, 
+                        hash: finalHash 
+                    });
                 } catch (genErr) {
-                    console.error('❌ ERRO ao gerar PDF final com termo:', genErr);
+                    console.error('❌ ERRO CRÍTICO ao gerar PDF final com termo:', genErr);
+                    console.error('Stack trace:', genErr);
+                    // Alertar usuário sobre falha (mas não bloqueia)
+                    alert('⚠️ Aviso: Erro ao gerar PDF final com termo. O documento foi assinado, mas pode não ter o termo anexado. Verifique os logs.');
                 }
 
                 // Atualizar service_orders com dados do PDF final
                 if (finalPath && finalName && finalHash) {
                     console.log('💾 Salvando dados do PDF final no banco...');
-                    await supabase
+                    const { error: updateErr } = await supabase
                         .from('service_orders')
                         .update({
                             final_file_path: finalPath,
@@ -282,7 +298,14 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                             final_file_hash: finalHash
                         })
                         .eq('id', order.id);
-                    console.log('✅ Dados do PDF final salvos no banco');
+                    
+                    if (updateErr) {
+                        console.error('❌ Erro ao salvar PDF final no banco:', updateErr);
+                    } else {
+                        console.log('✅ Dados do PDF final salvos no banco com sucesso');
+                    }
+                } else {
+                    console.warn('⚠️ PDF final NÃO foi gerado, dados não salvos no banco');
                 }
 
                 const orderWithSigners = {
@@ -296,6 +319,14 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                     final_file_hash: finalHash
                 };
 
+                console.log('📧 Preparando envio de e-mails de finalização...');
+                console.log('📄 Dados para sendFinalized:', {
+                    final_file_path: finalPath,
+                    final_file_name: finalName,
+                    file_path: order.file_path,
+                    signers_count: allSigners?.length
+                });
+
                 // Enviar e-mails com PDF anexado para todos que assinaram
                 try {
                     console.log('📧 Enviando e-mails de finalização para todos que assinaram...');
@@ -303,6 +334,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                     console.log('✅ E-mails de finalização enviados com sucesso!');
                 } catch (emailErr) {
                     console.error('❌ ERRO ao enviar e-mails de finalização:', emailErr);
+                    console.error('Stack trace:', emailErr);
                     // Não bloqueia a assinatura, mas loga o erro
                 }
             }
