@@ -618,6 +618,10 @@ const Step2Content: React.FC<Step2ContentProps> = ({
                                 onChange={(e) => setProfileSearch(e.target.value)}
                                 placeholder="Buscar por nome ou e-mail..."
                                 className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                autoComplete="off"
+                                name="collaborator-search"
+                                role="search"
+                                aria-label="Buscar colaboradores"
                             />
                             {profileSearch && (
                                 <button
