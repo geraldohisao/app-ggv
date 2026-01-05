@@ -374,6 +374,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                             description={description}
                             setDescription={setDescription}
                             file={file}
+                            setFile={setFile}
                             dragActive={dragActive}
                             handleDrag={handleDrag}
                             handleDrop={handleDrop}
@@ -425,6 +426,7 @@ interface Step1ContentProps {
     description: string;
     setDescription: (value: string) => void;
     file: File | null;
+    setFile: (file: File | null) => void;
     dragActive: boolean;
     handleDrag: (e: React.DragEvent) => void;
     handleDrop: (e: React.DragEvent) => void;
