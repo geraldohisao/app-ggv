@@ -441,6 +441,7 @@ const Step1Content: React.FC<Step1ContentProps> = ({
     description,
     setDescription,
     file,
+    setFile,
     dragActive,
     handleDrag,
     handleDrop,
