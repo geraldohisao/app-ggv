@@ -13,6 +13,7 @@ export const OSReprocessing: React.FC = () => {
     const [results, setResults] = useState<Array<{ id: string; title: string; success: boolean; error?: string }>>([]);
     const [osToReprocess, setOsToReprocess] = useState<ServiceOrder[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+    const [forceAll, setForceAll] = useState(false);
 
     const loadCompletedOrders = async () => {
         try {
@@ -31,12 +32,21 @@ export const OSReprocessing: React.FC = () => {
 
             console.log('📋 Total de OS concluídas:', data?.length);
             
-            // Filtrar as que NÃO têm final_file_path
-            const needsReprocessing = (data || []).filter(os => 
-                !os.final_file_path || os.final_file_path === '' || os.final_file_path === null
-            );
+            // Filtrar baseado em forceAll
+            let needsReprocessing;
             
-            console.log('📋 OS sem PDF final:', needsReprocessing.length);
+            if (forceAll) {
+                // Reprocessar TODAS (para atualizar layout)
+                needsReprocessing = data || [];
+                console.log('🔄 Modo FORÇAR TODAS: reprocessando', needsReprocessing.length, 'OS');
+            } else {
+                // Apenas as que NÃO têm final_file_path
+                needsReprocessing = (data || []).filter(os => 
+                    !os.final_file_path || os.final_file_path === '' || os.final_file_path === null
+                );
+                console.log('📋 OS sem PDF final:', needsReprocessing.length);
+            }
+            
             console.log('Detalhes:', needsReprocessing.map(os => ({
                 title: os.title,
                 has_final: !!os.final_file_path,
@@ -211,24 +221,42 @@ export const OSReprocessing: React.FC = () => {
                         Adicionar termo de assinatura em OS concluídas que não têm PDF final
                     </p>
 
-                    <div className="flex gap-3 mb-6">
-                        <button
-                            onClick={loadCompletedOrders}
-                            disabled={loadingOrders}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {loadingOrders ? 'Buscando...' : 'Buscar OS para Reprocessar'}
-                        </button>
+                    <div className="space-y-4 mb-6">
+                        <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <input
+                                type="checkbox"
+                                id="forceAll"
+                                checked={forceAll}
+                                onChange={(e) => setForceAll(e.target.checked)}
+                                className="w-4 h-4"
+                            />
+                            <label htmlFor="forceAll" className="text-sm text-amber-900 font-medium cursor-pointer">
+                                Forçar reprocessamento de TODAS (incluindo as que já têm PDF final)
+                                <span className="block text-xs text-amber-700 mt-1">
+                                    Use isto para atualizar o layout do termo em OS antigas
+                                </span>
+                            </label>
+                        </div>
 
-                        {osToReprocess.length > 0 && (
+                        <div className="flex gap-3">
                             <button
-                                onClick={reprocessAll}
-                                disabled={loading}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                onClick={loadCompletedOrders}
+                                disabled={loadingOrders}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                             >
-                                {loading ? 'Processando...' : `Reprocessar ${osToReprocess.length} OS`}
+                                {loadingOrders ? 'Buscando...' : 'Buscar OS para Reprocessar'}
                             </button>
-                        )}
+
+                            {osToReprocess.length > 0 && (
+                                <button
+                                    onClick={reprocessAll}
+                                    disabled={loading}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                >
+                                    {loading ? 'Processando...' : `Reprocessar ${osToReprocess.length} OS`}
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {osToReprocess.length > 0 && (
