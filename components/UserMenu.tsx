@@ -6,7 +6,9 @@ import {
     FlagIcon,
     BoltIcon,
     ChatBubbleLeftRightIcon,
-    DocumentSignatureIcon
+    DocumentSignatureIcon,
+    SparklesIcon,
+    ChartBarSquareIcon
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
@@ -75,6 +77,8 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
     const canSeeFeedback = user.role === UserRole.SuperAdmin || 
                           user.user_function === 'Closer' || 
                           user.user_function === 'Gestor';
+    const canSeeGGVTalent = true;
+    const canSeeOKRManager = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin;
 
     return (
         <div className="relative inline-flex">
@@ -117,6 +121,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                                 onClick={() => handleSelectModule(Module.OpportunityFeedback)}
                             />
                         )}
+                        {canSeeGGVTalent && (
+                            <MenuItem 
+                                icon={<SparklesIcon className="w-5 h-5 text-amber-500"/>} 
+                                text="GGV Talent" 
+                                isActive={activeModule === Module.GGVTalent}
+                                onClick={() => handleSelectModule(Module.GGVTalent)}
+                            />
+                        )}
                         {canSeeOSManager && (
                             <>
                                 <MenuItem 
@@ -124,6 +136,16 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                                     text="Gerenciar OS" 
                                     isActive={activeModule === Module.OSManager}
                                     onClick={() => handleSelectModule(Module.OSManager)}
+                                />
+                            </>
+                        )}
+                        {canSeeOKRManager && (
+                            <>
+                                <MenuItem 
+                                    icon={<ChartBarSquareIcon className="w-5 h-5 text-blue-600"/>} 
+                                    text="Gestão de OKR" 
+                                    isActive={activeModule === Module.OKRManager}
+                                    onClick={() => handleSelectModule(Module.OKRManager)}
                                 />
                             </>
                         )}

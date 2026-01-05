@@ -18,20 +18,34 @@ export const OSReprocessing: React.FC = () => {
         try {
             setLoadingOrders(true);
             
-            // Buscar OS concluídas sem final_file_path
+            console.log('🔍 Buscando OS concluídas...');
+            
+            // Buscar TODAS OS concluídas
             const { data, error } = await supabase
                 .from('service_orders')
                 .select('*, signers:os_signers(*)')
                 .eq('status', OSStatus.Completed)
-                .is('final_file_path', null)
-                .order('completed_at', { ascending: false });
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            setOsToReprocess((data || []) as any);
-            console.log('📋 OS para reprocessar:', data?.length);
+            console.log('📋 Total de OS concluídas:', data?.length);
+            
+            // Filtrar as que NÃO têm final_file_path
+            const needsReprocessing = (data || []).filter(os => 
+                !os.final_file_path || os.final_file_path === '' || os.final_file_path === null
+            );
+            
+            console.log('📋 OS sem PDF final:', needsReprocessing.length);
+            console.log('Detalhes:', needsReprocessing.map(os => ({
+                title: os.title,
+                has_final: !!os.final_file_path,
+                final_path: os.final_file_path
+            })));
+
+            setOsToReprocess(needsReprocessing as any);
         } catch (err: any) {
-            console.error('Erro ao buscar OS:', err);
+            console.error('❌ Erro ao buscar OS:', err);
             alert(`Erro: ${err.message}`);
         } finally {
             setLoadingOrders(false);

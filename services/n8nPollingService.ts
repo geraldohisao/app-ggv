@@ -6,6 +6,7 @@ import { supabase } from './supabaseClient';
  */
 
 const N8N_RESULTS_URL = 'https://api-test.ggvinteligencia.com.br/webhook/reativacao-leads';
+const TIMEOUT_MINUTES = 20; // Tempo máximo para aguardar callback do N8N antes de apenas sinalizar processamento
 
 interface N8NResult {
   id: number;
@@ -97,9 +98,9 @@ export async function checkAndUpdateCompletedReactivations(): Promise<{
         (result.status === 'completed' || result.status === 'failed' || result.count_leads > 0)
       );
 
-      // Se não encontrou match exato, verificar timeout (pendente há mais de 5 minutos)
+      // Se não encontrou match exato, verificar timeout estendido (pendente há mais de TIMEOUT_MINUTES)
       const pendingMinutes = (Date.now() - new Date(pending.created_at).getTime()) / (1000 * 60);
-      const isTimedOut = pendingMinutes > 5;
+      const isTimedOut = pendingMinutes > TIMEOUT_MINUTES;
 
       if (matchingResult) {
         console.log('🎯 N8N POLLING - Match encontrado:', {
@@ -151,18 +152,29 @@ export async function checkAndUpdateCompletedReactivations(): Promise<{
           console.error('❌ N8N POLLING - Erro ao atualizar:', updateError);
         }
       } else if (isTimedOut) {
-        // Marcar como failed se passou do timeout e não há resultado no N8N
-        console.log('⏰ N8N POLLING - Timeout detectado para:', {
+        // Não marcar mais como failed: apenas sinalizar que continua processando para evitar falso negativo
+        const timeoutMinutes = Math.round(pendingMinutes);
+        console.log('⏰ N8N POLLING - Timeout estendido, mantendo como processing:', {
           id: pending.id,
           sdr: pending.sdr,
-          minutes: Math.round(pendingMinutes)
+          minutes: timeoutMinutes
         });
 
         const { error: timeoutError } = await supabase
           .from('reactivated_leads')
           .update({
-            status: 'failed',
-            error_message: `Timeout - sem resposta do N8N após ${Math.round(pendingMinutes)} minutos`,
+            status: 'processing',
+            // Manter error_message limpo para não exibir falha no card
+            error_message: null,
+            n8n_data: {
+              ...(pending as any)?.n8n_data || {},
+              status: 'processing',
+              timeoutWarning: true,
+              timeoutMinutes,
+              pollingReceived: true,
+              pollingTime: new Date().toISOString(),
+              source: 'n8n_polling_service_timeout'
+            },
             updated_at: new Date().toISOString()
           })
           .eq('id', pending.id);
@@ -172,9 +184,11 @@ export async function checkAndUpdateCompletedReactivations(): Promise<{
             id: pending.id,
             sdr: pending.sdr,
             old_status: 'pending',
-            new_status: 'failed',
+            new_status: 'processing',
             old_count: pending.count_leads,
-            new_count: pending.count_leads
+            new_count: pending.count_leads,
+            timeout: true,
+            timeoutMinutes
           });
         }
       }

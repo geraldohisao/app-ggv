@@ -207,19 +207,20 @@ const ReativacaoLeadsPage: React.FC = () => {
       setIsLoadingSdrs(true);
       console.log('🔄 REATIVACAO PAGE - Carregando SDRs da tabela profiles...');
       
-      const profiles = await listProfiles();
-      console.log('📋 REATIVACAO PAGE - Perfis carregados:', profiles);
+      // ✅ Buscar apenas usuários ATIVOS (false = não incluir inativos)
+      const profiles = await listProfiles(false);
+      console.log('📋 REATIVACAO PAGE - Perfis ativos carregados:', profiles);
       
       // Filtrar apenas perfis que têm nome e extrair apenas o nome
       const sdrsList = profiles
-        .filter(profile => profile.name && profile.name.trim() !== '')
+        .filter(profile => profile.name && profile.name.trim() !== '' && profile.is_active !== false)
         .map(profile => ({
           name: profile.name!,
           id: profile.id
         }))
         .sort((a, b) => a.name.localeCompare(b.name)); // Ordenar alfabeticamente
       
-      console.log('✅ REATIVACAO PAGE - SDRs processados:', sdrsList);
+      console.log('✅ REATIVACAO PAGE - SDRs ativos processados:', sdrsList);
       setSdrs(sdrsList);
       
       // Se não há SDRs carregados ainda, manter o valor padrão

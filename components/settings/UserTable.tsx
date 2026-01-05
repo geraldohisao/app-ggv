@@ -6,7 +6,7 @@ export const UserTable: React.FC<{
   users: UiUser[];
   canEdit: boolean;
   savingIds: Set<string>;
-  onChangeRow: (id: string, patch: Partial<Pick<UiUser, 'role' | 'func'>>) => void;
+  onChangeRow: (id: string, patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive'>>) => void;
   onSelectionChange: (ids: string[]) => void;
 }> = ({ users, canEdit, savingIds, onChangeRow, onSelectionChange }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -35,6 +35,7 @@ export const UserTable: React.FC<{
           <th className="py-2 font-semibold">Email</th>
           <th className="py-2 font-semibold">Role</th>
           <th className="py-2 font-semibold">Função</th>
+          <th className="py-2 font-semibold">Status</th>
         </tr>
       </thead>
       <tbody>
@@ -51,7 +52,7 @@ export const UserTable: React.FC<{
         ))}
         {users.length === 0 && (
           <tr>
-            <td colSpan={5} className="py-6 text-center text-slate-500">Nenhum usuário encontrado.</td>
+            <td colSpan={6} className="py-6 text-center text-slate-500">Nenhum usuário encontrado.</td>
           </tr>
         )}
       </tbody>

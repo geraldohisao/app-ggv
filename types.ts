@@ -20,6 +20,8 @@ export enum Module {
   Calls = 'CALLS',
   ReativacaoLeads = 'REATIVACAO_LEADS',
   OSManager = 'OS_MANAGER',
+  GGVTalent = 'GGV_TALENT',
+  OKRManager = 'OKR_MANAGER',
 }
 
 export enum UserRole {
@@ -261,4 +263,106 @@ export interface OSFilters {
     signerEmail?: string;
     createdBy?: string;
     search?: string;
+}
+
+// ========================================
+// TYPES PARA OKR (OBJECTIVES & KEY RESULTS)
+// ========================================
+
+export interface OKRContext {
+    companyName?: string;
+    industry?: string;
+    context: string; // Texto livre sobre a empresa, desafios, etc.
+    documentsUploaded?: File[];
+}
+
+export interface StrategicMap {
+    id?: string;
+    user_id?: string;
+    company_name: string;
+    date: string;
+    
+    // Identidade
+    mission?: string;
+    vision?: string;
+    values?: string[];
+    
+    // Estratégias
+    motors?: Motor[];
+    
+    // Objetivos
+    objectives?: Objective[];
+    
+    // Plano de Ação
+    actionPlans?: ActionPlan[];
+    
+    // Execução
+    roles?: Role[];
+    
+    // Rituais
+    rituals?: Ritual[];
+    
+    // Acompanhamento
+    tracking?: TrackingMetric[];
+    
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Motor {
+    id: string;
+    name: string;
+    strategies: Strategy[];
+}
+
+export interface Strategy {
+    id: string;
+    text: string;
+}
+
+export interface Objective {
+    id: string;
+    title: string;
+    kpis: KPI[];
+}
+
+export interface KPI {
+    id: string;
+    name: string;
+    frequency: 'Mensal' | 'Semanal' | 'Trimestral' | 'Semestral' | 'Anual';
+    target: string | number;
+}
+
+export interface ActionPlan {
+    id: string;
+    quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+    actions: string[];
+}
+
+export interface Role {
+    id: string;
+    title: string;
+    responsibility: string;
+    metrics: RoleMetric[];
+}
+
+export interface RoleMetric {
+    id: string;
+    name: string;
+    target: string | number;
+}
+
+export interface Ritual {
+    id: string;
+    name: string;
+    frequency: 'Diário' | 'Semanal' | 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
+}
+
+export interface TrackingMetric {
+    id: string;
+    indicator: string;
+    type: 'Real' | 'Meta' | 'Percentual';
+    data: { [month: string]: number };
+    average?: number;
+    total?: number;
 }

@@ -5,11 +5,14 @@ import { UserFunction } from '../../hooks/useUsersData';
 export const BulkBar: React.FC<{
   count: number;
   canEdit: boolean;
-  onApply: (patch: { role?: UserRole; func?: UserFunction }) => void;
+  onApply: (patch: { role?: UserRole; func?: UserFunction; isActive?: boolean }) => void;
 }> = ({ count, canEdit, onApply }) => {
   const [role, setRole] = React.useState<UserRole | ''>('');
   const [func, setFunc] = React.useState<UserFunction | ''>('');
   const apply = () => onApply({ role: role || undefined, func: (func || undefined) as any });
+  const activateAll = () => onApply({ isActive: true });
+  const deactivateAll = () => onApply({ isActive: false });
+  
   if (count === 0) return null;
   return (
     <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-2 flex items-center justify-between gap-2 text-xs">
@@ -29,6 +32,24 @@ export const BulkBar: React.FC<{
           <option value="Analista de Marketing">Analista de Marketing</option>
         </select>
         <button onClick={apply} disabled={!canEdit} className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 transition disabled:opacity-60">Aplicar</button>
+        <div className="border-l pl-2 flex gap-2">
+          <button 
+            onClick={activateAll} 
+            disabled={!canEdit} 
+            className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition disabled:opacity-60"
+            title="Ativar usuários selecionados"
+          >
+            🟢 Ativar
+          </button>
+          <button 
+            onClick={deactivateAll} 
+            disabled={!canEdit} 
+            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition disabled:opacity-60"
+            title="Desativar usuários selecionados"
+          >
+            🔴 Desativar
+          </button>
+        </div>
       </div>
     </div>
   );

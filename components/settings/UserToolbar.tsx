@@ -6,10 +6,11 @@ type Props = {
   search: string; setSearch: (v: string) => void;
   roleFilter: UserRole | 'ALL'; setRoleFilter: (r: UserRole | 'ALL') => void;
   funcFilter: 'ALL' | 'SDR' | 'Closer' | 'Gestor'; setFuncFilter: (f: any) => void;
+  statusFilter?: 'ALL' | 'ACTIVE' | 'INACTIVE'; setStatusFilter?: (s: 'ALL' | 'ACTIVE' | 'INACTIVE') => void;
   onRefresh: () => void; onClear: () => void;
 };
 
-export const UserToolbar: React.FC<Props> = ({ total, search, setSearch, roleFilter, setRoleFilter, funcFilter, setFuncFilter, onRefresh, onClear }) => {
+export const UserToolbar: React.FC<Props> = ({ total, search, setSearch, roleFilter, setRoleFilter, funcFilter, setFuncFilter, statusFilter, setStatusFilter, onRefresh, onClear }) => {
   const [local, setLocal] = useState(search);
   useEffect(() => setLocal(search), [search]);
   useEffect(() => {
@@ -35,6 +36,13 @@ export const UserToolbar: React.FC<Props> = ({ total, search, setSearch, roleFil
           <option value="Gestor">Gestor</option>
           <option value="Analista de Marketing">Analista de Marketing</option>
         </select>
+        {statusFilter !== undefined && setStatusFilter && (
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="px-2 py-1.5 border rounded-lg font-medium">
+            <option value="ACTIVE">✅ Apenas Ativos</option>
+            <option value="INACTIVE">🔴 Apenas Inativos</option>
+            <option value="ALL">Todos (Ativos + Inativos)</option>
+          </select>
+        )}
         <button onClick={onRefresh} className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 transition">Atualizar</button>
         <button onClick={onClear} className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 transition">Limpar filtros</button>
       </div>

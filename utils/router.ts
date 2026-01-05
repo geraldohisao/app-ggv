@@ -11,6 +11,8 @@ export const moduleRoutes: Record<string, Module> = {
     '/feedback': Module.OpportunityFeedback,
     '/reativacao': Module.ReativacaoLeads,
     '/ordens-servico': Module.OSManager,
+    '/ggv-talent': Module.GGVTalent,
+    '/okr': Module.OKRManager,
 };
 
 // Mapeamento reverso: módulo para URL
@@ -24,6 +26,8 @@ export const routeModules: Record<Module, string> = {
     [Module.OpportunityFeedback]: '/feedback',
     [Module.ReativacaoLeads]: '/reativacao',
     [Module.OSManager]: '/ordens-servico',
+    [Module.GGVTalent]: '/ggv-talent',
+    [Module.OKRManager]: '/okr',
 };
 
 // Função para obter o módulo baseado na URL atual

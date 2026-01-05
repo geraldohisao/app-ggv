@@ -159,6 +159,30 @@ exports.handler = async (event) => {
         .maybeSingle());
     }
 
+    // Estratégia 4: Recuperar registros marcados como timeout (failed) para não perder callbacks atrasados
+    if (!updatedRecord && !updateError) {
+      console.log('🔄 REATIVACAO WEBHOOK - Tentando recuperar registro marcado como timeout (failed)...');
+      
+      ({ data: updatedRecord, error: updateError } = await supabase
+        .from('reactivated_leads')
+        .update({
+          status: mappedStatus,
+          count_leads: leadsProcessed || 0,
+          workflow_id: workflowId,
+          execution_id: `webhook_${Date.now()}`,
+          n8n_data: n8nResponseData,
+          error_message: status === 'failed' ? message : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('status', 'failed')
+        .ilike('error_message', '%Timeout - sem resposta do N8N%')
+        .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()) // últimas 6h
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .select()
+        .maybeSingle());
+    }
+
     if (updateError) {
       console.error('❌ REATIVACAO WEBHOOK - Erro ao atualizar:', updateError);
       return {

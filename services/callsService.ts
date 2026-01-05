@@ -472,6 +472,7 @@ export async function fetchRealUsers() {
         email,
         calls!inner(count)
       `)
+      .eq('is_active', true) // ✅ FILTRAR APENAS USUÁRIOS ATIVOS
       .not('full_name', 'is', null)
       .neq('full_name', '')
       .not('full_name', 'like', 'Usuário%')

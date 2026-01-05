@@ -120,25 +120,28 @@ export const fetchOrCreateUserWithRole = async (): Promise<User | null> => {
 
 // ---------------- Users management (roles & functions) ----------------
 // Nova listagem simples ligada diretamente a profiles
-export const listProfiles = async (): Promise<Array<{ id: string; email: string | null; name: string | null; role: UserRole; user_function: 'SDR' | 'Closer' | 'Gestor' | null }>> => {
+export const listProfiles = async (includeInactive: boolean = false): Promise<Array<{ id: string; email: string | null; name: string | null; role: UserRole; user_function: 'SDR' | 'Closer' | 'Gestor' | null; is_active?: boolean }>> => {
     if (!supabase) throw new Error('Supabase client is not initialized.');
     
-    console.log('🔄 SUPABASE SERVICE - listProfiles iniciado');
+    console.log('🔄 SUPABASE SERVICE - listProfiles iniciado (includeInactive:', includeInactive, ')');
     
     // Tentar múltiplas abordagens para garantir que admins vejam todos os perfis
     try {
-        // 1. Tentar RPC list_all_profiles primeiro (função simples sem verificação de auth)
-        console.log('🔄 SUPABASE SERVICE - Tentando RPC list_all_profiles...');
-        const { data: rpcData, error: rpcError } = await supabase.rpc('list_all_profiles');
+        // 1. Se includeInactive = false, usar RPC list_active_profiles (apenas ativos)
+        // 2. Se includeInactive = true, usar RPC list_all_profiles (todos)
+        const rpcName = includeInactive ? 'list_all_profiles' : 'list_active_profiles';
+        console.log(`🔄 SUPABASE SERVICE - Tentando RPC ${rpcName}...`);
+        const { data: rpcData, error: rpcError } = await supabase.rpc(rpcName);
         
         if (!rpcError && rpcData) {
-            console.log('✅ SUPABASE SERVICE - RPC list_all_profiles sucesso:', rpcData.length, 'perfis');
+            console.log(`✅ SUPABASE SERVICE - RPC ${rpcName} sucesso:`, rpcData.length, 'perfis');
             return (rpcData || []).map((p: any) => ({
                 id: p.id,
                 email: p.email ?? null,
                 name: p.name ?? null,
                 role: (p.role as UserRole) ?? UserRole.User,
                 user_function: (p.user_function as any) ?? null,
+                is_active: p.is_active ?? true,
             }));
         } else {
             console.warn('⚠️ SUPABASE SERVICE - RPC admin_list_profiles falhou:', rpcError?.message);
@@ -176,13 +179,16 @@ export const listProfiles = async (): Promise<Array<{ id: string; email: string 
         const fallbackProfiles = await listProfilesOnly();
         console.log('✅ SUPABASE SERVICE - listProfilesOnly sucesso:', fallbackProfiles.length, 'perfis');
         
-        return fallbackProfiles.map(p => ({
-            id: p.id,
-            email: p.email,
-            name: p.name,
-            role: p.role,
-            user_function: p.function as any,
-        }));
+        return fallbackProfiles
+            .filter(p => includeInactive || p.is_active !== false) // ✅ Filtrar inativos se necessário
+            .map(p => ({
+                id: p.id,
+                email: p.email,
+                name: p.name,
+                role: p.role,
+                user_function: p.function as any,
+                is_active: p.is_active ?? true,
+            }));
     } catch (fallbackErr) {
         console.error('❌ SUPABASE SERVICE - Todos os métodos falharam:', fallbackErr);
         
@@ -217,14 +223,14 @@ export const listProfiles = async (): Promise<Array<{ id: string; email: string 
 };
 
 // Fallback simples: lista apenas a tabela profiles, com melhor esforço para email/name
-export const listProfilesOnly = async (): Promise<Array<{ id: string; email: string; name: string; role: UserRole; function?: 'SDR' | 'Closer' | 'Gestor'; }>> => {
+export const listProfilesOnly = async (): Promise<Array<{ id: string; email: string; name: string; role: UserRole; function?: 'SDR' | 'Closer' | 'Gestor'; is_active?: boolean; }>> => {
     if (!supabase) throw new Error('Supabase client is not initialized.');
     try {
         console.log('[users] listProfilesOnly: iniciando');
         // tentar com colunas extras
         let profiles: any[] = [];
         try {
-            const select = supabase.from('profiles').select('id, role, email, name');
+            const select = supabase.from('profiles').select('id, role, email, name, is_active'); // ✅ Incluir is_active
             const { data, error } = await Promise.race([
                 select,
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout (6s) em profiles (fallback)')), 6000)),
@@ -237,7 +243,7 @@ export const listProfilesOnly = async (): Promise<Array<{ id: string; email: str
                 selectMin,
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout (6s) em profiles (mínimo fallback)')), 6000)),
             ]) as any;
-            profiles = (data || []).map((p: any) => ({ ...p, email: '-', name: p.id }));
+            profiles = (data || []).map((p: any) => ({ ...p, email: '-', name: p.id, is_active: true }));
         }
         const selectFns = supabase.from('user_functions').select('user_id, function');
         const { data: functions } = await Promise.race([
@@ -250,6 +256,7 @@ export const listProfilesOnly = async (): Promise<Array<{ id: string; email: str
             name: p.name || p.id,
             role: p.role || UserRole.User,
             function: (functions || []).find((f: any) => f.user_id === p.id)?.function || undefined,
+            is_active: p.is_active ?? true, // ✅ Incluir is_active
         }));
     } catch (e: any) {
         console.warn('[users] listProfilesOnly falhou:', e?.message || e);
@@ -287,6 +294,42 @@ export const setUserFunction = async (userId: string, fn: 'SDR' | 'Closer' | 'Ge
                 .upsert({ user_id: userId, function: fn }, { onConflict: 'user_id' });
             if (error) throw error;
         }
+    }
+};
+
+export const toggleUserStatus = async (userId: string, isActive: boolean): Promise<void> => {
+    if (!supabase) throw new Error('Supabase client is not initialized.');
+    
+    console.log(`🔄 SUPABASE SERVICE - toggleUserStatus: ${userId} -> ${isActive ? 'ATIVO' : 'INATIVO'}`);
+    
+    try {
+        // Tentar usar RPC primeiro
+        const { error: rpcError } = await supabase.rpc('admin_toggle_user_status', { 
+            p_user_id: userId, 
+            p_is_active: isActive 
+        });
+        
+        if (rpcError) {
+            console.warn('⚠️ RPC admin_toggle_user_status falhou, usando fallback direto:', rpcError);
+            throw rpcError;
+        }
+        
+        console.log('✅ SUPABASE SERVICE - toggleUserStatus: sucesso via RPC');
+        return;
+    } catch {
+        // Fallback: update direto
+        console.log('🔄 SUPABASE SERVICE - toggleUserStatus: tentando fallback direto');
+        const { error } = await supabase
+            .from('profiles')
+            .update({ is_active: isActive })
+            .eq('id', userId);
+        
+        if (error) {
+            console.error('❌ SUPABASE SERVICE - toggleUserStatus: falha no fallback:', error);
+            throw error;
+        }
+        
+        console.log('✅ SUPABASE SERVICE - toggleUserStatus: sucesso via fallback');
     }
 };
 

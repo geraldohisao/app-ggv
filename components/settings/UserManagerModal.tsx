@@ -51,8 +51,15 @@ export const UserManagerModal: React.FC<{ onClose: () => void }> = ({ onClose })
             setRoleFilter={data.setRoleFilter}
             funcFilter={data.funcFilter as any}
             setFuncFilter={data.setFuncFilter as any}
+            statusFilter={data.statusFilter}
+            setStatusFilter={data.setStatusFilter}
             onRefresh={data.refresh}
-            onClear={() => { data.setSearch(''); data.setRoleFilter('ALL' as any); data.setFuncFilter('ALL' as any); }}
+            onClear={() => { 
+              data.setSearch(''); 
+              data.setRoleFilter('ALL' as any); 
+              data.setFuncFilter('ALL' as any); 
+              data.setStatusFilter('ACTIVE');
+            }}
           />
 
           <UserTable

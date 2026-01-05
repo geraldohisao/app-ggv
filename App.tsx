@@ -11,12 +11,14 @@ import Header from './components/Header';
 import CallsList from './components/Calls/CallsList';
 import CallsPlaceholder from './components/Calls/CallsPlaceholder';
 import CallsApp from './components/Calls/CallsApp';
+import GGVTalentPage from './components/GGVTalent/GGVTalentPage';
 import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
 import PublicDiagnosticReport from './components/PublicDiagnosticReport';
 import OSManagerPage from './components/OSManager/OSManagerPage';
+import OKRPage from './components/okr/OKRPage';
 import { UserProvider, useUser } from './contexts/DirectUserContext';
 import { BulkAnalysisProvider } from './contexts/BulkAnalysisContext';
 import { BulkAnalysisProgressNotification } from './components/BulkAnalysisProgressNotification';
@@ -46,6 +48,10 @@ const AppContent: React.FC = () => {
     user.role === UserRole.SuperAdmin ||
     user.role === UserRole.Admin ||
     user.user_function === 'Gestor'
+  );
+  const canAccessOKRManager = user && (
+    user.role === UserRole.SuperAdmin ||
+    user.role === UserRole.Admin
   );
 
   // Garantir que ao carregar a página, o módulo correto seja selecionado
@@ -302,6 +308,20 @@ const AppContent: React.FC = () => {
           );
         }
         return <OSManagerPage />;
+      case Module.OKRManager:
+        console.log('🎯 APP - Renderizando OKR Manager');
+        if (!canAccessOKRManager) {
+          return (
+            <div className="p-8 text-center">
+              <p className="text-lg font-semibold text-slate-800">Acesso restrito</p>
+              <p className="text-slate-600 mt-2">Disponível apenas para Administradores.</p>
+            </div>
+          );
+        }
+        return <OKRPage />;
+      case Module.GGVTalent:
+        console.log('✨ APP - Renderizando GGV Talent');
+        return <GGVTalentPage />;
       default:
         console.log('🏠 APP - Renderizando Default (Diagnóstico)');
         return <DiagnosticoComercial />;
