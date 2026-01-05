@@ -430,12 +430,12 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-8">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 md:p-6">
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 md:p-8">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold text-slate-900">Confirme seus dados</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                <div className="flex items-center justify-between mb-4 md:mb-6">
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-900">Confirme seus dados</h2>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 touch-manipulation">
                         <XMarkIcon className="w-6 h-6" />
                     </button>
                 </div>
@@ -460,7 +460,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                             type="text"
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
-                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 md:px-4 py-2 md:py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                             placeholder="Digite seu nome completo"
                         />
                     </div>
@@ -474,9 +474,10 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                             type="text"
                             value={cpf}
                             onChange={handleCPFChange}
-                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                            className="w-full px-3 md:px-4 py-2 md:py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-base"
                             placeholder="000.000.000-00"
                             maxLength={14}
+                            inputMode="numeric"
                         />
                     </div>
 
@@ -489,9 +490,10 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                             type="text"
                             value={birthDate}
                             onChange={handleBirthDateChange}
-                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                            className="w-full px-3 md:px-4 py-2 md:py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-base"
                             placeholder="21/11/1991"
                             maxLength={10}
+                            inputMode="numeric"
                         />
                     </div>
                 </div>
@@ -500,7 +502,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
                 <button
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="w-full mt-8 py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    className="w-full mt-6 md:mt-8 py-3 md:py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 active:bg-slate-950 font-semibold text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 touch-manipulation"
                 >
                     {loading ? (
                         <>

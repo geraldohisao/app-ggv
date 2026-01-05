@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ServiceOrder, OSStatus, OSFilters, OSSigner } from '../../types';
+import { OSListSkeleton } from '../ui/LoadingSkeleton';
 import {
     FilterIcon,
     MagnifyingGlassIcon,
@@ -203,10 +204,7 @@ const OSListPanel: React.FC<OSListPanelProps> = ({
             {/* List */}
             <div className="divide-y divide-slate-200">
                 {loading ? (
-                    <div className="p-12 text-center">
-                        <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                        <p className="text-slate-600">Carregando ordens de serviço...</p>
-                    </div>
+                    <OSListSkeleton count={3} />
                 ) : orders.length === 0 ? (
                     <div className="p-12 text-center">
                         <DocumentTextIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -308,12 +306,12 @@ const OSListItem: React.FC<OSListItemProps> = ({ order, onView }) => {
     const progress = order.total_signers ? (order.signed_count! / order.total_signers) * 100 : 0;
 
     return (
-        <div className="p-4 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onView(order)}>
-            <div className="flex items-start gap-4">
-                {/* Icon */}
+        <div className="p-3 md:p-4 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onView(order)}>
+            <div className="flex items-start gap-3 md:gap-4">
+                {/* Icon - Menor em mobile */}
                 <div className="shrink-0">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <DocumentTextIcon className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
                     </div>
                 </div>
 
@@ -399,11 +397,11 @@ const OSListItem: React.FC<OSListItemProps> = ({ order, onView }) => {
                             e.stopPropagation();
                             onView(order);
                         }}
-                        className="flex items-center gap-2 px-3 py-2 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors font-semibold text-sm"
+                        className="flex items-center gap-2 px-3 py-2 text-blue-700 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors font-semibold text-sm touch-manipulation"
                         title="Visualizar OS"
                     >
                         <DocumentSignatureIcon className="w-5 h-5" />
-                        <span>Visualizar</span>
+                        <span className="hidden sm:inline">Visualizar</span>
                     </button>
                 </div>
             </div>

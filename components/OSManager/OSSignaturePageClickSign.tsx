@@ -243,7 +243,7 @@ const OSSignaturePageClickSign: React.FC = () => {
     return (
         <div className="min-h-screen bg-white flex flex-col">
             {/* Header */}
-            <header className="border-b border-slate-200 px-6 py-4 flex items-center justify-between bg-white z-10 shrink-0">
+            <header className="border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between bg-white z-10 shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => {
@@ -262,7 +262,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                     <img 
                         src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png"
                         alt="Grupo GGV"
-                        className="h-10"
+                        className="h-8 md:h-10"
                     />
                 </div>
                 
@@ -290,8 +290,8 @@ const OSSignaturePageClickSign: React.FC = () => {
 
             {/* Main Content: Sidebar + PDF Viewer */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Sidebar de Progresso */}
-                <aside className="w-64 border-r border-slate-200 bg-slate-50 p-6">
+                {/* Sidebar de Progresso - Escondida em mobile */}
+                <aside className="hidden md:block w-64 border-r border-slate-200 bg-slate-50 p-6">
                     <nav className="space-y-4">
                         {/* Step 1: Revisar */}
                         <div className={`flex items-start gap-3 ${currentStep === 'review' ? 'opacity-100' : 'opacity-50'}`}>
@@ -350,16 +350,16 @@ const OSSignaturePageClickSign: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Botão Assinar Fixo - Sobreposto */}
-                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
+                    {/* Botão Assinar Fixo - Sobreposto - Responsivo */}
+                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
                         <div className="max-w-md mx-auto pointer-events-auto">
                             <button
                                 onClick={() => setShowSignatureModal(true)}
-                                className="w-full py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-lg transition-colors shadow-xl"
+                                className="w-full py-3 md:py-4 bg-slate-900 text-white rounded-lg hover:bg-slate-800 active:bg-slate-950 font-semibold text-base md:text-lg transition-colors shadow-xl touch-manipulation"
                             >
                                 Assinar
                             </button>
-                            <p className="text-xs text-slate-500 text-center mt-3">
+                            <p className="text-xs text-slate-500 text-center mt-2 md:mt-3">
                                 🔒 Ambiente seguro Grupo GGV
                             </p>
                         </div>
