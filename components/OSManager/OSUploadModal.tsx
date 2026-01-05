@@ -9,7 +9,8 @@ import {
     PlusIcon,
     TrashIcon,
     UsersIcon,
-    DocumentTextIcon
+    DocumentTextIcon,
+    MagnifyingGlassIcon
 } from '../ui/icons';
 
 interface OSUploadModalProps {
@@ -584,6 +585,7 @@ const Step2Content: React.FC<Step2ContentProps> = ({
     removeSigner
 }) => {
     const [showProfileSelector, setShowProfileSelector] = useState(false);
+    const [profileSearch, setProfileSearch] = useState('');
 
     return (
         <div className="space-y-6">
@@ -603,22 +605,69 @@ const Step2Content: React.FC<Step2ContentProps> = ({
                 </div>
 
                 {showProfileSelector && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                        {profiles.map((profile) => (
-                            <button
-                                key={profile.id}
-                                onClick={() => addSignerFromProfile(profile)}
-                                className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg hover:bg-blue-100 transition-colors text-left border border-slate-200"
-                            >
-                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
-                                    {profile.name.charAt(0).toUpperCase()}
+                    <div className="space-y-3">
+                        {/* Campo de busca */}
+                        <div className="relative">
+                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                value={profileSearch}
+                                onChange={(e) => setProfileSearch(e.target.value)}
+                                placeholder="Buscar por nome ou e-mail..."
+                                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            />
+                            {profileSearch && (
+                                <button
+                                    onClick={() => setProfileSearch('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <XMarkIcon className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        
+                        {/* Lista filtrada */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                            {profiles
+                                .filter(p => {
+                                    if (!profileSearch) return true;
+                                    const search = profileSearch.toLowerCase();
+                                    return (
+                                        p.name.toLowerCase().includes(search) ||
+                                        p.email.toLowerCase().includes(search)
+                                    );
+                                })
+                                .map((profile) => (
+                                    <button
+                                        key={profile.id}
+                                        onClick={() => {
+                                            addSignerFromProfile(profile);
+                                            setProfileSearch(''); // Limpar busca após adicionar
+                                        }}
+                                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg hover:bg-blue-100 transition-colors text-left border border-slate-200"
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
+                                            {profile.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-slate-700 truncate">{profile.name}</p>
+                                            <p className="text-xs text-slate-500 truncate">{profile.email}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            {profiles.filter(p => {
+                                if (!profileSearch) return false;
+                                const search = profileSearch.toLowerCase();
+                                return (
+                                    p.name.toLowerCase().includes(search) ||
+                                    p.email.toLowerCase().includes(search)
+                                );
+                            }).length === 0 && profileSearch && (
+                                <div className="col-span-full text-center py-4 text-slate-500 text-sm">
+                                    Nenhum colaborador encontrado para "{profileSearch}"
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-700 truncate">{profile.name}</p>
-                                    <p className="text-xs text-slate-500 truncate">{profile.email}</p>
-                                </div>
-                            </button>
-                        ))}
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
