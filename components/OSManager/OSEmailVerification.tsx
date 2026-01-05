@@ -11,6 +11,7 @@ interface OSEmailVerificationProps {
     signerEmail: string;
     signerName: string;
     onVerified: () => void;
+    autoSend?: boolean; // Se true, envia código automaticamente ao abrir
 }
 
 /**
@@ -20,14 +21,22 @@ interface OSEmailVerificationProps {
 const OSEmailVerification: React.FC<OSEmailVerificationProps> = ({
     signerEmail,
     signerName,
-    onVerified
+    onVerified,
+    autoSend = false
 }) => {
-    const [step, setStep] = useState<'send' | 'verify'>('send');
+    const [step, setStep] = useState<'send' | 'verify'>(autoSend ? 'verify' : 'send');
     const [code, setCode] = useState('');
     const [sentCode, setSentCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [attempts, setAttempts] = useState(0);
+
+    // Enviar código automaticamente ao montar (se autoSend=true)
+    React.useEffect(() => {
+        if (autoSend && !sentCode) {
+            sendVerificationCode();
+        }
+    }, [autoSend]);
 
     const generateCode = () => {
         return Math.floor(100000 + Math.random() * 900000).toString();

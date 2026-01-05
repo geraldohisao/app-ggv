@@ -416,6 +416,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                         <OSEmailVerification
                             signerEmail={signer.email}
                             signerName={signer.name}
+                            autoSend={true}
                             onVerified={() => {
                                 handleEmailVerified();
                                 setShowVerificationModal(false);
