@@ -131,11 +131,14 @@ export const useOteCalculator = (
             const premiacaoRate = getTieredRate(progressoMensal, CLOSER_REMUNERATION.individualCommission.tiers);
             const premiacaoIndividualMeta = vendasRealizadas * premiacaoRate;
 
-            const premiacaoColetiva = getTieredValue(
-                metaColetivaGlobalPerc,
-                CLOSER_REMUNERATION.teamBonus.tiers,
-                CLOSER_REMUNERATION.teamBonus.values[nivelKey as keyof typeof CLOSER_REMUNERATION.teamBonus.values]
-            );
+            // Premiação Coletiva: só ativa se atingir pelo menos 50% da meta individual
+            const premiacaoColetiva = progressoMensal >= 0.5
+                ? getTieredValue(
+                    metaColetivaGlobalPerc,
+                    CLOSER_REMUNERATION.teamBonus.tiers,
+                    CLOSER_REMUNERATION.teamBonus.values[nivelKey as keyof typeof CLOSER_REMUNERATION.teamBonus.values]
+                  )
+                : 0;
 
             const conversaoTrimestral = sqlsDoTrimestre > 0 ? (vendasDoTrimestre / sqlsDoTrimestre) : 0;
             const quarterlyBonusRule = CLOSER_REMUNERATION.quarterlyBonus[nivelKey as keyof typeof CLOSER_REMUNERATION.quarterlyBonus];
