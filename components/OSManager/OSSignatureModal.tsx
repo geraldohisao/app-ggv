@@ -362,85 +362,120 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        const marginX = 50;
-        const marginY = 50;
-        let cursorY = height - 60;
-        const lineHeight = 14;
+        const marginX = 60;
+        const marginY = 60;
+        let cursorY = height - 70;
+        const contentWidth = width - (2 * marginX);
 
-        const drawBox = (x: number, y: number, w: number, h: number, bgColor = rgb(0.95, 0.95, 0.95)) => {
+        // Função para desenhar box com estilo melhorado
+        const drawBox = (x: number, y: number, w: number, h: number, bgColor = rgb(0.98, 0.98, 0.98)) => {
             page.drawRectangle({ 
-                x, 
-                y, 
-                width: w, 
-                height: h, 
+                x, y, width: w, height: h, 
                 color: bgColor, 
-                borderWidth: 1, 
-                borderColor: rgb(0.8, 0.8, 0.8) 
+                borderWidth: 1.5, 
+                borderColor: rgb(0.85, 0.85, 0.85) 
             });
         };
 
-        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number] } = {}) => {
+        // Função para desenhar linha divisória
+        const drawLine = (y: number) => {
+            page.drawLine({
+                start: { x: marginX, y },
+                end: { x: width - marginX, y },
+                thickness: 1,
+                color: rgb(0.9, 0.9, 0.9)
+            });
+        };
+
+        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number]; lineHeight?: number } = {}) => {
             const size = options.size || 11;
             const usedFont = options.bold ? fontBold : font;
             const xPos = options.x !== undefined ? options.x : marginX;
-            const textColor = options.colorRgb ? rgb(options.colorRgb[0], options.colorRgb[1], options.colorRgb[2]) : rgb(0.2, 0.2, 0.2);
-            page.drawText(text, { 
-                x: xPos, 
-                y: cursorY, 
-                size, 
-                font: usedFont, 
-                color: textColor
-            });
-            cursorY -= size + lineHeight - size;
+            const textColor = options.colorRgb ? rgb(options.colorRgb[0], options.colorRgb[1], options.colorRgb[2]) : rgb(0.15, 0.15, 0.15);
+            const lh = options.lineHeight || (size * 1.4);
+            
+            page.drawText(text, { x: xPos, y: cursorY, size, font: usedFont, color: textColor });
+            cursorY -= lh;
         };
 
-        // Título
-        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 18, colorRgb: [0, 0, 0] });
-        cursorY -= 20;
-
-        // Documento
-        write(`Documento: ${baseOrder.file_name}`, { bold: true, size: 12 });
-        write(`Título: ${baseOrder.title}`, { size: 11 });
-        cursorY -= 8;
-
-        // Hash do documento original (destaque)
-        drawBox(marginX - 10, cursorY - 5, width - 2 * marginX + 20, 30);
-        cursorY += 5;
-        write(`Hash do documento original (SHA256):`, { bold: true, size: 10 });
-        const hashText = baseOrder.file_hash || 'Não disponível';
-        write(hashText.substring(0, 64), { size: 9, x: marginX + 10 });
-        if (hashText.length > 64) write(hashText.substring(64), { size: 9, x: marginX + 10 });
-        cursorY -= 20;
-
-        // Data de conclusão
-        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`, { size: 10 });
+        // ========== CABEÇALHO ==========
+        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 22, colorRgb: [0, 0, 0], lineHeight: 30 });
+        drawLine(cursorY + 5);
         cursorY -= 25;
 
-        // Assinaturas
-        write('Assinaturas', { bold: true, size: 14, colorRgb: [0, 0, 0] });
-        cursorY -= 15;
+        // ========== INFORMAÇÕES DO DOCUMENTO ==========
+        write('INFORMAÇÕES DO DOCUMENTO', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
+        cursorY -= 5;
 
-        signersList.filter(s => s.status === 'SIGNED').forEach((s, idx) => {
-            // Box para cada assinatura
-            const boxHeight = 120;
-            drawBox(marginX - 10, cursorY - boxHeight + 15, width - 2 * marginX + 20, boxHeight, rgb(0.98, 0.98, 0.98));
+        const docBoxY = cursorY - 75;
+        drawBox(marginX - 10, docBoxY, contentWidth + 20, 75, rgb(0.97, 0.97, 0.97));
+        cursorY -= 10;
+
+        write(`Documento: ${baseOrder.file_name}`, { size: 11, lineHeight: 16 });
+        write(`Título: ${baseOrder.title}`, { size: 11, lineHeight: 16 });
+        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`, { size: 10, colorRgb: [0.3, 0.3, 0.3], lineHeight: 16 });
+        
+        cursorY = docBoxY - 25;
+
+        // ========== HASH DO DOCUMENTO ==========
+        write('HASH DO DOCUMENTO ORIGINAL (SHA-256)', { bold: true, size: 11, colorRgb: [0.25, 0.25, 0.25], lineHeight: 18 });
+        cursorY -= 5;
+
+        const hashBoxY = cursorY - 35;
+        drawBox(marginX - 10, hashBoxY, contentWidth + 20, 35, rgb(0.95, 0.97, 1));
+        cursorY -= 10;
+
+        const hashText = baseOrder.file_hash || 'Não disponível';
+        write(hashText.substring(0, 64), { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14 });
+        if (hashText.length > 64) write(hashText.substring(64), { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14 });
+        
+        cursorY = hashBoxY - 30;
+
+        // ========== ASSINATURAS ==========
+        write('ASSINATURAS COLETADAS', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
+        cursorY -= 10;
+
+        const signedList = signersList.filter(s => s.status === 'SIGNED');
+        
+        signedList.forEach((s, idx) => {
+            const sigBoxHeight = 135;
+            const sigBoxY = cursorY - sigBoxHeight + 10;
             
-            write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 11 });
-            write(`    E-mail: ${s.email}`, { size: 10 });
-            write(`    CPF: ${s.cpf || 'Não informado'}`, { size: 10 });
-            write(`    Papel: ${s.role || 'Colaborador'}`, { size: 10 });
-            write(`    Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10 });
-            write(`    IP: ${s.ip_address || 'Não disponível'}`, { size: 9 });
-            write(`    User Agent: ${(s.user_agent || '').substring(0, 80)}${s.user_agent && s.user_agent.length > 80 ? '...' : ''}`, { size: 8 });
-            write(`    Hash da assinatura: ${(s.signature_hash || 'Não disponível').substring(0, 60)}`, { size: 8 });
+            // Box com fundo alternado
+            const boxBg = idx % 2 === 0 ? rgb(0.98, 0.98, 0.98) : rgb(0.96, 0.97, 0.98);
+            drawBox(marginX - 10, sigBoxY, contentWidth + 20, sigBoxHeight, boxBg);
             
             cursorY -= 15;
+            
+            // Nome com destaque
+            write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 12, colorRgb: [0, 0, 0], lineHeight: 18 });
+            
+            // Informações organizadas
+            write(`     E-mail: ${s.email}`, { size: 10, lineHeight: 15 });
+            write(`     CPF: ${s.cpf || 'Não informado'}`, { size: 10, lineHeight: 15 });
+            write(`     Função: ${s.role || 'Colaborador'}`, { size: 10, lineHeight: 15 });
+            write(`     Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10, lineHeight: 15 });
+            
+            cursorY -= 5;
+            
+            // Dados técnicos (menor)
+            write(`     IP: ${s.ip_address || 'Não disponível'}`, { size: 8, colorRgb: [0.4, 0.4, 0.4], lineHeight: 12 });
+            const ua = (s.user_agent || '').substring(0, 85);
+            write(`     User Agent: ${ua}${s.user_agent && s.user_agent.length > 85 ? '...' : ''}`, { size: 8, colorRgb: [0.4, 0.4, 0.4], lineHeight: 12 });
+            const sigHash = (s.signature_hash || 'Não disponível').substring(0, 64);
+            write(`     Hash da assinatura: ${sigHash}`, { size: 8, colorRgb: [0.4, 0.4, 0.4], lineHeight: 12 });
+            
+            cursorY = sigBoxY - 20;
         });
 
-        // Rodapé
-        cursorY = marginY + 20;
-        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 9, colorRgb: [0.4, 0.4, 0.4] });
-        write('Datas e horários em GMT -03:00 Brasília', { size: 8, colorRgb: [0.5, 0.5, 0.5] });
+        // ========== RODAPÉ ==========
+        drawLine(marginY + 40);
+        cursorY = marginY + 25;
+        
+        write('Este termo consolida as evidências de assinatura eletrônica deste documento e possui validade jurídica.', 
+            { size: 9, colorRgb: [0.35, 0.35, 0.35], lineHeight: 13, x: marginX + 5 });
+        write('Datas e horários em GMT-03:00 Brasília | Documento gerado automaticamente pelo Sistema GGV', 
+            { size: 8, colorRgb: [0.5, 0.5, 0.5], lineHeight: 12, x: marginX + 5 });
 
         const finalBytes = await pdfDoc.save();
 
