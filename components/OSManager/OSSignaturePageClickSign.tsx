@@ -236,34 +236,39 @@ const OSSignaturePageClickSign: React.FC = () => {
     // Função para iniciar assinatura (com verificação se necessário)
     const handleStartSignature = () => {
         console.log('🖊️ Iniciando processo de assinatura...', { 
-            user: !!user, 
+            hasUser: !!user,
+            userEmail: user?.email,
+            signerEmail: signer?.email,
             isEmailVerified, 
-            needsEmailVerification 
+            needsEmailVerification,
+            showVerificationModal
         });
         
-        // Se for usuário logado, vai direto para assinatura
+        // PRIORIDADE 1: Se for usuário logado, SEMPRE pula verificação
         if (user) {
-            console.log('✅ Usuário logado, pulando verificação');
+            console.log('✅ Usuário logado detectado, pulando verificação completamente');
+            setShowVerificationModal(false);
             setShowSignatureModal(true);
             return;
         }
         
-        // Se for externo e já verificou, vai direto
+        // PRIORIDADE 2: Se for externo e já verificou nesta sessão, vai direto
         if (isEmailVerified) {
-            console.log('✅ E-mail já verificado, abrindo modal de assinatura');
+            console.log('✅ E-mail já verificado nesta sessão, abrindo modal de assinatura');
+            setShowVerificationModal(false);
             setShowSignatureModal(true);
             return;
         }
         
-        // Se for externo e não verificou, MOSTRA modal de verificação AGORA
-        if (needsEmailVerification && !isEmailVerified) {
-            console.log('📧 Abrindo modal de verificação de e-mail');
+        // PRIORIDADE 3: Se for externo e não verificou, MOSTRA modal de verificação AGORA
+        if (!isEmailVerified) {
+            console.log('📧 E-mail não verificado, abrindo modal de verificação');
             setShowVerificationModal(true);
             return;
         }
         
         // Fallback: abrir modal de assinatura
-        console.log('⚠️ Fallback: abrindo modal de assinatura');
+        console.log('⚠️ Fallback inesperado: abrindo modal de assinatura');
         setShowSignatureModal(true);
     };
 
