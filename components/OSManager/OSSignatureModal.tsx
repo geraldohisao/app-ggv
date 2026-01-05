@@ -387,15 +387,38 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
             });
         };
 
-        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number]; lineHeight?: number } = {}) => {
+        // Quebra de texto manual para evitar cortes (hash, user-agent, etc.)
+        const wrapText = (text: string, maxWidth: number, size: number, fontUsed: any) => {
+            const words = text.split(' ');
+            const lines: string[] = [];
+            let currentLine = '';
+            words.forEach(word => {
+                const testLine = currentLine ? `${currentLine} ${word}` : word;
+                const width = fontUsed.widthOfTextAtSize(testLine, size);
+                if (width > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+            if (currentLine) lines.push(currentLine);
+            return lines;
+        };
+
+        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number]; lineHeight?: number; maxWidth?: number } = {}) => {
             const size = options.size || 11;
             const usedFont = options.bold ? fontBold : font;
             const xPos = options.x !== undefined ? options.x : marginX;
             const textColor = options.colorRgb ? rgb(options.colorRgb[0], options.colorRgb[1], options.colorRgb[2]) : rgb(0.15, 0.15, 0.15);
             const lh = options.lineHeight || (size * 1.4);
-            
-            page.drawText(text, { x: xPos, y: cursorY, size, font: usedFont, color: textColor });
-            cursorY -= lh;
+            const maxW = options.maxWidth || contentWidth;
+
+            const lines = wrapText(text, maxW, size, usedFont);
+            lines.forEach(line => {
+                page.drawText(line, { x: xPos, y: cursorY, size, font: usedFont, color: textColor });
+                cursorY -= lh;
+            });
         };
 
         // ========== CABEÇALHO ==========
@@ -426,8 +449,7 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         cursorY -= 10;
 
         const hashText = baseOrder.file_hash || 'Não disponível';
-        write(hashText.substring(0, 64), { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14 });
-        if (hashText.length > 64) write(hashText.substring(64), { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14 });
+        write(hashText, { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14, maxWidth: contentWidth - 20, x: marginX + 10 });
         
         cursorY = hashBoxY - 30;
 
@@ -438,34 +460,32 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         const signedList = signersList.filter(s => s.status === 'SIGNED');
         
         signedList.forEach((s, idx) => {
-            const sigBoxHeight = 135;
+            const sigBoxHeight = 150;
             const sigBoxY = cursorY - sigBoxHeight + 10;
             
             // Box com fundo alternado
             const boxBg = idx % 2 === 0 ? rgb(0.98, 0.98, 0.98) : rgb(0.96, 0.97, 0.98);
             drawBox(marginX - 10, sigBoxY, contentWidth + 20, sigBoxHeight, boxBg);
             
-            cursorY -= 15;
+            cursorY -= 18;
             
             // Nome com destaque
             write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 12, colorRgb: [0, 0, 0], lineHeight: 18 });
             
             // Informações organizadas
-            write(`     E-mail: ${s.email}`, { size: 10, lineHeight: 15 });
-            write(`     CPF: ${s.cpf || 'Não informado'}`, { size: 10, lineHeight: 15 });
-            write(`     Função: ${s.role || 'Colaborador'}`, { size: 10, lineHeight: 15 });
-            write(`     Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10, lineHeight: 15 });
+            write(`E-mail: ${s.email}`, { size: 10, lineHeight: 14, x: marginX });
+            write(`CPF: ${s.cpf || 'Não informado'}`, { size: 10, lineHeight: 14, x: marginX });
+            write(`Função: ${s.role || 'Colaborador'}`, { size: 10, lineHeight: 14, x: marginX });
+            write(`Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10, lineHeight: 14, x: marginX });
             
-            cursorY -= 5;
+            cursorY -= 4;
             
-            // Dados técnicos (menor)
-            write(`     IP: ${s.ip_address || 'Não disponível'}`, { size: 8, colorRgb: [0.4, 0.4, 0.4], lineHeight: 12 });
-            const ua = (s.user_agent || '').substring(0, 85);
-            write(`     User Agent: ${ua}${s.user_agent && s.user_agent.length > 85 ? '...' : ''}`, { size: 8, colorRgb: [0.4, 0.4, 0.4], lineHeight: 12 });
-            const sigHash = (s.signature_hash || 'Não disponível').substring(0, 64);
-            write(`     Hash da assinatura: ${sigHash}`, { size: 8, colorRgb: [0.4, 0.4, 0.4], lineHeight: 12 });
+            // Dados técnicos (menor) com quebra automática
+            write(`IP: ${s.ip_address || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX });
+            write(`User Agent: ${s.user_agent || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX, maxWidth: contentWidth });
+            write(`Hash da assinatura: ${s.signature_hash || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX, maxWidth: contentWidth });
             
-            cursorY = sigBoxY - 20;
+            cursorY = sigBoxY - 25;
         });
 
         // ========== RODAPÉ ==========
