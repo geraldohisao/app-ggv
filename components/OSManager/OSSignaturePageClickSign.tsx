@@ -46,6 +46,13 @@ const OSSignaturePageClickSign: React.FC = () => {
             setLoading(true);
             setError(null);
 
+            console.log('🔍 Carregando dados de assinatura...', { 
+                orderId, 
+                signerId, 
+                hasUser: !!user,
+                userEmail: user?.email 
+            });
+
             if (!orderId || !signerId) {
                 setError('Link inválido.');
                 return;
@@ -132,21 +139,24 @@ const OSSignaturePageClickSign: React.FC = () => {
                 setNeedsEmailVerification(false);
             } else if (!user) {
                 // Não está logado - vai precisar verificar (mas não mostra modal ainda)
+                console.log('ℹ️ Usuário não logado, verificação será necessária ao clicar Assinar');
                 setNeedsEmailVerification(true);
                 setIsEmailVerified(false);
-                setShowVerificationModal(false); // Não mostrar ainda
+                setShowVerificationModal(false);
             } else if (user.email === signerData.email) {
-                // Está logado com e-mail correto - não precisa verificar
+                // Está logado com e-mail correto - não precisa verificar NUNCA
+                console.log('✅ Usuário logado com e-mail correto, verificação dispensada');
                 setIsEmailVerified(true);
                 setNeedsEmailVerification(false);
                 setShowVerificationModal(false);
-                // Salvar na sessão para não pedir novamente
                 sessionStorage.setItem(`email_verified_${signerData.email}`, 'true');
             } else {
-                // Está logado mas e-mail diferente - vai precisar verificar
-                setNeedsEmailVerification(true);
-                setIsEmailVerified(false);
-                setShowVerificationModal(false); // Não mostrar ainda
+                // Está logado mas com e-mail diferente - ainda assim dispensa verificação
+                console.log('✅ Usuário logado (e-mail diferente), mas dispensando verificação');
+                setIsEmailVerified(true);
+                setNeedsEmailVerification(false);
+                setShowVerificationModal(false);
+                sessionStorage.setItem(`email_verified_${signerData.email}`, 'true');
             }
 
         } catch (err: any) {
