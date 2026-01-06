@@ -366,14 +366,15 @@ class OSEmailService {
                 .eq('key', 'grupo_ggv')
                 .single();
 
-            if (error || !data?.url) {
-                console.warn('⚠️ Falha ao buscar logo do brand_logos, usando fallback');
-                return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
-            }
+            const baseUrl = (error || !data?.url)
+                ? 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png'
+                : data.url;
 
-            console.log('✅ Logo URL (Grupo GGV):', data.url);
-            console.warn('⚠️ NOTA: URL pode ter limitações (WEBP com headers incorretos). Para melhor resultado, hospedar no Supabase Storage.');
-            return data.url;
+            // Força entrega em PNG (evita conversão para WEBP/headers ruins)
+            const logoUrl = `${baseUrl}?format=png`;
+
+            console.log('✅ Logo URL (Grupo GGV forçada para PNG):', logoUrl);
+            return logoUrl;
         } catch (e) {
             console.error('❌ Erro ao buscar logo:', e);
             return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
