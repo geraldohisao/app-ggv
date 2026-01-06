@@ -55,7 +55,7 @@ class OSEmailService {
     async sendSignatureRequest(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoAttachment = await this.getLogoAttachment();
+            const logoURL = await this.getLogoURL();
 
             // Link direto para este documento
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
@@ -69,7 +69,7 @@ class OSEmailService {
                 })
                 : 'Sem prazo definido';
 
-            // Template do e-mail (com CID)
+            // Template do e-mail (com URL externa)
             const emailHTML = this.createEmailTemplate({
                 signerName: signer.name,
                 orderTitle: order.title,
@@ -78,17 +78,16 @@ class OSEmailService {
                 expiresAt,
                 totalSigners: order.total_signers || 0,
                 signatureLink,
-                logoHTML: '<img src="cid:logo_ggv" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;">'
+                logoHTML: `<img src="${logoURL}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
             });
 
-            // Enviar via provider configurado com logo inline
+            // Enviar via provider configurado
             await this.sendEmail({
                 to: signer.email,
                 toName: signer.name,
                 subject: `Solicitação de Assinatura - ${order.title}`,
                 html: emailHTML,
-                config,
-                attachments: logoAttachment ? [logoAttachment] : []
+                config
             });
 
             // Registrar no log de auditoria
@@ -142,14 +141,14 @@ class OSEmailService {
     async sendReminder(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoAttachment = await this.getLogoAttachment();
+            const logoURL = await this.getLogoURL();
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
 
             const emailHTML = this.createReminderTemplate({
                 signerName: signer.name,
                 orderTitle: order.title,
                 signatureLink,
-                logoHTML: '<img src="cid:logo_ggv" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;">'
+                logoHTML: `<img src="${logoURL}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
             });
 
             await this.sendEmail({
@@ -157,8 +156,7 @@ class OSEmailService {
                 toName: signer.name,
                 subject: `Lembrete: Assinatura Pendente - ${order.title}`,
                 html: emailHTML,
-                config,
-                attachments: logoAttachment ? [logoAttachment] : []
+                config
             });
 
             // Atualizar contador de lembretes
@@ -189,12 +187,12 @@ class OSEmailService {
      */
     async sendCancelled(order: ServiceOrder, signers: OSSigner[], reason: string = 'Documento cancelado'): Promise<void> {
         const config = await this.loadConfig();
-        const logoAttachment = await this.getLogoAttachment();
+        const logoURL = await this.getLogoURL();
 
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
           <div style="text-align:center; margin-bottom: 24px;">
-            <img src="cid:logo_ggv" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;">
+            <img src="${logoURL}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
           </div>
           <h2 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; text-align:center; color:#111827;">
             Documento cancelado
@@ -217,8 +215,7 @@ class OSEmailService {
                 toName: signer.name,
                 subject: `Documento cancelado - ${order.title}`,
                 html: emailHTML,
-                config,
-                attachments: logoAttachment ? [logoAttachment] : []
+                config
             });
 
             // Log
@@ -239,7 +236,7 @@ class OSEmailService {
      */
     async sendFinalized(order: ServiceOrder, signers: OSSigner[]): Promise<void> {
         const config = await this.loadConfig();
-        const logoAttachment = await this.getLogoAttachment();
+        const logoURL = await this.getLogoURL();
 
         // Escolher PDF final (com termo, se existir)
         console.log('📄 Dados da OS para anexo:', {
@@ -300,7 +297,7 @@ class OSEmailService {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center" style="padding:16px 0;">
-                <img src="cid:logo_ggv" alt="GRUPO GGV" style="height:48px; width:auto; display:block; margin:0 auto; border:0;">
+                <img src="${logoURL}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
               </td>
             </tr>
           </table>
@@ -317,27 +314,20 @@ class OSEmailService {
         </div>`;
 
         for (const signer of signed) {
-            const attachments = [
-                {
-                    filename: chosenName,
-                    content: pdfBase64,
-                    type: 'application/pdf',
-                    disposition: 'attachment'
-                }
-            ];
-            
-            // Adicionar logo inline
-            if (logoAttachment) {
-                attachments.push(logoAttachment);
-            }
-            
             await this.sendEmail({
                 to: signer.email,
                 toName: signer.name,
                 subject: `Documento finalizado - ${order.title}`,
                 html: emailHTML,
                 config,
-                attachments
+                attachments: [
+                    {
+                        filename: chosenName,
+                        content: pdfBase64,
+                        type: 'application/pdf',
+                        disposition: 'attachment'
+                    }
+                ]
             });
 
             // Log
@@ -352,9 +342,9 @@ class OSEmailService {
     }
 
     /**
-     * Busca logo e retorna como attachment inline com CID
+     * Busca URL pública do logo (mesma abordagem do diagnóstico)
      */
-    private async getLogoAttachment(): Promise<any | null> {
+    private async getLogoURL(): Promise<string> {
         try {
             // Buscar URL do logo do banco
             const { data: logoData, error: dbError } = await supabase
@@ -364,35 +354,16 @@ class OSEmailService {
                 .single();
 
             if (dbError || !logoData?.url) {
-                console.warn('⚠️ Logo não encontrado no banco');
-                return null;
+                console.warn('⚠️ Logo não encontrado, usando fallback');
+                // Fallback: URL externa do site (mesma do diagnóstico)
+                return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png';
             }
 
-            // Baixar imagem
-            const response = await fetch(logoData.url);
-            if (!response.ok) {
-                console.warn('⚠️ Falha ao baixar logo');
-                return null;
-            }
-
-            const arrayBuffer = await response.arrayBuffer();
-            const base64 = this.arrayBufferToBase64(arrayBuffer);
-            const contentType = response.headers.get('content-type') || 'image/png';
-
-            console.log('✅ Logo preparado para anexo inline (CID)');
-
-            return {
-                filename: 'logo.png',
-                content: base64,
-                type: contentType,
-                disposition: 'inline',
-                headers: {
-                    'Content-ID': '<logo_ggv>' // CRÍTICO: brackets <> para Gmail
-                }
-            };
+            console.log('✅ Logo URL obtida:', logoData.url);
+            return logoData.url;
         } catch (error) {
-            console.error('❌ Erro ao preparar logo:', error);
-            return null;
+            console.error('❌ Erro ao buscar logo, usando fallback:', error);
+            return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png';
         }
     }
 
