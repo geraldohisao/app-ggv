@@ -36,6 +36,7 @@ const OSSignaturePageClickSign: React.FC = () => {
     const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [currentStep, setCurrentStep] = useState<'review' | 'confirm' | 'token'>('review');
+    const [pendingDocs, setPendingDocs] = useState<Array<{orderId: string; signerId: string; title: string; fileName: string}>>([]);
 
     useEffect(() => {
         loadSignatureData();
@@ -172,13 +173,66 @@ const OSSignaturePageClickSign: React.FC = () => {
         setNeedsEmailVerification(false);
     };
 
-    const handleSignatureComplete = () => {
+    const handleSignatureComplete = async () => {
         setSignedSuccess(true);
         setAlreadySigned(false);
         setSignedAtText(new Date().toLocaleString('pt-BR'));
         setShowSignatureModal(false);
+        
+        // Buscar outros documentos pendentes do mesmo email
+        await loadPendingDocuments();
+        
         // Recarregar dados sem sobrescrever estado de sucesso
         setTimeout(() => loadSignatureData(), 100);
+    };
+    
+    const loadPendingDocuments = async () => {
+        if (!signer?.email) return;
+        
+        try {
+            console.log('🔍 Buscando outros documentos pendentes para:', signer.email);
+            
+            // Buscar todos os assinantes pendentes deste email (exceto o atual)
+            const { data: pendingSigners, error } = await supabase
+                .from('os_signers')
+                .select(`
+                    id,
+                    os_id,
+                    email,
+                    status,
+                    service_orders (
+                        id,
+                        title,
+                        file_name,
+                        status
+                    )
+                `)
+                .eq('email', signer.email)
+                .eq('status', SignerStatus.Pending)
+                .neq('id', signer.id);
+            
+            if (error) {
+                console.error('Erro ao buscar documentos pendentes:', error);
+                return;
+            }
+            
+            // Filtrar documentos ativos (não cancelados/expirados)
+            const activePending = (pendingSigners || [])
+                .filter(s => s.service_orders && 
+                            s.service_orders.status !== 'CANCELLED' && 
+                            s.service_orders.status !== 'EXPIRED')
+                .map(s => ({
+                    orderId: s.os_id,
+                    signerId: s.id,
+                    title: s.service_orders.title,
+                    fileName: s.service_orders.file_name
+                }));
+            
+            console.log(`📋 ${activePending.length} documentos pendentes encontrados`);
+            setPendingDocs(activePending);
+        } catch (err) {
+            console.error('Erro ao carregar documentos pendentes:', err);
+        }
     };
 
     const signedCount = allSigners.filter(s => s.status === 'SIGNED').length;
@@ -198,19 +252,61 @@ const OSSignaturePageClickSign: React.FC = () => {
     if (alreadySigned || signedSuccess) {
         return (
             <div className="min-h-screen bg-white flex items-center justify-center p-4">
-                <div className="max-w-md w-full text-center">
-                    <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">
-                        {signedSuccess ? 'Documento assinado com sucesso' : 'Documento Já Assinado'}
-                    </h1>
-                    <p className="text-slate-600 mb-6">
-                        {signedSuccess ? 'Assinatura registrada.' : 'Você já assinou este documento.'}
-                    </p>
-                    {(signedAtText || signer?.signed_at) && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
-                            <p className="text-sm text-green-800">
-                                Assinado em: {signedAtText || new Date(signer!.signed_at!).toLocaleString('pt-BR')}
-                            </p>
+                <div className="max-w-2xl w-full">
+                    <div className="text-center mb-6">
+                        <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                        <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                            {signedSuccess ? 'Documento assinado com sucesso' : 'Documento Já Assinado'}
+                        </h1>
+                        <p className="text-slate-600 mb-4">
+                            {signedSuccess ? 'Assinatura registrada.' : 'Você já assinou este documento.'}
+                        </p>
+                        {(signedAtText || signer?.signed_at) && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left max-w-md mx-auto">
+                                <p className="text-sm text-green-800">
+                                    Assinado em: {signedAtText || new Date(signer!.signed_at!).toLocaleString('pt-BR')}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Lista de documentos pendentes */}
+                    {pendingDocs.length > 0 && (
+                        <div className="mt-8">
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                                <h2 className="text-lg font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                    📋 Você tem {pendingDocs.length} documento{pendingDocs.length > 1 ? 's' : ''} pendente{pendingDocs.length > 1 ? 's' : ''}
+                                </h2>
+                                <p className="text-sm text-blue-700 mb-4">
+                                    Continue assinando os documentos abaixo:
+                                </p>
+                                
+                                <div className="space-y-3">
+                                    {pendingDocs.map((doc, idx) => (
+                                        <a
+                                            key={doc.signerId}
+                                            href={`/assinar/${doc.orderId}/${doc.signerId}`}
+                                            className="block bg-white border border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all group"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">
+                                                        {doc.title}
+                                                    </p>
+                                                    <p className="text-sm text-slate-500 mt-1">
+                                                        {doc.fileName}
+                                                    </p>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium group-hover:bg-blue-200 transition-colors">
+                                                        Assinar →
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
