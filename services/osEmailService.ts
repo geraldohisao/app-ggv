@@ -374,7 +374,7 @@ class OSEmailService {
                 content: base64,
                 type: contentType,
                 disposition: 'inline',
-                content_id: 'logo_ggv', // Resend usa content_id para CID
+                cid: 'logo_ggv', // Resend usa cid para inline
             };
         } catch (error) {
             console.error('❌ Erro ao preparar logo inline:', error);
