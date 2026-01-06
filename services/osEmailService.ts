@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ServiceOrder, OSSigner } from '../types';
 import { format } from 'date-fns';
+import { sendEmailViaGmail } from './gmailService';
 
 interface EmailConfig {
     os_email_from: string;
@@ -238,7 +239,7 @@ class OSEmailService {
         const logoUrl = await this.getLogoUrl();
 
         // Escolher PDF final (com termo, se existir)
-        console.log('📄 Dados da OS para anexo:', {
+        console.log('📄 Dados da OS para download:', {
             final_file_path: (order as any).final_file_path,
             final_file_name: (order as any).final_file_name,
             file_path: order.file_path,
@@ -251,40 +252,50 @@ class OSEmailService {
             order.file_path
         ].filter(Boolean);
 
-        console.log('🔍 Tentando baixar PDF nos caminhos:', candidatePaths);
+        console.log('🔍 Gerando link de download para:', candidatePaths);
 
-        let pdfBase64 = '';
         let chosenPath = '';
         let chosenName = (order as any).final_file_name || order.file_name;
 
+        // Verificar qual arquivo existe
         for (const path of candidatePaths) {
             try {
-                console.log(`📥 Tentando baixar: ${path}`);
+                console.log(`📥 Verificando: ${path}`);
                 const { data, error } = await supabase.storage
                     .from('service-orders')
-                    .download(path as string);
+                    .list('', { 
+                        search: (path as string).split('/').pop() 
+                    });
+                
                 if (error) {
-                    console.warn(`❌ Falha em ${path}:`, error);
+                    console.warn(`❌ Falha ao verificar ${path}:`, error);
                     continue;
                 }
-                const buffer = await data.arrayBuffer();
-                pdfBase64 = this.arrayBufferToBase64(buffer);
+                
                 chosenPath = path as string;
                 if ((order as any).final_file_name) {
                     chosenName = (order as any).final_file_name;
                 } else if (path === `${order.file_path}.final.pdf`) {
                     chosenName = order.file_name.replace(/\.pdf$/i, '') + '-assinado.pdf';
                 }
-                console.log(`✅ PDF encontrado e convertido: ${chosenPath} (${chosenName})`);
+                console.log(`✅ PDF encontrado: ${chosenPath} (${chosenName})`);
                 break;
             } catch (e) {
-                console.warn(`⚠️ Erro ao processar ${path}:`, e);
+                console.warn(`⚠️ Erro ao verificar ${path}:`, e);
             }
         }
 
-        if (!pdfBase64) {
-            throw new Error('Não foi possível obter o PDF para envio finalizado.');
+        if (!chosenPath) {
+            // Se não encontrou, usar o path final_file_path ou file_path
+            chosenPath = (order as any).final_file_path || order.file_path;
         }
+
+        // Gerar URL pública do PDF final
+        const { data: publicUrlData } = await supabase.storage
+            .from('service-orders')
+            .createSignedUrl(chosenPath, 60 * 60 * 24 * 30); // 30 dias
+
+        const downloadUrl = publicUrlData?.signedUrl || '';
 
         const signed = signers.filter(s => s.status === 'SIGNED');
         const listHTML = signed
@@ -292,7 +303,7 @@ class OSEmailService {
             .join('');
 
         const emailHTML = `
-        <div style="font-family: Arial, sans-serif; color: #1f2937;">
+        <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center" style="padding:16px 0;">
@@ -300,16 +311,27 @@ class OSEmailService {
               </td>
             </tr>
           </table>
-          <div style="background:#e7f7ec; padding:12px 16px; border-radius:8px; color:#166534; font-weight:600; text-align:center;">
-            Seu documento assinado está em anexo, lembre-se de baixá-lo.
+          <div style="background:#e7f7ec; padding:16px; border-radius:8px; color:#166534; font-weight:600; text-align:center; margin-bottom:24px;">
+            ✅ Documento assinado e finalizado com sucesso!
           </div>
-          <h2 style="margin-top:24px; font-size:22px;">Documento assinado e finalizado</h2>
+          <h2 style="margin-top:24px; font-size:22px; color:#111827;">Documento Finalizado</h2>
           <p style="font-size:15px; margin:8px 0 16px 0;"><strong>Documento:</strong> ${order.file_name}</p>
           <p style="font-size:15px; margin:0 0 8px 0;"><strong>Título:</strong> ${order.title}</p>
-          <p style="font-size:15px; margin:0 0 8px 0;"><strong>Finalizado em:</strong> ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
-          <hr style="margin:20px 0;" />
-          <h3 style="font-size:18px; margin-bottom:8px;">Assinaturas</h3>
-          <ul style="padding-left:18px; line-height:1.6;">${listHTML}</ul>
+          <p style="font-size:15px; margin:0 0 16px 0;"><strong>Finalizado em:</strong> ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+          
+          <div style="background:#f3f4f6; padding:20px; border-radius:8px; margin:20px 0;">
+            <h3 style="font-size:18px; margin:0 0 12px 0; color:#111827;">📄 Baixar Documento Assinado</h3>
+            <p style="margin:0 0 16px 0; font-size:14px; color:#4b5563;">Clique no botão abaixo para fazer o download do documento com todas as assinaturas:</p>
+            <a href="${downloadUrl}" 
+               style="display:inline-block; background:#1a1a1a; color:#ffffff; padding:14px 32px; text-decoration:none; border-radius:8px; font-weight:600; font-size:16px;">
+              📥 Baixar Documento Assinado
+            </a>
+            <p style="margin:16px 0 0 0; font-size:12px; color:#6b7280;">Link válido por 30 dias</p>
+          </div>
+
+          <hr style="margin:24px 0; border:0; border-top:1px solid #e5e7eb;" />
+          <h3 style="font-size:18px; margin-bottom:8px; color:#111827;">Assinaturas Realizadas</h3>
+          <ul style="padding-left:18px; line-height:1.8; color:#374151;">${listHTML}</ul>
         </div>`;
 
         for (const signer of signed) {
@@ -318,15 +340,7 @@ class OSEmailService {
                 toName: signer.name,
                 subject: `Documento finalizado - ${order.title}`,
                 html: emailHTML,
-                config,
-                attachments: [
-                    {
-                        filename: chosenName,
-                        content: pdfBase64,
-                        type: 'application/pdf',
-                        disposition: 'attachment'
-                    }
-                ]
+                config
             });
 
             // Log
@@ -366,6 +380,9 @@ class OSEmailService {
     /**
      * Envia e-mail via Netlify Function (sem CORS!)
      */
+    /**
+     * Envia e-mail via Gmail API (igual ao diagnóstico)
+     */
     private async sendEmail(params: {
         to: string;
         toName: string;
@@ -375,36 +392,20 @@ class OSEmailService {
         attachments?: any[];
     }): Promise<void> {
         try {
-            console.log('📧 Enviando e-mail via Netlify Function...');
+            console.log('📧 Enviando e-mail de OS via Gmail API...');
 
-            // Determinar URL da função baseado no ambiente
-            const functionUrl = window.location.hostname === 'localhost'
-                ? 'http://localhost:8888/.netlify/functions/send-os-email' // Dev local
-                : '/.netlify/functions/send-os-email'; // Produção
-
-            const response = await fetch(functionUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    to: params.to,
-                    toName: params.toName,
-                    subject: params.subject,
-                    html: params.html,
-                    attachments: params.attachments || []
-                })
+            // Usar Gmail API (igual ao diagnóstico que funciona)
+            await sendEmailViaGmail({
+                to: params.to,
+                subject: params.subject,
+                html: params.html,
+                dealId: undefined,
+                companyName: params.toName
             });
 
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.details || result.error || `HTTP ${response.status}`);
-            }
-
-            console.log('✅ E-mail enviado com sucesso via Netlify!', result);
+            console.log('✅ E-mail de OS enviado com sucesso via Gmail!');
         } catch (error: any) {
-            console.error('❌ Erro ao enviar e-mail:', error);
+            console.error('❌ Erro ao enviar e-mail de OS:', error);
             throw new Error(`Falha ao enviar e-mail: ${error.message}`);
         }
     }
