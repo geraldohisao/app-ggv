@@ -360,6 +360,20 @@ class OSEmailService {
      */
     private async getLogoUrl(): Promise<string> {
         try {
+            // Preferir chave dedicada para e-mail (sem impactar o restante do sistema)
+            const { data: emailLogo, error: emailError } = await supabase
+                .from('brand_logos')
+                .select('url')
+                .eq('key', 'grupo_ggv_email')
+                .single();
+
+            if (!emailError && emailLogo?.url) {
+                const logoEmailUrl = `${emailLogo.url}?format=png`;
+                console.log('✅ Logo URL (grupo_ggv_email):', logoEmailUrl);
+                return logoEmailUrl;
+            }
+
+            // Fallback: chave original do sistema
             const { data, error } = await supabase
                 .from('brand_logos')
                 .select('url')
@@ -367,17 +381,15 @@ class OSEmailService {
                 .single();
 
             const baseUrl = (error || !data?.url)
-                ? 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png'
+                ? 'https://ggvinteligencia.com.br/wp-content/uploads/2026/01/LOGO_GrupoGGV-horizontal-scaled.png'
                 : data.url;
 
-            // Força entrega em PNG (evita conversão para WEBP/headers ruins)
             const logoUrl = `${baseUrl}?format=png`;
-
-            console.log('✅ Logo URL (Grupo GGV forçada para PNG):', logoUrl);
+            console.log('✅ Logo URL (grupo_ggv fallback):', logoUrl);
             return logoUrl;
         } catch (e) {
             console.error('❌ Erro ao buscar logo:', e);
-            return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
+            return 'https://ggvinteligencia.com.br/wp-content/uploads/2026/01/LOGO_GrupoGGV-horizontal-scaled.png?format=png';
         }
     }
 
