@@ -708,16 +708,27 @@ const MotorCard: React.FC<{
   </div>
 );
 
-const ObjectiveCard: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
+const ObjectiveCard: React.FC<{ 
+  objective: any;
+  index: number;
+  onUpdate: (objective: any) => void;
+  onRemove: () => void;
+}> = ({ objective, index, onUpdate, onRemove }) => (
   <div className="bg-white rounded-xl shadow-sm border-2 border-slate-200">
     <div className="border-b-4 border-slate-900 px-4 py-3">
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-bold bg-slate-900 text-white px-3 py-1 rounded-full">
-          {title}
+          OBJETIVO {index + 1}
         </span>
-        <button className="text-slate-400 hover:text-red-500">✕</button>
+        <button onClick={onRemove} className="text-slate-400 hover:text-red-500">✕</button>
       </div>
-      <div className="text-sm font-semibold text-slate-900 mt-2">{subtitle}</div>
+      <input
+        type="text"
+        value={objective.title}
+        onChange={(e) => onUpdate({ ...objective, title: e.target.value })}
+        className="text-sm font-semibold text-slate-900 mt-2 w-full bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+        placeholder="Título do Objetivo"
+      />
     </div>
     <div className="p-4 space-y-3">
       <div className="space-y-1">
@@ -726,50 +737,154 @@ const ObjectiveCard: React.FC<{ title: string; subtitle: string }> = ({ title, s
           <span className="text-slate-500">FREQ.</span>
           <span className="text-slate-500">META</span>
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-700">NPS</span>
-          <span className="text-slate-600">Mensal</span>
-          <span className="font-semibold text-slate-900">75</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-700">CSAT</span>
-          <span className="text-slate-600">Semanal</span>
-          <span className="font-semibold text-slate-900">4.5/5</span>
-        </div>
+        {objective.kpis?.map((kpi: any, kpiIdx: number) => (
+          <div key={kpi.id} className="flex items-center justify-between text-sm gap-2">
+            <input
+              type="text"
+              value={kpi.name}
+              onChange={(e) => {
+                const newKpis = [...objective.kpis];
+                newKpis[kpiIdx] = { ...kpi, name: e.target.value };
+                onUpdate({ ...objective, kpis: newKpis });
+              }}
+              className="flex-1 text-slate-700 bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+              placeholder="Nome KPI"
+            />
+            <select
+              value={kpi.frequency}
+              onChange={(e) => {
+                const newKpis = [...objective.kpis];
+                newKpis[kpiIdx] = { ...kpi, frequency: e.target.value };
+                onUpdate({ ...objective, kpis: newKpis });
+              }}
+              className="text-slate-600 text-xs bg-transparent outline-none"
+            >
+              <option value="Mensal">Mensal</option>
+              <option value="Semanal">Semanal</option>
+              <option value="Trimestral">Trimestral</option>
+              <option value="Semestral">Semestral</option>
+              <option value="Anual">Anual</option>
+            </select>
+            <input
+              type="text"
+              value={kpi.target}
+              onChange={(e) => {
+                const newKpis = [...objective.kpis];
+                newKpis[kpiIdx] = { ...kpi, target: e.target.value };
+                onUpdate({ ...objective, kpis: newKpis });
+              }}
+              className="w-16 font-semibold text-slate-900 text-right bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+              placeholder="Meta"
+            />
+            <button
+              onClick={() => {
+                const newKpis = objective.kpis.filter((_: any, i: number) => i !== kpiIdx);
+                onUpdate({ ...objective, kpis: newKpis });
+              }}
+              className="text-slate-400 hover:text-red-500 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
       </div>
-      <button className="text-xs text-slate-400 hover:text-blue-600">+ Adicionar KPI</button>
+      <button 
+        onClick={() => {
+          const newKpi = {
+            id: `kpi-${Date.now()}`,
+            name: '',
+            frequency: 'Mensal' as const,
+            target: ''
+          };
+          onUpdate({ ...objective, kpis: [...(objective.kpis || []), newKpi] });
+        }}
+        className="text-xs text-slate-400 hover:text-blue-600"
+      >
+        + Adicionar KPI
+      </button>
     </div>
   </div>
 );
 
-const RoleCard: React.FC<{ title: string }> = ({ title }) => (
+const RoleCard: React.FC<{ 
+  role: any;
+  onUpdate: (role: any) => void;
+  onRemove: () => void;
+}> = ({ role, onUpdate, onRemove }) => (
   <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
     <div className="flex items-center justify-between mb-4">
-      <div>
+      <div className="flex-1">
         <div className="text-xs text-slate-500 mb-1">PAPEL</div>
-        <div className="font-bold text-slate-900">{title}</div>
+        <input
+          type="text"
+          value={role.title}
+          onChange={(e) => onUpdate({ ...role, title: e.target.value })}
+          className="font-bold text-slate-900 bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500 w-full"
+          placeholder="Título do Papel"
+        />
       </div>
-      <button className="text-slate-400 hover:text-red-500">✕</button>
+      <button onClick={onRemove} className="text-slate-400 hover:text-red-500">✕</button>
     </div>
     
     <div className="space-y-3">
       <div>
         <div className="text-xs text-slate-500 mb-1">RESPONSABILIDADE</div>
         <textarea 
-          placeholder="Coordenar"
-          className="w-full text-sm text-slate-700 outline-none resize-none h-12"
+          value={role.responsibility || ''}
+          onChange={(e) => onUpdate({ ...role, responsibility: e.target.value })}
+          placeholder="Descreva a responsabilidade"
+          className="w-full text-sm text-slate-700 outline-none resize-none h-12 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded px-2 py-1"
         />
       </div>
       
       <div>
-        <div className="text-xs text-slate-500 mb-2">MÉTRICA</div>
-        <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-slate-700">NPS</span>
-          <span className="font-semibold">&gt; 75</span>
-        </div>
+        <div className="text-xs text-slate-500 mb-2">MÉTRICAS</div>
+        {role.metrics?.map((metric: any, metricIdx: number) => (
+          <div key={metric.id} className="flex items-center justify-between text-sm mb-1 gap-2">
+            <input
+              type="text"
+              value={metric.name}
+              onChange={(e) => {
+                const newMetrics = [...role.metrics];
+                newMetrics[metricIdx] = { ...metric, name: e.target.value };
+                onUpdate({ ...role, metrics: newMetrics });
+              }}
+              className="flex-1 text-slate-700 bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+              placeholder="Métrica"
+            />
+            <input
+              type="text"
+              value={metric.target}
+              onChange={(e) => {
+                const newMetrics = [...role.metrics];
+                newMetrics[metricIdx] = { ...metric, target: e.target.value };
+                onUpdate({ ...role, metrics: newMetrics });
+              }}
+              className="w-16 font-semibold text-right bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+              placeholder="Meta"
+            />
+            <button
+              onClick={() => {
+                const newMetrics = role.metrics.filter((_: any, i: number) => i !== metricIdx);
+                onUpdate({ ...role, metrics: newMetrics });
+              }}
+              className="text-slate-400 hover:text-red-500 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
       </div>
       
-      <button className="text-xs text-slate-400 hover:text-blue-600">+ Add Métrica (1/5)</button>
+      <button 
+        onClick={() => {
+          const newMetric = { id: `metric-${Date.now()}`, name: '', target: '' };
+          onUpdate({ ...role, metrics: [...(role.metrics || []), newMetric] });
+        }}
+        className="text-xs text-slate-400 hover:text-blue-600"
+      >
+        + Add Métrica ({role.metrics?.length || 0}/5)
+      </button>
     </div>
   </div>
 );

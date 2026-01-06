@@ -355,40 +355,33 @@ class OSEmailService {
 
     /**
      * Obtém logo do Grupo GGV em Base64 (inline, sempre aparece)
+     * Usa Netlify Function para evitar CORS
      */
     private async getLogoBase64(): Promise<string> {
         try {
-            // Buscar URL do logo
-            const { data, error } = await supabase
-                .from('brand_logos')
-                .select('url')
-                .eq('key', 'grupo_ggv')
-                .single();
+            console.log('📥 Buscando logo via Netlify Function (bypass CORS)...');
 
-            const logoUrl = (error || !data?.url)
-                ? 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png'
-                : data.url;
+            // Usar Netlify Function que já existe para buscar logo
+            const functionUrl = window.location.hostname === 'localhost'
+                ? 'http://localhost:8888/.netlify/functions/get-logo-base64'
+                : '/.netlify/functions/get-logo-base64';
 
-            console.log('📥 Baixando logo para Base64:', logoUrl);
-
-            // Baixar imagem
-            const response = await fetch(logoUrl);
+            const response = await fetch(functionUrl);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            // Converter para Base64
-            const arrayBuffer = await response.arrayBuffer();
-            const base64 = this.arrayBufferToBase64(arrayBuffer);
-            const mimeType = response.headers.get('content-type') || 'image/png';
-            
-            const dataUri = `data:${mimeType};base64,${base64}`;
-            console.log(`✅ Logo convertido para Base64 (${Math.round(dataUri.length / 1024)} KB)`);
-            
-            return dataUri;
+            const { dataURI } = await response.json();
+            if (!dataURI) {
+                throw new Error('Data URI não recebido da Netlify Function');
+            }
+
+            console.log(`✅ Logo convertido para Base64 (${Math.round(dataURI.length / 1024)} KB)`);
+            return dataURI;
         } catch (e) {
-            console.error('❌ Erro ao converter logo para Base64:', e);
+            console.error('❌ Erro ao buscar logo via Netlify Function:', e);
             // Fallback: SVG inline
+            console.log('⚠️ Usando fallback SVG inline');
             return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTgwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxODAiIGhlaWdodD0iNDAiIGZpbGw9IiNGM0Y0RjYiLz48dGV4dCB4PSI5MCIgeT0iMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzZCNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+R1JVUE8gR0dWPC90ZXh0Pjwvc3ZnPg==';
         }
     }
