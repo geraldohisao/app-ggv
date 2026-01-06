@@ -54,7 +54,7 @@ class OSEmailService {
     async sendSignatureRequest(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoBase64 = await this.getLogoBase64();
+            const logoUrl = await this.getLogoUrl();
 
             // Link direto para este documento
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
@@ -77,7 +77,7 @@ class OSEmailService {
                 expiresAt,
                 totalSigners: order.total_signers || 0,
                 signatureLink,
-                logoHTML: `<img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
+                logoHTML: `<img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
             });
 
             // Enviar via Resend (confiável, não depende de autenticação)
@@ -140,14 +140,14 @@ class OSEmailService {
     async sendReminder(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoBase64 = await this.getLogoBase64();
+            const logoUrl = await this.getLogoUrl();
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
 
             const emailHTML = this.createReminderTemplate({
                 signerName: signer.name,
                 orderTitle: order.title,
                 signatureLink,
-                logoHTML: `<img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
+                logoHTML: `<img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
             });
 
             await this.sendEmail({
@@ -191,7 +191,7 @@ class OSEmailService {
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
           <div style="text-align:center; margin-bottom: 24px;">
-            <img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
+            <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
           </div>
           <h2 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; text-align:center; color:#111827;">
             Documento cancelado
@@ -306,7 +306,7 @@ class OSEmailService {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center" style="padding:16px 0;">
-                <img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
+                <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
               </td>
             </tr>
           </table>
@@ -354,35 +354,26 @@ class OSEmailService {
     }
 
     /**
-     * Obtém logo do Grupo GGV em Base64 (inline, sempre aparece)
-     * Usa Netlify Function para evitar CORS
+     * Obtém URL do logo do Grupo GGV (URL externa - igual ao diagnóstico)
      */
-    private async getLogoBase64(): Promise<string> {
+    private async getLogoUrl(): Promise<string> {
         try {
-            console.log('📥 Buscando logo via Netlify Function (bypass CORS)...');
+            const { data, error } = await supabase
+                .from('brand_logos')
+                .select('url')
+                .eq('key', 'grupo_ggv')
+                .single();
 
-            // Usar Netlify Function que já existe para buscar logo
-            const functionUrl = window.location.hostname === 'localhost'
-                ? 'http://localhost:8888/.netlify/functions/get-logo-base64'
-                : '/.netlify/functions/get-logo-base64';
-
-            const response = await fetch(functionUrl);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            if (error || !data?.url) {
+                console.warn('⚠️ Falha ao buscar logo do brand_logos, usando fallback');
+                return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
             }
 
-            const { dataURI } = await response.json();
-            if (!dataURI) {
-                throw new Error('Data URI não recebido da Netlify Function');
-            }
-
-            console.log(`✅ Logo convertido para Base64 (${Math.round(dataURI.length / 1024)} KB)`);
-            return dataURI;
+            console.log('✅ Logo URL:', data.url);
+            return data.url;
         } catch (e) {
-            console.error('❌ Erro ao buscar logo via Netlify Function:', e);
-            // Fallback: SVG inline
-            console.log('⚠️ Usando fallback SVG inline');
-            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTgwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxODAiIGhlaWdodD0iNDAiIGZpbGw9IiNGM0Y0RjYiLz48dGV4dCB4PSI5MCIgeT0iMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzZCNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+R1JVUE8gR0dWPC90ZXh0Pjwvc3ZnPg==';
+            console.error('❌ Erro ao buscar logo:', e);
+            return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
         }
     }
 
@@ -418,11 +409,10 @@ class OSEmailService {
             console.log('📧 OS EMAIL - Assunto:', params.subject);
             console.log('📧 OS EMAIL - Tamanho HTML:', params.html.length);
             
-            // Verificar se o logo está no HTML (Base64)
-            const logoMatch = params.html.match(/<img[^>]+src="(data:image[^"]+)"[^>]*alt="GRUPO GGV"/);
+            // Verificar se o logo está no HTML
+            const logoMatch = params.html.match(/<img[^>]+src="([^"]+)"[^>]*alt="GRUPO GGV"/);
             if (logoMatch) {
-                const logoSize = Math.round(logoMatch[1].length / 1024);
-                console.log(`✅ OS EMAIL - Logo Base64 encontrado no HTML (${logoSize} KB)`);
+                console.log(`✅ OS EMAIL - Logo URL encontrado no HTML:`, logoMatch[1]);
             } else {
                 console.warn('⚠️ OS EMAIL - Logo NÃO encontrado no HTML!');
             }
