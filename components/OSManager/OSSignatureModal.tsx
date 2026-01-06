@@ -370,19 +370,11 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
             const originalPage = pdfDoc.getPage(i);
             const { width: pageWidth } = originalPage.getSize();
             
-            // Rodapé esquerdo pequeno (estilo Clicksign)
-            originalPage.drawText(`ggvinteligencia.com.br`, {
-                x: 20,
-                y: 10,
-                size: 7,
-                font: font,
-                color: rgb(0.5, 0.5, 0.5)
-            });
-            
+            // Rodapé esquerdo: apenas código de autenticação
             originalPage.drawText(`Autenticação: ${authCode}`, {
                 x: 20,
-                y: 20,
-                size: 6,
+                y: 15,
+                size: 7,
                 font: font,
                 color: rgb(0.6, 0.6, 0.6)
             });
@@ -601,19 +593,11 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
         });
 
         // ========== RODAPÉ DA PÁGINA DE TERMO ==========
-        // Rodapé esquerdo (autenticação)
-        page.drawText(`ggvinteligencia.com.br`, {
-            x: 20,
-            y: 10,
-            size: 7,
-            font: font,
-            color: rgb(0.5, 0.5, 0.5)
-        });
-        
+        // Rodapé esquerdo: apenas código de autenticação
         page.drawText(`Autenticação: ${authCode}`, {
             x: 20,
-            y: 20,
-            size: 6,
+            y: 15,
+            size: 7,
             font: font,
             color: rgb(0.6, 0.6, 0.6)
         });

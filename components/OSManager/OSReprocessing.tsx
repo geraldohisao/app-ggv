@@ -133,19 +133,11 @@ export const OSReprocessing: React.FC = () => {
             const originalPage = pdfDoc.getPage(i);
             const { width: pageWidth } = originalPage.getSize();
             
-            // Rodapé esquerdo pequeno (estilo Clicksign)
-            originalPage.drawText(`ggvinteligencia.com.br`, {
-                x: 20,
-                y: 10,
-                size: 7,
-                font: font,
-                color: rgb(0.5, 0.5, 0.5)
-            });
-            
+            // Rodapé esquerdo: apenas código de autenticação
             originalPage.drawText(`Autenticação: ${authCode}`, {
                 x: 20,
-                y: 20,
-                size: 6,
+                y: 15,
+                size: 7,
                 font: font,
                 color: rgb(0.6, 0.6, 0.6)
             });
@@ -338,18 +330,10 @@ export const OSReprocessing: React.FC = () => {
         });
         
         // Rodapé da página de termo
-        page.drawText(`ggvinteligencia.com.br`, {
-            x: 20,
-            y: 10,
-            size: 7,
-            font: font,
-            color: rgb(0.5, 0.5, 0.5)
-        });
-        
         page.drawText(`Autenticação: ${authCode}`, {
             x: 20,
-            y: 20,
-            size: 6,
+            y: 15,
+            size: 7,
             font: font,
             color: rgb(0.6, 0.6, 0.6)
         });
