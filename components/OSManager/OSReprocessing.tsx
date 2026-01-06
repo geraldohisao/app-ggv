@@ -125,69 +125,122 @@ export const OSReprocessing: React.FC = () => {
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        const marginX = 50;
-        const marginY = 50;
-        let cursorY = height - 60;
-        const lineHeight = 14;
+        const marginX = 60;
+        const marginY = 60;
+        let cursorY = height - 70;
+        const contentWidth = width - (2 * marginX);
 
-        const drawBox = (x: number, y: number, w: number, h: number, bgColor = rgb(0.95, 0.95, 0.95)) => {
+        const drawBox = (x: number, y: number, w: number, h: number, bgColor = rgb(0.98, 0.98, 0.98)) => {
             page.drawRectangle({ 
                 x, y, width: w, height: h, 
                 color: bgColor, 
-                borderWidth: 1, 
-                borderColor: rgb(0.8, 0.8, 0.8) 
+                borderWidth: 1.5, 
+                borderColor: rgb(0.85, 0.85, 0.85) 
             });
         };
 
-        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number] } = {}) => {
+        const wrapText = (text: string, maxWidth: number, size: number, fontUsed: any) => {
+            const words = text.split(' ');
+            const lines: string[] = [];
+            let currentLine = '';
+            words.forEach(word => {
+                const testLine = currentLine ? `${currentLine} ${word}` : word;
+                const width = fontUsed.widthOfTextAtSize(testLine, size);
+                if (width > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+            if (currentLine) lines.push(currentLine);
+            return lines;
+        };
+
+        const write = (text: string, options: { bold?: boolean; size?: number; x?: number; colorRgb?: [number, number, number]; lineHeight?: number; maxWidth?: number } = {}) => {
             const size = options.size || 11;
             const usedFont = options.bold ? fontBold : font;
             const xPos = options.x !== undefined ? options.x : marginX;
-            const textColor = options.colorRgb ? rgb(options.colorRgb[0], options.colorRgb[1], options.colorRgb[2]) : rgb(0.2, 0.2, 0.2);
-            page.drawText(text, { x: xPos, y: cursorY, size, font: usedFont, color: textColor });
-            cursorY -= size + lineHeight - size;
+            const textColor = options.colorRgb ? rgb(options.colorRgb[0], options.colorRgb[1], options.colorRgb[2]) : rgb(0.15, 0.15, 0.15);
+            const lh = options.lineHeight || (size * 1.4);
+            const maxW = options.maxWidth || contentWidth;
+
+            const lines = wrapText(text, maxW, size, usedFont);
+            lines.forEach(line => {
+                page.drawText(line, { x: xPos, y: cursorY, size, font: usedFont, color: textColor });
+                cursorY -= lh;
+            });
         };
 
-        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 18, colorRgb: [0, 0, 0] });
-        cursorY -= 20;
-
-        write(`Documento: ${baseOrder.file_name}`, { bold: true, size: 12 });
-        write(`Título: ${baseOrder.title}`, { size: 11 });
-        cursorY -= 8;
-
-        drawBox(marginX - 10, cursorY - 5, width - 2 * marginX + 20, 30);
-        cursorY += 5;
-        write(`Hash do documento original (SHA256):`, { bold: true, size: 10 });
-        const hashText = baseOrder.file_hash || 'Não disponível';
-        write(hashText.substring(0, 64), { size: 9, x: marginX + 10 });
-        if (hashText.length > 64) write(hashText.substring(64), { size: 9, x: marginX + 10 });
-        cursorY -= 20;
-
-        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`, { size: 10 });
+        // Cabeçalho
+        write('TERMO DE ASSINATURA DIGITAL', { bold: true, size: 22, colorRgb: [0, 0, 0], lineHeight: 30 });
         cursorY -= 25;
 
-        write('Assinaturas', { bold: true, size: 14, colorRgb: [0, 0, 0] });
-        cursorY -= 15;
+        // Informações do documento
+        write('INFORMAÇÕES DO DOCUMENTO', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
+        cursorY -= 5;
 
-        signersList.filter(s => s.status === 'SIGNED').forEach((s, idx) => {
-            const boxHeight = 120;
-            drawBox(marginX - 10, cursorY - boxHeight + 15, width - 2 * marginX + 20, boxHeight, rgb(0.98, 0.98, 0.98));
+        const docBoxY = cursorY - 75;
+        drawBox(marginX - 10, docBoxY, contentWidth + 20, 75, rgb(0.97, 0.97, 0.97));
+        cursorY -= 10;
+
+        write(`Documento: ${baseOrder.file_name}`, { size: 11, lineHeight: 16 });
+        write(`Título: ${baseOrder.title}`, { size: 11, lineHeight: 16 });
+        write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`, { size: 10, colorRgb: [0.3, 0.3, 0.3], lineHeight: 16 });
+        
+        cursorY = docBoxY - 25;
+
+        // Hash do documento
+        write('HASH DO DOCUMENTO ORIGINAL (SHA-256)', { bold: true, size: 11, colorRgb: [0.25, 0.25, 0.25], lineHeight: 18 });
+        cursorY -= 5;
+
+        const hashBoxY = cursorY - 35;
+        drawBox(marginX - 10, hashBoxY, contentWidth + 20, 35, rgb(0.95, 0.97, 1));
+        cursorY -= 10;
+
+        const hashText = baseOrder.file_hash || 'Não disponível';
+        write(hashText, { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14, maxWidth: contentWidth - 20, x: marginX + 10 });
+        
+        cursorY = hashBoxY - 30;
+
+        // Assinaturas
+        write('ASSINATURAS COLETADAS', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
+        cursorY -= 10;
+
+        const signedList = signersList.filter(s => s.status === 'SIGNED');
+        
+        signedList.forEach((s, idx) => {
+            const sigBoxHeight = 150;
+            const sigBoxY = cursorY - sigBoxHeight + 10;
             
-            write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 11 });
-            write(`    E-mail: ${s.email}`, { size: 10 });
-            write(`    CPF: ${s.cpf || 'Não informado'}`, { size: 10 });
-            write(`    Papel: ${s.role || 'Colaborador'}`, { size: 10 });
-            write(`    Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10 });
-            write(`    IP: ${s.ip_address || 'Não disponível'}`, { size: 9 });
-            write(`    User Agent: ${(s.user_agent || '').substring(0, 80)}${s.user_agent && s.user_agent.length > 80 ? '...' : ''}`, { size: 8 });
-            write(`    Hash da assinatura: ${(s.signature_hash || 'Não disponível').substring(0, 60)}`, { size: 8 });
+            // Box com fundo alternado
+            const boxBg = idx % 2 === 0 ? rgb(0.98, 0.98, 0.98) : rgb(0.96, 0.97, 0.98);
+            drawBox(marginX - 10, sigBoxY, contentWidth + 20, sigBoxHeight, boxBg);
             
-            cursorY -= 15;
+            cursorY -= 18;
+            
+            // Nome com destaque
+            write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 12, colorRgb: [0, 0, 0], lineHeight: 18 });
+            
+            // Informações organizadas
+            write(`E-mail: ${s.email}`, { size: 10, lineHeight: 14, x: marginX });
+            write(`CPF: ${s.cpf || 'Não informado'}`, { size: 10, lineHeight: 14, x: marginX });
+            write(`Função: ${s.role || 'Colaborador'}`, { size: 10, lineHeight: 14, x: marginX });
+            write(`Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10, lineHeight: 14, x: marginX });
+            
+            cursorY -= 4;
+            
+            // Dados técnicos (menor) com quebra automática
+            write(`IP: ${s.ip_address || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX });
+            write(`User Agent: ${s.user_agent || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX, maxWidth: contentWidth });
+            write(`Hash da assinatura: ${s.signature_hash || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX, maxWidth: contentWidth });
+            
+            cursorY = sigBoxY - 25;
         });
 
-        cursorY = marginY + 20;
-        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 9, colorRgb: [0.4, 0.4, 0.4] });
-        write('Datas e horários em GMT -03:00 Brasília', { size: 8, colorRgb: [0.5, 0.5, 0.5] });
+        cursorY = marginY + 25;
+        write('Observação: Este termo consolida as evidências de assinatura deste documento.', { size: 9, colorRgb: [0.4, 0.4, 0.4], maxWidth: contentWidth });
+        write('Datas e horários em GMT -03:00 Brasília', { size: 8, colorRgb: [0.5, 0.5, 0.5], maxWidth: contentWidth });
 
         const finalBytes = await pdfDoc.save();
 
