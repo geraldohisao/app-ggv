@@ -386,7 +386,9 @@ class OSEmailService {
                 content: base64,
                 type: contentType,
                 disposition: 'inline',
-                content_id: 'logo_ggv' // Content-ID para usar em <img src="cid:logo_ggv">
+                headers: {
+                    'Content-ID': '<logo_ggv>' // CRÍTICO: brackets <> para Gmail
+                }
             };
         } catch (error) {
             console.error('❌ Erro ao preparar logo:', error);
