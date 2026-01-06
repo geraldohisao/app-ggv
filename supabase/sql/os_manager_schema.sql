@@ -444,3 +444,22 @@ COMMENT ON TABLE service_orders IS 'Tabela principal de Ordens de Serviço para 
 COMMENT ON TABLE os_signers IS 'Assinantes de cada Ordem de Serviço';
 COMMENT ON TABLE os_audit_log IS 'Log de auditoria de todas as ações em OS';
 
+-- =========================================
+-- 9. EXTRAÇÃO AUTOMÁTICA (METADADOS DA OS)
+-- =========================================
+-- Campos para armazenar o resultado da extração (valor/pessoa) logo após upload
+-- Mantém a integridade do restante do sistema
+
+ALTER TABLE service_orders
+    ADD COLUMN IF NOT EXISTS extracted_valor TEXT,
+    ADD COLUMN IF NOT EXISTS extracted_pessoa TEXT,
+    ADD COLUMN IF NOT EXISTS extraction_confidence NUMERIC(3,2),
+    ADD COLUMN IF NOT EXISTS extraction_status TEXT DEFAULT 'PENDING' CHECK (
+        extraction_status IN ('PENDING', 'SUCCESS', 'REVIEW', 'ERROR')
+    ),
+    ADD COLUMN IF NOT EXISTS extraction_log JSONB DEFAULT '{}'::jsonb;
+
+-- Índice para consultas rápidas pelo status de extração
+CREATE INDEX IF NOT EXISTS idx_service_orders_extraction_status
+    ON service_orders(extraction_status);
+
