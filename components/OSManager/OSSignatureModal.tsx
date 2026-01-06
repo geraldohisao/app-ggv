@@ -357,10 +357,49 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
 
         const originalBytes = await data.arrayBuffer();
         const pdfDoc = await PDFDocument.load(originalBytes);
-        const page = pdfDoc.addPage();
-        const { width, height } = page.getSize();
+        
+        // Embed fonts
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        
+        // 🔐 ADICIONAR RODAPÉ DE AUTENTICAÇÃO EM TODAS AS PÁGINAS DO ORIGINAL
+        const authCode = baseOrder.file_hash?.substring(0, 18) || 'N/A';
+        const totalOriginalPages = pdfDoc.getPageCount();
+        
+        for (let i = 0; i < totalOriginalPages; i++) {
+            const originalPage = pdfDoc.getPage(i);
+            const { width: pageWidth } = originalPage.getSize();
+            
+            // Rodapé esquerdo pequeno (estilo Clicksign)
+            originalPage.drawText(`ggvinteligencia.com.br`, {
+                x: 20,
+                y: 10,
+                size: 7,
+                font: font,
+                color: rgb(0.5, 0.5, 0.5)
+            });
+            
+            originalPage.drawText(`Autenticação: ${authCode}`, {
+                x: 20,
+                y: 20,
+                size: 6,
+                font: font,
+                color: rgb(0.6, 0.6, 0.6)
+            });
+            
+            // Numeração de página (canto direito)
+            originalPage.drawText(`${i + 1}`, {
+                x: pageWidth - 30,
+                y: 15,
+                size: 9,
+                font: font,
+                color: rgb(0.4, 0.4, 0.4)
+            });
+        }
+        
+        // 📄 ADICIONAR PÁGINA DE TERMO
+        const page = pdfDoc.addPage();
+        const { width, height } = page.getSize();
 
         const marginX = 60;
         const marginY = 60;
@@ -459,43 +498,135 @@ const OSSignatureModal: React.FC<OSSignatureModalProps> = ({
 
         const signedList = signersList.filter(s => s.status === 'SIGNED');
         
+        // Função para desenhar check verde (círculo + check)
+        const drawCheckmark = (x: number, y: number) => {
+            // Círculo verde
+            page.drawCircle({
+                x: x + 6,
+                y: y + 4,
+                size: 6,
+                color: rgb(0.13, 0.77, 0.29), // Verde similar ao Clicksign
+                borderWidth: 1,
+                borderColor: rgb(0.13, 0.77, 0.29)
+            });
+            
+            // Check (linha simples como "✓")
+            page.drawLine({
+                start: { x: x + 3, y: y + 4 },
+                end: { x: x + 5, y: y + 2 },
+                thickness: 1.5,
+                color: rgb(1, 1, 1),
+                lineCap: 1 as any
+            });
+            page.drawLine({
+                start: { x: x + 5, y: y + 2 },
+                end: { x: x + 9, y: y + 6 },
+                thickness: 1.5,
+                color: rgb(1, 1, 1),
+                lineCap: 1 as any
+            });
+        };
+        
         signedList.forEach((s, idx) => {
-            const sigBoxHeight = 150;
+            const sigBoxHeight = 140;
             const sigBoxY = cursorY - sigBoxHeight + 10;
             
-            // Box com fundo alternado
-            const boxBg = idx % 2 === 0 ? rgb(0.98, 0.98, 0.98) : rgb(0.96, 0.97, 0.98);
-            drawBox(marginX - 10, sigBoxY, contentWidth + 20, sigBoxHeight, boxBg);
+            // Box limpo (sem fundo alternado, mais clean)
+            drawBox(marginX - 10, sigBoxY, contentWidth + 20, sigBoxHeight, rgb(0.99, 0.99, 0.99));
             
             cursorY -= 18;
             
-            // Nome com destaque
-            write(`${idx + 1}. ${s.name || s.email}`, { bold: true, size: 12, colorRgb: [0, 0, 0], lineHeight: 18 });
+            // ✅ Check verde + Nome
+            drawCheckmark(marginX, cursorY);
+            write(`${s.name || s.email}`, { bold: true, size: 11, colorRgb: [0, 0, 0], lineHeight: 16, x: marginX + 25 });
             
-            // Informações organizadas
-            write(`E-mail: ${s.email}`, { size: 10, lineHeight: 14, x: marginX });
-            write(`CPF: ${s.cpf || 'Não informado'}`, { size: 10, lineHeight: 14, x: marginX });
-            write(`Função: ${s.role || 'Colaborador'}`, { size: 10, lineHeight: 14, x: marginX });
-            write(`Assinado em: ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 10, lineHeight: 14, x: marginX });
+            // Informações organizadas (estilo Clicksign: mais compacto)
+            write(`CPF: ${s.cpf || 'Não informado'}`, { size: 9.5, lineHeight: 13, x: marginX + 25 });
+            write(`Assinou como ${s.role || 'Colaborador'} em ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 9, colorRgb: [0.3, 0.3, 0.3], lineHeight: 13, x: marginX + 25 });
             
-            cursorY -= 4;
+            cursorY -= 5;
             
-            // Dados técnicos (menor) com quebra automática
-            write(`IP: ${s.ip_address || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX });
-            write(`User Agent: ${s.user_agent || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX, maxWidth: contentWidth });
-            write(`Hash da assinatura: ${s.signature_hash || 'Não disponível'}`, { size: 8.5, colorRgb: [0.35, 0.35, 0.35], lineHeight: 12, x: marginX, maxWidth: contentWidth });
+            // Dados técnicos (bem pequenos, estilo Clicksign)
+            write(`Pontos de autenticação: Token via E-mail; Nome Completo; CPF`, { size: 7.5, colorRgb: [0.45, 0.45, 0.45], lineHeight: 11, x: marginX + 25 });
+            write(`Dados informados pelo Operador: ${s.cpf || 'N/A'}`, { size: 7.5, colorRgb: [0.45, 0.45, 0.45], lineHeight: 11, x: marginX + 25 });
+            write(`IP: ${s.ip_address || 'N/A'} | Navegador: ${(s.user_agent || 'N/A').substring(0, 60)}...`, { size: 7, colorRgb: [0.5, 0.5, 0.5], lineHeight: 10, x: marginX + 25, maxWidth: contentWidth - 30 });
             
-            cursorY = sigBoxY - 25;
+            cursorY = sigBoxY - 20;
+        });
+        
+        // ========== LOG DE EVENTOS ==========
+        cursorY -= 15;
+        write('Log', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
+        cursorY -= 10;
+        
+        // Criar logs baseado nas assinaturas
+        const logs: Array<{date: string; action: string; user: string}> = [];
+        
+        // Log de criação
+        logs.push({
+            date: new Date(baseOrder.created_at).toLocaleString('pt-BR'),
+            action: 'Documento criado e enviado para assinatura',
+            user: 'Sistema GGV'
+        });
+        
+        // Logs de assinaturas
+        signedList.forEach(s => {
+            if (s.signed_at) {
+                logs.push({
+                    date: new Date(s.signed_at).toLocaleString('pt-BR'),
+                    action: `Assinado por ${s.name || s.email}`,
+                    user: s.email
+                });
+            }
+        });
+        
+        // Log de conclusão
+        logs.push({
+            date: new Date().toLocaleString('pt-BR'),
+            action: 'Documento concluído e finalizado',
+            user: 'Sistema GGV'
+        });
+        
+        logs.forEach((log, idx) => {
+            const logBoxH = 35;
+            const logBoxY = cursorY - logBoxH + 5;
+            
+            drawBox(marginX - 10, logBoxY, contentWidth + 20, logBoxH, rgb(0.97, 0.99, 0.97));
+            cursorY -= 10;
+            
+            write(`${log.date}`, { bold: true, size: 8.5, colorRgb: [0.25, 0.25, 0.25], lineHeight: 11 });
+            write(`${log.action}`, { size: 8, colorRgb: [0.35, 0.35, 0.35], lineHeight: 11 });
+            
+            cursorY = logBoxY - 10;
         });
 
-        // ========== RODAPÉ ==========
-        drawLine(marginY + 40);
-        cursorY = marginY + 25;
+        // ========== RODAPÉ DA PÁGINA DE TERMO ==========
+        // Rodapé esquerdo (autenticação)
+        page.drawText(`ggvinteligencia.com.br`, {
+            x: 20,
+            y: 10,
+            size: 7,
+            font: font,
+            color: rgb(0.5, 0.5, 0.5)
+        });
         
-        write('Este termo consolida as evidências de assinatura eletrônica deste documento e possui validade jurídica.', 
-            { size: 9, colorRgb: [0.35, 0.35, 0.35], lineHeight: 13, x: marginX + 5 });
-        write('Datas e horários em GMT-03:00 Brasília | Documento gerado automaticamente pelo Sistema GGV', 
-            { size: 8, colorRgb: [0.5, 0.5, 0.5], lineHeight: 12, x: marginX + 5 });
+        page.drawText(`Autenticação: ${authCode}`, {
+            x: 20,
+            y: 20,
+            size: 6,
+            font: font,
+            color: rgb(0.6, 0.6, 0.6)
+        });
+        
+        // Numeração (última página)
+        const totalPages = pdfDoc.getPageCount();
+        page.drawText(`${totalPages}`, {
+            x: width - 30,
+            y: 15,
+            size: 9,
+            font: font,
+            color: rgb(0.4, 0.4, 0.4)
+        });
 
         const finalBytes = await pdfDoc.save();
 
