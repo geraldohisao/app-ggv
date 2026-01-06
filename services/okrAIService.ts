@@ -208,38 +208,99 @@ export async function generateStrategicMapWithAI(context: string): Promise<Strat
 }
 
 /**
- * Salva um mapa estratégico no Supabase
+ * Salva um mapa estratégico no Supabase (novo ou atualização)
  */
 export async function saveStrategicMap(map: StrategicMap, userId: string): Promise<string> {
   try {
-    const { data, error } = await supabase
+    const mapData = {
+      user_id: userId,
+      company_name: map.company_name,
+      date: map.date,
+      mission: map.mission,
+      vision: map.vision,
+      values: map.values || [],
+      motors: map.motors || [],
+      objectives: map.objectives || [],
+      action_plans: map.actionPlans || [],
+      roles: map.roles || [],
+      rituals: map.rituals || [],
+      tracking: map.tracking || []
+    };
+
+    // Se tem ID, atualiza. Se não, cria novo
+    if (map.id) {
+      const { error } = await supabase
+        .from('strategic_maps')
+        .update(mapData)
+        .eq('id', map.id)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('❌ Erro ao atualizar mapa estratégico:', error);
+        throw error;
+      }
+
+      console.log('✅ Mapa estratégico atualizado com sucesso!');
+      return map.id;
+    } else {
+      const { data, error } = await supabase
+        .from('strategic_maps')
+        .insert(mapData)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao criar mapa estratégico:', error);
+        throw error;
+      }
+
+      console.log('✅ Mapa estratégico criado com sucesso!');
+      return data.id;
+    }
+  } catch (error) {
+    console.error('❌ Erro ao salvar mapa estratégico:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deleta um mapa estratégico
+ */
+export async function deleteStrategicMap(mapId: string, userId: string): Promise<void> {
+  try {
+    const { error } = await supabase
       .from('strategic_maps')
-      .insert({
-        user_id: userId,
-        company_name: map.company_name,
-        date: map.date,
-        mission: map.mission,
-        vision: map.vision,
-        values: map.values,
-        motors: map.motors,
-        objectives: map.objectives,
-        action_plans: map.actionPlans,
-        roles: map.roles,
-        rituals: map.rituals,
-        tracking: map.tracking
-      })
-      .select('id')
-      .single();
+      .delete()
+      .eq('id', mapId)
+      .eq('user_id', userId);
 
     if (error) {
-      console.error('❌ Erro ao salvar mapa estratégico:', error);
+      console.error('❌ Erro ao deletar mapa estratégico:', error);
       throw error;
     }
 
-    console.log('✅ Mapa estratégico salvo com sucesso!');
-    return data.id;
+    console.log('✅ Mapa estratégico deletado com sucesso!');
   } catch (error) {
-    console.error('❌ Erro ao salvar mapa estratégico:', error);
+    console.error('❌ Erro ao deletar mapa estratégico:', error);
+    throw error;
+  }
+}
+
+/**
+ * Duplica um mapa estratégico
+ */
+export async function duplicateStrategicMap(map: StrategicMap, userId: string): Promise<string> {
+  try {
+    const duplicatedMap = {
+      ...map,
+      id: undefined, // Remove o ID para criar novo
+      company_name: `${map.company_name} (Cópia)`,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    return await saveStrategicMap(duplicatedMap, userId);
+  } catch (error) {
+    console.error('❌ Erro ao duplicar mapa estratégico:', error);
     throw error;
   }
 }
@@ -263,6 +324,92 @@ export async function listStrategicMaps(userId: string): Promise<StrategicMap[]>
     return data as StrategicMap[];
   } catch (error) {
     console.error('❌ Erro ao listar mapas estratégicos:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gera análise executiva com IA baseada no mapa estratégico
+ */
+export async function generateExecutiveAnalysis(map: StrategicMap): Promise<string> {
+  console.log('🤖 Gerando análise executiva...');
+  
+  const apiKey = await getOpenAIApiKey();
+  if (!apiKey) {
+    throw new Error('OpenAI API Key não configurada');
+  }
+
+  const prompt = `Analise o seguinte mapa estratégico e gere um resumo executivo detalhado:
+
+**Empresa:** ${map.company_name}
+**Data:** ${map.date}
+
+**IDENTIDADE:**
+- Missão: ${map.mission || 'Não definida'}
+- Visão: ${map.vision || 'Não definida'}
+- Valores: ${map.values?.join(', ') || 'Não definidos'}
+
+**OBJETIVOS ESTRATÉGICOS:**
+${map.objectives?.map(obj => `
+- ${obj.title}
+  KPIs: ${obj.kpis?.map(kpi => `${kpi.name} (${kpi.frequency}): ${kpi.target}`).join(', ')}
+`).join('\n') || 'Nenhum objetivo definido'}
+
+**MOTORES ESTRATÉGICOS:**
+${map.motors?.map(motor => `
+- ${motor.name}
+  Estratégias: ${motor.strategies?.map(s => s.text).join(', ')}
+`).join('\n') || 'Nenhum motor definido'}
+
+**ANÁLISE SOLICITADA:**
+1. Avalie a coerência entre missão, visão e objetivos
+2. Identifique pontos fortes e oportunidades de melhoria
+3. Analise a viabilidade dos KPIs definidos
+4. Sugira ações prioritárias
+5. Destaque riscos potenciais
+
+Forneça uma análise executiva profissional em formato markdown, com no máximo 500 palavras.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um consultor de estratégia empresarial sênior especializado em OKRs e planejamento estratégico.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const analysis = data.choices?.[0]?.message?.content;
+
+    if (!analysis) {
+      throw new Error('OpenAI retornou resposta vazia');
+    }
+
+    console.log('✅ Análise executiva gerada!');
+    return analysis;
+
+  } catch (error) {
+    console.error('❌ Erro ao gerar análise:', error);
     throw error;
   }
 }

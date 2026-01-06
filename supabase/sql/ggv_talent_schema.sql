@@ -202,3 +202,5 @@ CREATE INDEX IF NOT EXISTS idx_talent_alignments_user ON talent_alignments(user_
 CREATE INDEX IF NOT EXISTS idx_talent_feedbacks_user ON talent_feedbacks(user_id);
 CREATE INDEX IF NOT EXISTS idx_talent_ninebox_user ON talent_ninebox(user_id);
 
+
+

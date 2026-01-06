@@ -32,3 +32,5 @@ export const TalentAlignmentsView: React.FC<AlignmentsProps> = ({ alignments }) 
   );
 };
 
+
+

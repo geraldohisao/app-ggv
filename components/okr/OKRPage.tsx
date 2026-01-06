@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
+import OKRDashboard from './OKRDashboard';
 import OKRContextForm from './OKRContextForm';
 import StrategicMapBuilder from './StrategicMapBuilder';
 import { StrategicMap } from '../../types';
 import { generateStrategicMapWithAI } from '../../services/okrAIService';
 
-type ViewMode = 'initial' | 'context-form' | 'map-builder' | 'generating' | 'dashboard';
+type ViewMode = 'dashboard' | 'initial' | 'context-form' | 'map-builder' | 'generating';
 
 const OKRPage: React.FC = () => {
-  const [viewMode, setViewMode] = useState<ViewMode>('initial');
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentMap, setCurrentMap] = useState<StrategicMap | null>(null);
   const [contextData, setContextData] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -59,10 +60,31 @@ const OKRPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    setViewMode('initial');
+    setViewMode('dashboard');
     setCurrentMap(null);
     setContextData('');
   };
+
+  const handleCreateNew = () => {
+    setCurrentMap(null);
+    setContextData('');
+    setViewMode('initial');
+  };
+
+  const handleEditMap = (map: StrategicMap) => {
+    setCurrentMap(map);
+    setViewMode('map-builder');
+  };
+
+  // Dashboard View
+  if (viewMode === 'dashboard') {
+    return (
+      <OKRDashboard 
+        onCreateNew={handleCreateNew}
+        onEditMap={handleEditMap}
+      />
+    );
+  }
 
   if (viewMode === 'generating') {
     return (
@@ -102,6 +124,7 @@ const OKRPage: React.FC = () => {
       <StrategicMapBuilder
         initialMap={currentMap}
         onBack={handleBack}
+        onSaveSuccess={handleBack}
         contextData={contextData}
       />
     );
@@ -127,20 +150,16 @@ const OKRPage: React.FC = () => {
           <div className="mb-8">
             <textarea
               className="w-full h-48 px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none text-slate-700 placeholder-slate-400"
-              placeholder="Digite ou fale sobre o contexto da empresa aqui... (Ex: Somos uma consultoria querendo dobrar o faturamento...)"
+              placeholder="Digite sobre o contexto da empresa aqui... (Ex: Somos uma consultoria querendo dobrar o faturamento...)"
             />
             
-            {/* Upload and Voice Buttons */}
+            {/* Upload Button Only */}
             <div className="flex gap-3 mt-3 justify-end">
-              <button className="p-3 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors">
-                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="px-6 py-3 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-2 font-semibold text-slate-700">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-              </button>
-              <button className="p-3 rounded-lg bg-slate-900 hover:bg-slate-800 transition-colors">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
+                Upload de Arquivos
               </button>
             </div>
           </div>
@@ -186,4 +205,3 @@ const OKRPage: React.FC = () => {
 };
 
 export default OKRPage;
-

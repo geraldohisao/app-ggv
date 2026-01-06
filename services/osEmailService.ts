@@ -355,26 +355,11 @@ class OSEmailService {
     }
 
     /**
-     * Obtém URL pública do logo (tabela brand_logos) com fallback seguro
+     * Obtém URL pública do logo (EXATAMENTE igual ao diagnóstico)
      */
     private async getLogoUrl(): Promise<string> {
-        try {
-            const { data, error } = await supabase
-                .from('brand_logos')
-                .select('url')
-                .eq('key', 'grupo_ggv')
-                .single();
-
-            if (error) throw error;
-            if (data?.url) {
-                return data.url;
-            }
-        } catch (e) {
-            console.warn('⚠️ Falha ao buscar logo no brand_logos, usando fallback:', e);
-        }
-
-        // Fallback padrão (mesmo usado no diagnóstico público)
-        return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
+        // Usar EXATAMENTE o mesmo logo que funciona no diagnóstico (linha 159 do EmailModal.tsx)
+        return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png';
     }
 
     /**

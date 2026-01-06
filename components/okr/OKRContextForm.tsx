@@ -49,7 +49,7 @@ const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack }) => 
             Contexto da Empresa
           </h1>
           <p className="text-slate-600 mt-2">
-            Descreva sua empresa, seus objetivos, desafios e aspirações. Quanto mais detalhes, melhor será o plano estratégico gerado.
+            Descreva sua empresa, seus objetivos e desafios. Quanto mais detalhes, melhor será o plano estratégico gerado.
           </p>
         </div>
 
