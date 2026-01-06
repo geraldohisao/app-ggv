@@ -123,6 +123,10 @@ const OSManagerPage: React.FC = () => {
         setSelectedOrder(order);
     };
 
+    const handleFilterByStatus = (status: string) => {
+        setFilters(prev => ({ ...prev, status }));
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
             {/* Header */}
@@ -155,6 +159,7 @@ const OSManagerPage: React.FC = () => {
                         icon={<DocumentSignatureIcon className="w-6 h-6" />}
                         color="bg-blue-500"
                         textColor="text-blue-500"
+                        onClick={() => handleFilterByStatus('ALL')}
                     />
                     <StatCard
                         title="Aguardando"
@@ -162,6 +167,7 @@ const OSManagerPage: React.FC = () => {
                         icon={<ClockIcon className="w-6 h-6" />}
                         color="bg-amber-500"
                         textColor="text-amber-500"
+                        onClick={() => handleFilterByStatus(OSStatus.Pending)}
                     />
                     <StatCard
                         title="Parcialmente Assinadas"
@@ -169,6 +175,7 @@ const OSManagerPage: React.FC = () => {
                         icon={<ExclamationTriangleIcon className="w-6 h-6" />}
                         color="bg-orange-500"
                         textColor="text-orange-500"
+                        onClick={() => handleFilterByStatus(OSStatus.PartialSigned)}
                     />
                     <StatCard
                         title="Concluídas"
@@ -176,6 +183,7 @@ const OSManagerPage: React.FC = () => {
                         icon={<CheckCircleIcon className="w-6 h-6" />}
                         color="bg-green-500"
                         textColor="text-green-500"
+                        onClick={() => handleFilterByStatus(OSStatus.Completed)}
                     />
                 </div>
             </div>
@@ -217,11 +225,18 @@ interface StatCardProps {
     icon: React.ReactNode;
     color: string;
     textColor: string;
+    onClick?: () => void;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, textColor }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, textColor, onClick }) => {
     return (
-        <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+        <div 
+            className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-all cursor-pointer hover:scale-105 active:scale-95"
+            onClick={onClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+        >
             <div className="flex items-center justify-between">
                 <div>
                     <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
