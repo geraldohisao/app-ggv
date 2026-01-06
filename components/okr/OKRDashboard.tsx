@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StrategicMap } from '../../types';
 import { listStrategicMaps, deleteStrategicMap, duplicateStrategicMap } from '../../services/okrAIService';
 import { useUser } from '../../contexts/DirectUserContext';
+import { showSuccess, showError, showLoading, updateToastSuccess } from './utils/toast';
 
 interface OKRDashboardProps {
   onCreateNew: () => void;
@@ -61,13 +62,15 @@ const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEditMap }) =
 
     if (!confirmed) return;
 
+    const toastId = await showLoading('Deletando OKR...');
+    
     try {
       await deleteStrategicMap(mapId, user.id);
       setMaps(maps.filter(m => m.id !== mapId));
-      alert('OKR deletado com sucesso!');
+      await updateToastSuccess(toastId, '✅ OKR deletado com sucesso!');
     } catch (err) {
       console.error('Erro ao deletar:', err);
-      alert('Erro ao deletar OKR. Tente novamente.');
+      await showError('Erro ao deletar OKR. Tente novamente.');
     }
   };
 
@@ -76,13 +79,15 @@ const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEditMap }) =
     
     if (!user) return;
 
+    const toastId = await showLoading('Duplicando OKR...');
+
     try {
-      const newId = await duplicateStrategicMap(map, user.id);
-      alert('OKR duplicado com sucesso!');
-      loadMaps(); // Recarregar lista
+      await duplicateStrategicMap(map, user.id);
+      await updateToastSuccess(toastId, '✅ OKR duplicado com sucesso!');
+      loadMaps();
     } catch (err) {
       console.error('Erro ao duplicar:', err);
-      alert('Erro ao duplicar OKR. Tente novamente.');
+      await showError('Erro ao duplicar OKR. Tente novamente.');
     }
   };
 

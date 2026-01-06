@@ -3,6 +3,7 @@ import { OSSigner, SignerStatus, OSStatus } from '../../types';
 import { useUser } from '../../contexts/DirectUserContext';
 import { supabase } from '../../services/supabaseClient';
 import { osEmailService } from '../../services/osEmailService';
+import { extractOSMetadata } from '../../services/osExtractionService';
 import {
     XMarkIcon,
     CloudArrowUpIcon,
@@ -260,7 +261,19 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 
             if (osError) throw osError;
 
-            // 3. Criar registros dos assinantes
+            // 3. Disparar extração automática (assíncrono, não trava o fluxo)
+            console.log('🤖 Disparando extração automática de valor e pessoa...');
+            extractOSMetadata(osData.id).then((result) => {
+                if (result.success) {
+                    console.log('✅ Extração concluída:', result.extracted);
+                } else {
+                    console.warn('⚠️ Extração falhou:', result.error);
+                }
+            }).catch((err) => {
+                console.error('❌ Erro na extração automática:', err);
+            });
+
+            // 4. Criar registros dos assinantes
             const signersData = finalSigners.map((signer, index) => ({
                 os_id: osData.id,
                 name: signer.name!,
@@ -276,7 +289,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 
             if (signersError) throw signersError;
 
-            // 4. Registrar no log de auditoria
+            // 5. Registrar no log de auditoria
             await supabase.rpc('log_os_event', {
                 p_os_id: osData.id,
                 p_event_type: 'created',
@@ -284,7 +297,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                 p_metadata: { signers_count: signers.length }
             });
 
-            // 5. Enviar e-mails de notificação para os assinantes
+            // 6. Enviar e-mails de notificação para os assinantes
             console.log('📧 Enviando e-mails para os assinantes...');
             try {
                 const { data: signersWithIds } = await supabase

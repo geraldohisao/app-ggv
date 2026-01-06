@@ -5,6 +5,7 @@ import { useUser } from '../../contexts/DirectUserContext';
 import { validateStrategicMap, hasBlockingErrors, formatValidationErrors } from './utils/validation';
 import { useAutoSave } from './hooks/useAutoSave';
 import { retrySupabaseOperation } from './utils/retryWithBackoff';
+import { showSuccess, showError, showLoading, updateToastSuccess, showWarning } from './utils/toast';
 
 interface StrategicMapBuilderProps {
   initialMap: StrategicMap;
@@ -145,7 +146,7 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
       // Limpar draft do localStorage após salvar no servidor
       clearDraft();
       
-      alert('✅ Mapa estratégico salvo com sucesso!');
+      await showSuccess('✅ Mapa estratégico salvo com sucesso!');
       
       if (onSaveSuccess) {
         onSaveSuccess();
@@ -158,15 +159,15 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
       
       if (error instanceof Error) {
         if (error.message.includes('network')) {
-          errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+          errorMessage = 'Erro de conexão. Verifique sua internet.';
         } else if (error.message.includes('permission')) {
           errorMessage = 'Você não tem permissão para salvar este OKR.';
         } else if (error.message.includes('timeout')) {
-          errorMessage = 'A operação demorou muito. Tente novamente.';
+          errorMessage = 'Operação demorou muito. Tente novamente.';
         }
       }
       
-      alert(`❌ ${errorMessage}\n\nSeu trabalho está salvo localmente e não será perdido.`);
+      await showError(errorMessage + ' Seu trabalho está salvo localmente.');
     } finally {
       setIsSaving(false);
     }
