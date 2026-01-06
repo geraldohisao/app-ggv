@@ -209,30 +209,32 @@ export const OSReprocessing: React.FC = () => {
 
         // Informações do documento
         write('INFORMAÇÕES DO DOCUMENTO', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
-        cursorY -= 5;
+        cursorY -= 8;
 
-        const docBoxY = cursorY - 75;
-        drawBox(marginX - 10, docBoxY, contentWidth + 20, 75, rgb(0.97, 0.97, 0.97));
-        cursorY -= 10;
+        const docBoxStartY = cursorY;
+        const docBoxHeight = 70;
+        drawBox(marginX - 10, docBoxStartY - docBoxHeight, contentWidth + 20, docBoxHeight, rgb(0.97, 0.97, 0.97));
+        cursorY -= 12;
 
         write(`Documento: ${baseOrder.file_name}`, { size: 11, lineHeight: 16 });
         write(`Título: ${baseOrder.title}`, { size: 11, lineHeight: 16 });
         write(`Data/hora da conclusão: ${new Date().toLocaleString('pt-BR')}`, { size: 10, colorRgb: [0.3, 0.3, 0.3], lineHeight: 16 });
         
-        cursorY = docBoxY - 25;
+        cursorY = docBoxStartY - docBoxHeight - 20;
 
         // Hash do documento
         write('HASH DO DOCUMENTO ORIGINAL (SHA-256)', { bold: true, size: 11, colorRgb: [0.25, 0.25, 0.25], lineHeight: 18 });
-        cursorY -= 5;
+        cursorY -= 8;
 
-        const hashBoxY = cursorY - 35;
-        drawBox(marginX - 10, hashBoxY, contentWidth + 20, 35, rgb(0.95, 0.97, 1));
+        const hashBoxStartY = cursorY;
+        const hashBoxHeight = 32;
+        drawBox(marginX - 10, hashBoxStartY - hashBoxHeight, contentWidth + 20, hashBoxHeight, rgb(0.95, 0.97, 1));
         cursorY -= 10;
 
         const hashText = baseOrder.file_hash || 'Não disponível';
-        write(hashText, { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 14, maxWidth: contentWidth - 20, x: marginX + 10 });
+        write(hashText, { size: 9, colorRgb: [0.2, 0.2, 0.5], lineHeight: 13, maxWidth: contentWidth - 20 });
         
-        cursorY = hashBoxY - 30;
+        cursorY = hashBoxStartY - hashBoxHeight - 20;
 
         // Assinaturas
         write('ASSINATURAS COLETADAS', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
@@ -268,66 +270,76 @@ export const OSReprocessing: React.FC = () => {
         };
         
         signedList.forEach((s, idx) => {
-            const sigBoxHeight = 140;
-            const sigBoxY = cursorY - sigBoxHeight + 10;
+            const sigBoxStartY = cursorY;
+            const sigBoxHeight = 115;
             
-            drawBox(marginX - 10, sigBoxY, contentWidth + 20, sigBoxHeight, rgb(0.99, 0.99, 0.99));
+            drawBox(marginX - 10, sigBoxStartY - sigBoxHeight, contentWidth + 20, sigBoxHeight, rgb(0.99, 0.99, 0.99));
             
-            cursorY -= 18;
+            cursorY -= 12;
             
             // ✅ Check verde + Nome
             drawCheckmark(marginX, cursorY);
-            write(`${s.name || s.email}`, { bold: true, size: 11, colorRgb: [0, 0, 0], lineHeight: 16, x: marginX + 25 });
+            write(`${s.name || s.email}`, { bold: true, size: 11, colorRgb: [0, 0, 0], lineHeight: 15, x: marginX + 25 });
             
             write(`CPF: ${s.cpf || 'Não informado'}`, { size: 9.5, lineHeight: 13, x: marginX + 25 });
             write(`Assinou como ${s.role || 'Colaborador'} em ${s.signed_at ? new Date(s.signed_at).toLocaleString('pt-BR') : 'Pendente'}`, { size: 9, colorRgb: [0.3, 0.3, 0.3], lineHeight: 13, x: marginX + 25 });
             
             cursorY -= 5;
             
-            write(`Pontos de autenticação: Token via E-mail; Nome Completo; CPF`, { size: 7.5, colorRgb: [0.45, 0.45, 0.45], lineHeight: 11, x: marginX + 25 });
-            write(`Dados informados pelo Operador: ${s.cpf || 'N/A'}`, { size: 7.5, colorRgb: [0.45, 0.45, 0.45], lineHeight: 11, x: marginX + 25 });
-            write(`IP: ${s.ip_address || 'N/A'} | Navegador: ${(s.user_agent || 'N/A').substring(0, 60)}...`, { size: 7, colorRgb: [0.5, 0.5, 0.5], lineHeight: 10, x: marginX + 25, maxWidth: contentWidth - 30 });
+            write(`Pontos de autenticação: Token via E-mail; Nome Completo; CPF`, { size: 7.5, colorRgb: [0.45, 0.45, 0.45], lineHeight: 10, x: marginX + 25 });
+            write(`Dados informados: ${s.cpf || 'N/A'}`, { size: 7.5, colorRgb: [0.45, 0.45, 0.45], lineHeight: 10, x: marginX + 25 });
+            write(`IP: ${s.ip_address || 'N/A'} | Navegador: ${(s.user_agent || 'N/A').substring(0, 55)}...`, { size: 7, colorRgb: [0.5, 0.5, 0.5], lineHeight: 10, x: marginX + 25, maxWidth: contentWidth - 30 });
             
-            cursorY = sigBoxY - 20;
+            cursorY = sigBoxStartY - sigBoxHeight - 12;
         });
         
         // Log de eventos
         cursorY -= 15;
-        write('Log', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
-        cursorY -= 10;
         
-        const logs: Array<{date: string; action: string}> = [];
-        logs.push({
-            date: new Date(baseOrder.created_at).toLocaleString('pt-BR'),
-            action: 'Documento criado e enviado para assinatura'
-        });
-        
-        signedList.forEach(s => {
-            if (s.signed_at) {
-                logs.push({
-                    date: new Date(s.signed_at).toLocaleString('pt-BR'),
-                    action: `Assinado por ${s.name || s.email}`
-                });
-            }
-        });
-        
-        logs.push({
-            date: new Date().toLocaleString('pt-BR'),
-            action: 'Documento concluído e finalizado'
-        });
-        
-        logs.forEach((log) => {
-            const logBoxH = 35;
-            const logBoxY = cursorY - logBoxH + 5;
+        if (cursorY < 100) {
+            console.log('⚠️ Espaço insuficiente para logs');
+        } else {
+            write('Log', { bold: true, size: 13, colorRgb: [0.2, 0.2, 0.2], lineHeight: 20 });
+            cursorY -= 8;
             
-            drawBox(marginX - 10, logBoxY, contentWidth + 20, logBoxH, rgb(0.97, 0.99, 0.97));
-            cursorY -= 10;
+            const logs: Array<{date: string; action: string}> = [];
+            logs.push({
+                date: new Date(baseOrder.created_at).toLocaleString('pt-BR'),
+                action: 'Documento criado e enviado para assinatura'
+            });
             
-            write(`${log.date}`, { bold: true, size: 8.5, colorRgb: [0.25, 0.25, 0.25], lineHeight: 11 });
-            write(`${log.action}`, { size: 8, colorRgb: [0.35, 0.35, 0.35], lineHeight: 11 });
+            signedList.forEach(s => {
+                if (s.signed_at) {
+                    logs.push({
+                        date: new Date(s.signed_at).toLocaleString('pt-BR'),
+                        action: `Assinado por ${s.name || s.email}`
+                    });
+                }
+            });
             
-            cursorY = logBoxY - 10;
-        });
+            logs.push({
+                date: new Date().toLocaleString('pt-BR'),
+                action: 'Documento concluído e finalizado'
+            });
+            
+            logs.forEach((log, idx) => {
+                const logBoxH = 42;
+                const logBoxStartY = cursorY;
+                
+                if (cursorY - logBoxH < 60) {
+                    console.log(`⚠️ Log ${idx + 1} truncado`);
+                    return;
+                }
+                
+                drawBox(marginX - 10, logBoxStartY - logBoxH, contentWidth + 20, logBoxH, rgb(0.97, 0.99, 0.97));
+                cursorY -= 10;
+                
+                write(`${log.date}`, { bold: true, size: 8.5, colorRgb: [0.25, 0.25, 0.25], lineHeight: 11 });
+                write(`${log.action}`, { size: 8, colorRgb: [0.35, 0.35, 0.35], lineHeight: 11 });
+                
+                cursorY = logBoxStartY - logBoxH - 8;
+            });
+        }
         
         // Rodapé da página de termo
         page.drawText(`Autenticação: ${authCode}`, {
