@@ -394,7 +394,7 @@ class OSEmailService {
                 .single();
 
             if (!emailError && emailLogo?.url) {
-                const logoEmailUrl = `${emailLogo.url}?format=png`;
+                const logoEmailUrl = emailLogo.url;
                 console.log('✅ Logo URL (grupo_ggv_email):', logoEmailUrl);
                 return logoEmailUrl;
             }
@@ -407,7 +407,7 @@ class OSEmailService {
                 .single();
 
             const baseUrl = (error || !data?.url)
-                ? 'https://ggvinteligencia.com.br/wp-content/uploads/2026/01/LOGO_GrupoGGV-horizontal-scaled.png'
+                ? 'https://mwlekwyxbfbxfxskywgx.supabase.co/storage/v1/object/public/Logo%20Grupo%20GGV/LOGO_GrupoGGV-horizontal.png'
                 : data.url;
 
             const logoUrl = `${baseUrl}?format=png`;
