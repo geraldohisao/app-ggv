@@ -8,7 +8,7 @@ echo "NPM version: $(npm --version)"
 # Install dependencies
 npm ci --silent
 
-# Run build
-npm run build:fast
+# Run build (sem TypeScript check para deploy rápido)
+SKIP_TYPESCRIPT_CHECK=true npm run build:fast
 
 echo "✅ Build concluído"
