@@ -29,6 +29,7 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
+  const [trackingData, setTrackingData] = useState<TrackingMetric[]>([]);
 
   // Auto-save no localStorage (não no servidor)
   const { saveDraft, loadDraft, clearDraft } = useAutoSave(map, user?.id || '');

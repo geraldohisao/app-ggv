@@ -355,11 +355,33 @@ class OSEmailService {
     }
 
     /**
-     * Obtém URL pública do logo (EXATAMENTE igual ao diagnóstico)
+     * Obtém URL pública do logo do Grupo GGV (brand_logos)
      */
     private async getLogoUrl(): Promise<string> {
-        // Usar EXATAMENTE o mesmo logo que funciona no diagnóstico (linha 159 do EmailModal.tsx)
-        return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png';
+        try {
+            const { data, error } = await supabase
+                .from('brand_logos')
+                .select('url')
+                .eq('key', 'grupo_ggv')
+                .single();
+
+            if (error) {
+                console.error('❌ Erro ao buscar logo do brand_logos:', error);
+                throw error;
+            }
+            
+            if (data?.url) {
+                console.log('✅ Logo carregado do brand_logos:', data.url);
+                return data.url;
+            }
+        } catch (e) {
+            console.error('⚠️ Falha ao buscar logo no brand_logos:', e);
+        }
+
+        // Fallback para o logo correto do Grupo GGV
+        const fallbackUrl = 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
+        console.log('⚠️ Usando fallback do logo:', fallbackUrl);
+        return fallbackUrl;
     }
 
     /**
@@ -377,7 +399,18 @@ class OSEmailService {
         attachments?: any[];
     }): Promise<void> {
         try {
-            console.log('📧 Enviando e-mail de OS via Gmail API...');
+            console.log('📧 OS EMAIL - Iniciando envio via Gmail API...');
+            console.log('📧 OS EMAIL - Destinatário:', params.to);
+            console.log('📧 OS EMAIL - Assunto:', params.subject);
+            console.log('📧 OS EMAIL - Tamanho HTML:', params.html.length);
+            
+            // Verificar se o logo está no HTML
+            const logoMatch = params.html.match(/<img[^>]+src="([^"]+)"[^>]*alt="GRUPO GGV"/);
+            if (logoMatch) {
+                console.log('✅ OS EMAIL - Logo encontrado no HTML:', logoMatch[1]);
+            } else {
+                console.warn('⚠️ OS EMAIL - Logo NÃO encontrado no HTML!');
+            }
 
             // Usar Gmail API (igual ao diagnóstico que funciona)
             await sendEmailViaGmail({
@@ -388,9 +421,9 @@ class OSEmailService {
                 companyName: params.toName
             });
 
-            console.log('✅ E-mail de OS enviado com sucesso via Gmail!');
+            console.log('✅ OS EMAIL - Enviado com sucesso via Gmail API!');
         } catch (error: any) {
-            console.error('❌ Erro ao enviar e-mail de OS:', error);
+            console.error('❌ OS EMAIL - Erro ao enviar:', error);
             throw new Error(`Falha ao enviar e-mail: ${error.message}`);
         }
     }
