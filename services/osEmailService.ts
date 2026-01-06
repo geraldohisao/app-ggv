@@ -77,7 +77,14 @@ class OSEmailService {
                 expiresAt,
                 totalSigners: order.total_signers || 0,
                 signatureLink,
-                logoHTML: `<img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
+                logoHTML: `
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="background:#ffffff; border-radius:8px; padding:8px;">
+                        <tr>
+                            <td align="center">
+                                <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px; background:#ffffff;">
+                            </td>
+                        </tr>
+                    </table>`
             });
 
             // Enviar via Resend (confiável, não depende de autenticação)
@@ -147,7 +154,14 @@ class OSEmailService {
                 signerName: signer.name,
                 orderTitle: order.title,
                 signatureLink,
-                logoHTML: `<img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
+                logoHTML: `
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="background:#ffffff; border-radius:8px; padding:8px;">
+                        <tr>
+                            <td align="center">
+                                <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px; background:#ffffff;">
+                            </td>
+                        </tr>
+                    </table>`
             });
 
             await this.sendEmail({
@@ -191,7 +205,13 @@ class OSEmailService {
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
           <div style="text-align:center; margin-bottom: 24px;">
-            <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="background:#ffffff; border-radius:8px; padding:8px;">
+              <tr>
+                <td align="center">
+                  <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px; background:#ffffff;">
+                </td>
+              </tr>
+            </table>
           </div>
           <h2 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; text-align:center; color:#111827;">
             Documento cancelado
@@ -306,7 +326,13 @@ class OSEmailService {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center" style="padding:16px 0;">
-                <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="background:#ffffff; border-radius:8px; padding:8px;">
+                  <tr>
+                    <td align="center">
+                      <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px; background:#ffffff;">
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
