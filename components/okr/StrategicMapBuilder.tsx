@@ -30,11 +30,32 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showAdvancedAnalysis, setShowAdvancedAnalysis] = useState(false);
   const [trackingData, setTrackingData] = useState<TrackingMetric[]>([]);
+  const [motors, setMotors] = useState(initialMap.motors || [
+    { id: 'motor-1', name: 'Motor 1', strategies: [{ id: 'st-1-1', text: '' }, { id: 'st-1-2', text: '' }] },
+    { id: 'motor-2', name: 'Motor 2', strategies: [{ id: 'st-2-1', text: '' }, { id: 'st-2-2', text: '' }] },
+    { id: 'motor-3', name: 'Motor 3', strategies: [{ id: 'st-3-1', text: '' }, { id: 'st-3-2', text: '' }] }
+  ]);
+  const [objectives, setObjectives] = useState(initialMap.objectives || [
+    { id: 'obj-1', title: 'Aumentar Satisfação do Cliente', kpis: [
+      { id: 'kpi-1-1', name: 'NPS', frequency: 'Mensal' as const, target: '75' },
+      { id: 'kpi-1-2', name: 'CSAT', frequency: 'Semanal' as const, target: '4.5/5' }
+    ]},
+    { id: 'obj-2', title: 'Melhorar Eficiência Operacional', kpis: [
+      { id: 'kpi-2-1', name: 'SLA de Atendimento', frequency: 'Mensal' as const, target: '98%' }
+    ]},
+    { id: 'obj-3', title: 'Expandir Base de Clientes', kpis: [
+      { id: 'kpi-3-1', name: 'Novos Leads', frequency: 'Mensal' as const, target: '500/mês' }
+    ]}
+  ]);
+  const [roles, setRoles] = useState(initialMap.roles || [
+    { id: 'role-1', title: 'Gerente', responsibility: 'Coordenar', metrics: [{ id: 'm-1', name: 'NPS', target: '> 75' }] },
+    { id: 'role-2', title: 'Coordenador', responsibility: 'Supervisionar o time', metrics: [{ id: 'm-2', name: 'Taxa de no show', target: '< 5%' }] }
+  ]);
 
   // Auto-save no localStorage (não no servidor)
   const { saveDraft, loadDraft, clearDraft } = useAutoSave(map, user?.id || '');
 
-  // Carregar draft ao montar componente
+  // Carregar draft e tracking ao montar componente
   useEffect(() => {
     if (!user) return;
 
@@ -51,7 +72,39 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
         setTimeout(() => setShowDraftBanner(false), 5000);
       }
     }
+
+    // Inicializar tracking data
+    if (map.tracking && map.tracking.length > 0) {
+      setTrackingData(map.tracking);
+    } else {
+      // Dados de exemplo iniciais
+      setTrackingData([
+        {
+          id: 'tracking-1',
+          indicator: 'Faturamento',
+          type: 'Real',
+          data: {
+            'JAN': 5000, 'FEV': 4000, 'MAR': 3800, 'ABR': 1200,
+            'MAI': 8700, 'JUN': 4200, 'JUL': 2500, 'AGO': 7500,
+            'SET': 2900, 'OUT': 9900, 'NOV': 6800, 'DEZ': 7700
+          },
+          average: 5350,
+          total: 64200
+        }
+      ]);
+    }
   }, []);
+
+  // Atualizar map quando dados mudarem
+  useEffect(() => {
+    setMap(prev => ({ 
+      ...prev, 
+      tracking: trackingData,
+      motors: motors,
+      objectives: objectives,
+      roles: roles
+    }));
+  }, [trackingData, motors, objectives, roles]);
 
   const handleSave = async () => {
     if (!user) {
@@ -316,25 +369,39 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
 
             {/* Motors Section */}
             <div className="grid grid-cols-3 gap-4">
-              <MotorCard title="MOTOR 1" />
-              <MotorCard title="MOTOR 2" />
-              <MotorCard title="MOTOR 3" />
+              {motors.map((motor, motorIdx) => (
+                <MotorCard 
+                  key={motor.id}
+                  motor={motor}
+                  onUpdate={(updatedMotor) => {
+                    setMotors(prev => prev.map((m, i) => i === motorIdx ? updatedMotor : m));
+                  }}
+                  onRemove={() => {
+                    if (window.confirm(`Remover ${motor.name}?`)) {
+                      setMotors(prev => prev.filter((_, i) => i !== motorIdx));
+                    }
+                  }}
+                />
+              ))}
             </div>
 
             {/* Objectives Section */}
             <div className="grid grid-cols-3 gap-4">
-              <ObjectiveCard 
-                title="OBJETIVO 1"
-                subtitle="Aumentar a Satisfação do Cliente"
-              />
-              <ObjectiveCard 
-                title="OBJETIVO 2"
-                subtitle="Melhorar Eficiência Operacional"
-              />
-              <ObjectiveCard 
-                title="OBJETIVO 3"
-                subtitle="Expandir Base de Clientes"
-              />
+              {objectives.map((objective, objIdx) => (
+                <ObjectiveCard 
+                  key={objective.id}
+                  objective={objective}
+                  index={objIdx}
+                  onUpdate={(updatedObj) => {
+                    setObjectives(prev => prev.map((o, i) => i === objIdx ? updatedObj : o));
+                  }}
+                  onRemove={() => {
+                    if (window.confirm(`Remover objetivo "${objective.title}"?`)) {
+                      setObjectives(prev => prev.filter((_, i) => i !== objIdx));
+                    }
+                  }}
+                />
+              ))}
             </div>
 
             {/* Execution Section */}
@@ -364,8 +431,20 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <RoleCard title="Gerente" />
-                  <RoleCard title="Coordenador" />
+                  {roles.map((role, roleIdx) => (
+                    <RoleCard 
+                      key={role.id}
+                      role={role}
+                      onUpdate={(updatedRole) => {
+                        setRoles(prev => prev.map((r, i) => i === roleIdx ? updatedRole : r));
+                      }}
+                      onRemove={() => {
+                        if (window.confirm(`Remover papel "${role.title}"?`)) {
+                          setRoles(prev => prev.filter((_, i) => i !== roleIdx));
+                        }
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -410,10 +489,30 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
 
               {/* Tracking Table */}
               <div className="overflow-x-auto">
-                <TrackingTable map={map} setMap={setMap} />
+                <TrackingTable 
+                  trackingData={trackingData}
+                  setTrackingData={setTrackingData}
+                />
               </div>
 
-              <button className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-semibold">
+              <button 
+                onClick={() => {
+                  const newTracking: TrackingMetric = {
+                    id: `tracking-${Date.now()}`,
+                    indicator: 'Novo Indicador',
+                    type: 'Real',
+                    data: {
+                      'JAN': 0, 'FEV': 0, 'MAR': 0, 'ABR': 0,
+                      'MAI': 0, 'JUN': 0, 'JUL': 0, 'AGO': 0,
+                      'SET': 0, 'OUT': 0, 'NOV': 0, 'DEZ': 0
+                    },
+                    average: 0,
+                    total: 0
+                  };
+                  setTrackingData([...trackingData, newTracking]);
+                }}
+                className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+              >
                 + Adicionar Linha de Acompanhamento
               </button>
             </div>
@@ -554,32 +653,57 @@ const IdentityCard: React.FC<{
   </div>
 );
 
-const MotorCard: React.FC<{ title: string }> = ({ title }) => (
+const MotorCard: React.FC<{ 
+  motor: any;
+  onUpdate: (motor: any) => void;
+  onRemove: () => void;
+}> = ({ motor, onUpdate, onRemove }) => (
   <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-slate-200">
     <div className="flex items-center justify-between mb-3">
-      <span className="text-xs font-bold text-slate-600">● {title}</span>
-      <button className="text-slate-400 hover:text-red-500">✕</button>
+      <input
+        type="text"
+        value={motor.name}
+        onChange={(e) => onUpdate({ ...motor, name: e.target.value })}
+        className="text-xs font-bold text-slate-600 bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+        placeholder="Nome do Motor"
+      />
+      <button onClick={onRemove} className="text-slate-400 hover:text-red-500">✕</button>
     </div>
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-400">●</span>
-        <input
-          type="text"
-          placeholder="Estratégia 1"
-          className="flex-1 outline-none text-slate-700"
-        />
-        <button className="text-slate-400 hover:text-red-500 text-xs">✕</button>
-      </div>
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-400">●</span>
-        <input
-          type="text"
-          placeholder="Estratégia 2"
-          className="flex-1 outline-none text-slate-700"
-        />
-        <button className="text-slate-400 hover:text-red-500 text-xs">✕</button>
-      </div>
-      <button className="text-xs text-slate-400 hover:text-blue-600 mt-2">+ Adicionar</button>
+      {motor.strategies?.map((strategy: any, idx: number) => (
+        <div key={strategy.id} className="flex items-center gap-2 text-sm">
+          <span className="text-slate-400">●</span>
+          <input
+            type="text"
+            value={strategy.text}
+            onChange={(e) => {
+              const newStrategies = [...motor.strategies];
+              newStrategies[idx] = { ...strategy, text: e.target.value };
+              onUpdate({ ...motor, strategies: newStrategies });
+            }}
+            placeholder={`Estratégia ${idx + 1}`}
+            className="flex-1 outline-none text-slate-700 border-b border-transparent hover:border-slate-300 focus:border-blue-500"
+          />
+          <button 
+            onClick={() => {
+              const newStrategies = motor.strategies.filter((_: any, i: number) => i !== idx);
+              onUpdate({ ...motor, strategies: newStrategies });
+            }}
+            className="text-slate-400 hover:text-red-500 text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button 
+        onClick={() => {
+          const newStrategy = { id: `st-${Date.now()}`, text: '' };
+          onUpdate({ ...motor, strategies: [...motor.strategies, newStrategy] });
+        }}
+        className="text-xs text-slate-400 hover:text-blue-600 mt-2"
+      >
+        + Adicionar
+      </button>
     </div>
   </div>
 );
@@ -691,11 +815,11 @@ const TrackingCell = React.memo<{
 
 TrackingCell.displayName = 'TrackingCell';
 
-// Tracking Table Component (otimizado)
+// Tracking Table Component TOTALMENTE FUNCIONAL
 const TrackingTable: React.FC<{ 
-  map: StrategicMap; 
-  setMap: React.Dispatch<React.SetStateAction<StrategicMap>>;
-}> = React.memo(({ map, setMap }) => {
+  trackingData: TrackingMetric[];
+  setTrackingData: React.Dispatch<React.SetStateAction<TrackingMetric[]>>;
+}> = React.memo(({ trackingData, setTrackingData }) => {
   const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
   
   const getPercentageColor = (percentage: number): string => {
@@ -711,29 +835,50 @@ const TrackingTable: React.FC<{
     return `${pct}%`;
   };
 
-  // Dados de exemplo (podem vir do map.tracking)
-  const trackingData = [
-    {
-      indicator: 'Faturamento',
-      type: 'Moeda (R$)',
-      data: {
-        real: [5000, 4000, 3800, 1200, 8700, 4200, 2500, 7500, 2900, 9900, 6800, 7700],
-        meta: [9500, 900, 4500, 2200, 7300, 9700, 7600, 2400, 6600, 3400, 800, 7800]
-      },
-      average: 5350,
-      total: 64200
-    },
-    {
-      indicator: 'Atendimentos',
-      type: 'Quantidade (#)',
-      data: {
-        real: [8049, 2867, 3363, 377, 3683, 3631, 8749, 1289, 3440, 9729, 5287, 4499],
-        meta: [3439, 1252, 3071, 9159, 39, 5456, 9809, 3133, 7779, 1327, 2505, 1280]
-      },
-      average: 4580,
-      total: 54963
+  // Atualizar indicador
+  const updateIndicator = (trackingId: string, field: string, value: any) => {
+    setTrackingData(prev => prev.map(item => 
+      item.id === trackingId ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // Atualizar valor de um mês específico
+  const updateMonthValue = (trackingId: string, month: string, value: number) => {
+    setTrackingData(prev => prev.map(item => {
+      if (item.id === trackingId) {
+        const newData = { ...item.data, [month]: value };
+        
+        // Recalcular média e total
+        const values = Object.values(newData);
+        const total = values.reduce((sum: number, val) => sum + (Number(val) || 0), 0);
+        const average = Math.round(total / values.length);
+        
+        return {
+          ...item,
+          data: newData,
+          average,
+          total
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Remover linha de tracking
+  const removeTracking = (trackingId: string) => {
+    if (window.confirm('Remover esta linha de acompanhamento?')) {
+      setTrackingData(prev => prev.filter(item => item.id !== trackingId));
     }
-  ];
+  };
+
+  if (trackingData.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-500">
+        <p className="mb-4">Nenhum indicador de acompanhamento.</p>
+        <p className="text-sm">Click em "+ Adicionar Linha" para começar.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-w-full">
@@ -749,74 +894,116 @@ const TrackingTable: React.FC<{
             ))}
             <th className="text-center py-3 px-3 font-semibold text-slate-600">MÉDIA</th>
             <th className="text-center py-3 px-3 font-semibold text-slate-600">TOTAL</th>
+            <th className="text-center py-3 px-2 font-semibold text-slate-600"></th>
           </tr>
         </thead>
         <tbody>
-          {trackingData.map((item, idx) => (
-            <React.Fragment key={idx}>
-              {/* Indicator Name Row */}
-              <tr className="border-b border-slate-100">
-                <td className="py-2 px-3 font-semibold text-slate-900" rowSpan={3}>
-                  {item.indicator}
-                  <div className="text-xs text-slate-500 font-normal mt-1">{item.type}</div>
-                </td>
-                <td className="py-2 px-3 text-slate-600 bg-slate-50">REAL</td>
-                {item.data.real.map((value, i) => (
-                  <td key={i} className="py-2 px-2 text-center bg-slate-50">
-                    <TrackingCell
-                      value={value}
-                      type="real"
-                      onChange={(newValue) => {
-                        console.log(`Real value updated: ${newValue}`);
-                      }}
+          {trackingData.map((item, idx) => {
+            // Preparar dados para REAL e META
+            const realData: number[] = months.map(month => Number(item.data[month]) || 0);
+            const metaKey = `${item.id}-meta`;
+            const metaDataStored = trackingData.find(t => t.id === metaKey);
+            const metaData: number[] = months.map(month => 
+              metaDataStored ? (Number(metaDataStored.data[month]) || 0) : 0
+            );
+
+            return (
+              <React.Fragment key={item.id}>
+                {/* Indicator Name Row */}
+                <tr className="border-b border-slate-100">
+                  <td className="py-2 px-3" rowSpan={3}>
+                    <input
+                      type="text"
+                      value={item.indicator}
+                      onChange={(e) => updateIndicator(item.id, 'indicator', e.target.value)}
+                      className="font-semibold text-slate-900 bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-blue-500 transition-colors"
+                      placeholder="Nome do Indicador"
+                    />
+                    <input
+                      type="text"
+                      value={item.type}
+                      onChange={(e) => updateIndicator(item.id, 'type', e.target.value)}
+                      className="text-xs text-slate-500 font-normal mt-1 bg-transparent outline-none block w-full border-b border-transparent hover:border-slate-300 focus:border-blue-500 transition-colors"
+                      placeholder="Tipo (ex: R$, #, %)"
                     />
                   </td>
-                ))}
-                <td className="py-2 px-3 text-center font-semibold bg-slate-50">
-                  {item.average.toLocaleString('pt-BR')}
-                </td>
-                <td className="py-2 px-3 text-center font-semibold bg-slate-50">
-                  {item.type.includes('R$') ? `R$ ${item.total.toLocaleString('pt-BR')}` : item.total.toLocaleString('pt-BR')}
-                </td>
-              </tr>
-              
-              {/* Meta Row */}
-              <tr className="border-b border-slate-100">
-                <td className="py-2 px-3 text-slate-600 bg-blue-50">META</td>
-                {item.data.meta.map((value, i) => (
-                  <td key={i} className="py-2 px-2 text-center bg-blue-50">
-                    <TrackingCell
-                      value={value}
-                      type="meta"
-                      onChange={(newValue) => {
-                        console.log(`Meta value updated: ${newValue}`);
-                      }}
-                    />
-                  </td>
-                ))}
-                <td className="py-2 px-3 text-center bg-blue-50"></td>
-                <td className="py-2 px-3 text-center bg-blue-50"></td>
-              </tr>
-              
-              {/* Percentage Row */}
-              <tr className="border-b border-slate-200">
-                <td className="py-2 px-3 text-slate-600">%</td>
-                {item.data.real.map((real, i) => {
-                  const meta = item.data.meta[i];
-                  const percentage = meta > 0 ? ((real / meta) * 100) : 0;
-                  return (
-                    <td key={i} className="py-2 px-2 text-center">
-                      <span className={`px-2 py-1 rounded font-semibold text-xs ${getPercentageColor(percentage)}`}>
-                        {calculatePercentage(real, meta)}
-                      </span>
+                  <td className="py-2 px-3 text-slate-600 bg-slate-50">REAL</td>
+                  {months.map((month, i) => (
+                    <td key={month} className="py-2 px-2 text-center bg-slate-50">
+                      <input
+                        type="number"
+                        value={realData[i] || ''}
+                        onChange={(e) => updateMonthValue(item.id, month, Number(e.target.value) || 0)}
+                        className="w-full text-center bg-transparent outline-none px-1 py-1 hover:bg-white focus:bg-white focus:border focus:border-blue-500 rounded"
+                      />
                     </td>
-                  );
-                })}
-                <td className="py-2 px-3 text-center"></td>
-                <td className="py-2 px-3 text-center"></td>
-              </tr>
-            </React.Fragment>
-          ))}
+                  ))}
+                  <td className="py-2 px-3 text-center font-semibold bg-slate-50">
+                    {item.average?.toLocaleString('pt-BR') || '0'}
+                  </td>
+                  <td className="py-2 px-3 text-center font-semibold bg-slate-50">
+                    {item.type?.includes('R$') 
+                      ? `R$ ${(item.total || 0).toLocaleString('pt-BR')}` 
+                      : (item.total || 0).toLocaleString('pt-BR')
+                    }
+                  </td>
+                  <td className="py-2 px-2 text-center" rowSpan={3}>
+                    <button
+                      onClick={() => removeTracking(item.id)}
+                      className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                      title="Remover linha"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                
+                {/* Meta Row */}
+                <tr className="border-b border-slate-100">
+                  <td className="py-2 px-3 text-slate-600 bg-blue-50">META</td>
+                  {months.map((month, i) => (
+                    <td key={month} className="py-2 px-2 text-center bg-blue-50">
+                      <input
+                        type="number"
+                        value={metaData[i] || ''}
+                        onChange={(e) => {
+                          // Salvar meta em item separado ou no mesmo item
+                          const newValue = Number(e.target.value) || 0;
+                          // Por simplicidade, vamos adicionar _meta ao data
+                          const metaMonthKey = `${month}_META`;
+                          updateMonthValue(item.id, metaMonthKey, newValue);
+                        }}
+                        className="w-full text-center bg-transparent outline-none px-1 py-1 hover:bg-white focus:bg-white focus:border focus:border-blue-500 rounded"
+                      />
+                    </td>
+                  ))}
+                  <td className="py-2 px-3 text-center bg-blue-50"></td>
+                  <td className="py-2 px-3 text-center bg-blue-50"></td>
+                </tr>
+                
+                {/* Percentage Row */}
+                <tr className="border-b border-slate-200">
+                  <td className="py-2 px-3 text-slate-600">%</td>
+                  {months.map((month, i) => {
+                    const real = realData[i];
+                    const meta = Number(item.data[`${month}_META`]) || metaData[i] || 0;
+                    const percentage = meta > 0 ? ((real / meta) * 100) : 0;
+                    return (
+                      <td key={month} className="py-2 px-2 text-center">
+                        <span className={`px-2 py-1 rounded font-semibold text-xs ${getPercentageColor(percentage)}`}>
+                          {calculatePercentage(real, meta)}
+                        </span>
+                      </td>
+                    );
+                  })}
+                  <td className="py-2 px-3 text-center"></td>
+                  <td className="py-2 px-3 text-center"></td>
+                </tr>
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

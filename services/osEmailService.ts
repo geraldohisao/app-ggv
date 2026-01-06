@@ -1,7 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ServiceOrder, OSSigner } from '../types';
 import { format } from 'date-fns';
-import { sendEmailViaGmail } from './gmailService';
 
 interface EmailConfig {
     os_email_from: string;
@@ -55,7 +54,7 @@ class OSEmailService {
     async sendSignatureRequest(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoUrl = await this.getLogoUrl();
+            const logoBase64 = await this.getLogoBase64();
 
             // Link direto para este documento
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
@@ -69,7 +68,7 @@ class OSEmailService {
                 })
                 : 'Sem prazo definido';
 
-            // Template do e-mail (com CID)
+            // Template do e-mail com logo Base64 inline
             const emailHTML = this.createEmailTemplate({
                 signerName: signer.name,
                 orderTitle: order.title,
@@ -78,10 +77,10 @@ class OSEmailService {
                 expiresAt,
                 totalSigners: order.total_signers || 0,
                 signatureLink,
-                logoHTML: `<img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
+                logoHTML: `<img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
             });
 
-            // Enviar via provider configurado
+            // Enviar via Resend (confiável, não depende de autenticação)
             await this.sendEmail({
                 to: signer.email,
                 toName: signer.name,
@@ -141,14 +140,14 @@ class OSEmailService {
     async sendReminder(order: ServiceOrder, signer: OSSigner): Promise<void> {
         try {
             const config = await this.loadConfig();
-            const logoUrl = await this.getLogoUrl();
+            const logoBase64 = await this.getLogoBase64();
             const signatureLink = `${config.os_base_url}/assinar/${order.id}/${signer.id}`;
 
             const emailHTML = this.createReminderTemplate({
                 signerName: signer.name,
                 orderTitle: order.title,
                 signatureLink,
-                logoHTML: `<img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
+                logoHTML: `<img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">`
             });
 
             await this.sendEmail({
@@ -187,12 +186,12 @@ class OSEmailService {
      */
     async sendCancelled(order: ServiceOrder, signers: OSSigner[], reason: string = 'Documento cancelado'): Promise<void> {
         const config = await this.loadConfig();
-        const logoUrl = await this.getLogoUrl();
+        const logoBase64 = await this.getLogoBase64();
 
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
           <div style="text-align:center; margin-bottom: 24px;">
-            <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
+            <img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
           </div>
           <h2 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; text-align:center; color:#111827;">
             Documento cancelado
@@ -236,7 +235,7 @@ class OSEmailService {
      */
     async sendFinalized(order: ServiceOrder, signers: OSSigner[]): Promise<void> {
         const config = await this.loadConfig();
-        const logoUrl = await this.getLogoUrl();
+        const logoBase64 = await this.getLogoBase64();
 
         // Escolher PDF final (com termo, se existir)
         console.log('📄 Dados da OS para download:', {
@@ -307,7 +306,7 @@ class OSEmailService {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center" style="padding:16px 0;">
-                <img src="${logoUrl}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
+                <img src="${logoBase64}" alt="GRUPO GGV" width="180" height="auto" style="display:block; margin:0 auto; border:0; outline:none; text-decoration:none; max-width:180px;">
               </td>
             </tr>
           </table>
@@ -355,40 +354,62 @@ class OSEmailService {
     }
 
     /**
-     * Obtém URL pública do logo do Grupo GGV (brand_logos)
+     * Obtém logo do Grupo GGV em Base64 (inline, sempre aparece)
      */
-    private async getLogoUrl(): Promise<string> {
+    private async getLogoBase64(): Promise<string> {
         try {
+            // Buscar URL do logo
             const { data, error } = await supabase
                 .from('brand_logos')
                 .select('url')
                 .eq('key', 'grupo_ggv')
                 .single();
 
-            if (error) {
-                console.error('❌ Erro ao buscar logo do brand_logos:', error);
-                throw error;
-            }
-            
-            if (data?.url) {
-                console.log('✅ Logo carregado do brand_logos:', data.url);
-                return data.url;
-            }
-        } catch (e) {
-            console.error('⚠️ Falha ao buscar logo no brand_logos:', e);
-        }
+            const logoUrl = (error || !data?.url)
+                ? 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png'
+                : data.url;
 
-        // Fallback para o logo correto do Grupo GGV
-        const fallbackUrl = 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
-        console.log('⚠️ Usando fallback do logo:', fallbackUrl);
-        return fallbackUrl;
+            console.log('📥 Baixando logo para Base64:', logoUrl);
+
+            // Baixar imagem
+            const response = await fetch(logoUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            // Converter para Base64
+            const arrayBuffer = await response.arrayBuffer();
+            const base64 = this.arrayBufferToBase64(arrayBuffer);
+            const mimeType = response.headers.get('content-type') || 'image/png';
+            
+            const dataUri = `data:${mimeType};base64,${base64}`;
+            console.log(`✅ Logo convertido para Base64 (${Math.round(dataUri.length / 1024)} KB)`);
+            
+            return dataUri;
+        } catch (e) {
+            console.error('❌ Erro ao converter logo para Base64:', e);
+            // Fallback: SVG inline
+            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTgwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxODAiIGhlaWdodD0iNDAiIGZpbGw9IiNGM0Y0RjYiLz48dGV4dCB4PSI5MCIgeT0iMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzZCNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+R1JVUE8gR0dWPC90ZXh0Pjwvc3ZnPg==';
+        }
+    }
+
+    /**
+     * Converte ArrayBuffer para Base64
+     */
+    private arrayBufferToBase64(buffer: ArrayBuffer): string {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
     }
 
     /**
      * Envia e-mail via Netlify Function (sem CORS!)
      */
     /**
-     * Envia e-mail via Gmail API (igual ao diagnóstico)
+     * Envia e-mail via Resend (confiável, não depende de autenticação)
      */
     private async sendEmail(params: {
         to: string;
@@ -399,29 +420,46 @@ class OSEmailService {
         attachments?: any[];
     }): Promise<void> {
         try {
-            console.log('📧 OS EMAIL - Iniciando envio via Gmail API...');
+            console.log('📧 OS EMAIL - Iniciando envio via Resend...');
             console.log('📧 OS EMAIL - Destinatário:', params.to);
             console.log('📧 OS EMAIL - Assunto:', params.subject);
             console.log('📧 OS EMAIL - Tamanho HTML:', params.html.length);
             
-            // Verificar se o logo está no HTML
-            const logoMatch = params.html.match(/<img[^>]+src="([^"]+)"[^>]*alt="GRUPO GGV"/);
+            // Verificar se o logo está no HTML (Base64)
+            const logoMatch = params.html.match(/<img[^>]+src="(data:image[^"]+)"[^>]*alt="GRUPO GGV"/);
             if (logoMatch) {
-                console.log('✅ OS EMAIL - Logo encontrado no HTML:', logoMatch[1]);
+                const logoSize = Math.round(logoMatch[1].length / 1024);
+                console.log(`✅ OS EMAIL - Logo Base64 encontrado no HTML (${logoSize} KB)`);
             } else {
                 console.warn('⚠️ OS EMAIL - Logo NÃO encontrado no HTML!');
             }
 
-            // Usar Gmail API (igual ao diagnóstico que funciona)
-            await sendEmailViaGmail({
-                to: params.to,
-                subject: params.subject,
-                html: params.html,
-                dealId: undefined,
-                companyName: params.toName
+            // Determinar URL da Netlify Function
+            const functionUrl = window.location.hostname === 'localhost'
+                ? 'http://localhost:8888/.netlify/functions/send-os-email'
+                : '/.netlify/functions/send-os-email';
+
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    to: params.to,
+                    toName: params.toName,
+                    subject: params.subject,
+                    html: params.html,
+                    attachments: params.attachments || []
+                })
             });
 
-            console.log('✅ OS EMAIL - Enviado com sucesso via Gmail API!');
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.details || result.error || `HTTP ${response.status}`);
+            }
+
+            console.log('✅ OS EMAIL - Enviado com sucesso via Resend!', result);
         } catch (error: any) {
             console.error('❌ OS EMAIL - Erro ao enviar:', error);
             throw new Error(`Falha ao enviar e-mail: ${error.message}`);
