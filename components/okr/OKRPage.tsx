@@ -59,10 +59,14 @@ const OKRPage: React.FC = () => {
     }
   };
 
-  const handleBack = () => {
+  const handleBackToDashboard = () => {
     setViewMode('dashboard');
     setCurrentMap(null);
     setContextData('');
+  };
+
+  const handleBackToInitial = () => {
+    setViewMode('initial');
   };
 
   const handleCreateNew = () => {
@@ -114,7 +118,9 @@ const OKRPage: React.FC = () => {
     return (
       <OKRContextForm 
         onSubmit={handleContextSubmit}
-        onBack={handleBack}
+        onBack={handleBackToInitial}
+        initialContext={contextData}
+        onContextChange={setContextData}
       />
     );
   }
@@ -123,8 +129,8 @@ const OKRPage: React.FC = () => {
     return (
       <StrategicMapBuilder
         initialMap={currentMap}
-        onBack={handleBack}
-        onSaveSuccess={handleBack}
+        onBack={handleBackToDashboard}
+        onSaveSuccess={handleBackToDashboard}
         contextData={contextData}
       />
     );
@@ -149,6 +155,8 @@ const OKRPage: React.FC = () => {
           {/* Context Input Area */}
           <div className="mb-8">
             <textarea
+              value={contextData}
+              onChange={(e) => setContextData(e.target.value)}
               className="w-full h-48 px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none text-slate-700 placeholder-slate-400"
               placeholder="Digite sobre o contexto da empresa aqui... (Ex: Somos uma consultoria querendo dobrar o faturamento...)"
             />

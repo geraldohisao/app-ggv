@@ -4,10 +4,12 @@ import { supabase } from '../../services/supabaseClient';
 interface OKRContextFormProps {
   onSubmit: (context: string) => void;
   onBack: () => void;
+  initialContext?: string;
+  onContextChange?: (value: string) => void;
 }
 
-const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack }) => {
-  const [context, setContext] = useState('');
+const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack, initialContext = '', onContextChange }) => {
+  const [context, setContext] = useState(initialContext);
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean | null>(null);
   const [checkingApiKey, setCheckingApiKey] = useState(true);
@@ -16,6 +18,11 @@ const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack }) => 
   useEffect(() => {
     checkApiKey();
   }, []);
+
+  // Reidrata contexto quando vindo da tela anterior
+  useEffect(() => {
+    setContext(initialContext);
+  }, [initialContext]);
 
   const checkApiKey = async () => {
     try {
@@ -127,7 +134,10 @@ const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack }) => 
               </label>
               <textarea
                 value={context}
-                onChange={(e) => setContext(e.target.value)}
+                onChange={(e) => {
+                  setContext(e.target.value);
+                  onContextChange?.(e.target.value);
+                }}
                 className="w-full h-64 px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none text-slate-700"
                 placeholder="Exemplo: Somos uma consultoria de vendas B2B que atende empresas de médio e grande porte. Nosso principal desafio é escalar o time comercial mantendo a qualidade do atendimento. Queremos dobrar o faturamento nos próximos 12 meses, passando de R$ 2M para R$ 4M. Atualmente temos 5 consultores e queremos chegar a 10..."
               />
