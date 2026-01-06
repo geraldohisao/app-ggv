@@ -354,27 +354,14 @@ class OSEmailService {
     }
 
     /**
-     * Obtém URL do logo do Grupo GGV (URL externa - igual ao diagnóstico)
+     * Obtém URL do logo (usa o mesmo que funciona no diagnóstico)
      */
     private async getLogoUrl(): Promise<string> {
-        try {
-            const { data, error } = await supabase
-                .from('brand_logos')
-                .select('url')
-                .eq('key', 'grupo_ggv')
-                .single();
-
-            if (error || !data?.url) {
-                console.warn('⚠️ Falha ao buscar logo do brand_logos, usando fallback');
-                return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
-            }
-
-            console.log('✅ Logo URL:', data.url);
-            return data.url;
-        } catch (e) {
-            console.error('❌ Erro ao buscar logo:', e);
-            return 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png';
-        }
+        // Usar o mesmo logo que funciona perfeitamente no diagnóstico
+        // Este logo é PNG real e funciona em todos os clientes de e-mail
+        const logoUrl = 'https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-GGV-Branca.png';
+        console.log('✅ Logo URL (igual ao diagnóstico):', logoUrl);
+        return logoUrl;
     }
 
     /**
