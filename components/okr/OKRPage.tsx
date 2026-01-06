@@ -75,6 +75,11 @@ const OKRPage: React.FC = () => {
     setViewMode('initial');
   };
 
+  // Permite retomar contexto salvo localmente se voltarem para inicial
+  const handleRestoreContext = (value: string) => {
+    setContextData(value);
+  };
+
   const handleEditMap = (map: StrategicMap) => {
     setCurrentMap(map);
     setViewMode('map-builder');
@@ -120,7 +125,7 @@ const OKRPage: React.FC = () => {
         onSubmit={handleContextSubmit}
         onBack={handleBackToInitial}
         initialContext={contextData}
-        onContextChange={setContextData}
+        onContextChange={handleRestoreContext}
       />
     );
   }

@@ -156,7 +156,18 @@ const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack, initi
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Documentos (Opcional)
               </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
+              <label className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer block">
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      alert(`Arquivo recebido: ${file.name} (uso opcional, não enviado à IA ainda)`);
+                    }
+                  }}
+                />
                 <svg className="w-12 h-12 text-slate-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
@@ -164,9 +175,9 @@ const OKRContextForm: React.FC<OKRContextFormProps> = ({ onSubmit, onBack, initi
                   Arraste arquivos ou clique para fazer upload
                 </p>
                 <p className="text-xs text-slate-500">
-                  PDF, DOC, DOCX até 10MB
+                  PDF, DOC, DOCX, PNG, JPG até 10MB
                 </p>
-              </div>
+              </label>
             </div>
 
             {/* Action Buttons */}

@@ -53,16 +53,14 @@ const StrategicMapBuilder: React.FC<StrategicMapBuilderProps> = ({
     { id: 'role-2', title: 'Coordenador', responsibility: 'Supervisionar o time', metrics: [{ id: 'm-2', name: 'Taxa de no show', target: '< 5%' }] }
   ]);
 
-  // Auto-save no localStorage (não no servidor)
-  const { saveDraft, loadDraft, clearDraft } = useAutoSave(map, user?.id || '');
+  // Auto-save no localStorage (não no servidor) - salva também para usuário guest
+  const { saveDraft, loadDraft, clearDraft } = useAutoSave(map, user?.id || 'guest');
 
   // Carregar draft e tracking ao montar componente
   useEffect(() => {
-    if (!user) return;
-
+    // Restaurar draft mesmo se user não estiver definido (usa guest)
     const draft = loadDraft();
     if (draft && !initialMap.id) {
-      // Perguntar se quer restaurar draft
       const restore = window.confirm(
         'Encontramos um rascunho salvo automaticamente. Deseja restaurá-lo?'
       );

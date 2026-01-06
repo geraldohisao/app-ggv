@@ -3,6 +3,7 @@ import { StrategicMap } from '../../../types';
 
 const DRAFT_KEY_PREFIX = 'okr-draft-';
 const AUTO_SAVE_INTERVAL = 30000; // 30 segundos
+const CHANGE_SAVE_DELAY = 2000; // salva 2s após mudança
 
 /**
  * Hook para auto-save de OKR no localStorage
@@ -10,8 +11,10 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 segundos
 export const useAutoSave = (map: StrategicMap, userId: string) => {
   const lastSavedRef = useRef<string>('');
   const intervalRef = useRef<NodeJS.Timeout>();
+  const changeTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const draftKey = `${DRAFT_KEY_PREFIX}${userId}${map.id ? `-${map.id}` : '-new'}`;
+  const safeUserId = userId || 'guest';
+  const draftKey = `${DRAFT_KEY_PREFIX}${safeUserId}${map.id ? `-${map.id}` : '-new'}`;
 
   const saveDraft = (currentMap: StrategicMap) => {
     try {
@@ -53,6 +56,7 @@ export const useAutoSave = (map: StrategicMap, userId: string) => {
     }
   };
 
+  // Salva em intervalo fixo
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       saveDraft(map);
@@ -65,6 +69,17 @@ export const useAutoSave = (map: StrategicMap, userId: string) => {
     };
   }, [map]);
 
+  // Salva 2s após qualquer mudança (para não depender apenas do intervalo)
+  useEffect(() => {
+    if (changeTimeoutRef.current) clearTimeout(changeTimeoutRef.current);
+    changeTimeoutRef.current = setTimeout(() => saveDraft(map), CHANGE_SAVE_DELAY);
+
+    return () => {
+      if (changeTimeoutRef.current) clearTimeout(changeTimeoutRef.current);
+    };
+  }, [map]);
+
+  // Salva ao desmontar
   useEffect(() => {
     return () => {
       saveDraft(map);
