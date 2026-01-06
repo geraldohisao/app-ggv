@@ -16,13 +16,14 @@ if (GlobalWorkerOptions.workerSrc !== workerSrc) {
  * Visualizador de PDF usando PDF.js (canvas inline, com worker local)
  */
 const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [numPages, setNumPages] = useState(0);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [currentVisiblePage, setCurrentVisiblePage] = useState(1);
     const [scale, setScale] = useState(1.25);
     const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
+    const [renderedPages, setRenderedPages] = useState<number[]>([]);
 
     useEffect(() => {
         let mounted = true;
@@ -45,7 +46,7 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
 
                 setPdfDocument(pdf);
                 setNumPages(pdf.numPages);
-                setCurrentPage(1);
+                setCurrentVisiblePage(1);
             } catch (err: any) {
                 console.error('❌ [PDF.js] Erro ao carregar PDF:', err);
                 setError(true);
@@ -69,20 +70,36 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
     }, [pdfUrl]);
 
     useEffect(() => {
-        if (pdfDocument) {
-            renderPage(currentPage);
+        if (pdfDocument && numPages > 0) {
+            renderAllPages();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, scale, pdfDocument]);
+    }, [scale, pdfDocument, numPages]);
+
+    const renderAllPages = async () => {
+        if (!pdfDocument) return;
+
+        const pageNumbers = Array.from({ length: numPages }, (_, i) => i + 1);
+        setRenderedPages(pageNumbers);
+
+        // Renderizar cada página com um pequeno delay para não travar a UI
+        for (const pageNum of pageNumbers) {
+            await renderPage(pageNum);
+            // Pequeno delay para permitir que a UI responda
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    };
 
     const renderPage = async (pageNum: number) => {
-        if (!pdfDocument || !canvasRef.current) return;
+        if (!pdfDocument) return;
 
         try {
             const page = await pdfDocument.getPage(pageNum);
             const viewport = page.getViewport({ scale });
 
-            const canvas = canvasRef.current;
+            const canvas = document.getElementById(`pdf-page-${pageNum}`) as HTMLCanvasElement;
+            if (!canvas) return;
+
             const context = canvas.getContext('2d');
             if (!context) return;
 
@@ -96,9 +113,36 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
             const renderContext = { canvasContext: context, viewport };
             await page.render(renderContext).promise;
         } catch (err) {
-            console.error('❌ [PDF.js] Erro ao renderizar página:', err);
+            console.error(`❌ [PDF.js] Erro ao renderizar página ${pageNum}:`, err);
         }
     };
+    
+    // Detectar página visível ao rolar
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        
+        const handleScroll = () => {
+            const containerTop = container.scrollTop;
+            const containerHeight = container.clientHeight;
+            const centerY = containerTop + containerHeight / 2;
+            
+            // Encontrar qual página está no centro da viewport
+            const canvases = container.querySelectorAll('canvas[id^="pdf-page-"]');
+            canvases.forEach((canvas, idx) => {
+                const rect = canvas.getBoundingClientRect();
+                const canvasTop = canvas.getBoundingClientRect().top - container.getBoundingClientRect().top + containerTop;
+                const canvasBottom = canvasTop + rect.height;
+                
+                if (centerY >= canvasTop && centerY <= canvasBottom) {
+                    setCurrentVisiblePage(idx + 1);
+                }
+            });
+        };
+        
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [renderedPages]);
 
     const handleZoomIn = () => {
         setScale(prev => Math.min(prev + 0.25, 3));
@@ -106,14 +150,6 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
 
     const handleZoomOut = () => {
         setScale(prev => Math.max(prev - 0.25, 0.5));
-    };
-
-    const handlePrevPage = () => {
-        setCurrentPage(prev => Math.max(prev - 1, 1));
-    };
-
-    const handleNextPage = () => {
-        setCurrentPage(prev => Math.min(prev + 1, numPages));
     };
 
     if (loading) {
@@ -178,25 +214,11 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
                     </button>
                 </div>
 
-                {/* Page Navigation */}
+                {/* Page Indicator */}
                 <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
-                    <button
-                        onClick={handlePrevPage}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                    >
-                        ←
-                    </button>
-                    <span className="text-sm text-slate-600 min-w-[80px] text-center">
-                        {currentPage} / {numPages}
+                    <span className="text-sm text-slate-600">
+                        Página {currentVisiblePage} de {numPages}
                     </span>
-                    <button
-                        onClick={handleNextPage}
-                        disabled={currentPage === numPages}
-                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                    >
-                        →
-                    </button>
                 </div>
 
                 {/* File Name */}
@@ -216,20 +238,30 @@ const PDFViewerCanvas: React.FC<PDFViewerCanvasProps> = ({ pdfUrl, fileName }) =
                 </a>
             </div>
 
-            {/* Canvas Container */}
-            <div className="flex-1 overflow-auto p-8">
-                <div className="flex justify-center">
-                    <canvas 
-                        ref={canvasRef}
-                        className="shadow-2xl bg-white"
-                    />
+            {/* Canvas Container - Scroll Contínuo */}
+            <div 
+                ref={containerRef}
+                className="flex-1 overflow-auto p-8"
+            >
+                <div className="flex flex-col items-center gap-4">
+                    {renderedPages.map((pageNum) => (
+                        <div key={pageNum} className="relative">
+                            <canvas 
+                                id={`pdf-page-${pageNum}`}
+                                className="shadow-2xl bg-white"
+                            />
+                            <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs font-medium">
+                                {pageNum}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
             {/* Footer Info */}
             <div className="border-t border-slate-200 px-4 py-2 bg-white text-center shrink-0">
                 <p className="text-xs text-slate-500">
-                    Renderizado com PDF.js - Página {currentPage} de {numPages}
+                    Renderizado com PDF.js - Role para ver todas as páginas
                 </p>
             </div>
         </div>
