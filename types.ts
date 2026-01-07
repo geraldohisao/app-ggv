@@ -253,6 +253,12 @@ export interface ServiceOrder {
     completed_at?: string;
     created_at?: string;
     updated_at?: string;
+    // Extração automática (valor/pessoa) – pode não existir em OS antigas
+    extracted_valor?: string | null;
+    extracted_pessoa?: string | null;
+    extraction_confidence?: number | null;
+    extraction_status?: 'PENDING' | 'SUCCESS' | 'REVIEW' | 'ERROR';
+    extraction_log?: any;
 }
 
 export interface OSFilters {
@@ -274,6 +280,19 @@ export interface OKRContext {
     industry?: string;
     context: string; // Texto livre sobre a empresa, desafios, etc.
     documentsUploaded?: File[];
+}
+
+export interface KeyResult {
+    id: string;
+    name: string;
+    target?: string | number;
+}
+
+export interface OKRItem {
+    id?: string;
+    title: string;
+    summary?: string;
+    keyResults: KeyResult[];
 }
 
 export interface StrategicMap {
@@ -304,6 +323,9 @@ export interface StrategicMap {
     
     // Acompanhamento
     tracking?: TrackingMetric[];
+
+    // Hierarquia OKR
+    okrs?: OKRItem[];
     
     created_at?: string;
     updated_at?: string;

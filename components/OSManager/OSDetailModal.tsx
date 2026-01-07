@@ -14,7 +14,9 @@ import {
     CalendarDaysIcon,
     UsersIcon,
     ExclamationTriangleIcon,
-    EyeIcon
+    EyeIcon,
+    CurrencyDollarIcon,
+    UserIcon
 } from '../ui/icons';
 
 interface OSDetailModalProps {
@@ -607,6 +609,15 @@ const OverviewTab: React.FC<{
     formatDate: (date?: string) => string;
     formatFileSize: (bytes?: number) => string;
 }> = ({ order, formatDate, formatFileSize }) => {
+    const extractionStatusLabel = (() => {
+        switch (order.extraction_status) {
+            case 'SUCCESS': return { label: 'Sucesso', color: 'text-green-700', bg: 'bg-green-50' };
+            case 'REVIEW': return { label: 'Revisar', color: 'text-amber-700', bg: 'bg-amber-50' };
+            case 'ERROR': return { label: 'Erro', color: 'text-red-700', bg: 'bg-red-50' };
+            default: return { label: 'Pendente', color: 'text-slate-700', bg: 'bg-slate-50' };
+        }
+    })();
+
     return (
         <div className="space-y-4">
             {/* Info Cards */}
@@ -638,6 +649,40 @@ const OverviewTab: React.FC<{
                     label="Expira em"
                     value={formatDate(order.expires_at)}
                 />
+            </div>
+
+            {/* Dados Extraídos (Valor / Pessoa) */}
+            <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                    <div className={`px-2 py-1 text-xs font-semibold rounded ${extractionStatusLabel.bg} ${extractionStatusLabel.color}`}>
+                        Extração: {extractionStatusLabel.label}
+                    </div>
+                    {typeof order.extraction_confidence === 'number' && (
+                        <span className="text-xs text-slate-500">Confiança: {(order.extraction_confidence * 100).toFixed(0)}%</span>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <InfoCard
+                        icon={<CurrencyDollarIcon className="w-5 h-5" />}
+                        label="Valor identificado"
+                        value={order.extracted_valor || 'Não encontrado'}
+                    />
+                    <InfoCard
+                        icon={<UserIcon className="w-5 h-5" />}
+                        label="Pessoa/cliente identificado"
+                        value={order.extracted_pessoa || 'Não encontrado'}
+                    />
+                </div>
+                {order.extraction_log?.valor?.context && (
+                    <p className="text-xs text-slate-500">
+                        Trecho valor: {order.extraction_log.valor.context}
+                    </p>
+                )}
+                {order.extraction_log?.pessoa?.context && (
+                    <p className="text-xs text-slate-500">
+                        Trecho pessoa: {order.extraction_log.pessoa.context}
+                    </p>
+                )}
             </div>
 
             {/* Status Summary */}
