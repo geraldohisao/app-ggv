@@ -200,7 +200,7 @@ class OSEmailService {
      */
     async sendCancelled(order: ServiceOrder, signers: OSSigner[], reason: string = 'Documento cancelado'): Promise<void> {
         const config = await this.loadConfig();
-        const logoBase64 = await this.getLogoBase64();
+        const logoUrl = await this.getLogoUrl();
 
         const emailHTML = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px 20px; background: #ffffff;">
@@ -255,7 +255,7 @@ class OSEmailService {
      */
     async sendFinalized(order: ServiceOrder, signers: OSSigner[]): Promise<void> {
         const config = await this.loadConfig();
-        const logoBase64 = await this.getLogoBase64();
+        const logoUrl = await this.getLogoUrl();
 
         // Escolher PDF final (com termo, se existir)
         console.log('📄 Dados da OS para download:', {
