@@ -14,11 +14,13 @@ import CallsApp from './components/Calls/CallsApp';
 import GGVTalentPage from './components/GGVTalent/GGVTalentPage';
 import LoginPage from './components/LoginPage';
 import SettingsPage from './components/SettingsPage';
+import OrganogramaPage from './components/OrganogramaPage';
 import ReativacaoLeadsPage from './components/ReativacaoLeadsPage';
 import PublicResultPage from './components/PublicResultPage';
 import PublicDiagnosticReport from './components/PublicDiagnosticReport';
+import PublicOrganogramaPage from './components/PublicOrganogramaPage';
 import OSManagerPage from './components/OSManager/OSManagerPage';
-import OKRPage from './components/okr/OKRPage';
+import { OKRModule } from './components/okr/OKRModule';
 import { UserProvider, useUser } from './contexts/DirectUserContext';
 import { BulkAnalysisProvider } from './contexts/BulkAnalysisContext';
 import { BulkAnalysisProgressNotification } from './components/BulkAnalysisProgressNotification';
@@ -69,6 +71,7 @@ const AppContent: React.FC = () => {
   // Verificar se é uma página de relatório público com token seguro (formato: /r/{token})
   const tokenMatch = window.location.pathname.match(/^\/r\/(.+)$/);
   const isPublicDiagnosticReport = tokenMatch !== null;
+  const isPublicOrganograma = window.location.pathname.startsWith('/organograma-publico');
   
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
@@ -94,69 +97,22 @@ const AppContent: React.FC = () => {
   // Captura global de erros e rejeições para alertas críticos
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
-      try {
-        const error = event.error || new Error(event.message);
-        // @ts-ignore lazy import to avoid cycle
-        const { postCriticalAlert } = require('./src/utils/net');
-        
-        // Fallback seguro se postCriticalAlert falhar
-        const safePostAlert = (data: any) => {
-          try {
-            postCriticalAlert(data);
-          } catch (alertError) {
-            console.warn('🔒 Erro ao enviar alerta crítico:', alertError);
-            // Log local como fallback
-            console.error('🚨 Erro global capturado:', {
-              title: data.title,
-              message: data.message,
-              timestamp: new Date().toISOString()
-            });
-          }
-        };
-        
-        safePostAlert({
-          title: 'Erro global não tratado',
-          message: error?.message || String(error),
-          context: {
-            url: window.location.href,
-            stack: error?.stack || '',
-            filename: event.filename,
-            lineno: event.lineno,
-            colno: event.colno
-          }
-        });
-      } catch (fallbackError) {
-        console.warn('🔒 Erro no handler de erro global:', fallbackError);
-      }
+      const error = event.error || new Error(event.message);
+      console.error('🚨 Erro global capturado:', {
+        message: error?.message || String(error),
+        stack: error?.stack,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      });
     };
     
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       try {
-        // @ts-ignore lazy import to avoid cycle
-        const { postCriticalAlert } = require('./src/utils/net');
-        
-        // Fallback seguro se postCriticalAlert falhar
-        const safePostAlert = (data: any) => {
-          try {
-            postCriticalAlert(data);
-          } catch (alertError) {
-            console.warn('🔒 Erro ao enviar alerta crítico:', alertError);
-            // Log local como fallback
-            console.error('🚨 Promise rejeitada capturada:', {
-              title: data.title,
-              message: data.message,
-              timestamp: new Date().toISOString()
-            });
-          }
-        };
-        
-        safePostAlert({
-          title: 'Promise rejeitada não tratada',
-          message: String(event.reason),
-          context: {
-            url: window.location.href,
-            reason: event.reason
-          }
+        console.error('🚨 Promise rejeitada não tratada:', {
+          reason: event.reason,
+          url: window.location.href,
+          timestamp: new Date().toISOString()
         });
       } catch (fallbackError) {
         console.warn('🔒 Erro no handler de promise rejeitada:', fallbackError);
@@ -199,6 +155,10 @@ const AppContent: React.FC = () => {
   // Se for página de relatório público com deal_id, não precisa de autenticação
   if (isPublicDiagnosticReport) {
     return <PublicDiagnosticReport />;
+  }
+
+  if (isPublicOrganograma) {
+    return <PublicOrganogramaPage />;
   }
   
   // Se for página de admin de incidentes (temporariamente desabilitada)
@@ -287,6 +247,9 @@ const AppContent: React.FC = () => {
       case Module.Settings:
         console.log('⚙️ APP - Renderizando Settings');
         return <SettingsPage />;
+      case Module.Organograma:
+        console.log('🏢 APP - Renderizando Organograma');
+        return <OrganogramaPage />;
       case Module.OpportunityFeedback:
         console.log('📝 APP - Renderizando Opportunity Feedback');
         return <OpportunityFeedbackPage />;
@@ -318,7 +281,7 @@ const AppContent: React.FC = () => {
             </div>
           );
         }
-        return <OKRPage />;
+        return <OKRModule />;
       case Module.GGVTalent:
         console.log('✨ APP - Renderizando GGV Talent');
         return <GGVTalentPage />;
