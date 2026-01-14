@@ -1,21 +1,3 @@
-import React from 'react';
-
-/**
- * Placeholder do módulo de OKR.
- * Mantém a aplicação compilando enquanto o módulo completo não está disponível.
- */
-export const OKRModule: React.FC = () => {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-slate-800 mb-2">Gestão de OKR</h1>
-      <p className="text-slate-600">
-        O módulo de OKR está temporariamente indisponível nesta build.
-      </p>
-    </div>
-  );
-};
-
-export default OKRModule;
 import React, { useState, useEffect, useMemo } from 'react';
 import { OKRDashboard } from './pages/OKRDashboard';
 import { SprintList } from './pages/SprintList';
@@ -186,3 +168,5 @@ export const OKRModule: React.FC = () => {
     </div>
   );
 };
+
+export default OKRModule;
