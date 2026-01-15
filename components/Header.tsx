@@ -4,7 +4,7 @@ import UserMenu from './UserMenu';
 import NotificationCenter from './NotificationCenter';
 import { Module } from '../types';
 import ConnectionStatus from './ConnectionStatus';
-import { ChartBarIcon, CpuChipIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
+import { ChartBarIcon, CpuChipIcon, CalculatorIcon, PhoneIcon, PresentationChartLineIcon } from './ui/icons';
 import { navigateToModule } from '../utils/router';
 
 interface HeaderProps {
@@ -18,6 +18,7 @@ const navItems = [
     { module: Module.Assistente, text: "Assistente", icon: <CpuChipIcon className="w-5 h-5" /> },
     { module: Module.Calculadora, text: "Calculadora", icon: <CalculatorIcon className="w-5 h-5" /> },
     { module: Module.Calls, text: "Chamadas", icon: <PhoneIcon className="w-5 h-5" /> },
+    { module: Module.Organograma, text: "Organograma", icon: <PresentationChartLineIcon className="w-5 h-5" /> },
 ];
 
 const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule, onLogout }) => {
