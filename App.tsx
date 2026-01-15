@@ -43,9 +43,14 @@ const DebugPanelWrapper: React.FC<{ user: any }> = ({ user }) => {
 };
 
 
+const resolveModuleFromPathname = (pathname: string): Module => {
+  if (pathname.startsWith('/organograma')) return Module.Organograma;
+  return getModuleFromPath(pathname);
+};
+
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useUser();
-  const [activeModule, setActiveModule] = useState<Module>(() => getModuleFromPath(window.location.pathname));
+  const [activeModule, setActiveModule] = useState<Module>(() => resolveModuleFromPathname(window.location.pathname));
   const canAccessOSManager = user && (
     user.role === UserRole.SuperAdmin ||
     user.role === UserRole.Admin ||
@@ -58,7 +63,7 @@ const AppContent: React.FC = () => {
 
   // Garantir que ao carregar a página, o módulo correto seja selecionado
   useEffect(() => {
-    const currentModule = getModuleFromPath(window.location.pathname);
+    const currentModule = resolveModuleFromPathname(window.location.pathname);
     if (currentModule !== activeModule) {
       console.log(`🔄 APP - Atualizando módulo: ${activeModule} → ${currentModule}`);
       setActiveModule(currentModule);
@@ -134,7 +139,7 @@ const AppContent: React.FC = () => {
     };
 
     const handlePopState = () => {
-      const newModule = getModuleFromPath(window.location.pathname);
+      const newModule = resolveModuleFromPathname(window.location.pathname);
       setActiveModule(newModule);
     };
 
