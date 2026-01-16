@@ -8,7 +8,8 @@ import {
     ChatBubbleLeftRightIcon,
     DocumentSignatureIcon,
     SparklesIcon,
-    ChartBarSquareIcon
+    ChartBarSquareIcon,
+    PresentationChartLineIcon
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { supabase } from '../services/supabaseClient';
@@ -99,7 +100,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                     ref={dropdown}
                     onFocus={() => setIsOpen(true)}
                     onBlur={() => setIsOpen(false)}
-                    className="origin-top-right z-10 absolute top-full right-0 min-w-64 bg-white border border-slate-200 py-1.5 rounded-lg shadow-lg overflow-hidden mt-2"
+                    className="origin-top-right z-50 absolute top-full right-0 min-w-64 bg-white border border-slate-200 py-1.5 rounded-lg shadow-lg overflow-hidden mt-2"
                 >
                     <div className="px-4 py-3 border-b border-slate-200">
                         <p className="font-semibold text-slate-800">{user.name}</p>
@@ -121,6 +122,12 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                                 onClick={() => handleSelectModule(Module.OpportunityFeedback)}
                             />
                         )}
+                        <MenuItem 
+                            icon={<PresentationChartLineIcon className="w-5 h-5 text-indigo-600"/>} 
+                            text="Organograma Corporativo" 
+                            isActive={activeModule === Module.Organograma}
+                            onClick={() => handleSelectModule(Module.Organograma)}
+                        />
                         {canSeeGGVTalent && (
                             <MenuItem 
                                 icon={<SparklesIcon className="w-5 h-5 text-amber-500"/>} 
