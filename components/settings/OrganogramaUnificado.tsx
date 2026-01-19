@@ -244,7 +244,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const [shareStatus, setShareStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(0.7); // Começar em 70% para visão geral
+  const [zoomLevel, setZoomLevel] = useState(1.0); // Começar em 100%
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const isStatic = Boolean(staticData);
@@ -262,13 +262,21 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
         const container = containerRef.current;
         const content = contentRef.current;
         if (container && content) {
+          // Centralizar horizontalmente no meio do conteúdo
           const centerX = (content.scrollWidth - container.clientWidth) / 2;
           container.scrollLeft = centerX;
+          // Scroll para o topo (onde está o CEO/COO)
           container.scrollTop = 0;
+          
+          console.log('🎯 Organograma centralizado:', { 
+            scrollLeft: centerX, 
+            contentWidth: content.scrollWidth, 
+            containerWidth: container.clientWidth 
+          });
         }
-      }, 100);
+      }, 150); // Delay maior para garantir que o DOM renderizou completamente
     }
-  }, [loading, usuarios]);
+  }, [loading, usuarios, zoomLevel]); // Re-centralizar ao mudar zoom
 
   // 🔄 Busca de dados
   const fetchData = async () => {
