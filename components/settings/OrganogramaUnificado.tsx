@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { UserRole } from '../../types';
 import { createPublicOrgChartLink } from '../../services/organogramaService';
 import { copyToClipboard } from '../../src/utils/clipboard';
+import Draggable from 'react-draggable';
 
 // ============================================
 // TIPOS
@@ -245,6 +246,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const isStatic = Boolean(staticData);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // 🔄 Busca de dados
   const fetchData = async () => {
@@ -519,12 +521,24 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
         </div>
       )}
 
-      {/* Área do Organograma (Scrollável) */}
-      <div className="flex-1 overflow-auto bg-slate-50 p-8 pt-20 shadow-inner custom-scrollbar">
-        <div className="min-w-max flex flex-col items-center pb-20 scale-90 origin-top">
-          
-          {/* 1. TOPO: CEO e COO */}
-          <div className="flex gap-24 items-start relative">
+      {/* Área do Organograma (Scrollável + Drag) */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-slate-50 relative cursor-grab active:cursor-grabbing"
+      >
+        <Draggable
+          nodeRef={containerRef}
+          onDrag={(e, data) => {
+            if (containerRef.current) {
+              containerRef.current.scrollLeft -= data.deltaX;
+              containerRef.current.scrollTop -= data.deltaY;
+            }
+          }}
+        >
+          <div className="min-w-max flex flex-col items-center p-8 pt-20 pb-20 scale-90 origin-top">
+            
+            {/* 1. TOPO: CEO e COO */}
+            <div className="flex gap-24 items-start relative">
             
             {/* Grupo CEO */}
             <div className="flex flex-col items-center">
@@ -617,6 +631,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
 
           {/* Legenda (Removida daqui pois agora é flutuante no topo) */}
         </div>
+        </Draggable>
       </div>
     </div>
   );
