@@ -32,6 +32,16 @@ const resolveBaseUrl = () => {
     : window.location.origin;
 };
 
+const normalizeToken = (rawToken: string) => {
+  let token = (rawToken || '').trim();
+  if (!token) return token;
+  const httpIndex = token.indexOf('http');
+  if (httpIndex > 0) token = token.slice(0, httpIndex);
+  if (token.includes('&')) token = token.split('&')[0];
+  if (token.includes('?')) token = token.split('?')[0];
+  return token.trim();
+};
+
 export async function createPublicOrgChartLink(params: {
   usuarios: OrgChartUser[];
   cargos: OrgChartCargo[];
@@ -58,11 +68,12 @@ export async function createPublicOrgChartLink(params: {
 }
 
 export async function getPublicOrgChart(token: string): Promise<OrgChartSnapshot | null> {
-  if (!token) return null;
+  const normalizedToken = normalizeToken(token);
+  if (!normalizedToken) return null;
 
   // Preferir endpoint público via Netlify Function (sem exigir auth)
   try {
-    const res = await fetch(`/.netlify/functions/organograma-publico?token=${encodeURIComponent(token)}`);
+    const res = await fetch(`/.netlify/functions/organograma-publico?token=${encodeURIComponent(normalizedToken)}`);
     if (res.ok) {
       const payload = await res.json();
       if (payload?.report) return payload.report as OrgChartSnapshot;
@@ -71,7 +82,7 @@ export async function getPublicOrgChart(token: string): Promise<OrgChartSnapshot
     // fallback abaixo
   }
 
-  const row: PublicReportRow | null = await getPublicReport(token);
+  const row: PublicReportRow | null = await getPublicReport(normalizedToken);
   if (!row || !row.report) return null;
 
   if (row.report.type && row.report.type !== 'organograma') {
