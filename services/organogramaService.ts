@@ -60,6 +60,17 @@ export async function createPublicOrgChartLink(params: {
 export async function getPublicOrgChart(token: string): Promise<OrgChartSnapshot | null> {
   if (!token) return null;
 
+  // Preferir endpoint público via Netlify Function (sem exigir auth)
+  try {
+    const res = await fetch(`/.netlify/functions/organograma-publico?token=${encodeURIComponent(token)}`);
+    if (res.ok) {
+      const payload = await res.json();
+      if (payload?.report) return payload.report as OrgChartSnapshot;
+    }
+  } catch {
+    // fallback abaixo
+  }
+
   const row: PublicReportRow | null = await getPublicReport(token);
   if (!row || !row.report) return null;
 
