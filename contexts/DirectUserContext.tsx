@@ -55,13 +55,15 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 if (session?.user) {
                                     const { data: profile } = await supabase
                                         .from('profiles')
-                                        .select('role, user_function')
+                                        .select('role, department, cargo, user_function')
                                         .eq('id', session.user.id)
                                         .single();
-                                    if (profile && (profile.user_function || profile.role)) {
+                                    if (profile && (profile.role || profile.department || profile.cargo)) {
                                         const updatedUser = {
                                             ...sessionInfo.user,
                                             role: (profile.role as UserRole) || sessionInfo.user.role,
+                                            department: profile.department || sessionInfo.user.department,
+                                            cargo: profile.cargo || sessionInfo.user.cargo,
                                             user_function: (profile.user_function as any) || sessionInfo.user.user_function,
                                         } as User;
                                         setUser(updatedUser);
@@ -105,21 +107,25 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                      email.split('@')[0] || 
                                      'Usuário';
                         
-                        // Consultar role e função comercial da tabela profiles
+                        // Consultar role, department e cargo da tabela profiles
                         let userRole = UserRole.User;
-                        let userFunction: 'SDR' | 'Closer' | 'Gestor' | undefined = undefined;
+                        let userDepartment: string | undefined = undefined;
+                        let userCargo: string | undefined = undefined;
+                        let userFunction: 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined = undefined;
                         
                         try {
                             const { data: profile } = await supabase
                                 .from('profiles')
-                                .select('role, user_function')
+                                .select('role, department, cargo, user_function')
                                 .eq('id', session.user.id)
                                 .single();
                             
                             if (profile?.role) {
                                 userRole = profile.role as UserRole;
-                                userFunction = profile.user_function as 'SDR' | 'Closer' | 'Gestor' | undefined;
-                                console.log('✅ DIRECT CONTEXT - Role e função carregados do banco:', { role: userRole, function: userFunction });
+                                userDepartment = profile.department;
+                                userCargo = profile.cargo;
+                                userFunction = profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined;
+                                console.log('✅ DIRECT CONTEXT - Role, department e cargo carregados do banco:', { role: userRole, department: userDepartment, cargo: userCargo, function: userFunction });
                             } else {
                                 // Fallback para emails específicos
                                 const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
@@ -140,6 +146,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             name: name.split(' ').map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(' '),
                             initials: name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
                             role: userRole,
+                            department: userDepartment,
+                            cargo: userCargo,
                             user_function: userFunction
                         };
                         
@@ -216,7 +224,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (supabase) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('role, user_function')
+                    .select('role, department, cargo, user_function')
                     .eq('id', authenticatedUser.id)
                     .single();
                 
@@ -224,13 +232,15 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     finalUser = {
                         ...authenticatedUser,
                         role: profile.role as UserRole,
-                        user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | undefined
+                        department: profile.department,
+                        cargo: profile.cargo,
+                        user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined
                     };
-                    console.log('✅ DIRECT CONTEXT - Role e função atualizados do banco:', { role: profile.role, function: profile.user_function });
+                    console.log('✅ DIRECT CONTEXT - Role, department e cargo atualizados do banco:', { role: profile.role, department: profile.department, cargo: profile.cargo, function: profile.user_function });
                 }
             }
         } catch (profileError) {
-            console.warn('⚠️ DIRECT CONTEXT - Erro ao atualizar role/função:', profileError);
+            console.warn('⚠️ DIRECT CONTEXT - Erro ao atualizar role/department/cargo:', profileError);
         }
         
         // Salvar usuário usando utilitário de sessão
@@ -277,24 +287,26 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            // Buscar role e função atualizados do banco
+            // Buscar role, department e cargo atualizados do banco
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('role, user_function')
+                .select('role, department, cargo, user_function')
                 .eq('id', user.id)
                 .single();
             
-            if (profile && (profile.role !== user.role || profile.user_function !== user.user_function)) {
+            if (profile && (profile.role !== user.role || profile.department !== user.department || profile.cargo !== user.cargo || profile.user_function !== user.user_function)) {
                 const updatedUser = {
                     ...user,
                     role: profile.role as UserRole,
-                    user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | undefined
+                    department: profile.department,
+                    cargo: profile.cargo,
+                    user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined
                 };
                 
-                console.log('✅ DIRECT CONTEXT - Role/função atualizados:', 
-                    { role: user.role, function: user.user_function }, 
+                console.log('✅ DIRECT CONTEXT - Role/department/cargo atualizados:', 
+                    { role: user.role, department: user.department, cargo: user.cargo, function: user.user_function }, 
                     '→', 
-                    { role: profile.role, function: profile.user_function }
+                    { role: profile.role, department: profile.department, cargo: profile.cargo, function: profile.user_function }
                 );
                 
                 // Atualizar estado
@@ -303,15 +315,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // Atualizar storage usando utilitário
                 saveSession(updatedUser);
             } else {
-                console.log('ℹ️ DIRECT CONTEXT - Role/função não mudaram:', { role: user.role, function: user.user_function });
+                console.log('ℹ️ DIRECT CONTEXT - Role/department/cargo não mudaram:', { role: user.role, department: user.department, cargo: user.cargo, function: user.user_function });
             }
         } catch (error) {
             console.error('❌ DIRECT CONTEXT - Erro ao atualizar usuário:', error);
         }
     };
 
+    const isPublicOrganograma = typeof window !== 'undefined' && window.location.pathname.startsWith('/organograma-publico');
+
     // Se deve mostrar autenticação
-    if (showAuth) {
+    if (showAuth && !isPublicOrganograma) {
         return (
             <UserContext.Provider value={{ user, loading, logout, refreshUser }}>
                 <DirectAuth 
