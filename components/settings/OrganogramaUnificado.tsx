@@ -245,12 +245,30 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(0.7); // Começar em 70% para visão geral
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const isStatic = Boolean(staticData);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.4));
   const handleZoomReset = () => setZoomLevel(1);
+
+  // Centralizar no nível 1 ao carregar
+  useEffect(() => {
+    if (!loading && containerRef.current && contentRef.current) {
+      setTimeout(() => {
+        const container = containerRef.current;
+        const content = contentRef.current;
+        if (container && content) {
+          const centerX = (content.scrollWidth - container.clientWidth) / 2;
+          container.scrollLeft = centerX;
+          container.scrollTop = 0;
+        }
+      }, 100);
+    }
+  }, [loading, usuarios]);
 
   // 🔄 Busca de dados
   const fetchData = async () => {
@@ -562,48 +580,44 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
       {/* Área do Organograma (Scrollável + Drag) */}
       <div 
         ref={containerRef}
-        className={`flex-1 overflow-auto bg-slate-50 relative ${zoomLevel > 0.85 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+        className={`flex-1 overflow-auto bg-slate-50 relative ${isDragging ? 'cursor-grabbing' : (zoomLevel > 0.85 ? 'cursor-grab' : 'cursor-default')}`}
         style={{
-          scrollBehavior: 'smooth'
+          scrollBehavior: isDragging ? 'auto' : 'smooth'
         }}
         onMouseDown={(e) => {
-          if (zoomLevel <= 0.85) return; // Só permite drag se zoom > 85%
+          if (zoomLevel <= 0.85 || e.button !== 0) return;
+          e.preventDefault();
           const el = containerRef.current;
           if (!el) return;
           
-          const startX = e.pageX - el.offsetLeft;
-          const startY = e.pageY - el.offsetTop;
-          const scrollLeft = el.scrollLeft;
-          const scrollTop = el.scrollTop;
-          let isDragging = false;
-
-          const handleMouseMove = (moveE: MouseEvent) => {
-            isDragging = true;
-            const x = moveE.pageX - el.offsetLeft;
-            const y = moveE.pageY - el.offsetTop;
-            const walkX = (x - startX) * 1.5; // Multiplicador de velocidade
-            const walkY = (y - startY) * 1.5;
-            el.scrollLeft = scrollLeft - walkX;
-            el.scrollTop = scrollTop - walkY;
-          };
-
-          const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-            if (isDragging) {
-              e.preventDefault();
-            }
-          };
-
-          document.addEventListener('mousemove', handleMouseMove);
-          document.addEventListener('mouseup', handleMouseUp);
+          setIsDragging(true);
+          setDragStart({
+            x: e.clientX,
+            y: e.clientY,
+            scrollLeft: el.scrollLeft,
+            scrollTop: el.scrollTop
+          });
         }}
+        onMouseMove={(e) => {
+          if (!isDragging || zoomLevel <= 0.85) return;
+          e.preventDefault();
+          const el = containerRef.current;
+          if (!el) return;
+          
+          const dx = e.clientX - dragStart.x;
+          const dy = e.clientY - dragStart.y;
+          el.scrollLeft = dragStart.scrollLeft - dx;
+          el.scrollTop = dragStart.scrollTop - dy;
+        }}
+        onMouseUp={() => setIsDragging(false)}
+        onMouseLeave={() => setIsDragging(false)}
       >
           <div 
+            ref={contentRef}
             className="min-w-max flex flex-col items-center p-8 pt-20 pb-20 origin-center"
             style={{
               transform: `scale(${zoomLevel})`,
-              transition: 'transform 0.2s ease-out'
+              transition: isDragging ? 'none' : 'transform 0.2s ease-out'
             }}
           >
             
