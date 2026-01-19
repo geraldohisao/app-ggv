@@ -3,7 +3,6 @@ import { supabase } from '../../services/supabaseClient';
 import { UserRole } from '../../types';
 import { createPublicOrgChartLink } from '../../services/organogramaService';
 import { copyToClipboard } from '../../src/utils/clipboard';
-import Draggable from 'react-draggable';
 
 // ============================================
 // TIPOS
@@ -245,8 +244,13 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const [shareStatus, setShareStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(0.7); // Começar em 70% para visão geral
   const isStatic = Boolean(staticData);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.4));
+  const handleZoomReset = () => setZoomLevel(1);
 
   // 🔄 Busca de dados
   const fetchData = async () => {
@@ -441,6 +445,40 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
               </button>
             )}
           </div>
+
+          {/* Controles de Zoom */}
+          <div className="bg-white/90 backdrop-blur p-1.5 rounded-lg shadow-sm border border-slate-200 flex items-center gap-1">
+            <button
+              onClick={handleZoomOut}
+              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+              title="Reduzir zoom"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+              </svg>
+            </button>
+            <span className="text-xs font-semibold text-slate-600 min-w-[3rem] text-center">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button
+              onClick={handleZoomIn}
+              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+              title="Aumentar zoom"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </button>
+            <div className="w-px h-4 bg-slate-200"></div>
+            <button
+              onClick={handleZoomReset}
+              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors text-xs font-semibold"
+              title="Resetar zoom"
+            >
+              100%
+            </button>
+          </div>
+
           {enableShare && !isStatic && (
             <button
               onClick={handleGenerateShareLink}
@@ -524,18 +562,50 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
       {/* Área do Organograma (Scrollável + Drag) */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto bg-slate-50 relative cursor-grab active:cursor-grabbing"
-      >
-        <Draggable
-          nodeRef={containerRef}
-          onDrag={(e, data) => {
-            if (containerRef.current) {
-              containerRef.current.scrollLeft -= data.deltaX;
-              containerRef.current.scrollTop -= data.deltaY;
+        className={`flex-1 overflow-auto bg-slate-50 relative ${zoomLevel > 0.85 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+        style={{
+          scrollBehavior: 'smooth'
+        }}
+        onMouseDown={(e) => {
+          if (zoomLevel <= 0.85) return; // Só permite drag se zoom > 85%
+          const el = containerRef.current;
+          if (!el) return;
+          
+          const startX = e.pageX - el.offsetLeft;
+          const startY = e.pageY - el.offsetTop;
+          const scrollLeft = el.scrollLeft;
+          const scrollTop = el.scrollTop;
+          let isDragging = false;
+
+          const handleMouseMove = (moveE: MouseEvent) => {
+            isDragging = true;
+            const x = moveE.pageX - el.offsetLeft;
+            const y = moveE.pageY - el.offsetTop;
+            const walkX = (x - startX) * 1.5; // Multiplicador de velocidade
+            const walkY = (y - startY) * 1.5;
+            el.scrollLeft = scrollLeft - walkX;
+            el.scrollTop = scrollTop - walkY;
+          };
+
+          const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            if (isDragging) {
+              e.preventDefault();
             }
-          }}
-        >
-          <div className="min-w-max flex flex-col items-center p-8 pt-20 pb-20 scale-90 origin-top">
+          };
+
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('mouseup', handleMouseUp);
+        }}
+      >
+          <div 
+            className="min-w-max flex flex-col items-center p-8 pt-20 pb-20 origin-center"
+            style={{
+              transform: `scale(${zoomLevel})`,
+              transition: 'transform 0.2s ease-out'
+            }}
+          >
             
             {/* 1. TOPO: CEO e COO */}
             <div className="flex gap-24 items-start relative">
@@ -631,7 +701,6 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
 
           {/* Legenda (Removida daqui pois agora é flutuante no topo) */}
         </div>
-        </Draggable>
       </div>
     </div>
   );
