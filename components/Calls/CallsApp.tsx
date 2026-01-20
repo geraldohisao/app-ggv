@@ -68,9 +68,15 @@ export default function CallsApp() {
   const active = useMemo(() => route.name, [route]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Navigation Tabs - mesmo estilo do OKR */}
-      <div className="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-sm">
+    <div className="bg-slate-100 min-h-full">
+      {/* Header da página */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-screen-2xl mx-auto px-6 py-4">
+          <h1 className="text-xl font-semibold text-slate-800">Chamadas</h1>
+          <p className="text-sm text-slate-500">Métricas e análise de ligações da sua equipe.</p>
+        </div>
+        
+        {/* Navigation Tabs - colado no header */}
         <div className="max-w-screen-2xl mx-auto px-6">
           <div className="flex gap-1">
             {tabs.map((tab) => {
@@ -81,10 +87,10 @@ export default function CallsApp() {
                   key={tab.id}
                   href={tab.href}
                   className={`
-                    px-6 py-4 font-bold text-sm flex items-center gap-3 border-b-4 transition-all
+                    px-5 py-3 font-semibold text-sm flex items-center gap-2 border-b-[3px] transition-all
                     ${isActive
                       ? 'border-[#5B5FF5] text-[#5B5FF5]'
-                      : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200'
+                      : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'
                     }
                   `}
                 >
@@ -98,16 +104,14 @@ export default function CallsApp() {
       </div>
 
       {/* Content */}
-      <div className="min-h-[calc(100vh-130px)]">
-        <div className="max-w-screen-2xl mx-auto p-6">
-          {route.name === 'dashboard' && <CallsDashboardPage />}
-          {route.name === 'calls' && <CallsListPage />}
-          {route.name === 'call' && <CallDetailPage callId={route.id} />}
-          {route.name === 'scorecards' && <ScorecardPage />}
-          {route.name === 'scorecard' && <ScorecardEditPage scorecardId={route.id} />}
-          {route.name === 'sdr' && <SdrDetailPage sdrId={route.id} />}
-          {route.name === 'analyze' && <CallAnalyzePage callId={route.id} />}
-        </div>
+      <div className="max-w-screen-2xl mx-auto p-6">
+        {route.name === 'dashboard' && <CallsDashboardPage />}
+        {route.name === 'calls' && <CallsListPage />}
+        {route.name === 'call' && <CallDetailPage callId={route.id} />}
+        {route.name === 'scorecards' && <ScorecardPage />}
+        {route.name === 'scorecard' && <ScorecardEditPage scorecardId={route.id} />}
+        {route.name === 'sdr' && <SdrDetailPage sdrId={route.id} />}
+        {route.name === 'analyze' && <CallAnalyzePage callId={route.id} />}
       </div>
     </div>
   );
