@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import OrganogramaUnificado from './settings/OrganogramaUnificado';
-import { PresentationChartLineIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from './ui/icons';
+import { OrgChartIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from './ui/icons';
 
 const OrganogramaPage: React.FC = () => {
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -14,10 +14,10 @@ const OrganogramaPage: React.FC = () => {
              {/* Header Principal da Página (Oculto em Fullscreen) - Versão Ultra Compacta */}
              {!isFullscreen && (
                  <div className="bg-white border-b border-slate-200 px-4 py-2 shadow-sm z-10 flex items-center justify-between gap-4">
-                    <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <PresentationChartLineIcon className="w-5 h-5 text-indigo-600" />
-                        Organograma
-                    </h1>
+                        <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <OrgChartIcon className="w-5 h-5 text-cyan-600" />
+                            Organograma
+                        </h1>
 
                     <button 
                         onClick={toggleFullscreen}
@@ -43,9 +43,9 @@ const OrganogramaPage: React.FC = () => {
                     </button>
                 )}
 
-                <div className={`h-full bg-white shadow-sm border border-slate-200 overflow-hidden ${isFullscreen ? '' : 'rounded-xl'}`}>
+                    <div className={`h-full bg-white shadow-sm border border-slate-200 overflow-hidden ${isFullscreen ? '' : 'rounded-xl'}`}>
                     <OrganogramaUnificado isFullscreen={isFullscreen} enableShare />
-                </div>
+                    </div>
             </div>
         </div>
     );

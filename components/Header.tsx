@@ -2,9 +2,10 @@ import React from 'react';
 import AppBrand from './common/AppBrand';
 import UserMenu from './UserMenu';
 import NotificationCenter from './NotificationCenter';
+import AppLauncher from './AppLauncher';
 import { Module } from '../types';
 import ConnectionStatus from './ConnectionStatus';
-import { ChartBarIcon, CpuChipIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
+import { ChartBarIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
 import { navigateToModule } from '../utils/router';
 
 interface HeaderProps {
@@ -15,9 +16,8 @@ interface HeaderProps {
 
 const navItems = [
     { module: Module.Diagnostico, text: "Diagnóstico", icon: <ChartBarIcon className="w-5 h-5" /> },
-    { module: Module.Assistente, text: "Assistente", icon: <CpuChipIcon className="w-5 h-5" /> },
-    { module: Module.Calculadora, text: "Calculadora", icon: <CalculatorIcon className="w-5 h-5" /> },
     { module: Module.Calls, text: "Chamadas", icon: <PhoneIcon className="w-5 h-5" /> },
+    { module: Module.Calculadora, text: "Calculadora", icon: <CalculatorIcon className="w-5 h-5" /> },
 ];
 
 const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule, onLogout }) => {
@@ -51,10 +51,11 @@ const Header: React.FC<HeaderProps> = ({ activeModule, setActiveModule, onLogout
                         ))}
                     </nav>
 
-                    {/* Right side: Notifications, Status and User Menu */}
+                    {/* Right side: Status, Notifications, App Launcher and User Menu */}
                     <div className="flex items-center gap-3">
                        <ConnectionStatus />
                        <NotificationCenter />
+                       <AppLauncher activeModule={activeModule} setActiveModule={setActiveModule} />
                        <UserMenu activeModule={activeModule} setActiveModule={setActiveModule} onLogout={onLogout} />
                     </div>
                 </div>

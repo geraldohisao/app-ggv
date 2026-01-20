@@ -3,16 +3,9 @@ import { Module, UserRole } from '../types';
 import { 
     ArrowLeftOnRectangleIcon,
     Cog6ToothIcon,
-    FlagIcon,
-    BoltIcon,
-    ChatBubbleLeftRightIcon,
-    DocumentSignatureIcon,
-    SparklesIcon,
-    ChartBarSquareIcon,
-    PresentationChartLineIcon
+    ChatBubbleLeftRightIcon
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
-import { supabase } from '../services/supabaseClient';
 import { navigateToModule } from '../utils/router';
 import FeedbackSidebar from './ui/FeedbackSidebar';
 
@@ -27,8 +20,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
     const { user } = useUser();
     const [isOpen, setIsOpen] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [imgError, setImgError] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const dropdown = useRef<HTMLDivElement>(null);
+
+    // Reset image error when avatar_url changes
+    useEffect(() => {
+        setImgError(false);
+    }, [user?.avatar_url]);
 
     // Close on click outside
     useEffect(() => {
@@ -74,12 +73,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
 
     const isGestor = user.user_function === 'Gestor';
     const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor;
-    const canSeeOSManager = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor || user.user_function === 'Gestor';
-    const canSeeFeedback = user.role === UserRole.SuperAdmin || 
-                          user.user_function === 'Closer' || 
-                          user.user_function === 'Gestor';
-    const canSeeGGVTalent = true;
-    const canSeeOKRManager = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin;
 
     return (
         <div className="relative inline-flex">
@@ -90,8 +83,18 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                 aria-haspopup="true"
                 aria-expanded={isOpen}
             >
-                <div className="w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm">
-                    {user.initials}
+                <div className="w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden">
+                    {user.avatar_url && !imgError ? (
+                        <img 
+                            src={user.avatar_url} 
+                            alt={user.name}
+                            className="w-full h-full object-cover"
+                            onError={() => setImgError(true)}
+                            referrerPolicy="no-referrer"
+                        />
+                    ) : (
+                        user.initials
+                    )}
                 </div>
             </button>
 
@@ -102,9 +105,24 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                     onBlur={() => setIsOpen(false)}
                     className="origin-top-right z-50 absolute top-full right-0 min-w-64 bg-white border border-slate-200 py-1.5 rounded-lg shadow-lg overflow-hidden mt-2"
                 >
-                    <div className="px-4 py-3 border-b border-slate-200">
-                        <p className="font-semibold text-slate-800">{user.name}</p>
-                        <p className="text-xs text-slate-500 italic">{user.email}</p>
+                    <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden flex-shrink-0">
+                            {user.avatar_url && !imgError ? (
+                                <img 
+                                    src={user.avatar_url} 
+                                    alt={user.name}
+                                    className="w-full h-full object-cover"
+                                    onError={() => setImgError(true)}
+                                    referrerPolicy="no-referrer"
+                                />
+                            ) : (
+                                user.initials
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-semibold text-slate-800 truncate">{user.name}</p>
+                            <p className="text-xs text-slate-500 italic truncate">{user.email}</p>
+                        </div>
                     </div>
                     
                     <ul className="py-1">
@@ -114,63 +132,13 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                             isActive={false}
                             onClick={openFeedback}
                         />
-                        {canSeeFeedback && (
-                            <MenuItem 
-                                icon={<FlagIcon className="w-5 h-5"/>} 
-                                text="Feedback de Oportunidade" 
-                                isActive={activeModule === Module.OpportunityFeedback}
-                                onClick={() => handleSelectModule(Module.OpportunityFeedback)}
-                            />
-                        )}
-                        <MenuItem 
-                            icon={<PresentationChartLineIcon className="w-5 h-5 text-indigo-600"/>} 
-                            text="Organograma Corporativo" 
-                            isActive={activeModule === Module.Organograma}
-                            onClick={() => handleSelectModule(Module.Organograma)}
-                        />
-                        {canSeeGGVTalent && (
-                            <MenuItem 
-                                icon={<SparklesIcon className="w-5 h-5 text-amber-500"/>} 
-                                text="GGV Talent" 
-                                isActive={activeModule === Module.GGVTalent}
-                                onClick={() => handleSelectModule(Module.GGVTalent)}
-                            />
-                        )}
-                        {canSeeOSManager && (
-                            <>
-                                <MenuItem 
-                                    icon={<DocumentSignatureIcon className="w-5 h-5"/>} 
-                                    text="Gerenciar OS" 
-                                    isActive={activeModule === Module.OSManager}
-                                    onClick={() => handleSelectModule(Module.OSManager)}
-                                />
-                            </>
-                        )}
-                        {canSeeOKRManager && (
-                            <>
-                                <MenuItem 
-                                    icon={<ChartBarSquareIcon className="w-5 h-5 text-blue-600"/>} 
-                                    text="Gestão de OKR" 
-                                    isActive={activeModule === Module.OKRManager}
-                                    onClick={() => handleSelectModule(Module.OKRManager)}
-                                />
-                            </>
-                        )}
                         {canSeeSettings && (
-                            <>
-                                <MenuItem 
-                                    icon={<BoltIcon className="w-5 h-5"/>} 
-                                    text="Reativação de Leads (N8N)" 
-                                    isActive={activeModule === Module.ReativacaoLeads}
-                                    onClick={() => handleSelectModule(Module.ReativacaoLeads)}
-                                />
-                                <MenuItem 
-                                    icon={<Cog6ToothIcon className="w-5 h-5"/>} 
-                                    text="Configurações" 
-                                    isActive={activeModule === Module.Settings}
-                                    onClick={() => handleSelectModule(Module.Settings)}
-                                />
-                            </>
+                            <MenuItem 
+                                icon={<Cog6ToothIcon className="w-5 h-5"/>} 
+                                text="Configurações" 
+                                isActive={activeModule === Module.Settings}
+                                onClick={() => handleSelectModule(Module.Settings)}
+                            />
                         )}
                     </ul>
                     

@@ -428,3 +428,30 @@ export const ArrowsPointingInIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 9H6.75A2.25 2.25 0 0 0 4.5 11.25V15m0-6 4.5 4.5M15 9h2.25A2.25 2.25 0 0 1 19.5 11.25V15m0-6-4.5 4.5M9 15H6.75A2.25 2.25 0 0 1 4.5 12.75V9m0 6 4.5-4.5M15 15h2.25A2.25 2.25 0 0 0 19.5 12.75V9m0 6-4.5-4.5" />
   </svg>
 );
+
+// Ícone de Organograma/Hierarquia (estrutura organizacional)
+export const OrgChartIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    {/* Caixa do topo (CEO/líder) */}
+    <rect x="9" y="2" width="6" height="4" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+    {/* Linha vertical do topo para o meio */}
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v3" />
+    {/* Linha horizontal conectando os subordinados */}
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 9h14" />
+    {/* Linhas verticais para cada subordinado */}
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 9v3M12 9v3M19 9v3" />
+    {/* Caixas dos subordinados (3 pessoas) */}
+    <rect x="2" y="12" width="6" height="4" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="9" y="12" width="6" height="4" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="16" y="12" width="6" height="4" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+    {/* Linhas para o terceiro nível (apenas do meio) */}
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v2" />
+    {/* Linha horizontal do terceiro nível */}
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 18h8" />
+    {/* Linhas verticais para caixas do terceiro nível */}
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 18v2M16 18v2" />
+    {/* Caixas do terceiro nível */}
+    <rect x="5.5" y="20" width="5" height="2" rx="0.5" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="13.5" y="20" width="5" height="2" rx="0.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
