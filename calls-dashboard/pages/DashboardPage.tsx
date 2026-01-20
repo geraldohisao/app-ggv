@@ -513,6 +513,7 @@ const DashboardPage = () => {
                   <label className="text-xs text-slate-500 mb-1">De</label>
                   <input 
                     type="date"
+                    lang="pt-BR"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
@@ -523,6 +524,7 @@ const DashboardPage = () => {
                   <label className="text-xs text-slate-500 mb-1">Até</label>
                   <input 
                     type="date"
+                    lang="pt-BR"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                     className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
