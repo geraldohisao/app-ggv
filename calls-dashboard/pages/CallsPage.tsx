@@ -600,10 +600,10 @@ export default function CallsPage() {
         {/* === BARRA DE FILTROS UNIFICADA === */}
         <div className="p-4 bg-slate-50 border-b border-slate-100">
           <div className="flex flex-col gap-3">
-            {/* Linha 1: Busca e Filtros Principais */}
-            <div className="flex flex-col lg:flex-row gap-3">
+            {/* Linha 1: Todos os filtros principais em grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
               {/* Busca */}
-              <div className="relative flex-1 lg:max-w-xs">
+              <div className="relative col-span-2 md:col-span-1 lg:col-span-2">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -615,61 +615,60 @@ export default function CallsPage() {
                 />
               </div>
 
-              {/* Grupo: SDR e Status */}
-              <div className="flex gap-3">
-                <select 
-                  className="w-44 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
-                  value={sdr} 
-                  onChange={(e) => setSdr(e.target.value)}
-                >
-                  <option value="">Todos os SDRs</option>
-                  {sdrs.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} {s.callCount ? `(${s.callCount})` : ''}
-                    </option>
-                  ))}
-                </select>
+              {/* SDR */}
+              <select 
+                className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                value={sdr} 
+                onChange={(e) => setSdr(e.target.value)}
+              >
+                <option value="">Todos os SDRs</option>
+                {sdrs.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.callCount ? `(${s.callCount})` : ''}
+                  </option>
+                ))}
+              </select>
 
-                <select 
-                  className="w-40 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
-                  value={status} 
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  <option value="">Todos os Status</option>
-                  <option value="normal_clearing">Atendida</option>
-                  <option value="no_answer">Não atendida</option>
-                  <option value="originator_cancel">Cancelada</option>
-                  <option value="number_changed">Número mudou</option>
-                  <option value="recovery_on_timer_expire">Tempo esgotado</option>
-                  <option value="unallocated_number">Não encontrado</option>
-                </select>
+              {/* Status */}
+              <select 
+                className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                value={status} 
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="">Todos os Status</option>
+                <option value="normal_clearing">Atendida</option>
+                <option value="no_answer">Não atendida</option>
+                <option value="originator_cancel">Cancelada</option>
+                <option value="number_changed">Número mudou</option>
+                <option value="recovery_on_timer_expire">Tempo esgotado</option>
+                <option value="unallocated_number">Não encontrado</option>
+              </select>
+
+              {/* Data De */}
+              <div className="flex flex-col">
+                <label className="text-xs text-slate-500 mb-1">De</label>
+                <input 
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  type="date" 
+                  value={start} 
+                  onChange={(e) => setStart(e.target.value)}
+                />
               </div>
 
-              {/* Grupo: Datas */}
-              <div className="flex gap-2 items-center">
-                <div className="flex flex-col">
-                  <label className="text-xs text-slate-500 mb-1">De</label>
-                  <input 
-                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    type="date" 
-                    value={start} 
-                    onChange={(e) => setStart(e.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-xs text-slate-500 mb-1">Até</label>
-                  <input 
-                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    type="date" 
-                    value={end} 
-                    onChange={(e) => setEnd(e.target.value)}
-                  />
-                </div>
+              {/* Data Até */}
+              <div className="flex flex-col">
+                <label className="text-xs text-slate-500 mb-1">Até</label>
+                <input 
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  type="date" 
+                  value={end} 
+                  onChange={(e) => setEnd(e.target.value)}
+                />
               </div>
             </div>
 
             {/* Linha 2: Ordenação, Duração e Score */}
-            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+            <div className="flex flex-wrap gap-3 items-center">
               {/* Ordenação */}
               <div className="flex items-center gap-2">
                 <label className="text-xs text-slate-500 whitespace-nowrap">Ordenar:</label>
