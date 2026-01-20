@@ -7,6 +7,7 @@ import CallAnalyzePage from './pages/CallAnalyzePage'; // Este arquivo não exis
 import ScorecardPage from '../../calls-dashboard/pages/ScorecardPage';
 import ScorecardEditPage from '../../calls-dashboard/pages/ScorecardEditPage';
 import SdrDetailPage from '../../calls-dashboard/pages/SdrDetailPage';
+import { ChartBarIcon, PhoneIcon, ClipboardDocumentListIcon } from '../ui/icons';
 
 type Route =
   | { name: 'dashboard' }
@@ -31,6 +32,30 @@ function parseHash(): Route {
   return { name: 'dashboard' };
 }
 
+const tabs = [
+  { 
+    id: 'dashboard', 
+    label: 'Dashboard', 
+    icon: ChartBarIcon, 
+    href: '#/dashboard',
+    activeOn: ['dashboard'] 
+  },
+  { 
+    id: 'calls', 
+    label: 'Chamadas', 
+    icon: PhoneIcon, 
+    href: '#/calls',
+    activeOn: ['calls', 'call', 'analyze', 'sdr'] 
+  },
+  { 
+    id: 'scorecards', 
+    label: 'Scorecard', 
+    icon: ClipboardDocumentListIcon, 
+    href: '#/scorecards',
+    activeOn: ['scorecards', 'scorecard'] 
+  },
+];
+
 export default function CallsApp() {
   const [route, setRoute] = useState<Route>(() => parseHash());
 
@@ -43,23 +68,38 @@ export default function CallsApp() {
   const active = useMemo(() => route.name, [route]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">Chamadas</h2>
-          <p className="text-sm text-slate-600">Métricas e análise de ligações da sua equipe.</p>
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* Navigation Tabs - mesmo estilo do OKR */}
+      <div className="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-6">
+          <div className="flex gap-1">
+            {tabs.map((tab) => {
+              const isActive = tab.activeOn.includes(active);
+              const Icon = tab.icon;
+              return (
+                <a
+                  key={tab.id}
+                  href={tab.href}
+                  className={`
+                    px-6 py-4 font-bold text-sm flex items-center gap-3 border-b-4 transition-all
+                    ${isActive
+                      ? 'border-[#5B5FF5] text-[#5B5FF5]'
+                      : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200'
+                    }
+                  `}
+                >
+                  <Icon className="w-5 h-5" />
+                  {tab.label}
+                </a>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg">
-        <div className="px-3 pt-2">
-          <nav className="flex gap-1">
-            <a href="#/dashboard" className={`px-3 py-2 text-sm rounded-t ${active==='dashboard'?'bg-white border-x border-t border-slate-200 -mb-px text-indigo-700 font-medium':'text-slate-600 hover:text-slate-900'}`}>Dashboard</a>
-            <a href="#/calls" className={`px-3 py-2 text-sm rounded-t ${active==='calls'||active==='call'?'bg-white border-x border-t border-slate-200 -mb-px text-indigo-700 font-medium':'text-slate-600 hover:text-slate-900'}`}>Chamadas</a>
-            <a href="#/scorecards" className={`px-3 py-2 text-sm rounded-t ${active==='scorecards'||active==='scorecard'?'bg-white border-x border-t border-slate-200 -mb-px text-indigo-700 font-medium':'text-slate-600 hover:text-slate-900'}`}>Scorecard</a>
-          </nav>
-        </div>
-        <div className="p-4 border-t border-slate-200">
+      {/* Content */}
+      <div className="min-h-[calc(100vh-130px)]">
+        <div className="max-w-screen-2xl mx-auto p-6">
           {route.name === 'dashboard' && <CallsDashboardPage />}
           {route.name === 'calls' && <CallsListPage />}
           {route.name === 'call' && <CallDetailPage callId={route.id} />}
