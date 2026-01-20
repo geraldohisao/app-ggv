@@ -94,17 +94,12 @@ export async function getUnifiedBatchAnalysisStats(): Promise<BatchAnalysisStats
     }
     console.log('📋 Total de chamadas encontradas:', allCalls.length);
 
-    // Buscar análises existentes
-    const { data: analysisData, error: analysisError } = await supabase
-      .from('call_analysis')
-      .select('call_id, final_grade');
-
-    if (analysisError) {
-      console.warn('⚠️ Erro ao buscar análises (pode ser normal se tabela vazia):', analysisError);
-    }
-
-    const analyzedCallIds = new Set((analysisData || []).map(a => a.call_id));
-    const callsWithScore = (analysisData || []).filter(a => a.final_grade != null && a.final_grade > 0);
+    // Usar score retornado pela RPC (get_calls_with_filters) para evitar RLS em produção
+    const getCallScore = (call: any) => {
+      if (typeof call.calculated_score === 'number') return call.calculated_score;
+      if (typeof call.score === 'number') return call.score;
+      return 0;
+    };
 
     // Analisar cada chamada usando os MESMOS critérios
     let callsAnswered = 0;
@@ -113,6 +108,7 @@ export async function getUnifiedBatchAnalysisStats(): Promise<BatchAnalysisStats
     let callsWithMinSegments = 0;
     let callsEligibleForAnalysis = 0;
     let callsAlreadyAnalyzed = 0;
+    let callsWithScore = 0;
 
     allCalls.forEach(call => {
       // CRITÉRIOS MAIS FLEXÍVEIS PARA TESTE
@@ -135,11 +131,18 @@ export async function getUnifiedBatchAnalysisStats(): Promise<BatchAnalysisStats
 
       // Verificar se é elegível para análise (CRITÉRIOS FLEXÍVEIS)
       const isEligible = isAnswered && hasTranscription && isOver3Min && hasMinSegments;
+      const callScore = getCallScore(call);
+      const hasAnalysis = callScore > 0;
+
+      if (hasAnalysis) {
+        callsWithScore++;
+      }
+
       if (isEligible) {
         callsEligibleForAnalysis++;
         
         // Verificar se já foi analisada
-        if (analyzedCallIds.has(call.id)) {
+        if (hasAnalysis) {
           callsAlreadyAnalyzed++;
         }
       }
@@ -168,7 +171,7 @@ export async function getUnifiedBatchAnalysisStats(): Promise<BatchAnalysisStats
       callsEligibleForAnalysis,
       callsAlreadyAnalyzed,
       callsNeedingAnalysis: Math.max(0, callsNeedingAnalysis),
-      callsWithScore: callsWithScore.length
+      callsWithScore
     };
 
     console.log('📊 Estatísticas calculadas:', stats);
@@ -222,20 +225,16 @@ export async function getCallsNeedingAnalysisUnified(
     }
     console.log('📋 Chamadas encontradas na fonte principal:', allCalls.length);
 
-    // Buscar análises existentes (se não for reprocessamento)
-    let analyzedCallIds = new Set<string>();
-    if (!forceReprocess) {
-      const { data: analysisData } = await supabase
-        .from('call_analysis')
-        .select('call_id');
-      
-      analyzedCallIds = new Set((analysisData || []).map(a => a.call_id));
-      console.log('📋 Chamadas já analisadas:', analyzedCallIds.size);
-    }
+    // Usar score retornado pela RPC para identificar análises existentes
+    const getCallScore = (call: any) => {
+      if (typeof call.calculated_score === 'number') return call.calculated_score;
+      if (typeof call.score === 'number') return call.score;
+      return 0;
+    };
 
     // Filtrar chamadas elegíveis usando CRITÉRIOS FLEXÍVEIS PARA TESTE
     console.log(`🔍 Iniciando filtro de ${allCalls.length} chamadas...`);
-    console.log(`🔍 Análises já existentes: ${analyzedCallIds.size}`);
+    console.log(`🔍 Análises já existentes: usando score da RPC`);
     console.log(`🔍 ForceReprocess: ${forceReprocess}`);
     
     let debugCount = 0;
@@ -268,7 +267,8 @@ export async function getCallsNeedingAnalysisUnified(
       const hasMinSegments = hasTranscription && call.transcription.split('.').length > 5;
       
       // 5. Se não for reprocessamento, não deve ter análise
-      const needsAnalysis = forceReprocess || !analyzedCallIds.has(call.id);
+      const hasAnalysis = getCallScore(call) > 0;
+      const needsAnalysis = forceReprocess || !hasAnalysis;
 
       const isEligible = isAnswered && hasTranscription && isOver3Min && hasMinSegments && needsAnalysis;
 
