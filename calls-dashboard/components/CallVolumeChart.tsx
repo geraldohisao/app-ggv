@@ -38,9 +38,9 @@ async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endD
       periodEnd: periodEnd.toISOString().split('T')[0]
     });
 
-    // Primeiro buscar dados agregados dos SDRs para comparação
+    // Primeiro buscar dados agregados dos SDRs para comparação (usando mesmo período do gráfico)
     const { data: sdrMetrics, error: sdrError } = await supabase.rpc('get_sdr_metrics', {
-      p_days: 99999 // Todas as chamadas, igual aos rankings
+      p_days: days
     });
     
     if (sdrError) {

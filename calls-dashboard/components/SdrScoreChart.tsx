@@ -15,7 +15,7 @@ interface SdrScoreChartProps {
   data?: any[];
 }
 
-// Função para buscar dados de ranking dos SDRs
+// Função para buscar dados de ranking dos SDRs (apenas usuários ativos)
 async function fetchSdrRankingData(days: number = 30): Promise<SdrRankingData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
@@ -23,38 +23,94 @@ async function fetchSdrRankingData(days: number = 30): Promise<SdrRankingData[]>
   }
 
   try {
-    console.log('🔍 Buscando dados de ranking dos SDRs:', { days });
+    console.log('🔍 Buscando dados de ranking dos SDRs para os últimos', days, 'dias');
 
-    // USAR SEMPRE A FUNÇÃO ORIGINAL SEM FILTRO DE PERÍODO (mostrar todas as ligações)
-    console.log('📊 Usando função get_sdr_metrics para TODAS as ligações (sem filtro de período)...');
-    const { data, error } = await supabase
-      .rpc('get_sdr_metrics', { p_days: 99999 }); // Usar um valor muito alto para pegar todas
+    // Buscar métricas primeiro
+    const { data, error } = await supabase.rpc('get_sdr_metrics', { p_days: days });
 
     if (error) {
       console.error('❌ Erro ao buscar dados de SDRs:', error);
       return [];
     }
 
-    console.log('✅ Dados de SDRs carregados:', data?.length || 0);
-    console.log('🔍 DADOS BRUTOS RECEBIDOS:', data);
+    if (!data || data.length === 0) {
+      console.log('📭 Nenhum dado de SDR encontrado na RPC');
+      return [];
+    }
 
-    // Converter para o formato esperado e ordenar por volume
-    const result: SdrRankingData[] = (data || [])
-      .map((row: any) => {
-        console.log('📊 PROCESSANDO ROW:', row);
-        return {
+    console.log('✅ Dados de SDRs carregados:', data.length);
+    console.log('🔍 SDRs encontrados:', data.map((d: any) => ({ id: d.sdr_id, name: d.sdr_name })));
+
+    // Tentar buscar perfis ativos para filtrar
+    let activeUsernames: Set<string> = new Set();
+    try {
+      const { data: activeProfiles, error: profilesErr } = await supabase
+        .from('profiles')
+        .select('email, is_active')
+        .eq('is_active', true);
+
+      if (profilesErr) {
+        console.warn('⚠️ Erro ao buscar perfis ativos:', profilesErr);
+      } else if (activeProfiles && activeProfiles.length > 0) {
+        console.log('✅ Perfis ativos carregados:', activeProfiles.length);
+        console.log('🔍 Emails ativos:', activeProfiles.map((p: any) => p.email));
+        
+        activeUsernames = new Set(
+          activeProfiles.map((p: any) => {
+            const email = p.email?.toLowerCase() || '';
+            return email.split('@')[0];
+          }).filter(Boolean)
+        );
+        console.log('🔍 Usernames ativos:', Array.from(activeUsernames));
+      }
+    } catch (profileErr) {
+      console.warn('⚠️ Exceção ao buscar perfis:', profileErr);
+    }
+
+    // Converter para o formato esperado
+    let result: SdrRankingData[] = (data || []).map((row: any) => ({
+      sdr_id: row.sdr_id,
+      sdr_name: row.sdr_name,
+      total_calls: Number(row.total_calls),
+      answered_calls: Number(row.answered_calls),
+      avg_duration: Number(row.avg_duration) || 0,
+      avg_score: Number(row.avg_score) || 0
+    }));
+
+    // Filtrar por usuários ativos (se conseguimos a lista)
+    if (activeUsernames.size > 0) {
+      const beforeFilter = result.length;
+      result = result.filter((sdr) => {
+        const sdrUsername = (sdr.sdr_id?.toLowerCase() || '').split('@')[0];
+        const isActive = activeUsernames.has(sdrUsername);
+        if (!isActive) {
+          console.log('⏭️ SDR inativo ignorado:', sdr.sdr_name, sdr.sdr_id, '| username:', sdrUsername);
+        }
+        return isActive;
+      });
+      console.log(`📊 Filtro de ativos: ${beforeFilter} → ${result.length} SDRs`);
+      
+      // Se filtrou todos, pode ser problema de matching - mostrar sem filtro
+      if (result.length === 0 && beforeFilter > 0) {
+        console.warn('⚠️ TODOS SDRs foram filtrados! Verificar matching de usernames.');
+        console.warn('⚠️ Mostrando dados SEM filtro de ativos como fallback.');
+        result = (data || []).map((row: any) => ({
           sdr_id: row.sdr_id,
           sdr_name: row.sdr_name,
           total_calls: Number(row.total_calls),
           answered_calls: Number(row.answered_calls),
           avg_duration: Number(row.avg_duration) || 0,
           avg_score: Number(row.avg_score) || 0
-        };
-      })
-      .sort((a, b) => b.total_calls - a.total_calls) // Ordenar por volume decrescente
-      .slice(0, 10); // Top 10
+        }));
+      }
+    }
 
-    console.log('📊 Ranking processado:', result);
+    // Ordenar por volume e limitar a top 10
+    result = result
+      .sort((a, b) => b.total_calls - a.total_calls)
+      .slice(0, 10);
+
+    console.log('📊 Ranking final:', result.length, 'SDRs');
     return result;
 
   } catch (error) {
@@ -174,10 +230,16 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
 
   const maxCalls = Math.max(...chartData.map(d => d.total_calls));
 
+  // Calcular totais para exibição
+  const totalCalls = chartData.reduce((sum, sdr) => sum + sdr.total_calls, 0);
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
         <h3 className="font-semibold text-slate-800">🏆 Ranking por Volume de Chamadas</h3>
+        <p className="text-xs text-slate-500">
+          Últimos {selectedPeriod} dias • {totalCalls.toLocaleString('pt-BR')} chamadas no período
+        </p>
       </div>
       
       <div className="space-y-3">

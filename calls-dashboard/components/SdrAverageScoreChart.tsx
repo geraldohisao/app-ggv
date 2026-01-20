@@ -15,7 +15,7 @@ interface SdrAverageScoreChartProps {
   selectedPeriod?: number;
 }
 
-// Função para buscar dados de ranking por nota média
+// Função para buscar dados de ranking por nota média (apenas usuários ativos)
 async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRankingData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
@@ -23,12 +23,15 @@ async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRank
   }
 
   try {
-    console.log('🔍 Buscando dados de ranking por nota média:', { days });
+    console.log('🔍 Buscando dados de ranking por nota média para os últimos', days, 'dias');
 
-    // Buscar duas fontes em paralelo: totais e com notas
-    const [{ data: totals, error: totalsErr }, { data: withNotes, error: notesErr }] = await Promise.all([
-      supabase.rpc('get_sdr_metrics', { p_days: 99999 }),
-      supabase.rpc('get_sdr_metrics_with_analysis', { p_days: 99999 })
+    // Buscar métricas primeiro
+    const [
+      { data: totals, error: totalsErr }, 
+      { data: withNotes, error: notesErr }
+    ] = await Promise.all([
+      supabase.rpc('get_sdr_metrics', { p_days: days }),
+      supabase.rpc('get_sdr_metrics_with_analysis', { p_days: days })
     ]);
 
     if (totalsErr) {
@@ -40,18 +43,51 @@ async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRank
       return [];
     }
 
+    if (!withNotes || withNotes.length === 0) {
+      console.log('📭 Nenhum SDR com nota encontrado na RPC');
+      return [];
+    }
+
+    console.log('✅ SDRs com notas carregados:', withNotes.length);
+    console.log('🔍 SDRs com notas:', withNotes.map((d: any) => ({ id: d.sdr_id, name: d.sdr_name, score: d.avg_score })));
+
+    // Tentar buscar perfis ativos para filtrar
+    let activeUsernames: Set<string> = new Set();
+    try {
+      const { data: activeProfiles, error: profilesErr } = await supabase
+        .from('profiles')
+        .select('email, is_active')
+        .eq('is_active', true);
+
+      if (profilesErr) {
+        console.warn('⚠️ Erro ao buscar perfis ativos:', profilesErr);
+      } else if (activeProfiles && activeProfiles.length > 0) {
+        console.log('✅ Perfis ativos carregados:', activeProfiles.length);
+        
+        activeUsernames = new Set(
+          activeProfiles.map((p: any) => {
+            const email = p.email?.toLowerCase() || '';
+            return email.split('@')[0];
+          }).filter(Boolean)
+        );
+        console.log('🔍 Usernames ativos:', Array.from(activeUsernames));
+      }
+    } catch (profileErr) {
+      console.warn('⚠️ Exceção ao buscar perfis:', profileErr);
+    }
+
     const totalsById = new Map<string, any>();
     (totals || []).forEach((row: any) => {
       totalsById.set(row.sdr_id, row);
     });
 
-    // Montar resultado apenas para SDRs que têm notas
-    const result: SdrScoreRankingData[] = (withNotes || [])
+    // Montar resultado
+    let result: SdrScoreRankingData[] = (withNotes || [])
       .map((row: any) => {
         const cleanName = (row.sdr_name || '').replace(/^Usuário\s+/i, '').trim();
         const totalsRow = totalsById.get(row.sdr_id) || {};
         const totalCalls = Number(totalsRow.total_calls) || 0;
-        const notedCalls = Number(row.total_calls) || 0; // na função with_analysis total_calls == com nota
+        const notedCalls = Number(row.total_calls) || 0;
         const answeredCalls = Number(totalsRow.answered_calls) || 0;
         const answeredRate = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0;
         return {
@@ -64,11 +100,53 @@ async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRank
           answered_rate: answeredRate
         } as SdrScoreRankingData;
       })
-      .filter(sdr => sdr.noted_calls > 0)
+      .filter(sdr => sdr.noted_calls > 0);
+
+    // Filtrar por usuários ativos (se conseguimos a lista)
+    if (activeUsernames.size > 0) {
+      const beforeFilter = result.length;
+      result = result.filter((sdr) => {
+        const sdrUsername = (sdr.sdr_id?.toLowerCase() || '').split('@')[0];
+        const isActive = activeUsernames.has(sdrUsername);
+        if (!isActive) {
+          console.log('⏭️ SDR inativo ignorado:', sdr.sdr_name, sdr.sdr_id, '| username:', sdrUsername);
+        }
+        return isActive;
+      });
+      console.log(`📊 Filtro de ativos: ${beforeFilter} → ${result.length} SDRs`);
+      
+      // Se filtrou todos, pode ser problema de matching - mostrar sem filtro
+      if (result.length === 0 && beforeFilter > 0) {
+        console.warn('⚠️ TODOS SDRs foram filtrados! Verificar matching de usernames.');
+        console.warn('⚠️ Mostrando dados SEM filtro de ativos como fallback.');
+        result = (withNotes || [])
+          .map((row: any) => {
+            const cleanName = (row.sdr_name || '').replace(/^Usuário\s+/i, '').trim();
+            const totalsRow = totalsById.get(row.sdr_id) || {};
+            const totalCalls = Number(totalsRow.total_calls) || 0;
+            const notedCalls = Number(row.total_calls) || 0;
+            const answeredCalls = Number(totalsRow.answered_calls) || 0;
+            const answeredRate = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0;
+            return {
+              sdr_id: row.sdr_id,
+              sdr_name: cleanName,
+              total_calls: totalCalls,
+              noted_calls: notedCalls,
+              answered_calls: answeredCalls,
+              avg_score: Number(row.avg_score) || 0,
+              answered_rate: answeredRate
+            } as SdrScoreRankingData;
+          })
+          .filter(sdr => sdr.noted_calls > 0);
+      }
+    }
+
+    // Ordenar por nota e limitar a top 10
+    result = result
       .sort((a, b) => b.avg_score - a.avg_score)
       .slice(0, 10);
 
-    console.log('📊 Ranking por nota processado:', result);
+    console.log('📊 Ranking por nota final:', result.length, 'SDRs');
     return result;
 
   } catch (error) {
@@ -180,11 +258,17 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
 
   const maxScore = Math.max(...chartData.map(d => d.avg_score));
 
+  // Calcular totais para exibição
+  const totalNoted = chartData.reduce((sum, sdr) => sum + sdr.noted_calls, 0);
+  const totalCalls = chartData.reduce((sum, sdr) => sum + sdr.total_calls, 0);
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
         <h3 className="font-semibold text-slate-800">⭐ Ranking por Nota Média</h3>
-        <p className="text-xs text-slate-500">Somente ligações com nota • Exibe Total vs Com Nota</p>
+        <p className="text-xs text-slate-500">
+          Últimos {selectedPeriod} dias • {totalNoted.toLocaleString('pt-BR')} avaliadas de {totalCalls.toLocaleString('pt-BR')} totais
+        </p>
       </div>
       
       <div className="space-y-3">

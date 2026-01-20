@@ -602,16 +602,16 @@ export async function fetchCallDetail(callId: string): Promise<CallWithDetails |
 }
 
 /**
- * Busca lista de SDRs únicos para filtros
+ * Busca lista de SDRs únicos para filtros (apenas usuários ativos)
  */
 export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
   try {
     console.log('🔍 CALLS SERVICE - Buscando SDRs únicos');
 
-    // Buscar SDRs do Supabase
+    // Buscar SDRs das chamadas primeiro
     const { data, error } = await supabase.rpc('get_unique_sdrs');
     
-    console.log('🔍 CALLS SERVICE - Resultado get_unique_sdrs:', { data, error });
+    console.log('🔍 CALLS SERVICE - Resultado get_unique_sdrs:', { count: data?.length, error });
 
     if (error) {
       console.error('❌ CALLS SERVICE - Erro ao buscar SDRs:', error);
@@ -623,18 +623,62 @@ export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
       return [];
     }
 
-    const sdrs: SdrUser[] = data.map((sdr: any) => {
-      console.log('🔍 CALLS SERVICE - Mapeando SDR:', sdr);
-      return {
-        id: sdr.sdr_email,
-        name: sdr.sdr_name,
-        email: sdr.sdr_email,
-        avatarUrl: sdr.sdr_avatar_url || `https://i.pravatar.cc/64?u=${sdr.sdr_email}`,
-        callCount: sdr.call_count
-      };
-    });
+    // Mapear todos os SDRs primeiro
+    const allSdrs: SdrUser[] = data.map((sdr: any) => ({
+      id: sdr.sdr_email,
+      name: sdr.sdr_name,
+      email: sdr.sdr_email,
+      avatarUrl: sdr.sdr_avatar_url || `https://i.pravatar.cc/64?u=${sdr.sdr_email}`,
+      callCount: sdr.call_count
+    }));
 
-    console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs mapeados:`, sdrs);
+    // Tentar buscar perfis ativos para filtrar
+    let activeUsernames: Set<string> = new Set();
+    try {
+      const { data: activeProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('email, is_active')
+        .eq('is_active', true);
+      
+      if (profilesError) {
+        console.warn('⚠️ CALLS SERVICE - Erro ao buscar perfis:', profilesError);
+      } else if (activeProfiles && activeProfiles.length > 0) {
+        console.log('✅ CALLS SERVICE - Perfis ativos:', activeProfiles.length);
+        
+        activeUsernames = new Set(
+          activeProfiles.map((p: any) => {
+            const email = p.email?.toLowerCase() || '';
+            return email.split('@')[0];
+          }).filter(Boolean)
+        );
+        console.log('🔍 CALLS SERVICE - Usernames ativos:', Array.from(activeUsernames));
+      }
+    } catch (profileErr) {
+      console.warn('⚠️ CALLS SERVICE - Exceção ao buscar perfis:', profileErr);
+    }
+
+    // Filtrar por usuários ativos (se conseguimos a lista)
+    let sdrs = allSdrs;
+    if (activeUsernames.size > 0) {
+      sdrs = allSdrs.filter((sdr) => {
+        const sdrUsername = (sdr.email?.toLowerCase() || '').split('@')[0];
+        const isActive = activeUsernames.has(sdrUsername);
+        if (!isActive) {
+          console.log('⏭️ CALLS SERVICE - SDR inativo:', sdr.name, sdr.email, '| username:', sdrUsername);
+        }
+        return isActive;
+      });
+      
+      console.log(`📊 CALLS SERVICE - Filtro: ${allSdrs.length} → ${sdrs.length} SDRs`);
+      
+      // Se filtrou todos, mostrar sem filtro (fallback)
+      if (sdrs.length === 0 && allSdrs.length > 0) {
+        console.warn('⚠️ CALLS SERVICE - TODOS filtrados! Usando fallback sem filtro.');
+        sdrs = allSdrs;
+      }
+    }
+
+    console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs retornados`);
     return sdrs;
 
   } catch (error) {

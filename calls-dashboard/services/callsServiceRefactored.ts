@@ -233,13 +233,20 @@ export async function fetchCallDetails(callId: string): Promise<CallWithDetails 
 }
 
 /**
- * Busca lista de SDRs únicos com estatísticas
+ * Busca lista de SDRs únicos com estatísticas (apenas usuários ativos)
  */
 export async function fetchUniqueSdrsWithStats(): Promise<SdrStats[]> {
   try {
-    console.log('🔍 CALLS SERVICE - Buscando SDRs únicos com estatísticas');
+    console.log('🔍 CALLS SERVICE - Buscando SDRs únicos com estatísticas (apenas ativos)');
 
-    const { data, error } = await supabase.rpc('get_unique_sdrs');
+    // Buscar em paralelo: SDRs das chamadas e usuários ativos
+    const [sdrsResult, profilesResult] = await Promise.all([
+      supabase.rpc('get_unique_sdrs'),
+      supabase.from('profiles').select('email, is_active').eq('is_active', true)
+    ]);
+
+    const { data, error } = sdrsResult;
+    const { data: activeProfiles, error: profilesError } = profilesResult;
 
     if (error) {
       console.error('❌ CALLS SERVICE - Erro ao buscar SDRs:', error);
@@ -251,18 +258,33 @@ export async function fetchUniqueSdrsWithStats(): Promise<SdrStats[]> {
       return [];
     }
 
-    const sdrs: SdrStats[] = data.map((sdr: any) => ({
-      id: sdr.sdr_email,
-      name: sdr.sdr_name,
-      email: sdr.sdr_email,
-      avatarUrl: sdr.sdr_avatar_url,
-      callCount: sdr.call_count,
-      lastCallDate: sdr.last_call_date,
-      avgDuration: sdr.avg_duration || 0,
-      successRate: sdr.success_rate || 0
-    }));
+    // Criar Set de usernames ativos (parte antes do @) para filtro flexível
+    // Isso resolve problemas de domínios diferentes (@grupoggv.com vs @ggvinteligencia.com.br)
+    const activeUsernames = new Set(
+      (activeProfiles || []).map((p: any) => {
+        const email = p.email?.toLowerCase() || '';
+        return email.split('@')[0];
+      }).filter(Boolean)
+    );
 
-    console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs encontrados`);
+    // Filtrar apenas SDRs que estão ativos no sistema
+    const sdrs: SdrStats[] = data
+      .filter((sdr: any) => {
+        const sdrUsername = (sdr.sdr_email?.toLowerCase() || '').split('@')[0];
+        return activeUsernames.has(sdrUsername);
+      })
+      .map((sdr: any) => ({
+        id: sdr.sdr_email,
+        name: sdr.sdr_name,
+        email: sdr.sdr_email,
+        avatarUrl: sdr.sdr_avatar_url,
+        callCount: sdr.call_count,
+        lastCallDate: sdr.last_call_date,
+        avgDuration: sdr.avg_duration || 0,
+        successRate: sdr.success_rate || 0
+      }));
+
+    console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs ativos encontrados (de ${data.length} total)`);
     return sdrs;
 
   } catch (error) {
