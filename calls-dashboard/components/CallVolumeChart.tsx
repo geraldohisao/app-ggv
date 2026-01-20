@@ -18,24 +18,35 @@ interface CallVolumeChartProps {
 }
 
 // Função para buscar dados reais de chamadas via RPC (usando dados reais da lista)
-async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endDate?: string, selectedSdrEmail?: string | null): Promise<CallData[]> {
+async function fetchCallVolumeData(days: number = 14, customStartDate?: string, customEndDate?: string, selectedSdrEmail?: string | null): Promise<CallData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
     return [];
   }
 
   try {
-    // Calcular período solicitado (últimos N dias a partir de hoje)
-    const periodEnd = new Date();
-    const periodStart = new Date();
-    periodStart.setDate(periodEnd.getDate() - days + 1);
+    // Se datas customizadas foram fornecidas, usar elas
+    let periodStart: Date;
+    let periodEnd: Date;
+    
+    if (customStartDate && customEndDate) {
+      periodStart = new Date(customStartDate + 'T00:00:00');
+      periodEnd = new Date(customEndDate + 'T23:59:59');
+      console.log('📅 Usando período PERSONALIZADO:', { customStartDate, customEndDate });
+    } else {
+      // Calcular período solicitado (últimos N dias a partir de hoje)
+      periodEnd = new Date();
+      periodStart = new Date();
+      periodStart.setDate(periodEnd.getDate() - days + 1);
+    }
 
     console.log('🔍 fetchCallVolumeData - FILTRO SDR ATIVO:', { 
       days, 
       selectedSdrEmail,
       filtroAtivo: !!selectedSdrEmail,
       periodStart: periodStart.toISOString().split('T')[0],
-      periodEnd: periodEnd.toISOString().split('T')[0]
+      periodEnd: periodEnd.toISOString().split('T')[0],
+      usandoDatasCustomizadas: !!(customStartDate && customEndDate)
     });
 
     // Primeiro buscar dados agregados dos SDRs para comparação (usando mesmo período do gráfico)
@@ -130,16 +141,20 @@ async function fetchCallVolumeData(days: number = 14, _startDate?: string, _endD
       primeiroDia: allEntries[0]?.[0],
       ultimoDia: allEntries[allEntries.length - 1]?.[0],
       periodoSelecionado: days,
+      usandoDatasCustomizadas: !!(customStartDate && customEndDate),
       todosOsDias: allEntries.map(([date, data]) => ({ 
         data: date, 
         chamadas: data.total 
       }))
     });
     
-    // Se o período for menor que o total de dias, pegar apenas os últimos N dias
-    const finalEntries = days < allEntries.length 
-      ? allEntries.slice(-days) // Últimos N dias dos dados disponíveis
-      : allEntries; // Todos os dias
+    // Se datas customizadas foram usadas, mostrar todos os dados retornados
+    // Caso contrário, se o período for menor que o total de dias, pegar apenas os últimos N dias
+    const finalEntries = (customStartDate && customEndDate)
+      ? allEntries // Usar todos os dados quando datas customizadas
+      : (days < allEntries.length 
+          ? allEntries.slice(-days) // Últimos N dias dos dados disponíveis
+          : allEntries); // Todos os dias
     
     console.log('🎯 DADOS FINAIS PARA O GRÁFICO:', {
       diasSelecionados: finalEntries.length,
@@ -387,7 +402,7 @@ ${trendText} (${diffFromAvg > 0 ? '+' : ''}${diffFromAvg}% vs média ${avgAnswer
   
   // Título dinâmico baseado no tipo de dados
   const chartTitle = isSpecificDateForTitle 
-    ? `Volume de Chamadas - ${new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
+    ? `Volume de Chamadas - ${new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR')} a ${new Date(endDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
     : `Volume de Chamadas - Últimos ${selectedPeriod} dia${selectedPeriod > 1 ? 's' : ''}`;
     
   console.log('🏷️ Título definido:', chartTitle);

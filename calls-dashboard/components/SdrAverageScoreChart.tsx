@@ -13,10 +13,12 @@ interface SdrScoreRankingData {
 
 interface SdrAverageScoreChartProps {
   selectedPeriod?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 // Função para buscar dados de ranking por nota média (apenas usuários ativos)
-async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRankingData[]> {
+async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, endDate?: string): Promise<SdrScoreRankingData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
     return [];
@@ -155,7 +157,7 @@ async function fetchSdrScoreRankingData(days: number = 30): Promise<SdrScoreRank
   }
 }
 
-export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverageScoreChartProps) {
+export default function SdrAverageScoreChart({ selectedPeriod = 30, startDate, endDate }: SdrAverageScoreChartProps) {
   const [chartData, setChartData] = useState<SdrScoreRankingData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +168,7 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
       setError(null);
       
       try {
-        const rankingData = await fetchSdrScoreRankingData(selectedPeriod);
+        const rankingData = await fetchSdrScoreRankingData(selectedPeriod, startDate, endDate);
         setChartData(rankingData);
       } catch (err: any) {
         console.error('❌ Erro ao carregar dados de ranking por nota:', err);
@@ -177,7 +179,7 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
     };
 
     loadData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, startDate, endDate]);
 
   // Listener para novas análises em tempo real
   useEffect(() => {
@@ -262,12 +264,22 @@ export default function SdrAverageScoreChart({ selectedPeriod = 30 }: SdrAverage
   const totalNoted = chartData.reduce((sum, sdr) => sum + sdr.noted_calls, 0);
   const totalCalls = chartData.reduce((sum, sdr) => sum + sdr.total_calls, 0);
 
+  // Formatar período para exibição
+  const getPeriodText = () => {
+    if (startDate && endDate) {
+      const start = new Date(startDate + 'T00:00:00');
+      const end = new Date(endDate + 'T00:00:00');
+      return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    }
+    return `Últimos ${selectedPeriod} dias`;
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
         <h3 className="font-semibold text-slate-800">⭐ Ranking por Nota Média</h3>
         <p className="text-xs text-slate-500">
-          Últimos {selectedPeriod} dias • {totalNoted.toLocaleString('pt-BR')} avaliadas de {totalCalls.toLocaleString('pt-BR')} totais
+          {getPeriodText()} • {totalNoted.toLocaleString('pt-BR')} avaliadas de {totalCalls.toLocaleString('pt-BR')} totais
         </p>
       </div>
       

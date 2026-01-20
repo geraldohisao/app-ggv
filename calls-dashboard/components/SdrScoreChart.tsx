@@ -13,10 +13,12 @@ interface SdrRankingData {
 interface SdrScoreChartProps {
   selectedPeriod?: number;
   data?: any[];
+  startDate?: string;
+  endDate?: string;
 }
 
 // Função para buscar dados de ranking dos SDRs (apenas usuários ativos)
-async function fetchSdrRankingData(days: number = 30): Promise<SdrRankingData[]> {
+async function fetchSdrRankingData(days: number = 30, startDate?: string, endDate?: string): Promise<SdrRankingData[]> {
   if (!supabase) {
     console.log('⚠️ Supabase não inicializado');
     return [];
@@ -119,7 +121,7 @@ async function fetchSdrRankingData(days: number = 30): Promise<SdrRankingData[]>
   }
 }
 
-export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreChartProps) {
+export default function SdrScoreChart({ selectedPeriod = 30, data, startDate, endDate }: SdrScoreChartProps) {
   const [chartData, setChartData] = useState<SdrRankingData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +140,7 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
       }
       
       try {
-        const rankingData = await fetchSdrRankingData(selectedPeriod);
+        const rankingData = await fetchSdrRankingData(selectedPeriod, startDate, endDate);
         setChartData(rankingData);
       } catch (err: any) {
         console.error('❌ Erro ao carregar dados de ranking:', err);
@@ -149,7 +151,7 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
     };
 
     loadData();
-  }, [selectedPeriod, data]);
+  }, [selectedPeriod, data, startDate, endDate]);
 
   // Listener para novas análises em tempo real
   useEffect(() => {
@@ -233,12 +235,22 @@ export default function SdrScoreChart({ selectedPeriod = 30, data }: SdrScoreCha
   // Calcular totais para exibição
   const totalCalls = chartData.reduce((sum, sdr) => sum + sdr.total_calls, 0);
 
+  // Formatar período para exibição
+  const getPeriodText = () => {
+    if (startDate && endDate) {
+      const start = new Date(startDate + 'T00:00:00');
+      const end = new Date(endDate + 'T00:00:00');
+      return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    }
+    return `Últimos ${selectedPeriod} dias`;
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="mb-3">
         <h3 className="font-semibold text-slate-800">🏆 Ranking por Volume de Chamadas</h3>
         <p className="text-xs text-slate-500">
-          Últimos {selectedPeriod} dias • {totalCalls.toLocaleString('pt-BR')} chamadas no período
+          {getPeriodText()} • {totalCalls.toLocaleString('pt-BR')} chamadas no período
         </p>
       </div>
       

@@ -40,6 +40,7 @@ const FilterBadge = ({ label, value, color = 'indigo' }: { label: string; value:
 
 // Labels para período
 const periodLabels: Record<number, string> = {
+  0: 'Personalizado',
   1: 'Hoje',
   7: '7 dias',
   14: '14 dias',
@@ -70,6 +71,33 @@ const DashboardPage = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Filtros de data personalizada
+  const [useCustomDates, setUseCustomDates] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  // Calcular período em dias a partir das datas customizadas
+  const getEffectivePeriod = (): number => {
+    if (useCustomDates && startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return diffDays;
+    }
+    return selectedPeriod;
+  };
+  
+  // Label do período atual
+  const getPeriodLabel = (): string => {
+    if (useCustomDates && startDate && endDate) {
+      const start = new Date(startDate + 'T00:00:00');
+      const end = new Date(endDate + 'T00:00:00');
+      return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    }
+    return periodLabels[selectedPeriod] || `${selectedPeriod} dias`;
+  };
 
   // Função para atualização manual (sem reload da página)
   const handleManualRefresh = useCallback(async () => {
@@ -413,7 +441,7 @@ const DashboardPage = () => {
             Dashboard de Chamadas
           </h1>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            <FilterBadge label="Período" value={periodLabels[selectedPeriod] || `${selectedPeriod} dias`} color="indigo" />
+            <FilterBadge label="Período" value={getPeriodLabel()} color="indigo" />
             <FilterBadge label="SDR" value={selectedSdrName} color="emerald" />
             <span className="text-sm text-slate-500">
               {dashboardData.totalCalls.toLocaleString('pt-BR')} chamadas
@@ -448,26 +476,61 @@ const DashboardPage = () => {
 
       {/* === BARRA DE FILTROS === */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Filtros à esquerda */}
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Período */}
+        <div className="flex flex-col gap-4">
+          {/* Linha 1: Filtros principais */}
+          <div className="flex flex-wrap items-end gap-4">
+            {/* Tipo de período */}
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-600">Período:</label>
               <select 
-                value={selectedPeriod} 
-                onChange={(e) => setSelectedPeriod(parseInt(e.target.value))}
+                value={useCustomDates ? 0 : selectedPeriod} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (val === 0) {
+                    setUseCustomDates(true);
+                  } else {
+                    setUseCustomDates(false);
+                    setSelectedPeriod(val);
+                  }
+                }}
                 className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
                            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
-                           hover:border-slate-400 transition-colors cursor-pointer min-w-[140px]"
+                           hover:border-slate-400 transition-colors cursor-pointer"
               >
                 <option value="1">Hoje</option>
                 <option value="7">Últimos 7 dias</option>
                 <option value="14">Últimos 14 dias</option>
                 <option value="30">Últimos 30 dias</option>
                 <option value="90">Últimos 90 dias</option>
+                <option value="0">Personalizado</option>
               </select>
             </div>
+
+            {/* Campos de data (visíveis quando personalizado) */}
+            {useCustomDates && (
+              <>
+                <div className="flex flex-col">
+                  <label className="text-xs text-slate-500 mb-1">De</label>
+                  <input 
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs text-slate-500 mb-1">Até</label>
+                  <input 
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              </>
+            )}
 
             {/* SDR */}
             <div className="flex items-center gap-2">
@@ -495,12 +558,12 @@ const DashboardPage = () => {
               onChange={setAutoRefresh} 
               label="Auto-refresh (15s)" 
             />
-          </div>
 
-          {/* Status à direita */}
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-            <span>Atualizado às {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+            {/* Status */}
+            <div className="flex items-center gap-2 text-sm text-slate-500 ml-auto">
+              <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+              <span>Atualizado às {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -571,15 +634,25 @@ const DashboardPage = () => {
       {/* === GRÁFICO DE VOLUME === */}
       <div>
         <CallVolumeChart 
-          selectedPeriod={selectedPeriod} 
+          selectedPeriod={getEffectivePeriod()} 
           selectedSdrEmail={selectedSdr}
+          startDate={useCustomDates ? startDate : undefined}
+          endDate={useCustomDates ? endDate : undefined}
         />
       </div>
 
       {/* === RANKINGS LADO A LADO === */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SdrScoreChart selectedPeriod={selectedPeriod} />
-        <SdrAverageScoreChart selectedPeriod={selectedPeriod} />
+        <SdrScoreChart 
+          selectedPeriod={getEffectivePeriod()} 
+          startDate={useCustomDates ? startDate : undefined}
+          endDate={useCustomDates ? endDate : undefined}
+        />
+        <SdrAverageScoreChart 
+          selectedPeriod={getEffectivePeriod()}
+          startDate={useCustomDates ? startDate : undefined}
+          endDate={useCustomDates ? endDate : undefined}
+        />
       </div>
     </div>
   );
