@@ -402,240 +402,327 @@ export default function CallsPage() {
   const paginatedCalls = filtered;
   const totalItems = totalCount;
 
+  // Função para recarregar chamadas
+  const handleReload = async () => {
+    console.log('🔄 Forçando reload das calls...');
+    setCalls([]);
+    setTotalCount(0);
+    setLoading(true);
+    try {
+      const response = await fetchCalls({
+        sdr_email: sdr || undefined,
+        status: status || undefined,
+        call_type: type || undefined,
+        start: start || undefined,
+        end: end || undefined,
+        min_duration: minDuration ? parseInt(minDuration) : undefined,
+        max_duration: maxDuration ? parseInt(maxDuration) : undefined,
+        limit: itemsPerPage,
+        offset: (currentPage - 1) * itemsPerPage,
+        sortBy: sortBy
+      });
+      const callItems = response.calls.map(convertToCallItem);
+      setCalls(callItems);
+      setTotalCount(response.totalCount);
+      console.log('✅ Reload forçado concluído:', callItems.length, 'calls');
+    } catch (err) {
+      console.error('❌ Erro no reload forçado:', err);
+      setError('Erro ao recarregar chamadas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para limpar filtros
+  const handleClearFilters = () => {
+    setQuery('');
+    setMinDuration('');
+    setMaxDuration('');
+    setMinScore('');
+    setSdr('');
+    setStatus('');
+    setType('');
+    setStart('');
+    setEnd('');
+    setSortBy('created_at');
+    setCurrentPage(1);
+  };
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = sdr || status || start || end || minDuration || maxDuration || minScore || query;
+
+  // Presets de duração em segundos
+  const durationPresets = [
+    { label: 'Qualquer', value: '' },
+    { label: '> 1 min', value: '60' },
+    { label: '> 3 min', value: '180' },
+    { label: '> 5 min', value: '300' },
+    { label: '> 10 min', value: '600' },
+  ];
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4">
       {/* Painel de Análise IA em Lote */}
       <UnifiedBatchAnalysisPanel />
 
-      {/* Abas já existentes no shell - removido menu duplicado */}
+      {/* === CABEÇALHO DA SEÇÃO DE CHAMADAS === */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        {/* Header com título, contadores e ações */}
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Título e contadores */}
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">Chamadas</h2>
+                <p className="text-sm text-slate-500">
+                  {loading ? (
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Carregando...
+                    </span>
+                  ) : (
+                    <span>
+                      <span className="font-medium text-slate-700">{totalCount.toLocaleString('pt-BR')}</span> chamadas encontradas
+                    </span>
+                  )}
+                </p>
+              </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">Chamadas</h2>
-          <p className="text-sm text-slate-600">
-            Visualize, filtre e analise as ligações dos seus SDRs. 
-            {totalCount > 0 && (
-              <span className="font-medium">
-                {" "}({totalCount} chamadas encontradas
-                {(minDuration || maxDuration) && (
-                  <span className="text-blue-600">
-                    {" "}• Duração: {minDuration && `≥${minDuration}s`}{minDuration && maxDuration && " e "}{maxDuration && `≤${maxDuration}s`}
-                  </span>
-                )}
-                )
-              </span>
-            )}
-            {start && end && start === end && (
-              <span className="ml-2 inline-flex items-center px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                📅 Filtrado por: {new Date(start + 'T00:00:00').toLocaleDateString('pt-BR')}
-              </span>
-            )}
-          </p>
-        </div>
-        
-        {/* Botões de Exportação */}
-        <div className="flex items-center gap-2">
-          <div className="relative group">
-            <button className="px-3 py-2 bg-slate-600 text-white rounded text-sm hover:bg-slate-700 flex items-center gap-1">
-              📊 Exportar
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-              <button 
-                onClick={() => downloadCSV(filtered, 'chamadas')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              {/* Badges de filtros ativos */}
+              {hasActiveFilters && (
+                <div className="hidden md:flex items-center gap-2 pl-4 border-l border-slate-200">
+                  {sdr && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs">
+                      SDR: {sdrs.find(s => s.id === sdr)?.name || sdr}
+                      <button onClick={() => setSdr('')} className="hover:text-indigo-900">×</button>
+                    </span>
+                  )}
+                  {status && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs">
+                      {status === 'normal_clearing' ? 'Atendidas' : status === 'no_answer' ? 'Não atendidas' : status}
+                      <button onClick={() => setStatus('')} className="hover:text-emerald-900">×</button>
+                    </span>
+                  )}
+                  {(start || end) && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-xs">
+                      {start && end && start === end 
+                        ? new Date(start + 'T00:00:00').toLocaleDateString('pt-BR')
+                        : `${start ? new Date(start + 'T00:00:00').toLocaleDateString('pt-BR') : '...'} - ${end ? new Date(end + 'T00:00:00').toLocaleDateString('pt-BR') : '...'}`
+                      }
+                      <button onClick={() => { setStart(''); setEnd(''); }} className="hover:text-amber-900">×</button>
+                    </span>
+                  )}
+                  {minDuration && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-700 rounded-full text-xs">
+                      {`> ${Math.floor(parseInt(minDuration) / 60)} min`}
+                      <button onClick={() => setMinDuration('')} className="hover:text-violet-900">×</button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Botões de ação */}
+            <div className="flex items-center gap-2">
+              {/* Limpar filtros */}
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearFilters}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Limpar
+                </button>
+              )}
+
+              {/* Recarregar */}
+              <button
+                onClick={handleReload}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
               >
-                📄 Exportar CSV
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Atualizar
               </button>
-              <button 
-                onClick={() => downloadExcel(filtered, 'chamadas')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                📊 Exportar Excel
-              </button>
-              <button 
-                onClick={() => downloadSummaryReport(filtered, 'relatorio_chamadas')}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                📋 Relatório Resumido
-              </button>
+
+              {/* Exportar */}
+              <div className="relative group">
+                <button className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Exportar
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                  <button 
+                    onClick={() => downloadCSV(filtered, 'chamadas')}
+                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 first:rounded-t-lg"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    CSV
+                  </button>
+                  <button 
+                    onClick={() => downloadExcel(filtered, 'chamadas')}
+                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                    Excel
+                  </button>
+                  <button 
+                    onClick={() => downloadSummaryReport(filtered, 'relatorio_chamadas')}
+                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 last:rounded-b-lg"
+                  >
+                    <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Relatório
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
-        {/* Primeira linha - Filtros principais */}
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
-          <input
-            className="border border-slate-300 rounded px-3 py-2 text-sm col-span-2"
-            placeholder="Empresa ou Deal ID..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select className="border border-slate-300 rounded px-3 py-2 text-sm" value={sdr} onChange={(e) => setSdr(e.target.value)}>
-            <option value="">Todos os SDRs</option>
-            {sdrs.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} {s.callCount && `(${s.callCount})`}
-              </option>
-            ))}
-          </select>
-          <select className="border border-slate-300 rounded px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Todos os Status</option>
-            <option value="normal_clearing">Atendida</option>
-            <option value="no_answer">Não atendida</option>
-            <option value="originator_cancel">Cancelada pela SDR</option>
-            <option value="number_changed">Numero mudou</option>
-            <option value="recovery_on_timer_expire">Tempo esgotado</option>
-            <option value="unallocated_number">Número não encontrado</option>
-          </select>
-          <input 
-            className="border border-slate-300 rounded px-3 py-2 text-sm" 
-            type="date" 
-            value={start} 
-            onChange={(e) => setStart(e.target.value)}
-            placeholder="Data início"
-          />
-          <input 
-            className="border border-slate-300 rounded px-3 py-2 text-sm" 
-            type="date" 
-            value={end} 
-            onChange={(e) => setEnd(e.target.value)}
-            placeholder="Data fim"
-          />
-        </div>
-        
-        {/* Segunda linha - Filtros avançados */}
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-200">
-          <select 
-            className="border border-slate-300 rounded px-3 py-2 text-sm" 
-            value={sortBy} 
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="created_at">📅 Mais Recentes</option>
-            <option value="duration">⏱️ Maior Duração</option>
-            <option value="score">⭐ Maior Nota</option>
-            <option value="score_asc">⬇️ Menor Nota</option>
-          </select>
-          <input
-            className="border border-slate-300 rounded px-3 py-2 text-sm"
-            type="number"
-            placeholder="Duração mín. (seg)"
-            value={minDuration}
-            onChange={(e) => setMinDuration(e.target.value)}
-            min="0"
-            title="Duração mínima em segundos"
-          />
-          <input
-            className="border border-slate-300 rounded px-3 py-2 text-sm"
-            type="number"
-            placeholder="Duração máx. (seg)"
-            value={maxDuration}
-            onChange={(e) => setMaxDuration(e.target.value)}
-            min="0"
-            title="Duração máxima em segundos"
-          />
-          <input
-            className="border border-slate-300 rounded px-3 py-2 text-sm"
-            type="number"
-            placeholder="Score mín."
-            value={minScore}
-            onChange={(e) => setMinScore(e.target.value)}
-            min="0"
-            max="100"
-          />
-          <button
-            onClick={() => {
-              setQuery('');
-              setMinDuration('');
-              setMaxDuration('');
-              setMinScore('');
-              setSdr('');
-              setStatus('');
-              setType('');
-              setStart('');
-              setEnd('');
-              setSortBy('created_at'); // Resetar ordenação
-              setCurrentPage(1); // Resetar para primeira página
-            }}
-            className="border border-slate-300 rounded px-3 py-2 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600"
-          >
-            🗑️ Limpar Filtros
-          </button>
-          <button
-            onClick={() => {
-              console.log('🔄 Forçando reload das calls...');
-              setCalls([]);
-              setTotalCount(0);
-              setLoading(true);
-              // Forçar reload dos dados sem recarregar a página
-              const forceReload = async () => {
-                try {
-                  const response = await fetchCalls({
-                    sdr_email: sdr || undefined,
-                    status: status || undefined,
-                    call_type: type || undefined,
-                    start: start || undefined,
-                    end: end || undefined,
-                    min_duration: minDuration ? parseInt(minDuration) : undefined,
-                    max_duration: maxDuration ? parseInt(maxDuration) : undefined,
-                    limit: itemsPerPage,  // ✅ Sempre usar paginação normal
-                    offset: (currentPage - 1) * itemsPerPage,  // ✅ Sempre usar offset correto
-                    sortBy: sortBy
-                  });
-                  const callItems = response.calls.map(convertToCallItem);
-                  setCalls(callItems);
-                  setTotalCount(response.totalCount);
-                  console.log('✅ Reload forçado concluído:', callItems.length, 'calls');
-                } catch (err) {
-                  console.error('❌ Erro no reload forçado:', err);
-                  setError('Erro ao recarregar chamadas');
-                } finally {
-                  setLoading(false);
-                }
-              };
-              forceReload();
-            }}
-            className="border border-blue-300 rounded px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-600"
-          >
-            🔄 Recarregar
-          </button>
-          <div className="flex items-center text-xs text-slate-500 flex-wrap gap-2">
-            <span>
-              📊 {calls.length} de {totalItems} chamadas
-            </span>
-            {loading && (
-              <span className="text-orange-600">🔄 Carregando...</span>
-            )}
-            {!loading && sortBy === 'duration' && (
-              <span className="text-green-600 bg-green-50 px-2 py-1 rounded">⏱️ Ordenado por duração</span>
-            )}
-            {!loading && sortBy === 'score' && (
-              <span className="text-purple-600 bg-purple-50 px-2 py-1 rounded">⭐ Ordenado por nota</span>
-            )}
-            {!loading && sortBy === 'score_asc' && (
-              <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded">⬇️ Ordenado por menor nota</span>
-            )}
-            {!loading && (minDuration.trim() || maxDuration.trim()) && (
-              <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
-                🔍 Duração: {minDuration && `≥${minDuration}s`}{minDuration && maxDuration && " • "}{maxDuration && `≤${maxDuration}s`}
-                <button
-                  onClick={() => {setMinDuration(''); setMaxDuration('');}}
-                  className="text-blue-400 hover:text-blue-600 ml-1"
-                  title="Limpar filtros de duração"
+        {/* === BARRA DE FILTROS UNIFICADA === */}
+        <div className="p-4 bg-slate-50 border-b border-slate-100">
+          <div className="flex flex-col gap-3">
+            {/* Linha 1: Busca e Filtros Principais */}
+            <div className="flex flex-col lg:flex-row gap-3">
+              {/* Busca */}
+              <div className="relative flex-1 lg:max-w-xs">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Buscar empresa ou Deal ID..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Grupo: SDR e Status */}
+              <div className="flex flex-1 gap-3">
+                <select 
+                  className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  value={sdr} 
+                  onChange={(e) => setSdr(e.target.value)}
                 >
-                  ✕
-                </button>
-              </span>
-            )}
-            {!loading && totalCount > 0 && (minDuration.trim() || maxDuration.trim()) && (
-              <span className="text-green-600 text-xs">
-                ✅ {filtered.length} resultado{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
-              </span>
-            )}
+                  <option value="">Todos os SDRs</option>
+                  {sdrs.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} {s.callCount ? `(${s.callCount})` : ''}
+                    </option>
+                  ))}
+                </select>
+
+                <select 
+                  className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  value={status} 
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="">Todos os Status</option>
+                  <option value="normal_clearing">Atendida</option>
+                  <option value="no_answer">Não atendida</option>
+                  <option value="originator_cancel">Cancelada</option>
+                  <option value="number_changed">Número mudou</option>
+                  <option value="recovery_on_timer_expire">Tempo esgotado</option>
+                  <option value="unallocated_number">Não encontrado</option>
+                </select>
+              </div>
+
+              {/* Grupo: Datas */}
+              <div className="flex gap-2 items-center">
+                <div className="flex flex-col">
+                  <label className="text-xs text-slate-500 mb-1">De</label>
+                  <input 
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    type="date" 
+                    value={start} 
+                    onChange={(e) => setStart(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs text-slate-500 mb-1">Até</label>
+                  <input 
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    type="date" 
+                    value={end} 
+                    onChange={(e) => setEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 2: Ordenação, Duração e Score */}
+            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+              {/* Ordenação */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 whitespace-nowrap">Ordenar:</label>
+                <select 
+                  className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="created_at">Mais recentes</option>
+                  <option value="duration">Maior duração</option>
+                  <option value="score">Maior nota</option>
+                  <option value="score_asc">Menor nota</option>
+                </select>
+              </div>
+
+              {/* Duração mínima (presets) */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 whitespace-nowrap">Duração:</label>
+                <select 
+                  className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  value={minDuration} 
+                  onChange={(e) => setMinDuration(e.target.value)}
+                >
+                  {durationPresets.map(preset => (
+                    <option key={preset.value} value={preset.value}>{preset.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Score mínimo */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 whitespace-nowrap">Nota mín:</label>
+                <input
+                  className="w-20 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  type="number"
+                  placeholder="0-10"
+                  value={minScore}
+                  onChange={(e) => setMinScore(e.target.value)}
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+
+              {/* Indicador de ordenação ativa */}
+              {sortBy !== 'created_at' && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-200 text-slate-600 rounded text-xs">
+                  {sortBy === 'duration' && 'Por duração'}
+                  {sortBy === 'score' && 'Por maior nota'}
+                  {sortBy === 'score_asc' && 'Por menor nota'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
