@@ -1,9 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
 import SdrAverageScoreChart from '../components/SdrAverageScoreChart';
 import { fetchUniqueSdrs } from '../services/callsService';
+
+// Componente Toggle Switch
+const ToggleSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
+  <label className="flex items-center gap-2 cursor-pointer select-none">
+    <div className="relative">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <div className={`w-10 h-5 rounded-full transition-colors duration-200 ${checked ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+        <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </div>
+    </div>
+    <span className="text-sm text-slate-600">{label}</span>
+  </label>
+);
+
+// Componente Badge para filtros ativos
+const FilterBadge = ({ label, value, color = 'indigo' }: { label: string; value: string; color?: string }) => {
+  const colors: Record<string, string> = {
+    indigo: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    amber: 'bg-amber-100 text-amber-700 border-amber-200',
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${colors[color]}`}>
+      <span className="text-slate-500">{label}:</span>
+      <span>{value}</span>
+    </span>
+  );
+};
+
+// Labels para período
+const periodLabels: Record<number, string> = {
+  1: 'Hoje',
+  7: '7 dias',
+  14: '14 dias',
+  30: '30 dias',
+  90: '90 dias',
+};
 
 const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState({
@@ -27,9 +69,52 @@ const DashboardPage = () => {
   const [sdrOptions, setSdrOptions] = useState<{ email: string; name: string }[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // LOG IMEDIATO PARA TESTE
-  console.log('🔥🔥🔥 DASHBOARD REFATORADO COMPLETO - NOVA ARQUITETURA!');
+  // Função para atualização manual (sem reload da página)
+  const handleManualRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    
+    setIsRefreshing(true);
+    console.log('🔄 Atualização manual iniciada...');
+    
+    try {
+      if (!supabase) {
+        throw new Error('Supabase não inicializado');
+      }
+
+      const { data: totalsData, error: totalsErr } = await supabase.rpc('get_dashboard_totals');
+      if (totalsErr) throw totalsErr;
+      
+      const metrics = Array.isArray(totalsData) ? totalsData[0] : totalsData;
+      const totalCount = Number(metrics?.total_calls || 0);
+      const answeredCount = Number(metrics?.answered_calls || 0);
+      const avgDurationFromRpc = Math.round(Number(metrics?.avg_duration_answered || 0));
+      const answeredRate = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
+
+      setDashboardData(prev => ({
+        ...prev,
+        totalCalls: totalCount,
+        answeredCalls: answeredCount,
+        answeredRate,
+        avgDuration: avgDurationFromRpc,
+        loading: false,
+        error: null
+      }));
+      
+      setLastUpdate(new Date());
+      console.log('✅ Atualização manual concluída!');
+    } catch (err: any) {
+      console.error('❌ Erro na atualização manual:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing]);
+
+  // Obter nome do SDR selecionado
+  const selectedSdrName = selectedSdr 
+    ? sdrOptions.find(s => s.email === selectedSdr)?.name || selectedSdr 
+    : 'Todos';
 
   // Função para converter HH:MM:SS para segundos
   const timeToSeconds = (timeStr) => {
@@ -290,9 +375,15 @@ const DashboardPage = () => {
 
   if (dashboardData.loading) {
     return (
-      <div style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-          <div style={{ fontSize: '18px' }}>🔄 Carregando dados do dashboard...</div>
+      <div className="p-6">
+        <div className="flex items-center justify-center h-48">
+          <div className="flex items-center gap-3">
+            <svg className="animate-spin h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-lg text-slate-600">Carregando dashboard...</span>
+          </div>
         </div>
       </div>
     );
@@ -300,148 +391,193 @@ const DashboardPage = () => {
 
   if (dashboardData.error) {
     return (
-      <div style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-          <div style={{ fontSize: '18px', color: 'red' }}>❌ Erro: {dashboardData.error}</div>
+      <div className="p-6">
+        <div className="flex items-center justify-center h-48">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+            <svg className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-red-700">{dashboardData.error}</span>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
-          Dashboard - Dados Diretos 🚀
-        </h1>
-        <p style={{ color: '#666', marginBottom: '16px' }}>
-          Métricas dos últimos {selectedPeriod} dias (Total: {dashboardData.totalCalls} chamadas)
-        </p>
+    <div className="p-4 md:p-6 space-y-6">
+      {/* === CABEÇALHO PRINCIPAL === */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+            Dashboard de Chamadas
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <FilterBadge label="Período" value={periodLabels[selectedPeriod] || `${selectedPeriod} dias`} color="indigo" />
+            <FilterBadge label="SDR" value={selectedSdrName} color="emerald" />
+            <span className="text-sm text-slate-500">
+              {dashboardData.totalCalls.toLocaleString('pt-BR')} chamadas
+            </span>
+          </div>
+        </div>
         
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <label style={{ marginRight: '8px', fontSize: '14px', color: '#666' }}>Período:</label>
-            <select 
-              value={selectedPeriod} 
-              onChange={(e) => setSelectedPeriod(parseInt(e.target.value))}
-              style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-            >
-              <option value="1">Hoje</option>
-              <option value="7">Últimos 7 dias</option>
-              <option value="14">Últimos 14 dias</option>
-              <option value="30">Últimos 30 dias</option>
-              <option value="90">Últimos 90 dias</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ marginRight: '8px', fontSize: '14px', color: '#666' }}>SDR:</label>
-            <select 
-              value={selectedSdr || ''}
-              onChange={(e) => setSelectedSdr(e.target.value || null)}
-              style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-            >
-              <option value="">Todos os SDRs</option>
-              {sdrOptions.map(s => (
-                <option key={s.email} value={s.email}>{s.name || s.email}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{ fontSize: '14px', color: '#666' }}>
-              <input 
-                type="checkbox" 
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                style={{ marginRight: '4px' }}
-              />
-              Atualização automática (15s)
-            </label>
-          </div>
-          
-          <div style={{ fontSize: '12px', color: '#888' }}>
-            🕐 Última atualização: {lastUpdate.toLocaleTimeString()}
-          </div>
-          
-          <button 
-            onClick={() => window.location.reload()}
-            style={{ 
-              padding: '8px 16px', 
-              border: '1px solid #3b82f6', 
-              borderRadius: '4px', 
-              backgroundColor: '#3b82f6', 
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
+        {/* Botão de Atualizar */}
+        <button 
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className={`
+            inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+            transition-all duration-200 shadow-sm
+            ${isRefreshing 
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+              : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
+            }
+          `}
+        >
+          <svg 
+            className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
           >
-            🔄 Atualizar Agora
-          </button>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {isRefreshing ? 'Atualizando...' : 'Atualizar'}
+        </button>
+      </div>
+
+      {/* === BARRA DE FILTROS === */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Filtros à esquerda */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Período */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-600">Período:</label>
+              <select 
+                value={selectedPeriod} 
+                onChange={(e) => setSelectedPeriod(parseInt(e.target.value))}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
+                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                           hover:border-slate-400 transition-colors cursor-pointer min-w-[140px]"
+              >
+                <option value="1">Hoje</option>
+                <option value="7">Últimos 7 dias</option>
+                <option value="14">Últimos 14 dias</option>
+                <option value="30">Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+              </select>
+            </div>
+
+            {/* SDR */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-600">SDR:</label>
+              <select 
+                value={selectedSdr || ''}
+                onChange={(e) => setSelectedSdr(e.target.value || null)}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
+                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                           hover:border-slate-400 transition-colors cursor-pointer min-w-[180px]"
+              >
+                <option value="">Todos os SDRs</option>
+                {sdrOptions.map(s => (
+                  <option key={s.email} value={s.email}>{s.name || s.email}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Divisor visual */}
+            <div className="hidden lg:block w-px h-8 bg-slate-300" />
+
+            {/* Auto-refresh toggle */}
+            <ToggleSwitch 
+              checked={autoRefresh} 
+              onChange={setAutoRefresh} 
+              label="Auto-refresh (15s)" 
+            />
+          </div>
+
+          {/* Status à direita */}
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+            <span>Atualizado às {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
         </div>
       </div>
 
-      {/* Cards de Métricas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-            📞 Total de Chamadas
+      {/* === CARDS DE MÉTRICAS === */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total de Chamadas */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-slate-100 rounded-lg">
+              <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-slate-600">Total de Chamadas</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#1f2937' }}>
-            {dashboardData.totalCalls}
-          </div>
-        </div>
-
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-            ✅ Chamadas Atendidas
-          </div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>
-            {dashboardData.answeredCalls}
+          <div className="text-3xl font-bold text-slate-800">
+            {dashboardData.totalCalls.toLocaleString('pt-BR')}
           </div>
         </div>
 
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-            📈 Taxa de Atendimento
+        {/* Chamadas Atendidas */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-slate-600">Atendidas</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>
+          <div className="text-3xl font-bold text-emerald-600">
+            {dashboardData.answeredCalls.toLocaleString('pt-BR')}
+          </div>
+        </div>
+
+        {/* Taxa de Atendimento */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-slate-600">Taxa de Atendimento</span>
+          </div>
+          <div className="text-3xl font-bold text-amber-600">
             {dashboardData.answeredRate}%
           </div>
         </div>
 
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-            ⏱️ Duração Média
+        {/* Duração Média */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-violet-100 rounded-lg">
+              <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-slate-600">Duração Média</span>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#8b5cf6' }}>
+          <div className="text-3xl font-bold text-violet-600">
             {formatDuration(dashboardData.avgDuration)}
           </div>
         </div>
       </div>
 
-      {/* Informações de Debug */}
-      <div style={{ 
-        backgroundColor: '#f3f4f6', 
-        padding: '12px', 
-        borderRadius: '6px', 
-        marginBottom: '24px',
-        fontSize: '12px',
-        color: '#6b7280'
-      }}>
-        🔍 Debug: {dashboardData.volumeData.length} dias de dados | {dashboardData.sdrMetrics.length} SDRs | 
-        Última atualização: {new Date().toLocaleTimeString()}
-      </div>
-
-      {/* Gráfico de volume - largura total */}
-      <div style={{ marginBottom: '24px' }}>
+      {/* === GRÁFICO DE VOLUME === */}
+      <div>
         <CallVolumeChart 
           selectedPeriod={selectedPeriod} 
           selectedSdrEmail={selectedSdr}
         />
       </div>
 
-      {/* Rankings lado a lado */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '24px' }}>
+      {/* === RANKINGS LADO A LADO === */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <SdrScoreChart selectedPeriod={selectedPeriod} />
         <SdrAverageScoreChart selectedPeriod={selectedPeriod} />
       </div>
