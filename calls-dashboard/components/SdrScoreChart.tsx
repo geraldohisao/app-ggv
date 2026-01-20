@@ -25,9 +25,135 @@ async function fetchSdrRankingData(days: number = 30, startDate?: string, endDat
   }
 
   try {
-    console.log('🔍 Buscando dados de ranking dos SDRs para os últimos', days, 'dias');
+    const useCustomRange = !!(startDate && endDate);
+    console.log('🔍 Buscando dados de ranking dos SDRs:', { days, startDate, endDate, useCustomRange });
 
-    // Buscar métricas primeiro
+    // Se houver período personalizado, calcular no front com base em chamadas filtradas
+    if (useCustomRange) {
+      const startIso = new Date(startDate + 'T00:00:00.000Z').toISOString();
+      const endIso = new Date(endDate + 'T23:59:59.999Z').toISOString();
+      const limit = 5000;
+      const maxRecords = 50000;
+      let offset = 0;
+      let allCalls: any[] = [];
+      let totalCount = 0;
+
+      while (offset < maxRecords) {
+        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+          p_sdr: null,
+          p_status: null,
+          p_type: null,
+          p_start_date: startIso,
+          p_end_date: endIso,
+          p_limit: limit,
+          p_offset: offset,
+          p_sort_by: 'created_at',
+          p_min_duration: null,
+          p_max_duration: null,
+          p_min_score: null,
+          p_search_query: null
+        });
+
+        if (callsError) {
+          console.error('❌ Erro ao buscar chamadas filtradas:', callsError);
+          break;
+        }
+
+        const chunk = Array.isArray(callsData) ? callsData : [];
+        if (chunk.length === 0) break;
+
+        totalCount = Number(chunk[0]?.total_count || totalCount);
+        allCalls = allCalls.concat(chunk);
+
+        if (allCalls.length >= totalCount) break;
+        offset += limit;
+      }
+
+      if (allCalls.length === 0) {
+        console.log('📭 Nenhuma chamada encontrada no período personalizado');
+        return [];
+      }
+
+      if (totalCount > maxRecords) {
+        console.warn('⚠️ Limite máximo atingido no período personalizado. Dados podem estar incompletos.');
+      }
+
+      const sdrMap = new Map<string, SdrRankingData & { durationSum: number; durationCount: number }>();
+      allCalls.forEach((call: any) => {
+        const sdrId = call.sdr_id || call.agent_id || 'desconhecido';
+        const sdrName = call.sdr_name || call.agent_id || 'SDR';
+        const key = String(sdrId).toLowerCase();
+        const duration = Number(call.duration_seconds || call.duration || 0);
+
+        if (!sdrMap.has(key)) {
+          sdrMap.set(key, {
+            sdr_id: String(sdrId),
+            sdr_name: String(sdrName),
+            total_calls: 0,
+            answered_calls: 0,
+            avg_duration: 0,
+            avg_score: 0,
+            durationSum: 0,
+            durationCount: 0
+          });
+        }
+
+        const item = sdrMap.get(key)!;
+        item.total_calls += 1;
+        if (call.status_voip === 'normal_clearing') {
+          item.answered_calls += 1;
+          if (duration > 30) {
+            item.durationSum += duration;
+            item.durationCount += 1;
+          }
+        }
+      });
+
+      let result = Array.from(sdrMap.values()).map((item) => ({
+        sdr_id: item.sdr_id,
+        sdr_name: item.sdr_name,
+        total_calls: item.total_calls,
+        answered_calls: item.answered_calls,
+        avg_duration: item.durationCount > 0 ? Math.round(item.durationSum / item.durationCount) : 0,
+        avg_score: 0
+      }));
+
+      // Filtrar por usuários ativos (se conseguimos a lista)
+      const { data: activeProfiles, error: profilesErr } = await supabase
+        .from('profiles')
+        .select('email, is_active')
+        .eq('is_active', true);
+
+      if (!profilesErr && activeProfiles && activeProfiles.length > 0) {
+        const activeUsernames = new Set(
+          activeProfiles.map((p: any) => {
+            const email = p.email?.toLowerCase() || '';
+            return email.split('@')[0];
+          }).filter(Boolean)
+        );
+
+        const beforeFilter = result.length;
+        result = result.filter((sdr) => {
+          const sdrUsername = (sdr.sdr_id?.toLowerCase() || '').split('@')[0];
+          return activeUsernames.has(sdrUsername);
+        });
+
+        if (result.length === 0 && beforeFilter > 0) {
+          result = Array.from(sdrMap.values()).map((item) => ({
+            sdr_id: item.sdr_id,
+            sdr_name: item.sdr_name,
+            total_calls: item.total_calls,
+            answered_calls: item.answered_calls,
+            avg_duration: item.durationCount > 0 ? Math.round(item.durationSum / item.durationCount) : 0,
+            avg_score: 0
+          }));
+        }
+      }
+
+      return result.sort((a, b) => b.total_calls - a.total_calls).slice(0, 10);
+    }
+
+    // Buscar métricas primeiro (período relativo)
     const { data, error } = await supabase.rpc('get_sdr_metrics', { p_days: days });
 
     if (error) {

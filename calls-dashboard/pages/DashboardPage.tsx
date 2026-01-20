@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import DatePicker from 'react-datepicker';
+import { ptBR } from 'date-fns/locale';
+import 'react-datepicker/dist/react-datepicker.css';
 import { supabase } from '../../services/supabaseClient';
 import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
@@ -74,14 +77,17 @@ const DashboardPage = () => {
   
   // Filtros de data personalizada
   const [useCustomDates, setUseCustomDates] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+
+  const startDateParam = startDate ? startDate.toISOString().split('T')[0] : '';
+  const endDateParam = endDate ? endDate.toISOString().split('T')[0] : '';
   
   // Calcular período em dias a partir das datas customizadas
   const getEffectivePeriod = (): number => {
     if (useCustomDates && startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const start = startDate;
+      const end = endDate;
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       return diffDays;
@@ -91,10 +97,13 @@ const DashboardPage = () => {
   
   // Label do período atual
   const getPeriodLabel = (): string => {
-    if (useCustomDates && startDate && endDate) {
-      const start = new Date(startDate + 'T00:00:00');
-      const end = new Date(endDate + 'T00:00:00');
-      return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    if (useCustomDates) {
+      if (startDate && endDate) {
+        const start = startDate;
+        const end = endDate;
+        return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+      }
+      return 'Personalizado';
     }
     return periodLabels[selectedPeriod] || `${selectedPeriod} dias`;
   };
@@ -511,22 +520,32 @@ const DashboardPage = () => {
               <>
                 <div className="flex flex-col">
                   <label className="text-xs text-slate-500 mb-1">De</label>
-                  <input 
-                    type="date"
-                    lang="pt-BR"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                  <DatePicker
+                    selected={startDate}
+                    onChange={(date) => setStartDate(date)}
+                    selectsStart
+                    startDate={startDate}
+                    endDate={endDate}
+                    maxDate={endDate || undefined}
+                    locale={ptBR}
+                    dateFormat="dd/MM/yyyy"
+                    placeholderText="dd/mm/aaaa"
                     className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
                                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <div className="flex flex-col">
                   <label className="text-xs text-slate-500 mb-1">Até</label>
-                  <input 
-                    type="date"
-                    lang="pt-BR"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                  <DatePicker
+                    selected={endDate}
+                    onChange={(date) => setEndDate(date)}
+                    selectsEnd
+                    startDate={startDate}
+                    endDate={endDate}
+                    minDate={startDate || undefined}
+                    locale={ptBR}
+                    dateFormat="dd/MM/yyyy"
+                    placeholderText="dd/mm/aaaa"
                     className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 
                                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
@@ -638,8 +657,8 @@ const DashboardPage = () => {
         <CallVolumeChart 
           selectedPeriod={getEffectivePeriod()} 
           selectedSdrEmail={selectedSdr}
-          startDate={useCustomDates ? startDate : undefined}
-          endDate={useCustomDates ? endDate : undefined}
+          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
+          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
         />
       </div>
 
@@ -647,13 +666,13 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <SdrScoreChart 
           selectedPeriod={getEffectivePeriod()} 
-          startDate={useCustomDates ? startDate : undefined}
-          endDate={useCustomDates ? endDate : undefined}
+          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
+          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
         />
         <SdrAverageScoreChart 
           selectedPeriod={getEffectivePeriod()}
-          startDate={useCustomDates ? startDate : undefined}
-          endDate={useCustomDates ? endDate : undefined}
+          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
+          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
         />
       </div>
     </div>
