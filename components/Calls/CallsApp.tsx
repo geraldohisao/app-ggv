@@ -69,14 +69,8 @@ export default function CallsApp() {
 
   return (
     <div className="bg-slate-100 min-h-full">
-      {/* Header da página */}
+      {/* Navigation Tabs */}
       <div className="bg-white border-b border-slate-200">
-        <div className="max-w-screen-2xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-semibold text-slate-800">Chamadas</h1>
-          <p className="text-sm text-slate-500">Métricas e análise de ligações da sua equipe.</p>
-        </div>
-        
-        {/* Navigation Tabs - colado no header */}
         <div className="max-w-screen-2xl mx-auto px-6">
           <div className="flex gap-1">
             {tabs.map((tab) => {
@@ -87,7 +81,7 @@ export default function CallsApp() {
                   key={tab.id}
                   href={tab.href}
                   className={`
-                    px-5 py-3 font-semibold text-sm flex items-center gap-2 border-b-[3px] transition-all
+                    px-5 py-3.5 font-semibold text-sm flex items-center gap-2 border-b-[3px] transition-all
                     ${isActive
                       ? 'border-[#5B5FF5] text-[#5B5FF5]'
                       : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'
