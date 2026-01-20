@@ -5,7 +5,7 @@ import NotificationCenter from './NotificationCenter';
 import AppLauncher from './AppLauncher';
 import { Module } from '../types';
 import ConnectionStatus from './ConnectionStatus';
-import { ChartBarIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
+import { MagnifyingGlassIcon, CalculatorIcon, PhoneIcon } from './ui/icons';
 import { navigateToModule } from '../utils/router';
 
 interface HeaderProps {
@@ -15,7 +15,7 @@ interface HeaderProps {
 }
 
 const navItems = [
-    { module: Module.Diagnostico, text: "Diagnóstico", icon: <ChartBarIcon className="w-5 h-5" /> },
+    { module: Module.Diagnostico, text: "Diagnóstico", icon: <MagnifyingGlassIcon className="w-5 h-5" /> },
     { module: Module.Calls, text: "Chamadas", icon: <PhoneIcon className="w-5 h-5" /> },
     { module: Module.Calculadora, text: "Calculadora", icon: <CalculatorIcon className="w-5 h-5" /> },
 ];

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Module, UserRole } from '../types';
 import { 
-    ChartBarIcon,
+    MagnifyingGlassIcon,
     PhoneIcon,
     CalculatorIcon,
     ChartBarSquareIcon,
@@ -78,7 +78,7 @@ const AppLauncher: React.FC<AppLauncherProps> = ({ activeModule, setActiveModule
         { 
             module: Module.Diagnostico, 
             name: 'Diagnóstico', 
-            icon: <ChartBarIcon className="w-6 h-6" />,
+            icon: <MagnifyingGlassIcon className="w-6 h-6" />,
             iconBgColor: 'bg-blue-100 text-blue-600',
             visible: true 
         },
