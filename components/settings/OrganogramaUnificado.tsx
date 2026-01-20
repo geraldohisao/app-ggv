@@ -250,10 +250,35 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const isStatic = Boolean(staticData);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const legendRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.4));
   const handleZoomReset = () => setZoomLevel(1);
+
+  // Fechar aviso de link público automaticamente
+  useEffect(() => {
+    if (shareStatus !== 'ready' || !shareUrl) return;
+    const timer = setTimeout(() => {
+      setShareUrl(null);
+      setShareStatus('idle');
+      setShareError(null);
+      setShareCopied(false);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [shareStatus, shareUrl]);
+
+  // Fechar legenda ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!legendRef.current) return;
+      if (!legendRef.current.contains(event.target as Node)) {
+        setShowLegend(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Centralizar no nível 1 ao carregar
   useEffect(() => {
@@ -517,7 +542,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
       </div>
 
       {/* Legenda Flutuante (Collapsible) */}
-      <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${showLegend ? 'w-48' : 'w-auto'}`}>
+      <div ref={legendRef} className={`absolute top-4 right-4 z-20 transition-all duration-300 ${showLegend ? 'w-48' : 'w-auto'}`}>
           <div className="bg-white/90 backdrop-blur rounded-lg shadow-sm border border-slate-200 overflow-hidden">
               <div 
                 className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50"
@@ -550,6 +575,18 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
                 <p className="text-sm font-semibold text-emerald-800">Link público gerado</p>
                 <p className="text-xs text-emerald-700">O link já foi copiado para a área de transferência.</p>
               </div>
+              <button
+                onClick={() => {
+                  setShareUrl(null);
+                  setShareStatus('idle');
+                  setShareError(null);
+                  setShareCopied(false);
+                }}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+                title="Fechar"
+              >
+                ✕
+              </button>
               <a
                 href={shareUrl}
                 target="_blank"
