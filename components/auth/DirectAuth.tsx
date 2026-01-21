@@ -109,16 +109,22 @@ export const DirectAuth: React.FC<DirectAuthProps> = ({ onAuthSuccess, onAuthErr
                      session.user.user_metadata?.name || 
                      email.split('@')[0] || 
                      'Usuário';
+        
+        // Foto do Google OAuth
+        const avatarUrl = session.user.user_metadata?.avatar_url || 
+                         session.user.user_metadata?.picture || 
+                         undefined;
 
         const user: User = {
           id: session.user.id,
           email,
           name: formatName(name),
           initials: getInitials(name),
-          role: isAdminEmail(email) ? UserRole.SuperAdmin : UserRole.User
+          role: isAdminEmail(email) ? UserRole.SuperAdmin : UserRole.User,
+          avatar_url: avatarUrl
         };
 
-        console.log('✅ DIRECT AUTH - Usuário criado com sessão Supabase:', user);
+        console.log('✅ DIRECT AUTH - Usuário criado com sessão Supabase:', { ...user, avatar_url: !!avatarUrl });
         
         // Limpar URL
         cleanUrl();
@@ -136,16 +142,22 @@ export const DirectAuth: React.FC<DirectAuthProps> = ({ onAuthSuccess, onAuthErr
                    payload.user_metadata?.name || 
                    email.split('@')[0] || 
                    'Usuário';
+      
+      // Foto do Google OAuth (fallback)
+      const avatarUrl = payload.user_metadata?.avatar_url || 
+                       payload.user_metadata?.picture || 
+                       undefined;
 
       const user: User = {
         id: payload.sub || `google-${Date.now()}`,
         email,
         name: formatName(name),
         initials: getInitials(name),
-        role: isAdminEmail(email) ? UserRole.SuperAdmin : UserRole.User
+        role: isAdminEmail(email) ? UserRole.SuperAdmin : UserRole.User,
+        avatar_url: avatarUrl
       };
 
-      console.log('✅ DIRECT AUTH - Usuário criado (fallback):', user);
+      console.log('✅ DIRECT AUTH - Usuário criado (fallback):', { ...user, avatar_url: !!avatarUrl });
       
       // Limpar URL
       cleanUrl();

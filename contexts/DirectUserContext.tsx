@@ -55,20 +55,21 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 if (session?.user) {
                                     const { data: profile } = await supabase
                                         .from('profiles')
-                                        .select('role, department, cargo, user_function')
+                                        .select('role, department, cargo, user_function, avatar_url')
                                         .eq('id', session.user.id)
                                         .single();
-                                    if (profile && (profile.role || profile.department || profile.cargo)) {
+                                    if (profile && (profile.role || profile.department || profile.cargo || profile.avatar_url)) {
                                         const updatedUser = {
                                             ...sessionInfo.user,
                                             role: (profile.role as UserRole) || sessionInfo.user.role,
                                             department: profile.department || sessionInfo.user.department,
                                             cargo: profile.cargo || sessionInfo.user.cargo,
                                             user_function: (profile.user_function as any) || sessionInfo.user.user_function,
+                                            avatar_url: profile.avatar_url || sessionInfo.user.avatar_url,
                                         } as User;
                                         setUser(updatedUser);
                                         saveSession(updatedUser);
-                                        console.log('🔄 DIRECT CONTEXT - Função/role atualizados em background do profiles:', { role: updatedUser.role, user_function: updatedUser.user_function });
+                                        console.log('🔄 DIRECT CONTEXT - Função/role atualizados em background do profiles:', { role: updatedUser.role, user_function: updatedUser.user_function, avatar_url: !!updatedUser.avatar_url });
                                     }
                                 }
                             } catch (bgErr) {
@@ -107,16 +108,22 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                      email.split('@')[0] || 
                                      'Usuário';
                         
-                        // Consultar role, department e cargo da tabela profiles
+                        // Foto do Google OAuth (fallback)
+                        const googleAvatarUrl = session.user.user_metadata?.avatar_url || 
+                                               session.user.user_metadata?.picture || 
+                                               undefined;
+                        
+                        // Consultar role, department, cargo e avatar_url da tabela profiles
                         let userRole = UserRole.User;
                         let userDepartment: string | undefined = undefined;
                         let userCargo: string | undefined = undefined;
                         let userFunction: 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined = undefined;
+                        let userAvatarUrl: string | undefined = googleAvatarUrl; // Começa com foto do Google
                         
                         try {
                             const { data: profile } = await supabase
                                 .from('profiles')
-                                .select('role, department, cargo, user_function')
+                                .select('role, department, cargo, user_function, avatar_url')
                                 .eq('id', session.user.id)
                                 .single();
                             
@@ -125,7 +132,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 userDepartment = profile.department;
                                 userCargo = profile.cargo;
                                 userFunction = profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined;
-                                console.log('✅ DIRECT CONTEXT - Role, department e cargo carregados do banco:', { role: userRole, department: userDepartment, cargo: userCargo, function: userFunction });
+                                // Prioriza avatar do banco, senão usa do Google OAuth
+                                userAvatarUrl = profile.avatar_url || googleAvatarUrl || undefined;
+                                console.log('✅ DIRECT CONTEXT - Role, department e cargo carregados do banco:', { role: userRole, department: userDepartment, cargo: userCargo, function: userFunction, avatar_url: !!userAvatarUrl, source: profile.avatar_url ? 'db' : 'google' });
                             } else {
                                 // Fallback para emails específicos
                                 const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
@@ -148,7 +157,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             role: userRole,
                             department: userDepartment,
                             cargo: userCargo,
-                            user_function: userFunction
+                            user_function: userFunction,
+                            avatar_url: userAvatarUrl
                         };
                         
                         // Salvar no storage local para próximas sessões usando utilitário
@@ -224,7 +234,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (supabase) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('role, department, cargo, user_function')
+                    .select('role, department, cargo, user_function, avatar_url')
                     .eq('id', authenticatedUser.id)
                     .single();
                 
@@ -234,9 +244,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         role: profile.role as UserRole,
                         department: profile.department,
                         cargo: profile.cargo,
-                        user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined
+                        user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined,
+                        // Prioriza avatar do banco, senão usa do Google OAuth (que veio no authenticatedUser)
+                        avatar_url: profile.avatar_url || authenticatedUser.avatar_url || undefined
                     };
-                    console.log('✅ DIRECT CONTEXT - Role, department e cargo atualizados do banco:', { role: profile.role, department: profile.department, cargo: profile.cargo, function: profile.user_function });
+                    console.log('✅ DIRECT CONTEXT - Role, department e cargo atualizados do banco:', { role: profile.role, department: profile.department, cargo: profile.cargo, function: profile.user_function, avatar_url: !!finalUser.avatar_url, source: profile.avatar_url ? 'db' : 'google' });
                 }
             }
         } catch (profileError) {
@@ -287,26 +299,27 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            // Buscar role, department e cargo atualizados do banco
+            // Buscar role, department, cargo e avatar_url atualizados do banco
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('role, department, cargo, user_function')
+                .select('role, department, cargo, user_function, avatar_url')
                 .eq('id', user.id)
                 .single();
             
-            if (profile && (profile.role !== user.role || profile.department !== user.department || profile.cargo !== user.cargo || profile.user_function !== user.user_function)) {
+            if (profile && (profile.role !== user.role || profile.department !== user.department || profile.cargo !== user.cargo || profile.user_function !== user.user_function || profile.avatar_url !== user.avatar_url)) {
                 const updatedUser = {
                     ...user,
                     role: profile.role as UserRole,
                     department: profile.department,
                     cargo: profile.cargo,
-                    user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined
+                    user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined,
+                    avatar_url: profile.avatar_url || undefined
                 };
                 
                 console.log('✅ DIRECT CONTEXT - Role/department/cargo atualizados:', 
-                    { role: user.role, department: user.department, cargo: user.cargo, function: user.user_function }, 
+                    { role: user.role, department: user.department, cargo: user.cargo, function: user.user_function, avatar_url: !!user.avatar_url }, 
                     '→', 
-                    { role: profile.role, department: profile.department, cargo: profile.cargo, function: profile.user_function }
+                    { role: profile.role, department: profile.department, cargo: profile.cargo, function: profile.user_function, avatar_url: !!profile.avatar_url }
                 );
                 
                 // Atualizar estado
@@ -315,7 +328,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // Atualizar storage usando utilitário
                 saveSession(updatedUser);
             } else {
-                console.log('ℹ️ DIRECT CONTEXT - Role/department/cargo não mudaram:', { role: user.role, department: user.department, cargo: user.cargo, function: user.user_function });
+                console.log('ℹ️ DIRECT CONTEXT - Role/department/cargo não mudaram:', { role: user.role, department: user.department, cargo: user.cargo, function: user.user_function, avatar_url: !!user.avatar_url });
             }
         } catch (error) {
             console.error('❌ DIRECT CONTEXT - Erro ao atualizar usuário:', error);

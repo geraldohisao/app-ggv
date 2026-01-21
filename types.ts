@@ -16,6 +16,7 @@ export enum Module {
   Assistente = 'ASSISTENTE',
   Calculadora = 'CALCULADORA',
   Settings = 'SETTINGS',
+  Organograma = 'ORGANOGRAMA',
   OpportunityFeedback = 'OPPORTUNITY_FEEDBACK',
   Calls = 'CALLS',
   ReativacaoLeads = 'REATIVACAO_LEADS',
@@ -36,7 +37,10 @@ export interface User {
   name: string;
   initials: string;
   role: UserRole;
-  user_function?: 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing'; // Função comercial do usuário
+  department?: string; // Departamento do usuário (comercial, marketing, projetos, etc)
+  cargo?: string; // Cargo/posição hierárquica do usuário
+  user_function?: 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing'; // [DEPRECATED] Manter por compatibilidade temporária
+  avatar_url?: string; // URL da foto do usuário (Google Workspace ou upload)
 }
 
 export interface CompanyData {
