@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 interface Scorecard {
   id: string;
@@ -24,6 +25,7 @@ interface CreateScorecardData {
 }
 
 export default function ScorecardPage() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const [scorecards, setScorecards] = useState<Scorecard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,16 @@ export default function ScorecardPage() {
     loadScorecards();
     fetchAvailableCallTypes();
   }, []);
+
+  if (!canAccessManualAnalysis) {
+    return (
+      <div className="p-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-600">
+          A visualização de scorecards é restrita a Admin e Super Admin.
+        </div>
+      </div>
+    );
+  }
 
   const loadScorecards = async () => {
     try {

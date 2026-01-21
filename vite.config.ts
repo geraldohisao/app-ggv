@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
       plugins: [react(), cspProdOnly()],
       server: {
         port: 5173,
-        strictPort: true,
+        strictPort: false,
         headers: {
           // Permitir cache para melhor persistência durante desenvolvimento
           'Cache-Control': 'max-age=0',

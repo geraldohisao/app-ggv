@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { UserRole, Module } from '../types';
 import { useUser } from '../contexts/DirectUserContext';
-import { CpuChipIcon, ChartBarIcon, BookOpenIcon, ExclamationTriangleIcon, KeyIcon, CheckCircleIcon, PhotoIcon } from './ui/icons';
+import { CpuChipIcon, ChartBarIcon, BookOpenIcon, ExclamationTriangleIcon, KeyIcon, CheckCircleIcon, PhotoIcon, SignalIcon, UsersIcon, UserGroupIcon, CloudArrowDownIcon, BuildingOfficeIcon, IdentificationIcon, ServerIcon, ArrowsRightLeftIcon, ClipboardDocumentListIcon, ArrowPathIcon, ChatBubbleLeftRightIcon, Cog6ToothIcon, BuildingOffice2Icon, ClipboardDocumentIcon, TrashIcon } from './ui/icons';
 import { EnvelopeIcon } from './ui/icons';
 import { DiagnosticSettingsModal } from './settings/DiagnosticSettingsModal';
 import { AssistantSettingsModal } from './settings/AssistantSettingsModal';
@@ -11,6 +11,10 @@ import { ApiKeyManagerModal } from './settings/ApiKeyManagerModal';
 import { ServerKeyManagerModal } from './settings/ServerKeyManagerModal';
 import { ResetCacheModal } from './settings/ResetCacheModal';
 import { UserManagerModal } from './settings/UserManagerModal';
+import { DepartmentsManager } from './settings/DepartmentsManager';
+import { CargosManager } from './settings/CargosManager';
+import WorkspaceImportModal from './settings/WorkspaceImportModal';
+import OrgAISuggestionsPanel from './settings/OrgAISuggestionsPanel';
 import { SectorSyncPanel } from './settings/SectorSyncPanel';
 import { EmailLogsPage } from './admin/EmailLogsPage';
 import Breadcrumb from './common/Breadcrumb';
@@ -52,14 +56,14 @@ const SettingsPage: React.FC = () => {
                 id: 'diagnostic',
                 title: 'Configurações do Diagnóstico',
                 description: 'Gerencie os segmentos de mercado para análise do diagnóstico comercial.',
-                icon: <ChartBarIcon className="w-6 h-6 text-blue-800"/>,
+                icon: <ClipboardDocumentListIcon className="w-6 h-6 text-blue-800"/>,
                 kbd: 'Alt+1',
             } : null,
             canManageAssistant ? {
                 id: 'assistant',
                 title: 'Configurações do Assistente IA',
                 description: 'Gerencie as personas e comportamentos do assistente de IA.',
-                icon: <CpuChipIcon className="w-6 h-6 text-teal-600"/>,
+                icon: <ChatBubbleLeftRightIcon className="w-6 h-6 text-teal-600"/>,
                 kbd: 'Alt+2',
             } : null,
             canManageKnowledge ? {
@@ -73,49 +77,56 @@ const SettingsPage: React.FC = () => {
                 id: 'sectorSync',
                 title: 'Sincronizar Setores - Banco Vetorial',
                 description: 'Sincronize os setores de atuação com o banco vetorial para melhorar as respostas da IA.',
-                icon: <ChartBarIcon className="w-6 h-6 text-blue-600"/>,
+                icon: <ArrowsRightLeftIcon className="w-6 h-6 text-blue-600"/>,
                 kbd: 'Alt+S',
             } : null,
             {
                 id: 'preferences',
                 title: 'Preferências',
                 description: 'Ajustes rápidos da interface, como auto-aplicar sugestões.',
-                icon: <CheckCircleIcon className="w-6 h-6 text-emerald-700"/>,
+                icon: <Cog6ToothIcon className="w-6 h-6 text-emerald-700"/>,
                 kbd: 'Alt+4',
             },
             canManageApis ? {
                 id: 'apiStatus',
                 title: 'Diagnóstico de Conexões',
                 description: 'Verifique a conectividade com os serviços essenciais (Proxy Gemini, Supabase).',
-                icon: <CheckCircleIcon className="w-6 h-6 text-green-600"/>,
+                icon: <SignalIcon className="w-6 h-6 text-green-600"/>,
                 kbd: 'Alt+5',
             } : null,
             canManageApis ? {
                 id: 'userManager',
                 title: 'Gerenciar Usuários',
-                description: 'Defina roles (SUPER_ADMIN, ADMIN, USER) e funções (SDR, Closer, Gestor).',
-                icon: <KeyIcon className="w-6 h-6 text-slate-700"/>,
+                description: 'Defina roles (SUPER_ADMIN, ADMIN, USER), departamentos e cargos dos usuários.',
+                icon: <UsersIcon className="w-6 h-6 text-slate-700"/>,
                 kbd: 'Alt+6',
             } : null,
-            canManageApis ? {
+            (isSuperAdmin || isAdmin) ? {
+                id: 'workspaceImport',
+                title: 'Importar do Google Workspace',
+                description: 'Sincronize usuários, cargos e departamentos do Google Workspace automaticamente.',
+                icon: <CloudArrowDownIcon className="w-6 h-6 text-purple-600"/>,
+                kbd: 'Alt+W',
+            } : null,
+            (isSuperAdmin || isAdmin) ? {
                 id: 'serverKeyManager',
                 title: 'Gerenciar Chave do Servidor (Gemini)',
                 description: 'Insira e salve a chave de API do Google Gemini para o servidor usar.',
-                icon: <KeyIcon className="w-6 h-6 text-red-600"/>,
+                icon: <ServerIcon className="w-6 h-6 text-red-600"/>,
                 kbd: 'Alt+7',
             } : null,
             canManageApis ? {
                 id: 'apiKeyManager',
                 title: 'Gerenciar Chaves Públicas',
                 description: 'Insira e salve as chaves para os serviços da plataforma (Supabase, Google).',
-                icon: <KeyIcon className="w-6 h-6 text-orange-600"/>,
+                icon: <ClipboardDocumentIcon className="w-6 h-6 text-orange-600"/>,
                 kbd: 'Alt+8',
             } : null,
             canManageApis ? {
                 id: 'resetCache',
                 title: 'Resetar Cache',
                 description: 'Limpa caches locais e recarrega o app.',
-                icon: <KeyIcon className="w-6 h-6 text-slate-700"/>,
+                icon: <TrashIcon className="w-6 h-6 text-red-600"/>,
                 kbd: 'Alt+9',
             } : null,
             canManageApis ? {
@@ -157,6 +168,8 @@ const SettingsPage: React.FC = () => {
                     '7': 'serverKeyManager',
                     '8': 'apiKeyManager',
                     '9': 'resetCache',
+                    'w': 'workspaceImport',
+                    'W': 'workspaceImport',
                     'e': 'emailLogs',
                     'E': 'emailLogs',
                 };
@@ -269,7 +282,7 @@ const SettingsPage: React.FC = () => {
                     {canManageApis && (
                         <SettingsSection title="Sistema e Administração">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {cards.filter(c => ['apiStatus','userManager','serverKeyManager','apiKeyManager','resetCache','emailLogs'].includes(c.id)).map(c => (
+                                {cards.filter(c => ['apiStatus','userManager','workspaceImport','departments','cargos','serverKeyManager','apiKeyManager','resetCache','emailLogs'].includes(c.id)).map(c => (
                                     <SettingsCard key={c.id} icon={c.icon} title={c.title} description={c.description} onClick={() => setActiveModal(c.id)} />
                                 ))}
                             </div>
@@ -287,6 +300,7 @@ const SettingsPage: React.FC = () => {
             
             {activeModal === 'serverKeyManager' && <ServerKeyManagerModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'userManager' && <UserManagerModal onClose={() => setActiveModal(null)} />}
+            {activeModal === 'workspaceImport' && <WorkspaceImportModal onClose={() => setActiveModal(null)} />}
             {activeModal === 'emailLogs' && <EmailLogsPage onClose={() => setActiveModal(null)} />}
             {activeModal === 'preferences' && (
                 <Suspense fallback={<div className="p-6 text-sm text-slate-500">Carregando Preferências...</div>}>

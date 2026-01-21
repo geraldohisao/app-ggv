@@ -69,12 +69,29 @@ const CalculadoraOTE: React.FC = () => {
         
         if (user.email === 'geraldo@grupoggv.com') return 'ALL';
         
-        // Usar a função comercial carregada do banco de dados pelo contexto
+        // Para usuários normais, determinar OTE baseado em DEPARTMENT + CARGO
+        const department = user.department?.toLowerCase();
+        const cargo = user.cargo;
+        
+        // Departamento Comercial
+        if (department === 'comercial') {
+            if (cargo === 'SDR') return OTEProfile.SDR;
+            if (cargo === 'Closer') return OTEProfile.Closer;
+            if (cargo === 'Coordenador') return OTEProfile.Coordenador;
+            if (cargo === 'Coordenador Comercial') return OTEProfile.Coordenador; // ✅ ADICIONADO
+        }
+        
+        // Departamento Marketing
+        if (department === 'marketing') {
+            if (cargo === 'Analista de Marketing') return OTEProfile.AnalistaMarketing;
+        }
+        
+        // Fallback temporário: usar user_function (para compatibilidade)
         if (user.user_function) {
             return user.user_function as OTEProfile;
         }
         
-        // fallback: SDR
+        // Último fallback: SDR
         return OTEProfile.SDR;
     }, [user]);
 

@@ -23,6 +23,10 @@ interface DebugLog {
  * - Feedback visual de permissões
  */
 export const AlwaysVisibleDebugPanel: React.FC = () => {
+  // 🔕 Desabilitado temporariamente para evitar loops de render
+  // Reativar removendo este bloco quando o painel estiver estável.
+  return null;
+
   const { user } = useUser();
   const [isVisible, setIsVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('geral');
@@ -32,6 +36,7 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
   const [globalLogs, setGlobalLogs] = useState<DebugLog[]>([]);
   const [isMonitoringGlobal, setIsMonitoringGlobal] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const hasLoggedInit = useRef(false); // Flag para evitar loop de logs
 
   // 🔐 Verificar se é Super Admin
   const isSuperAdmin = user?.role === 'SuperAdmin';
@@ -78,8 +83,10 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
     }
   }, []);
 
-  // 🎯 Verificar ativação por URL (apenas para Super Admin)
+  // 🎯 Verificar ativação por URL (apenas para Super Admin) - PROTEGIDO CONTRA LOOP
   useEffect(() => {
+    if (hasLoggedInit.current) return; // Evitar re-execução
+    
     const urlParams = new URLSearchParams(window.location.search);
     const debugParam = urlParams.get('debug');
     const adminParam = urlParams.get('admin');
@@ -89,13 +96,15 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
       addLog('success', 'System', 'Debug ativado via URL');
     }
 
-    // Log de acesso
+    // Log de acesso apenas na primeira vez
     if (hasDebugAccess) {
       addLog('info', 'Auth', `Acesso autorizado: ${user?.role || 'Development'}`);
     } else if (user) {
       addLog('warn', 'Auth', `Acesso negado: ${user.role} (apenas Super Admin)`);
     }
-  }, [user, hasDebugAccess]);
+    
+    hasLoggedInit.current = true; // Marcar como já executado
+  }, [user, hasDebugAccess]); // Mantém as deps mas só executa uma vez
 
   // ⌨️ Atalhos de teclado múltiplos (apenas para Super Admin)
   useEffect(() => {
@@ -106,14 +115,13 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
         setIsVisible(prev => !prev);
-        addLog('debug', 'Keyboard', 'Toggle via Ctrl+Shift+D');
+        // Não chamar addLog aqui para evitar loop
       }
       
       // Ctrl+Alt+D (alternativo)
       if (e.ctrlKey && e.altKey && e.key === 'D') {
         e.preventDefault();
         setIsVisible(prev => !prev);
-        addLog('debug', 'Keyboard', 'Toggle via Ctrl+Alt+D');
       }
 
       // F12 + D (para quando F12 não abre DevTools)
@@ -122,7 +130,6 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
           const handleDKey = (event: KeyboardEvent) => {
             if (event.key === 'D' || event.key === 'd') {
               setIsVisible(prev => !prev);
-              addLog('debug', 'Keyboard', 'Toggle via F12+D');
               document.removeEventListener('keydown', handleDKey);
             }
           };
@@ -154,6 +161,13 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
     // Interceptar console.error
     const originalError = console.error;
     console.error = (...args) => {
+      // Evitar loop infinito: se o erro vem do próprio debug panel, ignora
+      if (args[0]?.toString().includes('AlwaysVisibleDebugPanel') || 
+          args[0]?.toString().includes('Too many re-renders')) {
+        originalError.apply(console, args);
+        return;
+      }
+      
       addLog('error', 'Console', args.join(' '), args);
       originalError.apply(console, args);
     };
@@ -161,6 +175,12 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
     // Interceptar console.warn
     const originalWarn = console.warn;
     console.warn = (...args) => {
+      // Evitar loop infinito
+      if (args[0]?.toString().includes('AlwaysVisibleDebugPanel')) {
+        originalWarn.apply(console, args);
+        return;
+      }
+
       addLog('warn', 'Console', args.join(' '), args);
       originalWarn.apply(console, args);
     };
@@ -168,8 +188,8 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
-    // Log inicial
-    addLog('success', 'System', 'Debug Panel inicializado');
+    // Não adicionar log inicial aqui, pois causaria loop
+    // addLog('success', 'System', 'Debug Panel inicializado');
 
     return () => {
       window.removeEventListener('error', handleError);
@@ -177,15 +197,16 @@ export const AlwaysVisibleDebugPanel: React.FC = () => {
       console.error = originalError;
       console.warn = originalWarn;
     };
-  }, []);
+  }, []); // IMPORTANTE: array vazio para rodar apenas uma vez
 
   // 🔐 Verificar acesso (removido sistema de senha)
   const checkAccess = () => {
     if (hasDebugAccess) {
       setIsVisible(true);
-      addLog('success', 'Auth', 'Acesso autorizado');
+      // Não adicionar log aqui para evitar loop
+      // addLog('success', 'Auth', 'Acesso autorizado');
     } else {
-      addLog('warn', 'Auth', 'Acesso negado - apenas Super Admin');
+      // addLog('warn', 'Auth', 'Acesso negado - apenas Super Admin');
     }
   };
 

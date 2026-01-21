@@ -1,8 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { IconDashboard, IconPhone, IconScorecard } from './icons';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 export default function Sidebar() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
       isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -23,10 +25,12 @@ export default function Sidebar() {
           <IconPhone className="w-5 h-5" />
           Chamadas
         </NavLink>
-        <NavLink to="/scorecards" className={linkClass}>
-          <IconScorecard className="w-5 h-5" />
-          Scorecard
-        </NavLink>
+        {canAccessManualAnalysis && (
+          <NavLink to="/scorecards" className={linkClass}>
+            <IconScorecard className="w-5 h-5" />
+            Scorecard
+          </NavLink>
+        )}
       </nav>
     </aside>
   );

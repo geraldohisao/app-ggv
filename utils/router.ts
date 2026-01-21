@@ -13,6 +13,7 @@ export const moduleRoutes: Record<string, Module> = {
     '/ordens-servico': Module.OSManager,
     '/ggv-talent': Module.GGVTalent,
     '/okr': Module.OKRManager,
+    '/organograma': Module.Organograma,
 };
 
 // Mapeamento reverso: módulo para URL
@@ -28,20 +29,37 @@ export const routeModules: Record<Module, string> = {
     [Module.OSManager]: '/ordens-servico',
     [Module.GGVTalent]: '/ggv-talent',
     [Module.OKRManager]: '/okr',
+    [Module.Organograma]: '/organograma',
 };
 
 // Função para obter o módulo baseado na URL atual
 export const getModuleFromPath = (pathname: string): Module => {
     console.log('🔍 ROUTER - Resolvendo pathname:', pathname);
     console.log('🔍 ROUTER - Módulos disponíveis:', Object.keys(moduleRoutes));
-    
+
     // Normalizar pathname removendo barra final se existir
     const normalizedPathname = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname;
     console.log('🔍 ROUTER - Pathname normalizado:', normalizedPathname);
-    
-    const module = moduleRoutes[normalizedPathname] || Module.Diagnostico;
+
+    // Primeiro tenta match exato
+    let module = moduleRoutes[normalizedPathname];
+
+    // Se não encontrar, tenta match por prefixo (para sub-rotas)
+    if (!module) {
+        // Encontrar a rota mais longa que seja prefixo do pathname atual
+        const sortedRoutes = Object.keys(moduleRoutes).sort((a, b) => b.length - a.length);
+        const prefixRoute = sortedRoutes.find(route =>
+            route !== '/' && normalizedPathname.startsWith(route + '/')
+        );
+
+        if (prefixRoute) {
+            module = moduleRoutes[prefixRoute];
+        }
+    }
+
+    module = module || Module.Diagnostico;
     console.log('🔍 ROUTER - Módulo resolvido:', module);
-    
+
     return module;
 };
 

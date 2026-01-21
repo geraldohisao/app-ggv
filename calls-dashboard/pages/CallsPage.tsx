@@ -11,6 +11,7 @@ import { processCallAnalysis, getCallAnalysisFromDatabase } from '../services/ca
 import { getRealDuration, formatDurationDisplay } from '../utils/durationUtils';
 import UnifiedBatchAnalysisPanel from '../components/UnifiedBatchAnalysisPanel';
 import { startAutoAnalysis, getAutoAnalysisStats } from '../services/autoAnalysisWorker';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 // Função para verificar se URL de áudio é válida
 function hasValidAudio(recording_url?: string): boolean {
@@ -114,6 +115,7 @@ function translateStatus(status: string | null | undefined): string {
 }
 
 export default function CallsPage() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const [query, setQuery] = useState('');
   const [sdr, setSdr] = useState('');
   const [status, setStatus] = useState('');
@@ -138,6 +140,16 @@ export default function CallsPage() {
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50); // 50 itens por página
+
+  // Garantir que filtros de score não apareçam para não-admin
+  useEffect(() => {
+    if (!canAccessManualAnalysis) {
+      if (minScore) setMinScore('');
+      if (sortBy === 'score' || sortBy === 'score_asc') {
+        setSortBy('created_at');
+      }
+    }
+  }, [canAccessManualAnalysis, minScore, sortBy]);
 
   // Carregar SDRs únicos
   useEffect(() => {
@@ -449,7 +461,7 @@ export default function CallsPage() {
   };
 
   // Verificar se há filtros ativos
-  const hasActiveFilters = sdr || status || start || end || minDuration || maxDuration || minScore || query;
+  const hasActiveFilters = sdr || status || start || end || minDuration || maxDuration || (canAccessManualAnalysis ? minScore : '') || query;
 
   // Presets de duração em segundos
   const durationPresets = [
@@ -679,8 +691,8 @@ export default function CallsPage() {
                 >
                   <option value="created_at">Mais recentes</option>
                   <option value="duration">Maior duração</option>
-                  <option value="score">Maior nota</option>
-                  <option value="score_asc">Menor nota</option>
+                  {canAccessManualAnalysis && <option value="score">Maior nota</option>}
+                  {canAccessManualAnalysis && <option value="score_asc">Menor nota</option>}
                 </select>
               </div>
 
@@ -699,26 +711,28 @@ export default function CallsPage() {
               </div>
 
               {/* Score mínimo */}
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-500 whitespace-nowrap">Nota mín:</label>
-                <input
-                  className="w-20 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  type="number"
-                  placeholder="0-10"
-                  value={minScore}
-                  onChange={(e) => setMinScore(e.target.value)}
-                  min="0"
-                  max="10"
-                  step="0.1"
-                />
-              </div>
+              {canAccessManualAnalysis && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-slate-500 whitespace-nowrap">Nota mín:</label>
+                  <input
+                    className="w-20 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    type="number"
+                    placeholder="0-10"
+                    value={minScore}
+                    onChange={(e) => setMinScore(e.target.value)}
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+              )}
 
               {/* Indicador de ordenação ativa */}
               {sortBy !== 'created_at' && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-200 text-slate-600 rounded text-xs">
                   {sortBy === 'duration' && 'Por duração'}
-                  {sortBy === 'score' && 'Por maior nota'}
-                  {sortBy === 'score_asc' && 'Por menor nota'}
+                  {sortBy === 'score' && canAccessManualAnalysis && 'Por maior nota'}
+                  {sortBy === 'score_asc' && canAccessManualAnalysis && 'Por menor nota'}
                 </span>
               )}
             </div>
@@ -750,7 +764,7 @@ export default function CallsPage() {
                   <th className="p-4 font-medium">Data</th>
                   <th className="p-4 font-medium">Duração</th>
                   <th className="p-4 font-medium">Status</th>
-                  <th className="p-4 font-medium">Nota</th>
+                  {canAccessManualAnalysis && <th className="p-4 font-medium">Nota</th>}
                   <th className="p-4 font-medium"></th>
                 </tr>
               </thead>
@@ -845,26 +859,28 @@ export default function CallsPage() {
                         {translateStatus(call.status_voip_friendly || call.status_voip || call.status)}
                       </span>
                     </td>
-                    <td className="p-4 text-sm font-semibold">
-                      <div className="flex items-center gap-2">
-                        <div>
-                          {typeof call.score === 'number' ? (
-                            <span 
-                              className={`inline-flex px-2 py-1 rounded-md text-sm font-medium ${
-                                call.score >= 8.0 ? 'bg-green-100 text-green-800' : 
-                                call.score >= 7.0 ? 'bg-yellow-100 text-yellow-800' : 
-                                'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {call.score.toFixed(1)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">N/A</span>
-                          )}
-                        </div>
+                    {canAccessManualAnalysis && (
+                      <td className="p-4 text-sm font-semibold">
+                        <div className="flex items-center gap-2">
+                          <div>
+                            {typeof call.score === 'number' ? (
+                              <span 
+                                className={`inline-flex px-2 py-1 rounded-md text-sm font-medium ${
+                                  call.score >= 8.0 ? 'bg-green-100 text-green-800' : 
+                                  call.score >= 7.0 ? 'bg-yellow-100 text-yellow-800' : 
+                                  'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {call.score.toFixed(1)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">N/A</span>
+                            )}
+                          </div>
 
-                      </div>
-                    </td>
+                        </div>
+                      </td>
+                    )}
                     <td className="p-4 text-right">
                     </td>
                   </tr>
@@ -903,7 +919,7 @@ export default function CallsPage() {
         <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center justify-between">
           <div className="text-sm text-slate-600">
             Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalItems)} de {totalItems} chamadas
-            {minScore && (
+            {canAccessManualAnalysis && minScore && (
               <span className="ml-2 text-blue-600">• Score ≥ {minScore}</span>
             )}
           </div>

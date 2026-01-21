@@ -6,7 +6,7 @@ export const UserTable: React.FC<{
   users: UiUser[];
   canEdit: boolean;
   savingIds: Set<string>;
-  onChangeRow: (id: string, patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive'>>) => void;
+  onChangeRow: (id: string, patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive' | 'department' | 'cargo'>>) => void;
   onSelectionChange: (ids: string[]) => void;
 }> = ({ users, canEdit, savingIds, onChangeRow, onSelectionChange }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -27,18 +27,25 @@ export const UserTable: React.FC<{
   };
 
   return (
-    <table className="w-full text-sm">
+    <table className="w-full text-left text-sm border-collapse">
       <thead>
-        <tr className="text-left border-b text-slate-500 sticky top-0 bg-white">
-          <th className="py-2 px-2"><input type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
-          <th className="py-2 font-semibold">Nome</th>
-          <th className="py-2 font-semibold">Email</th>
-          <th className="py-2 font-semibold">Role</th>
-          <th className="py-2 font-semibold">Função</th>
-          <th className="py-2 font-semibold">Status</th>
+        <tr className="border-b text-slate-500 bg-slate-50 sticky top-0 z-10">
+          <th className="py-3 px-4 w-10">
+            <input 
+              type="checkbox" 
+              checked={allSelected} 
+              onChange={toggleAll}
+              className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer" 
+            />
+          </th>
+          <th className="py-3 px-4 font-semibold text-xs uppercase tracking-wider">Usuário</th>
+          <th className="py-3 px-4 font-semibold text-xs uppercase tracking-wider w-32">Role</th>
+          <th className="py-3 px-4 font-semibold text-xs uppercase tracking-wider w-40">Departamento</th>
+          <th className="py-3 px-4 font-semibold text-xs uppercase tracking-wider w-40">Cargo</th>
+          <th className="py-3 px-4 font-semibold text-xs uppercase tracking-wider w-24 text-center">Status</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody className="divide-y divide-gray-100">
         {users.map(u => (
           <UserRow
             key={u.id}
@@ -52,7 +59,9 @@ export const UserTable: React.FC<{
         ))}
         {users.length === 0 && (
           <tr>
-            <td colSpan={6} className="py-6 text-center text-slate-500">Nenhum usuário encontrado.</td>
+            <td colSpan={6} className="py-8 text-center text-slate-500">
+              Nenhum usuário encontrado.
+            </td>
           </tr>
         )}
       </tbody>
@@ -61,5 +70,3 @@ export const UserTable: React.FC<{
 };
 
 export default UserTable;
-
-

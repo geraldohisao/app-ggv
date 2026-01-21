@@ -658,26 +658,21 @@ export async function fetchUniqueSdrs(): Promise<SdrUser[]> {
     }
 
     // Filtrar por usuários ativos (se conseguimos a lista)
-    let sdrs = allSdrs;
-    if (activeUsernames.size > 0) {
-      sdrs = allSdrs.filter((sdr) => {
-        const sdrUsername = (sdr.email?.toLowerCase() || '').split('@')[0];
-        const isActive = activeUsernames.has(sdrUsername);
-        if (!isActive) {
-          console.log('⏭️ CALLS SERVICE - SDR inativo:', sdr.name, sdr.email, '| username:', sdrUsername);
-        }
-        return isActive;
-      });
-      
-      console.log(`📊 CALLS SERVICE - Filtro: ${allSdrs.length} → ${sdrs.length} SDRs`);
-      
-      // Se filtrou todos, mostrar sem filtro (fallback)
-      if (sdrs.length === 0 && allSdrs.length > 0) {
-        console.warn('⚠️ CALLS SERVICE - TODOS filtrados! Usando fallback sem filtro.');
-        sdrs = allSdrs;
-      }
+    if (activeUsernames.size === 0) {
+      console.warn('⚠️ CALLS SERVICE - Nenhum perfil ativo encontrado. Lista de SDRs ficará vazia para evitar inativos.');
+      return [];
     }
 
+    const sdrs = allSdrs.filter((sdr) => {
+      const sdrUsername = (sdr.email?.toLowerCase() || '').split('@')[0];
+      const isActive = activeUsernames.has(sdrUsername);
+      if (!isActive) {
+        console.log('⏭️ CALLS SERVICE - SDR inativo:', sdr.name, sdr.email, '| username:', sdrUsername);
+      }
+      return isActive;
+    });
+    
+    console.log(`📊 CALLS SERVICE - Filtro: ${allSdrs.length} → ${sdrs.length} SDRs`);
     console.log(`✅ CALLS SERVICE - ${sdrs.length} SDRs retornados`);
     return sdrs;
 

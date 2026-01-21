@@ -109,3 +109,20 @@ force-*.sql
 .env.local.backup
 *.backup
 .env.local
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Arquivos com credenciais sensíveis
+components/okr/sql/*credentials*.sql
+components/okr/sql/restore_google*.sql
+components/okr/sql/emergency_restore*.sql
+*.json
+!package.json
+!tsconfig.json
+!.vscode/*.json
+

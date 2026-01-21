@@ -11,7 +11,8 @@ import {
     TrashIcon,
     UsersIcon,
     DocumentTextIcon,
-    MagnifyingGlassIcon
+    MagnifyingGlassIcon,
+    ExclamationTriangleIcon
 } from '../ui/icons';
 
 interface OSUploadModalProps {
@@ -31,6 +32,8 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
     const [step, setStep] = useState<1 | 2>(1);
     const [loading, setLoading] = useState(false);
     const [profiles, setProfiles] = useState<Profile[]>([]);
+    const [step1Errors, setStep1Errors] = useState<string[]>([]);
+    const [draftMode, setDraftMode] = useState(false);
     const FINANCIAL_EMAIL = 'financeiro@grupogg.com';
 
     // Step 1: Upload e informações
@@ -140,20 +143,18 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
         setSigners(signers.filter((_, i) => i !== index));
     };
 
+    const collectStep1Errors = (ignorePdf = false) => {
+        const errors: string[] = [];
+        if (!title.trim()) errors.push('Título da OS é obrigatório.');
+        if (!osNumber.trim()) errors.push('Número da OS é obrigatório.');
+        if (!ignorePdf && !file && !draftMode) errors.push('Selecione um PDF para continuar.');
+        return errors;
+    };
+
     const validateStep1 = () => {
-        if (!title.trim()) {
-            alert('Por favor, preencha o título da OS');
-            return false;
-        }
-        if (!osNumber.trim()) {
-            alert('Por favor, preencha o número da OS');
-            return false;
-        }
-        if (!file) {
-            alert('Por favor, selecione um arquivo PDF');
-            return false;
-        }
-        return true;
+        const errors = collectStep1Errors();
+        setStep1Errors(errors);
+        return errors.length === 0;
     };
 
     const validateStep2 = () => {
@@ -186,12 +187,96 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
 
     const handleNext = () => {
         if (validateStep1()) {
+            setStep1Errors([]);
             setStep(2);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        const errors = collectStep1Errors(true);
+        setStep1Errors(errors);
+        if (errors.length > 0) {
+            setStep(1);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            if (!user) throw new Error('Usuário não autenticado');
+
+            const draftFileName = file?.name || 'Rascunho - pendente de PDF.pdf';
+            const draftFilePath = file
+                ? `${user.id}/draft-${Date.now()}-${file.name}`
+                : `drafts/${user.id}/${Date.now()}-placeholder.pdf`;
+
+            const expiresAt = null;
+
+            const { data: osData, error: osError } = await supabase
+                .from('service_orders')
+                .insert({
+                    title: title.trim(),
+                    os_number: osNumber.trim(),
+                    description: description.trim() || null,
+                    file_name: draftFileName,
+                    file_path: draftFilePath,
+                    file_size: file?.size || null,
+                    file_hash: null,
+                    status: OSStatus.Draft,
+                    created_by: user.id,
+                    created_by_name: user.name,
+                    total_signers: signers.length,
+                    signed_count: 0,
+                    expires_at: expiresAt
+                })
+                .select()
+                .single();
+
+            if (osError) throw osError;
+
+            if (signers.length > 0) {
+                const signersData = signers.map((signer, index) => ({
+                    os_id: osData.id,
+                    name: signer.name || '',
+                    email: signer.email || '',
+                    role: signer.role || 'Colaborador',
+                    status: SignerStatus.Pending,
+                    order_index: index
+                }));
+
+                const { error: signersError } = await supabase
+                    .from('os_signers')
+                    .insert(signersData);
+
+                if (signersError) throw signersError;
+            }
+
+            await supabase.rpc('log_os_event', {
+                p_os_id: osData.id,
+                p_event_type: 'draft_created',
+                p_event_description: `OS "${title}" salva como rascunho`,
+                p_metadata: { signers_count: signers.length }
+            });
+
+            alert('✅ Rascunho salvo. Anexe um PDF para enviar aos assinantes.');
+            onSuccess();
+        } catch (error: any) {
+            console.error('Erro ao salvar rascunho:', error);
+            alert(`Erro ao salvar rascunho: ${error.message}`);
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleSubmit = async () => {
         if (!validateStep2()) return;
+        if (!file) {
+            alert('Selecione um PDF para enviar para assinatura.');
+            setStep(1);
+            return;
+        }
+        if (!confirm('Confirmar envio para assinatura digital? Os assinantes serão notificados.')) {
+            return;
+        }
 
         try {
             setLoading(true);
@@ -381,9 +466,9 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                     {step === 1 ? (
                         <Step1Content
                             title={title}
-                        osNumber={osNumber}
+                            osNumber={osNumber}
                             setTitle={setTitle}
-                        setOsNumber={setOsNumber}
+                            setOsNumber={setOsNumber}
                             description={description}
                             setDescription={setDescription}
                             file={file}
@@ -392,6 +477,9 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                             handleDrag={handleDrag}
                             handleDrop={handleDrop}
                             handleFileChange={handleFileChange}
+                            errors={step1Errors}
+                            draftMode={draftMode}
+                            setDraftMode={setDraftMode}
                         />
                     ) : (
                         <Step2Content
@@ -403,6 +491,7 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                             addSignerFromProfile={addSignerFromProfile}
                             updateSigner={updateSigner}
                             removeSigner={removeSigner}
+                            draftMode={draftMode}
                         />
                     )}
                 </div>
@@ -417,13 +506,25 @@ const OSUploadModal: React.FC<OSUploadModalProps> = ({ onClose, onSuccess }) => 
                         {step === 1 ? 'Cancelar' : 'Voltar'}
                     </button>
                     
-                    <button
-                        onClick={step === 1 ? handleNext : handleSubmit}
-                        disabled={loading}
-                        className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
-                    >
-                        {loading ? 'Processando...' : step === 1 ? 'Próximo' : 'Enviar para Assinatura'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {step === 2 && (
+                            <button
+                                onClick={handleSaveDraft}
+                                disabled={loading || !title.trim() || !osNumber.trim()}
+                                className="px-4 py-3 bg-slate-200 text-slate-800 rounded-lg hover:bg-slate-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Salvar rascunho
+                            </button>
+                        )}
+                        <button
+                            onClick={step === 1 ? handleNext : handleSubmit}
+                            disabled={loading || (step === 1 && !(title.trim() && osNumber.trim() && (draftMode || file))) || (step === 2 && !file)}
+                            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+                            title={step === 1 && !file && !draftMode ? 'Selecione um PDF para avançar' : undefined}
+                        >
+                            {loading ? 'Processando...' : step === 1 ? 'Próximo' : 'Enviar para Assinatura'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -444,6 +545,9 @@ interface Step1ContentProps {
     handleDrag: (e: React.DragEvent) => void;
     handleDrop: (e: React.DragEvent) => void;
     handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    errors: string[];
+    draftMode: boolean;
+    setDraftMode: (value: boolean) => void;
 }
 
 const Step1Content: React.FC<Step1ContentProps> = ({
@@ -458,10 +562,26 @@ const Step1Content: React.FC<Step1ContentProps> = ({
     dragActive,
     handleDrag,
     handleDrop,
-    handleFileChange
+    handleFileChange,
+    errors,
+    draftMode,
+    setDraftMode
 }) => {
     return (
         <div className="space-y-4">
+            {errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 flex gap-3">
+                    <ExclamationTriangleIcon className="w-6 h-6 shrink-0 text-red-500" />
+                    <div>
+                        <p className="font-semibold">Corrija para continuar:</p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                            {errors.map((err, idx) => (
+                                <li key={idx}>{err}</li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
             {/* Número da OS */}
             <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
@@ -490,6 +610,25 @@ const Step1Content: React.FC<Step1ContentProps> = ({
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     maxLength={200}
                 />
+            </div>
+
+            {/* Modo rascunho */}
+            <div className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <input
+                    id="draft-mode-toggle"
+                    type="checkbox"
+                    checked={draftMode}
+                    onChange={(e) => setDraftMode(e.target.checked)}
+                    className="mt-1 w-5 h-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                />
+                <div>
+                    <label htmlFor="draft-mode-toggle" className="font-semibold text-slate-800 cursor-pointer">
+                        Ativar modo rascunho para testes
+                    </label>
+                    <p className="text-sm text-slate-600">
+                        Permite avançar sem PDF. Para enviar aos assinantes será necessário anexar o documento.
+                    </p>
+                </div>
             </div>
 
             {/* Descrição */}
@@ -570,6 +709,11 @@ const Step1Content: React.FC<Step1ContentProps> = ({
                             <p className="text-xs text-slate-400 mt-4">
                                 Tamanho máximo: 50MB
                             </p>
+                            {!draftMode && (
+                                <p className="text-xs text-red-500 mt-1" role="alert">
+                                    O PDF é obrigatório para enviar. Ative o modo rascunho para apenas testar.
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>
@@ -588,6 +732,7 @@ interface Step2ContentProps {
     addSignerFromProfile: (profile: Profile) => void;
     updateSigner: (index: number, field: keyof OSSigner, value: any) => void;
     removeSigner: (index: number) => void;
+    draftMode: boolean;
 }
 
 const Step2Content: React.FC<Step2ContentProps> = ({
@@ -598,13 +743,23 @@ const Step2Content: React.FC<Step2ContentProps> = ({
     addSigner,
     addSignerFromProfile,
     updateSigner,
-    removeSigner
+    removeSigner,
+    draftMode
 }) => {
     const [showProfileSelector, setShowProfileSelector] = useState(false);
     const [profileSearch, setProfileSearch] = useState('');
 
     return (
         <div className="space-y-6">
+            {draftMode && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 flex gap-2">
+                    <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 text-amber-600" />
+                    <div>
+                        <p className="font-semibold">Modo rascunho ativo</p>
+                        <p className="text-sm">Nenhum e-mail será enviado. Anexe um PDF para concluir o envio oficial.</p>
+                    </div>
+                </div>
+            )}
             {/* Seleção rápida de colaboradores */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">

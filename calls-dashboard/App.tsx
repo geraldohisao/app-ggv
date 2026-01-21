@@ -8,8 +8,11 @@ import CallDetailPage from './pages/CallDetailPage';
 import ScorecardPage from './pages/ScorecardPage';
 import ScorecardEditPage from './pages/ScorecardEditPage';
 import SdrDetailPage from './pages/SdrDetailPage';
+import { useAdminFeatures } from '../hooks/useAdminPermissions';
 
 export default function App() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
+
   return (
     <HashRouter>
       <div className="h-full flex">
@@ -22,8 +25,14 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/calls" element={<CallsPage />} />
               <Route path="/calls/:id" element={<CallDetailPage />} />
-              <Route path="/scorecards" element={<ScorecardPage />} />
-              <Route path="/scorecards/:id" element={<ScorecardEditPage />} />
+              <Route
+                path="/scorecards"
+                element={canAccessManualAnalysis ? <ScorecardPage /> : <Navigate to="/dashboard" replace />}
+              />
+              <Route
+                path="/scorecards/:id"
+                element={canAccessManualAnalysis ? <ScorecardEditPage /> : <Navigate to="/dashboard" replace />}
+              />
               <Route path="/sdr/:id" element={<SdrDetailPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

@@ -136,6 +136,7 @@ const OSListPanel: React.FC<OSListPanelProps> = ({
                                     <option value={OSStatus.Pending}>Aguardando</option>
                                     <option value={OSStatus.PartialSigned}>Parcialmente Assinado</option>
                                     <option value={OSStatus.Completed}>Concluído</option>
+                                    <option value={OSStatus.Draft}>Rascunho</option>
                                     <option value={OSStatus.Cancelled}>Cancelado</option>
                                     <option value={OSStatus.Expired}>Expirado</option>
                                 </select>

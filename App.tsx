@@ -56,10 +56,11 @@ const AppContent: React.FC = () => {
     user.role === UserRole.Admin ||
     user.user_function === 'Gestor'
   );
-  const canAccessOKRManager = user && (
+  const allowOKRLocal = import.meta.env.DEV || import.meta.env.VITE_ALLOW_OKR_LOCAL === 'true';
+  const canAccessOKRManager = (allowOKRLocal && !!user) || (user && (
     user.role === UserRole.SuperAdmin ||
     user.role === UserRole.Admin
-  );
+  ));
 
   // Garantir que ao carregar a página, o módulo correto seja selecionado
   useEffect(() => {

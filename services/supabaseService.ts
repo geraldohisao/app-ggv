@@ -120,7 +120,7 @@ export const fetchOrCreateUserWithRole = async (): Promise<User | null> => {
 
 // ---------------- Users management (roles & functions) ----------------
 // Nova listagem simples ligada diretamente a profiles
-export const listProfiles = async (includeInactive: boolean = false): Promise<Array<{ id: string; email: string | null; name: string | null; role: UserRole; user_function: 'SDR' | 'Closer' | 'Gestor' | null; is_active?: boolean }>> => {
+export const listProfiles = async (includeInactive: boolean = false): Promise<Array<{ id: string; email: string | null; name: string | null; role: UserRole; user_function: 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | null; cargo?: string | null; department?: string | null; is_active?: boolean }>> => {
     if (!supabase) throw new Error('Supabase client is not initialized.');
     
     console.log('🔄 SUPABASE SERVICE - listProfiles iniciado (includeInactive:', includeInactive, ')');
@@ -141,6 +141,8 @@ export const listProfiles = async (includeInactive: boolean = false): Promise<Ar
                 name: p.name ?? null,
                 role: (p.role as UserRole) ?? UserRole.User,
                 user_function: (p.user_function as any) ?? null,
+                cargo: p.cargo ?? null,
+                department: p.department ?? null,
                 is_active: p.is_active ?? true,
             }));
         } else {
@@ -155,7 +157,7 @@ export const listProfiles = async (includeInactive: boolean = false): Promise<Ar
         console.log('🔄 SUPABASE SERVICE - Tentando query direta na tabela profiles...');
         const { data: directData, error: directError } = await supabase
             .from('profiles')
-            .select('id, email, name, role, user_function');
+            .select('id, email, name, role, user_function, cargo, department');
             
         if (!directError && directData) {
             console.log('✅ SUPABASE SERVICE - Query direta sucesso:', directData.length, 'perfis');
@@ -165,6 +167,8 @@ export const listProfiles = async (includeInactive: boolean = false): Promise<Ar
                 name: p.name ?? null,
                 role: (p.role as UserRole) ?? UserRole.User,
                 user_function: (p.user_function as any) ?? null,
+                cargo: p.cargo ?? null,
+                department: p.department ?? null,
             }));
         } else {
             console.warn('⚠️ SUPABASE SERVICE - Query direta falhou:', directError?.message);
@@ -294,6 +298,20 @@ export const setUserFunction = async (userId: string, fn: 'SDR' | 'Closer' | 'Ge
                 .upsert({ user_id: userId, function: fn }, { onConflict: 'user_id' });
             if (error) throw error;
         }
+    }
+};
+
+export const setUserCargo = async (userId: string, cargo: string | null): Promise<void> => {
+    if (!supabase) throw new Error('Supabase client is not initialized.');
+    try {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ cargo: cargo })
+            .eq('id', userId);
+        if (error) throw error;
+    } catch (e) {
+        console.error('Erro ao atualizar cargo:', e);
+        throw e;
     }
 };
 

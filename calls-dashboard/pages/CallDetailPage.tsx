@@ -14,6 +14,7 @@ import { supabase } from '../../services/supabaseClient';
 import { getCurrentUserDisplayName } from '../../services/supabaseService';
 import CallAIAssistantChat from '../../components/Calls/CallAIAssistantChat';
 import type { ScorecardAnalysisResult } from '../services/scorecardAnalysisService';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 // import DiarizedTranscription from '../../components/Calls/DiarizedTranscription';
 
 // Funções auxiliares para dados do usuário
@@ -111,6 +112,7 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
   const [fbError, setFbError] = useState<string | null>(null);
   const [editingFeedback, setEditingFeedback] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const { canAccessManualAnalysis } = useAdminFeatures();
 
   // ✅ CORREÇÃO: useCallback para evitar loop infinito no ScorecardAnalysis
   const handleAnalysisComplete = useCallback((result: ScorecardAnalysisResult) => {
@@ -561,10 +563,12 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
                   </span>
                 </div>
               </div>
-              <div>
-                <div className="text-slate-500">Nota</div>
-                <div className="font-semibold">{aiNote}</div>
-              </div>
+              {canAccessManualAnalysis && (
+                <div>
+                  <div className="text-slate-500">Nota</div>
+                  <div className="font-semibold">{aiNote}</div>
+                </div>
+              )}
               <div>
                 <div className="text-slate-500">Áudio</div>
                 <div className="font-semibold">{hasValidAudio(call.recording_url) ? '✅' : '❌'}</div>
@@ -804,19 +808,25 @@ export default function CallDetailPage({ callId }: CallDetailPageProps) {
 
         <div className="space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <AudioStatusIndicator call={call} />
-          <ScorecardAnalysis 
-            call={call} 
-            onAnalysisComplete={handleAnalysisComplete}
-            onProcessingChange={setAnalysisLoading}
-          />
-          
-          
-          <AiAssistant call={call} analysis={analysisResult} loading={analysisLoading} />
+          {canAccessManualAnalysis ? (
+            <>
+              <ScorecardAnalysis 
+                call={call} 
+                onAnalysisComplete={handleAnalysisComplete}
+                onProcessingChange={setAnalysisLoading}
+              />
+              <AiAssistant call={call} analysis={analysisResult} loading={analysisLoading} />
+            </>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-lg p-4 text-sm text-slate-600">
+              A análise IA e scorecard são visíveis apenas para Admin e Super Admin.
+            </div>
+          )}
         </div>
       </div>
 
       {/* Chat flutuante do assistente IA */}
-      {(call.deal_id || call.dealCode) && (
+      {canAccessManualAnalysis && (call.deal_id || call.dealCode) && (
         <CallAIAssistantChat 
           dealId={call.deal_id || call.dealCode} 
           dealCode={call.dealCode || call.deal_id || 'N/A'} 

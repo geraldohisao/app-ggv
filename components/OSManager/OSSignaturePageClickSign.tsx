@@ -30,13 +30,13 @@ const OSSignaturePageClickSign: React.FC = () => {
     const [alreadySigned, setAlreadySigned] = useState(false);
     const [signedSuccess, setSignedSuccess] = useState(false);
     const [signedAtText, setSignedAtText] = useState<string | null>(null);
-    
+
     const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
     const [isEmailVerified, setIsEmailVerified] = useState(false);
     const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [currentStep, setCurrentStep] = useState<'review' | 'confirm' | 'token'>('review');
-    const [pendingDocs, setPendingDocs] = useState<Array<{orderId: string; signerId: string; title: string; fileName: string}>>([]);
+    const [pendingDocs, setPendingDocs] = useState<Array<{ orderId: string; signerId: string; title: string; fileName: string }>>([]);
 
     useEffect(() => {
         loadSignatureData();
@@ -47,11 +47,11 @@ const OSSignaturePageClickSign: React.FC = () => {
             setLoading(true);
             setError(null);
 
-            console.log('🔍 Carregando dados de assinatura...', { 
-                orderId, 
-                signerId, 
+            console.log('🔍 Carregando dados de assinatura...', {
+                orderId,
+                signerId,
                 hasUser: !!user,
-                userEmail: user?.email 
+                userEmail: user?.email
             });
 
             if (!orderId || !signerId) {
@@ -84,9 +84,9 @@ const OSSignaturePageClickSign: React.FC = () => {
                 return;
             }
 
-            // Buscar todos os assinantes para mostrar progresso
+            // Buscar todos os assinantes para mostrar progresso (usando view protegida para evitar vazamento de PII)
             const { data: allSignersData } = await supabase
-                .from('os_signers')
+                .from('os_safe_signers_view')
                 .select('*')
                 .eq('os_id', orderId)
                 .order('order_index');
@@ -113,23 +113,28 @@ const OSSignaturePageClickSign: React.FC = () => {
             }
             setSignedAtText(isSigned && signerData.signed_at ? new Date(signerData.signed_at).toLocaleString('pt-BR') : null);
 
-            // Gerar URL pública do PDF (bucket agora é público)
-            console.log('📄 Gerando URL pública do PDF:', orderData.file_path);
-            
-            const { data: publicUrlData } = supabase.storage
-                .from('service-orders')
-                .getPublicUrl(orderData.file_path);
+            // Gerar URL assinada do PDF (mais seguro que URL pública)
+            console.log('📄 Gerando URL assinada do PDF:', orderData.file_path);
 
-            if (publicUrlData?.publicUrl) {
-                console.log('✅ URL pública gerada:', publicUrlData.publicUrl);
-                setPdfUrl(publicUrlData.publicUrl);
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                .from('service-orders')
+                .createSignedUrl(orderData.file_path, 3600); // 1 hora de validade
+
+            if (signedUrlData?.signedUrl) {
+                console.log('✅ URL assinada gerada');
+                setPdfUrl(signedUrlData.signedUrl);
             } else {
-                console.error('❌ Erro ao gerar URL pública');
+                console.error('❌ Erro ao gerar URL assinada:', signedUrlError);
+                // Fallback para publicUrl se estiver configurado como público (para não quebrar enquanto migra)
+                const { data: publicUrlData } = supabase.storage
+                    .from('service-orders')
+                    .getPublicUrl(orderData.file_path);
+                setPdfUrl(publicUrlData.publicUrl);
             }
 
             // Verificar se já validou o e-mail nesta sessão
             const alreadyVerified = sessionStorage.getItem(`email_verified_${signerData.email}`);
-            
+
             if (isSigned) {
                 // Já assinado: não precisa seguir para verificação/código
                 setNeedsEmailVerification(false);
@@ -178,20 +183,20 @@ const OSSignaturePageClickSign: React.FC = () => {
         setAlreadySigned(false);
         setSignedAtText(new Date().toLocaleString('pt-BR'));
         setShowSignatureModal(false);
-        
+
         // Buscar outros documentos pendentes do mesmo email
         await loadPendingDocuments();
-        
+
         // Recarregar dados sem sobrescrever estado de sucesso
         setTimeout(() => loadSignatureData(), 100);
     };
-    
+
     const loadPendingDocuments = async () => {
         if (!signer?.email) return;
-        
+
         try {
             console.log('🔍 Buscando outros documentos pendentes para:', signer.email);
-            
+
             // Buscar todos os assinantes pendentes deste email (exceto o atual)
             const { data: pendingSigners, error } = await supabase
                 .from('os_signers')
@@ -210,24 +215,24 @@ const OSSignaturePageClickSign: React.FC = () => {
                 .eq('email', signer.email)
                 .eq('status', SignerStatus.Pending)
                 .neq('id', signer.id);
-            
+
             if (error) {
                 console.error('Erro ao buscar documentos pendentes:', error);
                 return;
             }
-            
+
             // Filtrar documentos ativos (não cancelados/expirados)
             const activePending = (pendingSigners || [])
-                .filter(s => s.service_orders && 
-                            s.service_orders.status !== 'CANCELLED' && 
-                            s.service_orders.status !== 'EXPIRED')
+                .filter(s => s.service_orders &&
+                    s.service_orders.status !== 'CANCELLED' &&
+                    s.service_orders.status !== 'EXPIRED')
                 .map(s => ({
                     orderId: s.os_id,
                     signerId: s.id,
                     title: s.service_orders.title,
                     fileName: s.service_orders.file_name
                 }));
-            
+
             console.log(`📋 ${activePending.length} documentos pendentes encontrados`);
             setPendingDocs(activePending);
         } catch (err) {
@@ -269,7 +274,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Lista de documentos pendentes */}
                     {pendingDocs.length > 0 && (
                         <div className="mt-8">
@@ -280,7 +285,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                                 <p className="text-sm text-blue-700 mb-4">
                                     Continue assinando os documentos abaixo:
                                 </p>
-                                
+
                                 <div className="space-y-3">
                                     {pendingDocs.map((doc, idx) => (
                                         <a
@@ -323,7 +328,7 @@ const OSSignaturePageClickSign: React.FC = () => {
                         {error.includes('já assinou') ? 'Documento Já Assinado' : 'Atenção'}
                     </h1>
                     <p className="text-slate-600 mb-6">{error}</p>
-                    
+
                     {error.includes('já assinou') && signer && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
                             <CheckCircleIcon className="w-6 h-6 text-green-600 mb-2" />
@@ -341,15 +346,15 @@ const OSSignaturePageClickSign: React.FC = () => {
 
     // Função para iniciar assinatura (com verificação se necessário)
     const handleStartSignature = () => {
-        console.log('🖊️ Iniciando processo de assinatura...', { 
+        console.log('🖊️ Iniciando processo de assinatura...', {
             hasUser: !!user,
             userEmail: user?.email,
             signerEmail: signer?.email,
-            isEmailVerified, 
+            isEmailVerified,
             needsEmailVerification,
             showVerificationModal
         });
-        
+
         // PRIORIDADE 1: Se for usuário logado, SEMPRE pula verificação
         if (user) {
             console.log('✅ Usuário logado detectado, pulando verificação completamente');
@@ -357,7 +362,7 @@ const OSSignaturePageClickSign: React.FC = () => {
             setShowSignatureModal(true);
             return;
         }
-        
+
         // PRIORIDADE 2: Se for externo e já verificou nesta sessão, vai direto
         if (isEmailVerified) {
             console.log('✅ E-mail já verificado nesta sessão, abrindo modal de assinatura');
@@ -365,14 +370,14 @@ const OSSignaturePageClickSign: React.FC = () => {
             setShowSignatureModal(true);
             return;
         }
-        
+
         // PRIORIDADE 3: Se for externo e não verificou, MOSTRA modal de verificação AGORA
         if (!isEmailVerified) {
             console.log('📧 E-mail não verificado, abrindo modal de verificação');
             setShowVerificationModal(true);
             return;
         }
-        
+
         // Fallback: abrir modal de assinatura
         console.log('⚠️ Fallback inesperado: abrindo modal de assinatura');
         setShowSignatureModal(true);
@@ -397,18 +402,18 @@ const OSSignaturePageClickSign: React.FC = () => {
                     >
                         <ArrowLeftIcon className="w-5 h-5" />
                     </button>
-                    <img 
+                    <img
                         src="https://ggvinteligencia.com.br/wp-content/uploads/2025/08/Logo-Grupo-GGV-Preto-Vertical-1.png"
                         alt="Grupo GGV"
                         className="h-8 md:h-10"
                     />
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                     <span className="text-sm text-slate-600">
                         {signedCount}/{totalSigners} Assinaturas
                     </span>
-                    <button 
+                    <button
                         onClick={() => {
                             if (confirm('Deseja realmente sair sem assinar?')) {
                                 if (window.opener) {
@@ -433,9 +438,8 @@ const OSSignaturePageClickSign: React.FC = () => {
                     <nav className="space-y-4">
                         {/* Step 1: Revisar */}
                         <div className={`flex items-start gap-3 ${currentStep === 'review' ? 'opacity-100' : 'opacity-50'}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                currentStep === 'review' ? 'bg-orange-500 text-white' : 'bg-white border-2 border-slate-300 text-slate-600'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${currentStep === 'review' ? 'bg-orange-500 text-white' : 'bg-white border-2 border-slate-300 text-slate-600'
+                                }`}>
                                 {currentStep !== 'review' ? '✓' : '●'}
                             </div>
                             <div>
@@ -446,9 +450,8 @@ const OSSignaturePageClickSign: React.FC = () => {
 
                         {/* Step 2: Confirmar dados */}
                         <div className={`flex items-start gap-3 ${currentStep === 'confirm' ? 'opacity-100' : 'opacity-50'}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                currentStep === 'confirm' ? 'bg-orange-500 text-white' : 'bg-white border-2 border-slate-300 text-slate-600'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${currentStep === 'confirm' ? 'bg-orange-500 text-white' : 'bg-white border-2 border-slate-300 text-slate-600'
+                                }`}>
                                 {currentStep === 'token' ? '✓' : '●'}
                             </div>
                             <div>
@@ -459,9 +462,8 @@ const OSSignaturePageClickSign: React.FC = () => {
 
                         {/* Step 3: Token */}
                         <div className={`flex items-start gap-3 ${currentStep === 'token' ? 'opacity-100' : 'opacity-50'}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                currentStep === 'token' ? 'bg-orange-500 text-white' : 'bg-white border-2 border-slate-300 text-slate-600'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${currentStep === 'token' ? 'bg-orange-500 text-white' : 'bg-white border-2 border-slate-300 text-slate-600'
+                                }`}>
                                 ●
                             </div>
                             <div>

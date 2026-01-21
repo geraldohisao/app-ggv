@@ -36,6 +36,11 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
     const handleDownload = async () => {
         try {
             setDownloadLoading(true);
+
+            if (order.status === OSStatus.Draft || !order.file_path) {
+                alert('Este rascunho ainda não possui documento anexado.');
+                return;
+            }
             
             // Priorizar PDF final (com termo) se existir
             const pathToDownload = (order as any).final_file_path || order.file_path;
@@ -358,6 +363,12 @@ const OSDetailModal: React.FC<OSDetailModalProps> = ({ order, onClose, onUpdate 
     const progress = order.total_signers ? (order.signed_count! / order.total_signers) * 100 : 0;
 
     const openPreview = async () => {
+        if (order.status === OSStatus.Draft || !order.file_path) {
+            setPreviewUrl('');
+            setPreviewLoading(false);
+            alert('Pré-visualização indisponível: rascunho sem PDF anexado.');
+            return;
+        }
         setShowPreview(true);
         setPreviewLoading(true);
         const paths = [

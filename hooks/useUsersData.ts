@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UserRole } from '../types';
-import { listProfiles, setUserFunction, setUserRole } from '../services/supabaseService';
+import { listProfiles, setUserFunction, setUserRole, setUserCargo } from '../services/supabaseService';
 
 export type UserFunction = 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | '-';
 export interface UiUser { 
@@ -8,7 +8,9 @@ export interface UiUser {
   name: string; 
   email: string; 
   role: UserRole; 
-  func: UserFunction;
+  func: UserFunction | string;
+  cargo?: string;
+  department?: string;
   isActive: boolean;
 }
 
@@ -23,7 +25,7 @@ export function useUsersData() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ACTIVE');
 
   const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(25);
+  const [pageSize, setPageSize] = useState<number>(100); // ✅ Aumentado para 100
 
   const originalRef = useRef<Map<string, UiUser>>(new Map());
 
@@ -40,6 +42,8 @@ export function useUsersData() {
         email: r.email || '-',
         role: r.role as UserRole,
         func: (r.user_function as any) || '-',
+        cargo: r.cargo || '-',
+        department: r.department || null,
         isActive: r.is_active !== undefined ? r.is_active : true,
       }));
       // ordenar por nome
@@ -75,29 +79,29 @@ export function useUsersData() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
-  const updateUser = useCallback(async (id: string, patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive'>>) => {
+  const updateUser = useCallback(async (id: string, patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive' | 'cargo'>>) => {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, ...patch } : u));
     try {
       if (patch.role) await setUserRole(id, patch.role);
       if (patch.func && patch.func !== '-') await setUserFunction(id, patch.func as any);
       if (patch.func === '-') {
-        // limpar função
         await setUserFunction(id, undefined as any);
       }
+      if (patch.cargo !== undefined) {
+        await setUserCargo(id, patch.cargo === '-' ? null : patch.cargo);
+      }
       if (patch.isActive !== undefined) {
-        // Importar função para toggle status
         const { toggleUserStatus } = await import('../services/supabaseService');
         await toggleUserStatus(id, patch.isActive);
       }
     } catch (e) {
-      // rollback
       const original = originalRef.current.get(id);
       if (original) setUsers(prev => prev.map(u => u.id === id ? original : u));
       throw e;
     }
   }, []);
 
-  const bulkUpdate = useCallback(async (ids: string[], patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive'>>) => {
+  const bulkUpdate = useCallback(async (ids: string[], patch: Partial<Pick<UiUser, 'role' | 'func' | 'isActive' | 'cargo'>>) => {
     // otimista
     setUsers(prev => prev.map(u => ids.includes(u.id) ? { ...u, ...patch } : u));
     try {
@@ -106,6 +110,7 @@ export function useUsersData() {
         if (patch.role) await setUserRole(id, patch.role);
         if (patch.func && patch.func !== '-') await setUserFunction(id, patch.func as any);
         if (patch.func === '-') await setUserFunction(id, undefined as any);
+        if (patch.cargo !== undefined) await setUserCargo(id, patch.cargo === '-' ? null : patch.cargo);
         if (patch.isActive !== undefined) await toggleUserStatus(id, patch.isActive);
       }));
     } catch (e) {

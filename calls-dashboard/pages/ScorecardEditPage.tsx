@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 interface ScorecardEditPageProps {
   scorecardId: string;
@@ -23,6 +24,7 @@ interface ScorecardCriterion {
 }
 
 export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProps) {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const [editData, setEditData] = useState<EditScorecardData>({
     name: '',
     description: '',
@@ -38,6 +40,16 @@ export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProp
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddCriterion, setShowAddCriterion] = useState(false);
+
+  if (!canAccessManualAnalysis) {
+    return (
+      <div className="p-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-600">
+          A edição de scorecards é restrita a Admin e Super Admin.
+        </div>
+      </div>
+    );
+  }
   const [newCriterion, setNewCriterion] = useState({
     name: '',
     description: '',
