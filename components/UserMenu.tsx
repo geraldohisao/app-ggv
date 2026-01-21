@@ -54,6 +54,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
         navigateToModule(module);
         setActiveModule(module);
         setIsOpen(false);
+        if (module === Module.Organograma) {
+            // Fallback em produção: garantir navegação mesmo se o evento não disparar
+            window.location.href = '/organograma';
+        }
     }
 
     const handleLogoutClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
