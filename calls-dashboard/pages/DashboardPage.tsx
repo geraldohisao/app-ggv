@@ -6,6 +6,7 @@ import { supabase } from '../../services/supabaseClient';
 import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
 import SdrAverageScoreChart from '../components/SdrAverageScoreChart';
+import SdrUniqueLeadsChart from '../components/SdrUniqueLeadsChart';
 import { fetchUniqueSdrs } from '../services/callsService';
 
 // Componente Toggle Switch
@@ -662,14 +663,19 @@ const DashboardPage = () => {
         />
       </div>
 
-      {/* === RANKINGS LADO A LADO === */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {/* === RANKINGS === */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <SdrScoreChart 
           selectedPeriod={getEffectivePeriod()} 
           startDate={useCustomDates ? (startDateParam || undefined) : undefined}
           endDate={useCustomDates ? (endDateParam || undefined) : undefined}
         />
         <SdrAverageScoreChart 
+          selectedPeriod={getEffectivePeriod()}
+          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
+          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
+        />
+        <SdrUniqueLeadsChart 
           selectedPeriod={getEffectivePeriod()}
           startDate={useCustomDates ? (startDateParam || undefined) : undefined}
           endDate={useCustomDates ? (endDateParam || undefined) : undefined}
