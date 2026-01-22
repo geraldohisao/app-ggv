@@ -14,6 +14,7 @@ import {
   type KeyResult,
 } from '../../types/okr.types';
 import { useToast, ToastContainer } from '../shared/Toast';
+import { deleteKeyResult } from '../../services/okr.service';
 
 // Schema do formulário (simplificado para o form)
 const okrFormSchema = z.object({
@@ -71,6 +72,7 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
   const isEditMode = !!okr;
   const { createOKR, updateOKR } = useOKRStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [removedKRIds, setRemovedKRIds] = useState<string[]>([]);
   const [expandedKRs, setExpandedKRs] = useState<Set<number>>(new Set([0])); // Primeiro KR expandido por padrão
   const { toasts, addToast, removeToast } = useToast();
 
@@ -122,6 +124,17 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
     name: 'key_results',
   });
 
+  const trackRemovedKRId = (maybeId?: string) => {
+    if (!maybeId) return;
+    setRemovedKRIds((prev) => (prev.includes(maybeId) ? prev : [...prev, maybeId]));
+  };
+
+  const removeKRAtIndex = (index: number) => {
+    const current = (watch('key_results') || [])[index] as any;
+    if (current?.id) trackRemovedKRId(current.id);
+    remove(index);
+  };
+
   const toggleKR = (index: number) => {
     setExpandedKRs(prev => {
       const newSet = new Set(prev);
@@ -165,6 +178,10 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
 
         if (updated) {
           console.log('✅ OKR atualizado:', updated);
+          if (removedKRIds.length > 0) {
+            const uniqueIds = Array.from(new Set(removedKRIds));
+            await Promise.all(uniqueIds.map((id) => deleteKeyResult(id)));
+          }
           addToast('OKR atualizado com sucesso!', 'success');
           setTimeout(() => {
           onSuccess?.();
@@ -471,7 +488,7 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
                         type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            remove(index);
+                      removeKRAtIndex(index);
                             // Remover do set de expandidos
                             setExpandedKRs(prev => {
                               const newSet = new Set(prev);

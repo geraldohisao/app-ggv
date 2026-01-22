@@ -173,6 +173,9 @@ export async function listOKRs(filters?: OKRFilters, signal?: AbortSignal): Prom
     if (filters?.search) {
       query = query.ilike('objective', `%${filters.search}%`);
     }
+    if (filters?.owner) {
+      query = query.eq('owner', filters.owner);
+    }
 
     // Ordenar por posição (prioridade) e depois por data de criação
     query = query.order('position', { ascending: true, nullsFirst: false })
@@ -200,17 +203,25 @@ export async function listOKRs(filters?: OKRFilters, signal?: AbortSignal): Prom
 
 export async function getOKRIdsByKRResponsible(userId: string): Promise<string[]> {
   try {
-    if (!userId) return [];
+    if (!userId) {
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('key_results')
       .select('okr_id')
       .eq('responsible_user_id', userId);
-    if (error) throw error;
-    return (data || [])
+    
+    if (error) {
+      throw error;
+    }
+    
+    const okrIds = (data || [])
       .map((row: any) => row.okr_id)
       .filter((id: string | null) => Boolean(id));
+
+    return okrIds;
   } catch (error) {
-    console.error('❌ [getOKRIdsByKRResponsible] Erro ao buscar OKRs por KR responsável:', error);
     return [];
   }
 }
@@ -224,6 +235,7 @@ export async function listVisibleOKRsForUser(
 ): Promise<OKRWithKeyResults[]> {
   try {
     const okrIdsFromKrs = userId ? await getOKRIdsByKRResponsible(userId) : [];
+    
     const hasDept = Boolean(userDepartment);
 
     let query = supabase
@@ -269,7 +281,7 @@ export async function listVisibleOKRsForUser(
       console.error('❌ [listVisibleOKRsForUser] Erro na query:', error);
       throw error;
     }
-
+    
     // Filtrar key_results apenas para usuários OP (USER)
     // CEO (SUPER_ADMIN) e HEAD (ADMIN) veem todos os KRs
     const normalizedRole = (userRole || '').toString().toUpperCase();
@@ -283,6 +295,7 @@ export async function listVisibleOKRsForUser(
           (kr: any) => kr.responsible_user_id === userId
         )
       }));
+      
       return filteredOkrs;
     }
 
@@ -393,9 +406,18 @@ export async function createKeyResult(keyResult: Partial<KeyResult>): Promise<Ke
 
 export async function updateKeyResult(id: string, updates: Partial<KeyResult>): Promise<KeyResult | null> {
   try {
+    // Sanitizar updates (evita enviar campos de relação como `okrs` / `okr`, etc.)
+    const safeUpdates: any = { ...(updates as any) };
+    delete safeUpdates.okrs;
+    delete safeUpdates.okr;
+    delete safeUpdates.okr_id; // não atualiza vínculo aqui
+    delete safeUpdates.created_at;
+    delete safeUpdates.created_by;
+    delete safeUpdates.updated_at_local;
+
     let { data, error } = await supabase
       .from('key_results')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', id)
       .select()
       .single();
@@ -407,7 +429,7 @@ export async function updateKeyResult(id: string, updates: Partial<KeyResult>): 
       error.message?.includes('column')
     )) {
       console.warn('⚠️ Coluna show_in_cockpit não existe ainda. Tentando sem ela...');
-      const { show_in_cockpit, ...updatesWithoutCockpit } = updates as any;
+      const { show_in_cockpit, ...updatesWithoutCockpit } = safeUpdates as any;
       const result = await supabase
         .from('key_results')
         .update(updatesWithoutCockpit)
@@ -541,17 +563,15 @@ export async function updateOKRWithKeyResults(
     });
     const incomingIds = new Set(normalizedKeyResults.filter(kr => kr.id).map(kr => kr.id!));
 
-    // 3. Deletar KRs que foram removidos
-    const toDelete = existingKRs.filter(kr => !incomingIds.has(kr.id!));
-    for (const kr of toDelete) {
-      await deleteKeyResult(kr.id!);
-    }
-
-    // 4. Atualizar/Criar Key Results
-    console.log('📋 Processando KRs:', {
+    // 3. Atualizar/Criar Key Results
+    // IMPORTANTE (SEGURANÇA):
+    // NÃO deletamos automaticamente KRs ausentes no payload.
+    // Payload parcial (ex.: usuário OP vendo só parte dos KRs, ou falha de cache/relationship)
+    // poderia causar exclusão total em produção.
+    // A remoção de KRs deve ser explícita (deleteKeyResult) na UI/fluxo de negócio.
+    console.log('📋 Processando KRs (sem delete automático):', {
       incoming: normalizedKeyResults.length,
       existing: existingKRs.length,
-      toDelete: toDelete.length,
       incomingIds: Array.from(incomingIds),
     });
     
@@ -625,35 +645,26 @@ export async function updateOKRStatusFromActivity(okrId: string): Promise<string
       .single();
     if (!okrData || okrData.status === 'concluído') return null;
 
-    // Tentar buscar KRs com fallback progressivo de colunas (evita 400 se coluna não existe)
+    // Buscar KRs com colunas básicas (garante compatibilidade)
     let krs: any[] | null = null;
-    const selectCandidates = [
-      'type, start_value, current_value, activity_progress, activity_done, last_checkin_at',
-      'type, start_value, current_value, activity_progress, activity_done',
-      'type, start_value, current_value, last_checkin_at',
-      'type, start_value, current_value',
-    ];
-
-    for (const select of selectCandidates) {
-      try {
-        const { data, error } = await supabase
-          .from('key_results')
-          .select(select)
-          .eq('okr_id', okrId);
-        if (error) throw error;
-        krs = data;
-        break;
-      } catch (e) {
-        // tenta próxima combinação
-      }
+    try {
+      const { data, error } = await supabase
+        .from('key_results')
+        // NÃO usar last_checkin_at: alguns ambientes não têm essa coluna ainda
+        .select('type, start_value, current_value')
+        .eq('okr_id', okrId);
+      if (error) throw error;
+      krs = data;
+    } catch (e) {
+      console.error('Erro ao buscar KRs:', e);
+      krs = [];
     }
 
     const hasKrUpdate = (krs || []).some((kr) => {
-      if (kr.last_checkin_at) return true;
-      if (kr.type === 'activity') {
-        const activityProgress = kr.activity_progress ?? (kr.activity_done ? 100 : 0);
-        return activityProgress > 0;
-      }
+      // Sem colunas de check-in disponíveis, inferir por mudança de valor
+      if (kr.type === 'activity') return false;
+
+      // Para indicadores numéricos
       if (kr.current_value === null || kr.current_value === undefined) return false;
       if (kr.start_value === null || kr.start_value === undefined) {
         return kr.current_value > 0;

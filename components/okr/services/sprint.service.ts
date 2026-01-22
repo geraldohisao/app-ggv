@@ -587,9 +587,6 @@ export async function createSprintItem(item: Partial<SprintItem>): Promise<Sprin
 
 export async function updateSprintItem(id: string, updates: Partial<SprintItem>): Promise<SprintItem | null> {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sprint.service.ts:updateSprintItem-entry',message:'updateSprintItem called',data:{id,updates},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     const normalizedUpdates: any = {
       ...updates,
       due_date: updates.due_date ? updates.due_date : null,
@@ -611,10 +608,6 @@ export async function updateSprintItem(id: string, updates: Partial<SprintItem>)
       .eq('id', id)
       .select()
       .single();
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sprint.service.ts:updateSprintItem-result',message:'updateSprintItem result',data:{hasError:!!error,status:data?.status||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
 
     if (error) throw error;
     

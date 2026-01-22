@@ -46,6 +46,12 @@ export async function matchItemsWithAI(
     return [];
   }
 
+  // Limitar volume para reduzir latência/custo da IA
+  // Se vierem muitos itens do check-in, processar só um "chunk" e criar o resto como novos
+  const MAX_PARSED = 25;
+  const primaryParsed = parsedItems.slice(0, MAX_PARSED);
+  const overflowParsed = parsedItems.slice(MAX_PARSED);
+
   if (existingItems.length === 0) {
     return parsedItems.map(item => ({
       parsedItem: item,
@@ -56,14 +62,14 @@ export async function matchItemsWithAI(
     }));
   }
 
-  const prompt = buildMatchingPrompt(parsedItems, existingItems);
+  const prompt = buildMatchingPrompt(primaryParsed, existingItems);
   
   try {
     console.log('🤖 Iniciando match semântico com IA...');
     const responseText = await callOpenAI(prompt);
     const aiResult: AIMatchResult = JSON.parse(responseText);
     
-    const matches = parsedItems.map((parsedItem, idx) => {
+    const matches = primaryParsed.map((parsedItem, idx) => {
       const match = aiResult.matches[idx];
       
       if (match && match.existing_item_id && match.confidence >= 70) {
@@ -104,7 +110,19 @@ export async function matchItemsWithAI(
     const matchedCount = matches.filter(m => m.shouldUpdate).length;
     const newCount = matches.filter(m => !m.shouldUpdate).length;
     console.log(`📊 Match semântico: ${matchedCount} atualizados, ${newCount} novos`);
-    
+
+    // Itens além do limite entram como "novos" (sem bloquear com prompt gigante)
+    if (overflowParsed.length > 0) {
+      const overflowMatches: ItemMatch[] = overflowParsed.map((item) => ({
+        parsedItem: item,
+        existingItem: null,
+        matchConfidence: 0,
+        shouldUpdate: false,
+        updateFields: { checkin_id: checkinId },
+      }));
+      return [...matches, ...overflowMatches];
+    }
+
     return matches;
   } catch (error) {
     console.error('❌ Erro no match semântico, usando fallback:', error);
@@ -130,9 +148,11 @@ function buildMatchingPrompt(
     `${idx}: [${item.type}] "${item.title}"`
   ).join('\n');
   
-  const existingList = existingItems.map(item => 
-    `${item.id}: [${item.type}] "${item.title}"${item.description ? ` - ${item.description}` : ''}`
-  ).join('\n');
+  const truncate = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+  const existingList = existingItems.map(item => {
+    const desc = item.description ? truncate(String(item.description), 80) : '';
+    return `${item.id}: [${item.type}] "${truncate(String(item.title || ''), 80)}"${desc ? ` - ${desc}` : ''}`;
+  }).join('\n');
 
   return `Você é um especialista em análise semântica de tarefas e iniciativas.
 

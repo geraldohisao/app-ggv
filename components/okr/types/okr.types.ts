@@ -188,6 +188,7 @@ export interface OKRFilters {
   department?: Department;
   status?: OKRStatus;
   search?: string;
+  owner?: string; // Filtro por nome do responsável do OKR
 }
 
 // ============================================

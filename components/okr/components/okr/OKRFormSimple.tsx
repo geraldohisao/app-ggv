@@ -8,6 +8,7 @@ import { useOKRUsers, formatUserLabel } from '../../hooks/useOKRUsers';
 import { FormattedNumberInput } from '../../../shared/FormattedNumberInput';
 import { PeriodSelector } from '../shared/PeriodSelector';
 import { UserSelectCombobox } from '../shared/UserSelectCombobox';
+import { deleteKeyResult } from '../../services/okr.service';
 import {
   DndContext,
   closestCenter,
@@ -169,6 +170,7 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingKRs, setIsGeneratingKRs] = useState(false);
   const [isAddingKR, setIsAddingKR] = useState(false);
+  const [removedKRIds, setRemovedKRIds] = useState<string[]>([]);
 
   // Custom resolver que transforma dados antes da validação
   const customResolver = async (data: any, context: any, options: any) => {
@@ -210,6 +212,17 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
   const watchKeyResults = watch('key_results');
   const watchObjective = watch('objective');
   const watchOwner = watch('owner');
+
+  const trackRemovedKRId = (maybeId?: string) => {
+    if (!maybeId) return;
+    setRemovedKRIds((prev) => (prev.includes(maybeId) ? prev : [...prev, maybeId]));
+  };
+
+  const removeKRAtIndex = (index: number) => {
+    const current = (watchKeyResults || [])[index] as any;
+    if (current?.id) trackRemovedKRId(current.id);
+    remove(index);
+  };
 
   // Encontrar o ID do usuário owner do OKR para usar como fallback nos KRs
   const ownerUserId = React.useMemo(() => {
@@ -339,6 +352,12 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
       const suggestions = await suggestKeyResults(watchObjective);
 
       // Limpar KRs existentes e adicionar sugestões
+      // Se estiver editando, registrar IDs atuais para remoção explícita (seguro).
+      if (isEditMode) {
+        (watchKeyResults || []).forEach((kr: any) => {
+          if (kr?.id) trackRemovedKRId(kr.id);
+        });
+      }
       remove();
       suggestions.forEach((suggestion: any) => {
         append({
@@ -398,7 +417,18 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
               position: index + 1, // Salvar posição baseado na ordem do array
             }));
 
-            const payload = { ...data, key_results: normalizedKRs };
+            const okrUpdates: any = {
+              level: data.level,
+              department: data.department,
+              owner: data.owner,
+              objective: data.objective,
+              start_date: data.start_date,
+              end_date: data.end_date,
+              periodicity: data.periodicity,
+              status: data.status,
+            };
+
+            const payload = { ...okrUpdates, key_results: normalizedKRs };
 
             console.log('🚀 Calling createOKR/updateOKR with:', { 
               payload, 
@@ -406,10 +436,20 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
               krIds: normalizedKRs.map(kr => ({ id: kr.id, title: kr.title }))
             });
             
-            const success = okr?.id ? await updateOKR(okr.id, payload, normalizedKRs) : await createOKR(payload, normalizedKRs);
+            const success = okr?.id
+              ? await updateOKR(okr.id, okrUpdates, normalizedKRs)
+              : await createOKR(payload, normalizedKRs);
             
             console.log('✅ Result:', success);
-            if (success) { onSuccess?.(); onClose(); }
+            if (success) {
+              // Remoção explícita e segura de KRs removidos no formulário
+              if (isEditMode && removedKRIds.length > 0) {
+                const uniqueIds = Array.from(new Set(removedKRIds));
+                await Promise.all(uniqueIds.map((id) => deleteKeyResult(id)));
+              }
+              onSuccess?.();
+              onClose();
+            }
           } catch (err) {
             console.error('❌ Error submitting OKR:', err);
             alert('❌ Erro ao salvar OKR: ' + (err as Error).message);
@@ -540,7 +580,7 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
                               className="flex-1 bg-slate-50 rounded-xl px-4 py-3 border-none focus:ring-2 focus:ring-indigo-500 text-base font-bold"
                             />
                             {fields.length > 1 && (
-                              <button type="button" onClick={() => remove(index)} className="text-rose-400 hover:text-rose-600 text-xl">🗑️</button>
+                              <button type="button" onClick={() => removeKRAtIndex(index)} className="text-rose-400 hover:text-rose-600 text-xl">🗑️</button>
                             )}
                           </div>
 

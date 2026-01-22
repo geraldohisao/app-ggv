@@ -124,16 +124,23 @@ async function generateSuggestionsFromCheckin(
 
   console.log(`📋 Parser extraiu ${parsedItems.length} items`);
 
+  // Buscar apenas campos necessários e limitar volume para reduzir custo/latência
   const { data: existingItems } = await supabase
     .from('sprint_items')
-    .select('*')
-    .eq('sprint_id', checkin.sprint_id);
+    .select('id, type, title, description, status, created_at')
+    .eq('sprint_id', checkin.sprint_id)
+    .order('created_at', { ascending: false })
+    .limit(60);
 
   console.log(`📦 ${existingItems?.length || 0} items manuais existentes na sprint`);
 
+  // Reduzir contexto: só itens do mesmo tipo dos parsedItems
+  const typeSet = new Set(parsedItems.map((p) => p.type));
+  const relevantExisting = (existingItems || []).filter((i: any) => typeSet.has(i.type));
+
   const matches = await matchItemsWithAI(
     parsedItems,
-    existingItems || [],
+    relevantExisting as any,
     checkin.id
   );
 
@@ -309,7 +316,8 @@ export async function createSprintCheckin(
   sprintId: string,
   checkinData: Partial<SprintCheckin>,
   sprintItems: any[],
-  sprintScope: SprintScope = 'execucao' // NOVO parâmetro
+  sprintScope: SprintScope = 'execucao',
+  options?: { suggestionsMode?: 'sync' | 'async' }
 ): Promise<SprintCheckin | null> {
   try {
     const userId = await resolveUserId();
@@ -371,10 +379,18 @@ export async function createSprintCheckin(
     console.log('✅ Check-in da sprint criado:', data.id);
 
     if (data && data.id) {
-      try {
-        await generateSuggestionsFromCheckin(data as SprintCheckin, sprintScope, userId);
-      } catch (parserError) {
-        console.error('❌ Erro ao processar items do check-in:', parserError);
+      const mode = options?.suggestionsMode || 'async';
+      if (mode === 'sync') {
+        try {
+          await generateSuggestionsFromCheckin(data as SprintCheckin, sprintScope, userId);
+        } catch (parserError) {
+          console.error('❌ Erro ao processar items do check-in:', parserError);
+        }
+      } else {
+        // Async (não bloquear UX): gerar sugestões em background
+        void generateSuggestionsFromCheckin(data as SprintCheckin, sprintScope, userId).catch((parserError) => {
+          console.error('❌ Erro ao processar items do check-in (async):', parserError);
+        });
       }
     }
 
@@ -560,7 +576,10 @@ export async function updateSprintCheckin(
         }
 
         const scope = options?.sprintScope || 'execucao';
-        await generateSuggestionsFromCheckin(data as SprintCheckin, scope, userId);
+        // Não bloquear UX: gerar sugestões em background
+        void generateSuggestionsFromCheckin(data as SprintCheckin, scope, userId).catch((suggestionError) => {
+          console.error('❌ Erro ao recriar sugestões do check-in (async):', suggestionError);
+        });
       } catch (suggestionError) {
         console.error('❌ Erro ao recriar sugestões do check-in:', suggestionError);
       }

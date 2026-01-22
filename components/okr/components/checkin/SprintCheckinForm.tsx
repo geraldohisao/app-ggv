@@ -28,6 +28,7 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [createdCheckinId, setCreatedCheckinId] = useState<string | null>(null);
   const [postSaveSuggestions, setPostSaveSuggestions] = useState<any[]>([]);
   const [showPostSaveSuggestions, setShowPostSaveSuggestions] = useState(false);
@@ -50,6 +51,19 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
           console.log('✏️ Check-in de hoje encontrado. Modo edição ativado.');
           setExistingCheckin(todayCheckin);
           setIsEditMode(true);
+
+          // Se já houver sugestões pendentes para o check-in de hoje, exibir
+          try {
+            const suggestions = await checkinService.listSprintItemSuggestionsByCheckin(todayCheckin.id, 'pending');
+            setPostSaveSuggestions(suggestions || []);
+            if (suggestions && suggestions.length > 0) {
+              setCreatedCheckinId(todayCheckin.id);
+              // Não abrir automaticamente (evita prender usuário no modal)
+              setShowPostSaveSuggestions(false);
+            }
+          } catch {
+            // noop
+          }
         } else {
           console.log('📝 Nenhum check-in de hoje. Modo criação ativado.');
           setIsEditMode(false);
@@ -189,6 +203,20 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
     }
   };
 
+  const refreshSuggestionsOnce = async (checkinId: string) => {
+    try {
+      const suggestions = await checkinService.listSprintItemSuggestionsByCheckin(checkinId, 'pending');
+      if (suggestions && suggestions.length > 0) {
+        setPostSaveSuggestions(suggestions || []);
+        setShowPostSaveSuggestions(true);
+        setIsGeneratingSuggestions(false);
+      } else {
+        // Mantém "processando" para o usuário checar depois
+      }
+    } catch (e: any) {
+    }
+  };
+
   const onSubmit = async (data: any) => {
     // Validação adicional antes de enviar
     if (!data.summary || data.summary.trim().length < 10) {
@@ -202,6 +230,7 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
     }
 
     setIsSubmitting(true);
+    setIsGeneratingSuggestions(false);
     try {
       if (isEditMode && existingCheckin) {
         // SEGURANÇA: Verificar se check-in é realmente de hoje
@@ -222,35 +251,25 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
         addToast('✅ Check-in de hoje atualizado com sucesso!', 'success');
 
         setCreatedCheckinId(existingCheckin.id);
-        const suggestions = await checkinService.listSprintItemSuggestionsByCheckin(existingCheckin.id, 'pending');
-        setPostSaveSuggestions(suggestions || []);
-        if (suggestions && suggestions.length > 0) {
-          setShowPostSaveSuggestions(true);
-          return;
-        }
+        // Não prender o usuário no modal: fechar imediatamente (sugestões em background)
+        onSuccess();
+        onClose();
+        return;
       } else {
         // Modo criação: criar novo check-in + sugestões automaticamente
-        const created = await checkinService.createSprintCheckin(sprintId, data, sprintItems, sprintScope);
+        const created = await checkinService.createSprintCheckin(sprintId, data, sprintItems, sprintScope, {
+          suggestionsMode: 'async',
+        });
         addToast('✅ Check-in registrado com sucesso!', 'success');
         onSuccess();
 
         if (created?.id) {
           setCreatedCheckinId(created.id);
-          const suggestions = await checkinService.listSprintItemSuggestionsByCheckin(created.id, 'pending');
-          setPostSaveSuggestions(suggestions || []);
-          if (suggestions && suggestions.length > 0) {
-            setShowPostSaveSuggestions(true);
-            return;
-          }
+          // Fechar imediatamente (sugestões em background)
+          onClose();
+          return;
         }
         onClose();
-      }
-      
-      if (isEditMode) {
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 500);
       }
     } catch (error: any) {
       if (error.message?.includes('Já existe um check-in')) {
@@ -383,6 +402,29 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {!showPostSaveSuggestions && isGeneratingSuggestions && createdCheckinId && (
+              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-slate-800">🤖 Gerando sugestões com IA…</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      O check-in já foi salvo. Você pode fechar agora e abrir novamente depois para ver as sugestões.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="w-5 h-5 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
+                    <button
+                      type="button"
+                      onClick={() => refreshSuggestionsOnce(createdCheckinId)}
+                      className="px-3 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                    >
+                      Checar agora
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
             

@@ -40,19 +40,21 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
   };
 
   const handleSaveKR = async (updatedKR: KeyResult) => {
-    try {
-      const updated = await okrService.updateKeyResult(updatedKR.id!, updatedKR);
-      
-      if (updated) {
-        addToast('✅ KR atualizado com sucesso!', 'success');
-        await loadKRs();
-        setEditingKR(null);
-        onKRUpdated?.();
-      }
-    } catch (error: any) {
-      addToast(`❌ Erro ao atualizar KR: ${error.message}`, 'error');
-      throw error;
-    }
+    // IMPORTANTE:
+    // O KR já é salvo no banco dentro do `KREditModal` (ele chama okrService.updateKeyResult).
+    // Aqui nós só precisamos refletir na UI (sem salvar de novo, evitando enviar campos extras como `okrs`).
+    if (!updatedKR?.id) return;
+
+    setKrs((prev) =>
+      (prev || []).map((kr) => (kr?.id === updatedKR.id ? { ...kr, ...updatedKR } : kr))
+    );
+
+    addToast('✅ KR atualizado com sucesso!', 'success');
+    setEditingKR(null);
+    onKRUpdated?.();
+
+    // Recarregar para garantir consistência (e.g. cálculo de status no backend)
+    await loadKRs();
   };
 
   // Helper para cor do status

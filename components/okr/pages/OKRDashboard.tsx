@@ -101,6 +101,26 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
   // Determinar se é admin (CEO ou HEAD)
   const isAdmin = permissions.isCEO || permissions.isHEAD;
 
+  // Persistir última escolha do usuário (Meus OKRs / Todos)
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (!user?.id) return;
+    const key = `okrDashboard:viewScope:${user.id}`;
+    const stored = window.localStorage.getItem(key);
+    const next = stored === 'all' || stored === 'mine' ? stored : null;
+
+    if (next && next !== adminViewScope) {
+      setAdminViewScope(next);
+    }
+  }, [isAdmin, user?.id]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (!user?.id) return;
+    const key = `okrDashboard:viewScope:${user.id}`;
+    window.localStorage.setItem(key, adminViewScope);
+  }, [isAdmin, user?.id, adminViewScope]);
+
   // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -254,10 +274,11 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     // Filtro inicial baseado no escopo de visualização
     const initialFilters: any = {};
     
-    // Para OP ou admin com escopo 'mine', filtrar pelo nome do usuário
-    if (permissions.isOP || adminViewScope === 'mine') {
+    // Para admin com escopo 'mine', filtrar pelo responsável (owner) do OKR
+    // OP usa visibilidade (responsável/departamento) na query, sem filtros adicionais
+    if (!permissions.isOP && adminViewScope === 'mine') {
       if (user?.name) {
-        initialFilters.search = user.name;
+        initialFilters.owner = user.name; // Usar 'owner' em vez de 'search'
       }
     }
     
@@ -293,29 +314,24 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     if (statusFilter !== 'all') filters.status = statusFilter;
     
     // Lógica de filtro por responsável:
-    // 1. Se usuário é OP, sempre filtra pelo próprio nome
-    // 2. Se é admin e adminViewScope === 'mine', filtra pelo próprio nome
-    // 3. Se é admin e adminViewScope === 'all', usa o responsibleFilter do dropdown (ou mostra todos)
+    // 1. Se usuário é OP, não filtra (visibilidade já restringe por dept/KRs)
+    // 2. Se é admin e adminViewScope === 'mine', filtra pelo owner (responsável do OKR)
+    // 3. Se é admin e adminViewScope === 'all', usa o responsibleFilter do dropdown
     if (permissions.isOP) {
-      // OP sempre vê apenas seus OKRs
-      if (user?.name) {
-        filters.search = user.name;
-      }
+      // OP: visibilidade já restringe; não filtrar
     } else if (adminViewScope === 'mine') {
-      // Admin vendo "Meus OKRs"
+      // Admin vendo "Meus OKRs" - filtrar por owner
       if (user?.name) {
-        filters.search = user.name;
+        filters.owner = user.name; // Usar 'owner' para filtrar responsável do OKR
       }
     } else {
       // Admin vendo "Todos" - usa filtro normal do dropdown
       if (responsibleFilter !== 'all') {
-        filters.search = responsibleFilter;
+        filters.owner = responsibleFilter; // Usar 'owner' em vez de 'search'
       } else if (searchTerm) {
-        filters.search = searchTerm;
+        filters.search = searchTerm; // Busca no objetivo
       }
     }
-    
-    console.log('🔍 [OKRDashboard] Aplicando filtros:', filters, '| viewScope:', adminViewScope);
     fetchOKRs(
       filters,
       permissions.isOP
@@ -323,11 +339,6 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
         : { isAdmin: true }
     );
   }, [levelFilter, deptFilter, statusFilter, responsibleFilter, searchTerm, permissions.isOP, permissions.userDepartment, user?.id, user?.role, user?.name, adminViewScope]);
-
-  // Debug: Log quando OKRs mudam
-  useEffect(() => {
-    console.log('📊 [OKRDashboard] OKRs carregados:', okrs?.length || 0, okrs);
-  }, [okrs]);
 
   // Atualizar trimestre automaticamente a cada hora
   useEffect(() => {

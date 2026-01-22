@@ -120,10 +120,7 @@ export const SprintItemForm: React.FC<SprintItemFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SprintItemForm.tsx:handleSubmit',message:'SprintItemForm submit',data:{itemId:item?.id||null,type,status:formData.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
-    
+
     // Validação de campos obrigatórios
     if (!formData.title.trim()) {
       addToast('❌ Título é obrigatório', 'error');
