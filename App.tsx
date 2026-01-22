@@ -31,6 +31,7 @@ import AppBrand from './components/common/AppBrand';
 import FinalLoginPage from './components/FinalLoginPage';
 import { getModuleFromPath, isStandalonePage } from './utils/router';
 import { enableCriticalFetchAlerts } from './src/utils/net';
+import { canAccessCalculadora, canAccessCalls } from './utils/access';
 // Debug Panel sempre visível e robusto
 import AlwaysVisibleDebugPanel from './components/debug/AlwaysVisibleDebugPanel';
 // Utilitários de debug globais
@@ -61,6 +62,9 @@ const AppContent: React.FC = () => {
     user.role === UserRole.SuperAdmin ||
     user.role === UserRole.Admin
   ));
+  const canAccessGGVTalent = !!user && user.role !== UserRole.User;
+  const canAccessCalculator = canAccessCalculadora(user);
+  const canAccessCallsModule = canAccessCalls(user);
 
   // Garantir que ao carregar a página, o módulo correto seja selecionado
   useEffect(() => {
@@ -249,6 +253,14 @@ const AppContent: React.FC = () => {
         );
       case Module.Calculadora:
         console.log('🧮 APP - Renderizando Calculadora');
+        if (!canAccessCalculator) {
+          return (
+            <div className="p-8 text-center">
+              <p className="text-lg font-semibold text-slate-800">Acesso restrito</p>
+              <p className="text-slate-600 mt-2">Disponível apenas para Comercial com cargo definido.</p>
+            </div>
+          );
+        }
         return <CalculadoraOTE />;
       case Module.Settings:
         console.log('⚙️ APP - Renderizando Settings');
@@ -262,6 +274,14 @@ const AppContent: React.FC = () => {
       case Module.Calls:
         console.log('📞 APP - Renderizando Calls');
         // Nova UX dentro do app principal com roteamento via hash
+        if (!canAccessCallsModule) {
+          return (
+            <div className="p-8 text-center">
+              <p className="text-lg font-semibold text-slate-800">Acesso restrito</p>
+              <p className="text-slate-600 mt-2">Disponível apenas para Comercial ou Admin.</p>
+            </div>
+          );
+        }
         return <CallsApp />;
       case Module.ReativacaoLeads:
         console.log('🔄 APP - Renderizando Reativação');
@@ -290,6 +310,14 @@ const AppContent: React.FC = () => {
         return <OKRModule />;
       case Module.GGVTalent:
         console.log('✨ APP - Renderizando GGV Talent');
+        if (!canAccessGGVTalent) {
+          return (
+            <div className="p-8 text-center">
+              <p className="text-lg font-semibold text-slate-800">Módulo inativo</p>
+              <p className="text-slate-600 mt-2">O GGV Talent está inativo para o nível de usuário.</p>
+            </div>
+          );
+        }
         return <GGVTalentPage />;
       default:
         console.log('🏠 APP - Renderizando Default (Diagnóstico)');

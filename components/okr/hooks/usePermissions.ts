@@ -1,7 +1,9 @@
 import { useUser } from '../../../contexts/DirectUserContext';
 import { UserRole } from '../../../types';
 import type { OKR } from '../types/okr.types';
-import type { Sprint } from '../types/sprint.types';
+import type { Sprint, SprintItem } from '../types/sprint.types';
+import type { UnifiedTask } from '../types/task.types';
+import { TaskSource } from '../types/task.types';
 
 interface OKRPermissions {
   canCreate: boolean;
@@ -17,14 +19,30 @@ interface SprintPermissions {
   canViewAll: boolean;
 }
 
+interface SprintItemPermissions {
+  canCreate: boolean;
+  canEdit: (item: SprintItem) => boolean;
+  canDelete: (item: SprintItem) => boolean;
+}
+
+interface TaskPermissions {
+  canCreate: boolean;
+  canEdit: (task: UnifiedTask) => boolean;
+  canDelete: (task: UnifiedTask) => boolean;
+  canViewOwn: boolean;
+}
+
 interface Permissions {
   okr: OKRPermissions;
   sprint: SprintPermissions;
+  sprintItem: SprintItemPermissions;
+  task: TaskPermissions;
   isReadOnly: boolean;
   isCEO: boolean;
   isHEAD: boolean;
   isOP: boolean;
   userDepartment: string | null;
+  userId: string | null;
 }
 
 export function usePermissions(): Permissions {
@@ -45,17 +63,30 @@ export function usePermissions(): Permissions {
         canDelete: () => false,
         canViewAll: true,
       },
+      sprintItem: {
+        canCreate: false,
+        canEdit: () => false,
+        canDelete: () => false,
+      },
+      task: {
+        canCreate: false,
+        canEdit: () => false,
+        canDelete: () => false,
+        canViewOwn: false,
+      },
       isReadOnly: true,
       isCEO: false,
       isHEAD: false,
       isOP: true,
       userDepartment: null,
+      userId: null,
     };
   }
 
-  const isCEO = user.role === UserRole.SuperAdmin;
-  const isHEAD = user.role === UserRole.Admin;
-  const isOP = user.role === UserRole.User;
+  const normalizedRole = (user.role || '').toString().toUpperCase();
+  const isCEO = normalizedRole === UserRole.SuperAdmin;
+  const isHEAD = normalizedRole === UserRole.Admin;
+  const isOP = normalizedRole === UserRole.User;
   
   // Assumindo que o usuário tem um campo 'department' (comercial, marketing, projetos, geral)
   // Se não tiver, precisamos buscar do Supabase profiles
@@ -127,14 +158,83 @@ export function usePermissions(): Permissions {
     canViewAll: true,
   };
 
+  // ============================================
+  // PERMISSÕES DE SPRINT ITEMS
+  // ============================================
+  
+  const sprintItemPermissions: SprintItemPermissions = {
+    // CEO e HEAD podem criar itens em qualquer sprint
+    // OP pode criar itens (serão atribuídos a ele)
+    canCreate: isCEO || isHEAD,
+
+    // CEO e HEAD podem editar qualquer item
+    // OP pode editar apenas itens onde é responsável
+    canEdit: (item: SprintItem) => {
+      if (isCEO || isHEAD) return true;
+      // OP só pode editar itens onde é responsável
+      if (isOP && item.responsible_user_id === user.id) {
+        return true;
+      }
+      return false;
+    },
+
+    // CEO e HEAD podem deletar qualquer item
+    // OP pode deletar apenas itens onde é responsável
+    canDelete: (item: SprintItem) => {
+      if (isCEO || isHEAD) return true;
+      // OP só pode deletar itens onde é responsável
+      if (isOP && item.responsible_user_id === user.id) {
+        return true;
+      }
+      return false;
+    },
+  };
+
+  // ============================================
+  // PERMISSÕES DE TASKS (Pessoais + Sprint)
+  // ============================================
+  
+  const taskPermissions: TaskPermissions = {
+    // Todos os usuários podem criar tasks pessoais
+    canCreate: true,
+
+    // Usuário pode editar:
+    // - Tasks pessoais próprias
+    // - Tasks de sprint onde é responsável
+    canEdit: (task: UnifiedTask) => {
+      if (task.source === TaskSource.PERSONAL) {
+        return task.user_id === user.id;
+      }
+      // Para tasks de sprint, verificar se é responsável
+      return task.responsible_user_id === user.id || isCEO || isHEAD;
+    },
+
+    // Usuário pode deletar:
+    // - Apenas tasks pessoais próprias
+    // - Tasks de sprint: apenas CEO/HEAD podem deletar
+    canDelete: (task: UnifiedTask) => {
+      if (task.source === TaskSource.PERSONAL) {
+        return task.user_id === user.id;
+      }
+      // Tasks de sprint: apenas gestor pode deletar
+      return isCEO || isHEAD;
+    },
+
+    // Todos os usuários podem ver suas próprias tasks
+    canViewOwn: true,
+  };
+
   return {
     okr: okrPermissions,
     sprint: sprintPermissions,
+    sprintItem: sprintItemPermissions,
+    task: taskPermissions,
     isReadOnly: isOP,
     isCEO,
     isHEAD,
     isOP,
     userDepartment,
+    userId: user.id,
   };
 }
 

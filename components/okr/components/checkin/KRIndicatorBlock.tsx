@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { KRCheckinQuickForm } from './KRCheckinQuickForm';
+import { KREditModal } from '../okr/KREditModal';
+import { ProgressBar } from '../shared/ProgressBar';
 import * as checkinService from '../../services/checkin.service';
-import { calculateProgress } from '../../types/checkin.types';
+import * as okrService from '../../services/okr.service';
+import { calculateKRProgress, formatKRValue } from '../../utils/krProgress';
 import { useToast } from '../shared/Toast';
+import { useOKRUsers } from '../../hooks/useOKRUsers';
+import { MiniAvatar } from '../shared/MiniAvatar';
+import type { KeyResult } from '../../types/okr.types';
 
 interface KRIndicatorBlockProps {
   sprintId: string;
@@ -14,8 +19,9 @@ interface KRIndicatorBlockProps {
 export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, onKRUpdated, readOnly = false, isGovernance = false }) => {
   const [krs, setKrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedKR, setExpandedKR] = useState<string | null>(null);
+  const [editingKR, setEditingKR] = useState<KeyResult | null>(null);
   const { addToast } = useToast();
+  const { users } = useOKRUsers();
 
   useEffect(() => {
     loadKRs();
@@ -33,22 +39,29 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
     }
   };
 
-  const handleUpdateKR = async (krId: string, value: number, comment: string, confidence: 'baixa' | 'média' | 'alta') => {
+  const handleSaveKR = async (updatedKR: KeyResult) => {
     try {
-      await checkinService.createKRCheckin({
-        kr_id: krId,
-        sprint_id: sprintId,
-        value,
-        comment,
-        confidence
-      });
+      const updated = await okrService.updateKeyResult(updatedKR.id!, updatedKR);
       
-      // Recarregar KRs para mostrar novo valor
-      await loadKRs();
-      setExpandedKR(null);
-      onKRUpdated?.();
+      if (updated) {
+        addToast('✅ KR atualizado com sucesso!', 'success');
+        await loadKRs();
+        setEditingKR(null);
+        onKRUpdated?.();
+      }
     } catch (error: any) {
-      throw error; // Propaga para o form tratar
+      addToast(`❌ Erro ao atualizar KR: ${error.message}`, 'error');
+      throw error;
+    }
+  };
+
+  // Helper para cor do status
+  const getKRStatusColor = (status: string) => {
+    switch (status) {
+      case 'verde': return 'bg-emerald-100 text-emerald-700';
+      case 'amarelo': return 'bg-amber-100 text-amber-700';
+      case 'vermelho': return 'bg-rose-100 text-rose-700';
+      default: return 'bg-slate-100 text-slate-600';
     }
   };
 
@@ -88,106 +101,127 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
 
       {isGovernance && (
         <div className="mb-6 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-xs font-semibold text-purple-800">
-          🎯 <strong>Sprint de Governança:</strong> Indicadores em modo de visualização para análise qualitativa. Atualizações devem ser feitas nas sprints de execução.
+          🎯 <strong>Sprint de Governança:</strong> Indicadores em modo de visualização para análise qualitativa.
         </div>
       )}
 
-      <div className="space-y-6">
-        {krs.map((kr) => {
-          const progress = calculateProgress(kr.current_value, kr.target_value, kr.direction);
-          const isOnTrack = progress >= 70;
-          const isAtRisk = progress < 40;
+      {/* Lista de KRs - Mesmo estilo do OKRCard */}
+      <div className="space-y-3 bg-slate-50/50 rounded-3xl p-5 border border-slate-100">
+        {krs.map((kr, i) => {
+          const krProgress = calculateKRProgress(kr);
+          
+          // Determinar responsável do KR
+          const krResponsible = kr.responsible_user_id 
+            ? users.find(u => u.id === kr.responsible_user_id) 
+            : null;
+          
+          // Se não tem responsável próprio, buscar o owner do OKR
+          const okrOwner = kr.okrs?.owner ? users.find(u => u.name === kr.okrs.owner) : null;
+          const displayUser = krResponsible || okrOwner;
+          const isInherited = !krResponsible && !!okrOwner;
           
           return (
-            <div key={kr.id} className="pb-6 border-b last:border-0 border-slate-100">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
+            <div 
+              key={kr.id || i}
+              className="flex flex-col xl:flex-row xl:items-center gap-4 py-3 border-b border-slate-100 last:border-0 hover:bg-white/80 transition-colors rounded-xl px-3 cursor-pointer group/kr"
+              onClick={() => !readOnly && !isGovernance && setEditingKR(kr)}
+              title={readOnly ? 'Sprint encerrada' : isGovernance ? 'Apenas visualização' : 'Clique para editar este KR'}
+            >
+              {/* Avatar + Status indicator + Título */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {/* Avatar do responsável - sempre existe (KR ou OKR) */}
+                <MiniAvatar user={displayUser!} size="sm" isInherited={isInherited} />
+                
+                {/* Status indicator */}
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                  krProgress >= 85 ? 'bg-emerald-500 shadow-[0_0_8px_#10B981]' : 
+                  krProgress >= 75 ? 'bg-amber-500 shadow-[0_0_8px_#F59E0B]' : 
+                  'bg-rose-500 shadow-[0_0_8px_#F43F5E]'
+                }`} />
+                
+                <div className="flex flex-col min-w-0">
                   {kr.okrs?.objective && (
-                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400 truncate">
                       {kr.okrs.objective}
                     </p>
                   )}
-                  <h4 className="font-bold text-slate-800">{kr.title}</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {kr.direction === 'increase' ? '📈 Maior é melhor' : '📉 Menor é melhor'}
-                  </p>
+                  <p className="text-sm font-bold text-slate-700 leading-snug truncate">{kr.title}</p>
+                  {kr.description && (
+                    <p className="text-[10px] text-slate-400 truncate hidden sm:block">{kr.description}</p>
+                  )}
                 </div>
-                {isGovernance ? (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-purple-50 text-purple-600 border border-purple-200">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <span>Apenas Visualização</span>
+              </div>
+
+              {/* Valores e Progresso */}
+              <div className="flex items-center gap-4 w-full xl:w-auto mt-2 xl:mt-0">
+                <div className="flex flex-col items-end min-w-[100px]">
+                  <span className="text-sm font-black text-slate-900">
+                    {formatKRValue(kr.current_value, kr.type, kr.unit)}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                    Meta: {formatKRValue(kr.target_value, kr.type, kr.unit)}
+                  </span>
+                  <span className={`mt-1 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${getKRStatusColor(kr.status)}`}>
+                    {kr.status || 'vermelho'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-1 min-w-[100px]">
+                  <div className="flex-1">
+                    <ProgressBar 
+                      percentage={krProgress} 
+                      color={krProgress >= 85 ? 'green' : krProgress >= 75 ? 'yellow' : 'red'} 
+                    />
                   </div>
-                ) : (
+                  <span className="text-[10px] font-bold text-slate-500 min-w-[35px] text-right">
+                    {krProgress.toFixed(0)}%
+                  </span>
+                </div>
+
+                {/* Botão de Atualizar */}
+                {!readOnly && !isGovernance && (
                   <button
-                    onClick={() => !readOnly && setExpandedKR(expandedKR === kr.id ? null : kr.id)}
-                    disabled={readOnly}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                      readOnly
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                    }`}
-                    title={readOnly ? 'Sprint concluída/cancelada: atualização bloqueada' : 'Atualizar KR'}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setEditingKR(kr); }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all opacity-0 group-hover/kr:opacity-100"
+                    title="Atualizar KR"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    {readOnly ? 'Encerrado' : 'Atualizar'}
+                    Editar
                   </button>
                 )}
-              </div>
 
-              {/* Barra de Progresso */}
-              <div className="mb-3">
-                <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-1000 ${
-                      isOnTrack ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' :
-                      isAtRisk ? 'bg-gradient-to-r from-rose-400 to-rose-600' :
-                      'bg-gradient-to-r from-amber-400 to-amber-600'
-                    }`}
-                    style={{ width: `${Math.min(100, progress)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between mt-2 text-xs">
-                  <span className="font-bold text-slate-700">
-                    {kr.current_value.toLocaleString('pt-BR')} {kr.unit}
+                {isGovernance && (
+                  <span className="px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-purple-50 text-purple-600 border border-purple-200">
+                    Visualização
                   </span>
-                  <span className={`font-black ${
-                    isOnTrack ? 'text-emerald-600' :
-                    isAtRisk ? 'text-rose-600' :
-                    'text-amber-600'
-                  }`}>
-                    {progress.toFixed(0)}%
-                  </span>
-                  <span className="font-bold text-slate-500">
-                    Meta: {kr.target_value.toLocaleString('pt-BR')} {kr.unit}
-                  </span>
-                </div>
-              </div>
+                )}
 
-              {/* Form Inline Expandido - Apenas em sprints de execução */}
-              {!isGovernance && expandedKR === kr.id && (
-                <KRCheckinQuickForm
-                  kr={kr}
-                  sprintId={sprintId}
-                  onSubmit={(value, comment, confidence) => handleUpdateKR(kr.id, value, comment, confidence)}
-                  onCancel={() => setExpandedKR(null)}
-                />
-              )}
+                {readOnly && !isGovernance && (
+                  <span className="px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-400">
+                    Encerrado
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Link para histórico completo */}
-      <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-        <button className="text-sm font-bold text-indigo-600 hover:underline">
-          📈 Ver Evolução Completa dos KRs
-        </button>
-      </div>
+      {/* Modal de Edição de KR */}
+      {editingKR && (
+        <KREditModal
+          kr={editingKR}
+          defaultResponsibleUserId={
+            editingKR.responsible_user_id || 
+            (editingKR.okrs?.owner ? users.find(u => u.name === editingKR.okrs.owner)?.id : undefined)
+          }
+          onClose={() => setEditingKR(null)}
+          onSave={handleSaveKR}
+        />
+      )}
     </div>
   );
 };

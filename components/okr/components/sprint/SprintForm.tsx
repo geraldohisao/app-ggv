@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { parseLocalDate } from '../../utils/date';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSprintStore } from '../../store/sprintStore';
 import { useOKRStore } from '../../store/okrStore';
+import { useOKRUsers } from '../../hooks/useOKRUsers';
 import {
   SprintType,
   SprintStatus,
@@ -16,6 +18,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { checkSprintOkrsAvailability } from '../../services/sprint.service';
 import { DateInput } from '../shared/DateInput';
 import { SelectInput } from '../shared/SelectInput';
+import { UserSelectCombobox } from '../shared/UserSelectCombobox';
 
 const sprintFormSchema = z.object({
   type: z.enum([
@@ -29,8 +32,10 @@ const sprintFormSchema = z.object({
   department: z.enum([Department.GENERAL, Department.COMMERCIAL, Department.MARKETING, Department.PROJECTS]),
   title: z.string().min(5, 'Título deve ter pelo menos 5 caracteres'),
   description: z.string().optional(),
+  responsible: z.string().optional(),
+  responsible_user_id: z.string().uuid().nullable().optional(),
   start_date: z.string(),
-  end_date: z.string(),
+  end_date: z.string().nullable().optional(), // Permite sprints sem data fim (contínuas)
   status: z.enum([SprintStatus.PLANNED, SprintStatus.IN_PROGRESS, SprintStatus.COMPLETED, SprintStatus.CANCELLED]),
   okr_ids: z.array(z.string()).max(10, 'Selecione no máximo 10 OKRs'),
 });
@@ -57,9 +62,13 @@ export const SprintForm: React.FC<SprintFormProps> = ({
   const isEditMode = !!sprint;
   const { createSprint, updateSprint, deleteSprint } = useSprintStore();
   const { okrs, fetchOKRs } = useOKRStore();
+  const { users: okrUsers, loading: okrUsersLoading } = useOKRUsers();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [multiOkrsEnabled, setMultiOkrsEnabled] = useState(true);
+  const [responsibleUserId, setResponsibleUserId] = useState<string | null>(
+    (sprint as any)?.responsible_user_id || null
+  );
   const { toasts, addToast, removeToast } = useToast();
   const permissions = usePermissions();
 
@@ -92,6 +101,8 @@ export const SprintForm: React.FC<SprintFormProps> = ({
     ? {
         ...(sprint as SprintFormData),
         scope: (sprint as any)?.scope || SprintScope.EXECUTION,
+        responsible: (sprint as any)?.responsible || undefined,
+        responsible_user_id: (sprint as any)?.responsible_user_id || null,
         okr_ids: (sprint as any)?.okr_ids?.length
           ? (sprint as any).okr_ids
           : (sprint as any)?.okr_id
@@ -107,6 +118,8 @@ export const SprintForm: React.FC<SprintFormProps> = ({
         start_date: new Date().toISOString().split('T')[0],
         end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         status: SprintStatus.PLANNED,
+        responsible: undefined,
+        responsible_user_id: null,
         okr_ids: [],
       };
 
@@ -124,7 +137,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
   const selectedDepartment = watch('department');
   const selectedScope = watch('scope');
   const selectedOKRs = watch('okr_ids') || [];
-  
+
   // Regras automáticas baseadas em scope
   const isGovernance = selectedScope === SprintScope.GOVERNANCE;
   const allowMultiOkrs = isGovernance ? true : (multiOkrsEnabled && selectedDepartment === Department.GENERAL);
@@ -135,12 +148,41 @@ export const SprintForm: React.FC<SprintFormProps> = ({
       ? okrs
       : okrs.filter(okr => okr.department === selectedDepartment || okr.department === Department.GENERAL);
 
+  const selectedPrimaryOkrId = selectedOKRs[0];
+  const selectedOkr = selectedPrimaryOkrId
+    ? okrs.find((okr) => okr.id === selectedPrimaryOkrId)
+    : undefined;
+  const resolvedSprintResponsible = selectedOkr?.owner?.trim() || undefined;
+  const okrOwnerUser = useMemo(() => {
+    if (!resolvedSprintResponsible) return null;
+    return (
+      okrUsers.find(
+        (user) => user.name.toLowerCase() === resolvedSprintResponsible.toLowerCase()
+      ) || null
+    );
+  }, [okrUsers, resolvedSprintResponsible]);
+  const selectedResponsibleUser = useMemo(() => {
+    if (!responsibleUserId) return null;
+    return okrUsers.find((user) => user.id === responsibleUserId) || null;
+  }, [okrUsers, responsibleUserId]);
+
   useEffect(() => {
     if (!allowMultiOkrs && selectedOKRs.length > 1) {
       addToast('⚠️ Apenas 1 OKR por sprint (modo setor/estratégico limitado).', 'warning');
       setValue('okr_ids', [selectedOKRs[0]], { shouldDirty: true });
     }
   }, [allowMultiOkrs, selectedOKRs, setValue, addToast]);
+
+  useEffect(() => {
+    if (!isGovernance) return;
+    if (responsibleUserId || !sprint?.responsible || okrUsers.length === 0) return;
+    const matched = okrUsers.find(
+      (user) => user.name.toLowerCase() === sprint.responsible?.toLowerCase()
+    );
+    if (matched) {
+      setResponsibleUserId(matched.id);
+    }
+  }, [isGovernance, responsibleUserId, sprint?.responsible, okrUsers]);
 
   const onSubmit = async (data: SprintFormData) => {
     console.log('📝 Submitting Sprint data:', data);
@@ -152,13 +194,24 @@ export const SprintForm: React.FC<SprintFormProps> = ({
         return;
       }
 
-      if (!data.start_date || !data.end_date) {
-        addToast('Datas de início e fim são obrigatórias', 'error');
+      if (!data.start_date) {
+        addToast('Data de início é obrigatória', 'error');
         return;
       }
 
-      if (new Date(data.start_date) > new Date(data.end_date)) {
+      // Validar data fim apenas se definida
+      if (data.end_date && parseLocalDate(data.start_date) > parseLocalDate(data.end_date)) {
         addToast('Data de início deve ser anterior à data de fim', 'error');
+        return;
+      }
+
+      if (!isEditMode && (!data.okr_ids || data.okr_ids.length === 0)) {
+        addToast('Selecione um OKR para criar a sprint', 'error');
+        return;
+      }
+
+      if (isGovernance && !responsibleUserId) {
+        addToast('Selecione um responsável para a sprint de governança', 'error');
         return;
       }
     }
@@ -177,6 +230,10 @@ export const SprintForm: React.FC<SprintFormProps> = ({
         : {
             ...sprintData,
             okr_id: okrId,
+            responsible: isGovernance
+              ? selectedResponsibleUser?.name || undefined
+              : resolvedSprintResponsible || undefined,
+            responsible_user_id: isGovernance ? responsibleUserId : okrOwnerUser?.id || null,
           };
       if (isEditMode && sprint?.id) {
         console.log(`🔄 Atualizando sprint ${sprint.id}...`);
@@ -190,8 +247,8 @@ export const SprintForm: React.FC<SprintFormProps> = ({
         console.log('✅ Sprint salva com sucesso!');
         addToast(`Sprint ${isEditMode ? 'atualizada' : 'criada'} com sucesso!`, 'success');
         setTimeout(() => {
-          onSuccess?.();
-          onClose();
+        onSuccess?.();
+        onClose();
         }, 500);
       } else {
         console.error('❌ Falha ao salvar sprint (result null)');
@@ -253,9 +310,9 @@ export const SprintForm: React.FC<SprintFormProps> = ({
   return (
     <>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-6 overflow-y-auto"
-      >
+    <div
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-6 overflow-y-auto"
+    >
       <div
         className="bg-white rounded-[2.5rem] shadow-2xl max-w-6xl w-full my-auto max-h-[92vh] overflow-y-auto border border-slate-100"
       >
@@ -422,6 +479,32 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                   {!isGovernance && selectedDepartment === Department.GENERAL && multiOkrsEnabled && ' (estratégico: até 3 OKRs)'}
                 </p>
               </div>
+
+              {isGovernance && (
+                <div className="bg-emerald-50/60 rounded-3xl p-6 border border-emerald-100">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 block mb-3">
+                    Responsável da Sprint *
+                  </label>
+                  <UserSelectCombobox
+                    users={okrUsers}
+                    value={responsibleUserId}
+                    onChange={(value) => {
+                      const nextId = value || null;
+                      setResponsibleUserId(nextId);
+                      const nextUser = okrUsers.find((user) => user.id === nextId) || null;
+                      setValue('responsible_user_id', nextId, { shouldDirty: true });
+                      setValue('responsible', nextUser?.name || undefined, { shouldDirty: true });
+                    }}
+                    loading={okrUsersLoading}
+                    placeholder="Selecione o responsável"
+                    required
+                    disabled={statusOnly}
+                  />
+                  <p className="text-[10px] text-emerald-600/70 mt-3 font-bold uppercase tracking-wider">
+                    Para governança, o responsável pode ser definido manualmente.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* COLUNA DIREITA: Configurações */}
@@ -480,16 +563,47 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-3">
-                    Data Fim <span className="text-red-500">*</span>
-                  </label>
-                  <DateInput
-                    value={watch('end_date')}
-                    onChange={(val) => setValue('end_date', val, { shouldDirty: true })}
-                    disabled={statusOnly}
-                    required
-                    min={watch('start_date')}
-                  />
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                      Data Fim
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!watch('end_date')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setValue('end_date', null, { shouldDirty: true });
+                          } else {
+                            // Definir data fim padrão (7 dias após início)
+                            const startDate = watch('start_date');
+                            const defaultEnd = startDate 
+                              ? new Date(new Date(startDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                              : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                            setValue('end_date', defaultEnd, { shouldDirty: true });
+                          }
+                        }}
+                        disabled={statusOnly}
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Contínua
+                      </span>
+                    </label>
+                  </div>
+                  {watch('end_date') ? (
+                    <DateInput
+                      value={watch('end_date') || ''}
+                      onChange={(val) => setValue('end_date', val, { shouldDirty: true })}
+                      disabled={statusOnly}
+                      min={watch('start_date')}
+                    />
+                  ) : (
+                    <div className="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-xl px-4 py-3 text-center">
+                      <p className="text-sm font-bold text-indigo-600">∞ Sprint Contínua</p>
+                      <p className="text-[10px] text-indigo-500 mt-1">Sem data de término definida</p>
+                    </div>
+                  )}
                   {errors.end_date && (
                     <p className="text-rose-600 text-xs mt-2 font-medium">{errors.end_date.message}</p>
                   )}
@@ -547,13 +661,13 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                   {isDeleting ? 'Excluindo...' : 'Excluir Sprint'}
                 </button>
               )}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-[#5B5FF5] text-white px-12 py-4 rounded-2xl font-black uppercase tracking-[0.15em] shadow-xl shadow-indigo-100 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? 'Salvando...' : isEditMode ? 'Atualizar Sprint' : 'Criar Sprint'}
-              </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-[#5B5FF5] text-white px-12 py-4 rounded-2xl font-black uppercase tracking-[0.15em] shadow-xl shadow-indigo-100 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Salvando...' : isEditMode ? 'Atualizar Sprint' : 'Criar Sprint'}
+            </button>
             </div>
           </footer>
         </form>

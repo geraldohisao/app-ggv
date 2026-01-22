@@ -122,6 +122,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (userProfile) {
                         console.log('✅ AUTH - Usuário carregado:', userProfile.email, 'Role:', userProfile.role);
                         setUser(userProfile);
+                        // Salvar usuário no localStorage para acesso offline e em outros contextos
+                        localStorage.setItem('ggv-user', JSON.stringify(userProfile));
                     } else {
                         console.warn('⚠️ AUTH - Falha ao criar perfil do usuário');
                         // Em caso de falha, criar um perfil básico temporário
@@ -134,10 +136,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         };
                         console.log('🔧 AUTH - Usando perfil básico temporário');
                         setUser(basicProfile);
+                        localStorage.setItem('ggv-user', JSON.stringify(basicProfile));
                     }
                 } else {
                     console.log('🚪 AUTH - Usuário desconectado');
                     setUser(null);
+                    localStorage.removeItem('ggv-user');
                 }
             } catch (error: any) {
                 console.error(`❌ AUTH - Erro ao processar (${source}):`, error);
@@ -154,13 +158,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             role: UserRole.User,
                         };
                         setUser(basicProfile);
+                        localStorage.setItem('ggv-user', JSON.stringify(basicProfile));
                         console.log('✅ AUTH - Perfil básico criado após erro');
                     } catch (fallbackError) {
                         console.error('❌ AUTH - Falha até no perfil básico:', fallbackError);
-                        if (mounted) setUser(null);
+                        if (mounted) {
+                            setUser(null);
+                            localStorage.removeItem('ggv-user');
+                        }
                     }
                 } else {
-                    if (mounted) setUser(null);
+                    if (mounted) {
+                        setUser(null);
+                        localStorage.removeItem('ggv-user');
+                    }
                 }
             } finally {
                 if (mounted) {
@@ -248,6 +259,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 role: UserRole.User,
                             };
                             setUser(basicProfile);
+                            localStorage.setItem('ggv-user', JSON.stringify(basicProfile));
                         }
                     }).catch(console.error);
                 }
@@ -317,8 +329,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
     const logout = async () => {
-        // Limpar usuário de emergência se existir
+        // Limpar usuário de emergência e usuário normal do localStorage
         localStorage.removeItem('ggv-emergency-user');
+        localStorage.removeItem('ggv-user');
         
         // Test user doesn't have a supabase session, handle synchronously
         if (user?.id === 'test-user-001' || user?.id?.startsWith('emergency-')) {

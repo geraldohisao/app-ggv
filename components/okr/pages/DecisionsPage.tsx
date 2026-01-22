@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { parseLocalDate } from '../utils/date';
 import { listDecisions } from '../services/sprint.service';
 import type { SprintItem } from '../types/sprint.types';
 import { Department } from '../types/okr.types';
@@ -129,12 +130,12 @@ export const DecisionsPage: React.FC = () => {
                   )}
                   {item.decision_deadline && (
                     <div>
-                      <span className="font-bold">Prazo:</span> {new Date(item.decision_deadline).toLocaleDateString('pt-BR')}
+                      <span className="font-bold">Prazo:</span> {parseLocalDate(item.decision_deadline).toLocaleDateString('pt-BR')}
                     </div>
                   )}
                 </div>
                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  {new Date(item.created_at || '').toLocaleDateString('pt-BR')}
+                  {parseLocalDate(item.created_at || '').toLocaleDateString('pt-BR')}
                 </div>
               </div>
             </div>

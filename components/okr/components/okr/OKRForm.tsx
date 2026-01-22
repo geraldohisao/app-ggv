@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { parseLocalDate } from '../../utils/date';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,6 +38,7 @@ const okrFormSchema = z.object({
   key_results: z
     .array(
       z.object({
+        id: z.string().uuid().optional(),
         title: z.string().min(3, 'Título é obrigatório'),
         current_value: z.number().default(0),
         target_value: z.number().positive('Meta deve ser positiva'),
@@ -50,7 +52,7 @@ const okrFormSchema = z.object({
     )
     .min(1, 'Pelo menos 1 Key Result é obrigatório'),
 }).refine(
-  (data) => new Date(data.start_date) <= new Date(data.end_date),
+  (data) => parseLocalDate(data.start_date) <= parseLocalDate(data.end_date),
   {
     message: 'Data de início deve ser anterior à data de término',
     path: ['end_date'],
@@ -487,6 +489,8 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
                     {/* Conteúdo do KR - Colapsável */}
                     {isExpanded && (
                       <div className="px-4 pb-4 space-y-4 border-t border-gray-200">
+                    {/* ID do KR para updates (preserva referência no banco) */}
+                    <input type="hidden" {...register(`key_results.${index}.id`)} />
                     {/* Título do KR */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">

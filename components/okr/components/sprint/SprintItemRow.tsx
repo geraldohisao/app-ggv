@@ -1,22 +1,44 @@
 import React from 'react';
 import type { SprintItem } from '../../types/sprint.types';
-import { formatDate } from '../../types/sprint.types';
+import { formatDate, SprintItemType } from '../../types/sprint.types';
+import { parseLocalDate } from '../../utils/date';
+import { SprintItemInlineForm } from './SprintItemInlineForm';
 
 interface SprintItemRowProps {
   item: SprintItem;
+  sprintId?: string;
   onUpdate?: (id: string, updates: Partial<SprintItem>) => void;
   onDelete?: (id: string) => void;
   onEdit?: (item: SprintItem) => void;
+  onSave?: () => void;
+  onCancelEdit?: () => void;
+  isEditing?: boolean;
   readOnly?: boolean;
 }
 
 export const SprintItemRow: React.FC<SprintItemRowProps> = ({
   item,
+  sprintId,
   onUpdate,
   onDelete,
   onEdit,
+  onSave,
+  onCancelEdit,
+  isEditing = false,
   readOnly = false,
 }) => {
+  // Se está em modo edição, renderiza o formulário inline
+  if (isEditing && sprintId && onSave && onCancelEdit) {
+    return (
+      <SprintItemInlineForm
+        sprintId={sprintId}
+        type={item.type as SprintItemType}
+        item={item}
+        onSave={onSave}
+        onCancel={onCancelEdit}
+      />
+    );
+  }
   const isCompleted = item.status === 'concluído';
 
   const toggleStatus = () => {
@@ -49,7 +71,15 @@ export const SprintItemRow: React.FC<SprintItemRowProps> = ({
         </button>
 
         {/* Conteúdo */}
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={toggleStatus}>
+        <div 
+          className={`flex-1 min-w-0 ${onEdit ? 'cursor-pointer' : ''}`}
+          onClick={(e) => {
+            if (onEdit) {
+              e.stopPropagation();
+              onEdit(item);
+            }
+          }}
+        >
           <h4 className={`text-lg font-bold transition-all ${isCompleted ? 'text-slate-400 line-through decoration-2' : 'text-slate-800'}`}>
             {item.title}
           </h4>
@@ -71,7 +101,7 @@ export const SprintItemRow: React.FC<SprintItemRowProps> = ({
             {/* Data Limite */}
             {item.due_date && (
               <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${
-                new Date(item.due_date) < new Date() && !isCompleted ? 'text-rose-500' : 'text-slate-400'
+                parseLocalDate(item.due_date) < new Date() && !isCompleted ? 'text-rose-500' : 'text-slate-400'
               }`}>
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 {formatDate(item.due_date)}

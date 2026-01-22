@@ -13,6 +13,7 @@ import {
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { navigateToModule } from '../utils/router';
+import { canAccessCalculadora, canAccessCalls } from '../utils/access';
 
 interface AppLauncherProps {
     activeModule: Module;
@@ -73,6 +74,9 @@ const AppLauncher: React.FC<AppLauncherProps> = ({ activeModule, setActiveModule
                           user.user_function === 'Closer' || 
                           user.user_function === 'Gestor';
     const canSeeOKRManager = allowOKRLocal || user.role === UserRole.SuperAdmin || user.role === UserRole.Admin;
+    const canSeeGGVTalent = user.role !== UserRole.User;
+    const canSeeCalculadora = canAccessCalculadora(user);
+    const canSeeCalls = canAccessCalls(user);
 
     const apps: AppItem[] = [
         { 
@@ -87,14 +91,14 @@ const AppLauncher: React.FC<AppLauncherProps> = ({ activeModule, setActiveModule
             name: 'Chamadas', 
             icon: <PhoneIcon className="w-6 h-6" />,
             iconBgColor: 'bg-green-100 text-green-600',
-            visible: true 
+            visible: canSeeCalls 
         },
         { 
             module: Module.Calculadora, 
             name: 'Calculadora', 
             icon: <CalculatorIcon className="w-6 h-6" />,
             iconBgColor: 'bg-purple-100 text-purple-600',
-            visible: true 
+            visible: canSeeCalculadora 
         },
         { 
             module: Module.OKRManager, 
@@ -122,7 +126,7 @@ const AppLauncher: React.FC<AppLauncherProps> = ({ activeModule, setActiveModule
             name: 'GGV Talent', 
             icon: <SparklesIcon className="w-6 h-6" />,
             iconBgColor: 'bg-amber-100 text-amber-500',
-            visible: true 
+            visible: canSeeGGVTalent 
         },
         { 
             module: Module.ReativacaoLeads, 

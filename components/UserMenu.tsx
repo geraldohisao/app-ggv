@@ -3,11 +3,14 @@ import { Module, UserRole } from '../types';
 import { 
     ArrowLeftOnRectangleIcon,
     Cog6ToothIcon,
-    ChatBubbleLeftRightIcon
+    ChatBubbleLeftRightIcon,
+    EyeIcon
 } from './ui/icons';
 import { useUser } from '../contexts/DirectUserContext';
 import { navigateToModule } from '../utils/router';
 import FeedbackSidebar from './ui/FeedbackSidebar';
+import UserImpersonationModal from './admin/UserImpersonationModal';
+import { canImpersonate } from '../utils/sessionUtils';
 
 
 interface UserMenuProps {
@@ -17,9 +20,10 @@ interface UserMenuProps {
 }
 
 const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLogout }) => {
-    const { user } = useUser();
+    const { user, isImpersonating, originalUser, stopImpersonation } = useUser();
     const [isOpen, setIsOpen] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [showImpersonation, setShowImpersonation] = useState(false);
     const [imgError, setImgError] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const dropdown = useRef<HTMLDivElement>(null);
@@ -70,6 +74,16 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
         setShowFeedback(true);
         setIsOpen(false);
     }
+
+    const openImpersonation = () => {
+        setShowImpersonation(true);
+        setIsOpen(false);
+    }
+
+    const handleStopImpersonation = () => {
+        stopImpersonation();
+        setIsOpen(false);
+    }
     
     if (!user) {
         return null;
@@ -77,17 +91,23 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
 
     const isGestor = user.user_function === 'Gestor';
     const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor;
+    
+    // Check if user can impersonate (use originalUser email if impersonating)
+    const realUserEmail = originalUser?.email || user.email;
+    const canUseImpersonation = canImpersonate(realUserEmail);
 
     return (
         <div className="relative inline-flex">
             <button
                 ref={trigger}
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex justify-center items-center group"
+                className="inline-flex justify-center items-center group relative"
                 aria-haspopup="true"
                 aria-expanded={isOpen}
             >
-                <div className="w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden">
+                <div className={`w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden ${
+                    isImpersonating ? 'ring-2 ring-amber-500 ring-offset-2' : ''
+                }`}>
                     {user.avatar_url && !imgError ? (
                         <img 
                             src={user.avatar_url} 
@@ -100,6 +120,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                         user.initials
                     )}
                 </div>
+                {isImpersonating && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
+                        <EyeIcon className="w-2.5 h-2.5 text-white" />
+                    </div>
+                )}
             </button>
 
             {isOpen && (
@@ -107,10 +132,22 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                     ref={dropdown}
                     onFocus={() => setIsOpen(true)}
                     onBlur={() => setIsOpen(false)}
-                    className="origin-top-right z-50 absolute top-full right-0 min-w-64 bg-white border border-slate-200 py-1.5 rounded-lg shadow-lg overflow-hidden mt-2"
+                    className="origin-top-right z-[9999] absolute top-full right-0 min-w-64 bg-white border border-slate-200 py-1.5 rounded-lg shadow-lg overflow-hidden mt-2"
                 >
+                    {/* Impersonation notice in dropdown */}
+                    {isImpersonating && originalUser && (
+                        <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                            <EyeIcon className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                            <span className="text-xs text-amber-800">
+                                Visualizando como outro usuário
+                            </span>
+                        </div>
+                    )}
+
                     <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden flex-shrink-0">
+                        <div className={`w-10 h-10 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden flex-shrink-0 ${
+                            isImpersonating ? 'ring-2 ring-amber-400' : ''
+                        }`}>
                             {user.avatar_url && !imgError ? (
                                 <img 
                                     src={user.avatar_url} 
@@ -144,8 +181,37 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                                 onClick={() => handleSelectModule(Module.Settings)}
                             />
                         )}
+                        {canUseImpersonation && (
+                            <MenuItem 
+                                icon={<EyeIcon className="w-5 h-5"/>} 
+                                text="Trocar Visão" 
+                                isActive={false}
+                                onClick={openImpersonation}
+                            />
+                        )}
                     </ul>
                     
+                     {/* Stop impersonation button */}
+                     {isImpersonating && originalUser && (
+                        <>
+                            <div className="border-t border-slate-200 my-1"></div>
+                            <ul>
+                                <li className="font-medium text-sm text-amber-700 hover:bg-amber-50">
+                                    <a 
+                                        className="flex items-center py-2 px-4" 
+                                        href="#0" 
+                                        onClick={(e) => { e.preventDefault(); handleStopImpersonation(); }}
+                                    >
+                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
+                                        </svg>
+                                        <span>Voltar para {originalUser.name?.split(' ')[0]}</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </>
+                     )}
+
                      <div className="border-t border-slate-200 my-1"></div>
                      <ul>
                           <li className="font-medium text-sm text-red-600 hover:bg-red-50">
@@ -163,6 +229,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                 isOpen={showFeedback} 
                 onClose={() => setShowFeedback(false)} 
             />
+
+            {/* User Impersonation Modal */}
+            {canUseImpersonation && (
+                <UserImpersonationModal
+                    isOpen={showImpersonation}
+                    onClose={() => setShowImpersonation(false)}
+                />
+            )}
         </div>
     );
 };

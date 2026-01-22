@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseLocalDate } from '../utils/date';
 
 // ============================================
 // ENUMS
@@ -43,6 +44,9 @@ export const KeyResultType = {
 export const KeyResultDirection = {
   INCREASE: 'increase',
   DECREASE: 'decrease',
+  AT_MOST: 'at_most',
+  AT_LEAST: 'at_least',
+  IN_BETWEEN: 'in_between',
 } as const;
 
 // ============================================
@@ -65,12 +69,17 @@ export const keyResultSchema = z.object({
   direction: z.enum([
     KeyResultDirection.INCREASE,
     KeyResultDirection.DECREASE,
+    KeyResultDirection.AT_MOST,
+    KeyResultDirection.AT_LEAST,
+    KeyResultDirection.IN_BETWEEN,
   ]).optional(),
 
   start_value: z.number().nullable().optional(),
   current_value: z.number().nullable().optional(),
   target_value: z.number().nullable().optional(),
+  target_max: z.number().nullable().optional(), // Para direção "in_between" (faixa: target_value até target_max)
   unit: z.string().optional(),
+  position: z.number().nullable().optional(),
   weight: z.number().min(0).max(100).nullable().optional(),
 
   // Para atividades
@@ -83,6 +92,8 @@ export const keyResultSchema = z.object({
     KeyResultStatus.RED,
   ]),
   description: z.string().nullable().optional(), // Aceita null, undefined ou string
+  responsible_user_id: z.string().uuid().nullable().optional(), // Responsável pelo KR
+  show_in_cockpit: z.boolean().nullable().optional(), // Flag para exibir no dashboard estratégico (Cockpit)
   updated_at: z.string().optional(),
   last_checkin_at: z.string().optional(),
   last_checkin_comment: z.string().optional(),
@@ -126,8 +137,8 @@ export const okrSchema = z.object({
   key_results: z.array(keyResultSchema).min(1, 'Pelo menos 1 Key Result é obrigatório').optional(),
 }).refine(
   (data) => {
-    const start = new Date(data.start_date);
-    const end = new Date(data.end_date);
+    const start = parseLocalDate(data.start_date);
+    const end = parseLocalDate(data.end_date);
     return start <= end;
   },
   {
@@ -207,6 +218,13 @@ function calculateProgressDecreasing(
 export function calculateKeyResultProgress(kr: KeyResult): KeyResultProgress {
   // Atividade: 0% ou 100%
   if (kr.type === KeyResultType.ACTIVITY) {
+    if (kr.activity_progress !== null && kr.activity_progress !== undefined) {
+      return {
+        percentage: Math.max(0, Math.min(100, kr.activity_progress)),
+        status: kr.status,
+        isOverTarget: false,
+      };
+    }
     const percentage = kr.activity_done ? 100 : 0;
     return {
       percentage,
@@ -218,6 +236,18 @@ export function calculateKeyResultProgress(kr: KeyResult): KeyResultProgress {
   const start = kr.start_value ?? 0;
   const current = kr.current_value ?? 0;
   const target = kr.target_value ?? 0;
+
+  const isAllZero =
+    (kr.start_value === null || kr.start_value === undefined || kr.start_value === 0) &&
+    (kr.current_value === null || kr.current_value === undefined || kr.current_value === 0) &&
+    (kr.target_value === null || kr.target_value === undefined || kr.target_value === 0);
+  if (isAllZero) {
+    return {
+      percentage: 0,
+      status: kr.status,
+      isOverTarget: false,
+    };
+  }
 
   // Se não tem direção definida, usar lógica antiga (simples) mas com clamp
   if (!kr.direction) {
@@ -233,18 +263,73 @@ export function calculateKeyResultProgress(kr: KeyResult): KeyResultProgress {
 
   // Usar nova lógica com direção
   let percentage = 0;
-  if (kr.direction === KeyResultDirection.INCREASE) {
-    percentage = calculateProgressIncreasing(start, current, target);
-  } else if (kr.direction === KeyResultDirection.DECREASE) {
-    percentage = calculateProgressDecreasing(start, current, target);
+  let isOverTarget = false;
+  const targetMax = kr.target_max ?? target;
+
+  switch (kr.direction) {
+    case KeyResultDirection.INCREASE:
+      // Aumentar: mais é melhor (atual → meta)
+      percentage = calculateProgressIncreasing(start, current, target);
+      isOverTarget = current > target;
+      break;
+
+    case KeyResultDirection.DECREASE:
+      // Diminuir: menos é melhor (atual → meta)
+      percentage = calculateProgressDecreasing(start, current, target);
+      isOverTarget = current < target;
+      break;
+
+    case KeyResultDirection.AT_MOST:
+      // No máximo: 100% se atual <= meta, senão calcula quanto passou
+      if (current <= target) {
+        percentage = 100;
+        isOverTarget = false;
+      } else {
+        // Quanto mais passa da meta, menor o progresso
+        const excess = current - target;
+        const tolerance = target * 0.5; // 50% de tolerância
+        percentage = Math.max(0, 100 - (excess / tolerance) * 100);
+        isOverTarget = true;
+      }
+      break;
+
+    case KeyResultDirection.AT_LEAST:
+      // No mínimo: 100% se atual >= meta, senão calcula progresso
+      if (current >= target) {
+        percentage = 100;
+        isOverTarget = current > target;
+      } else {
+        percentage = target > 0 ? (current / target) * 100 : 0;
+        isOverTarget = false;
+      }
+      break;
+
+    case KeyResultDirection.IN_BETWEEN:
+      // Entre: 100% se está na faixa, senão calcula distância
+      if (current >= target && current <= targetMax) {
+        percentage = 100;
+        isOverTarget = false;
+      } else if (current < target) {
+        // Abaixo do mínimo
+        percentage = target > 0 ? (current / target) * 100 : 0;
+        isOverTarget = false;
+      } else {
+        // Acima do máximo
+        const excess = current - targetMax;
+        const tolerance = (targetMax - target) || targetMax * 0.5;
+        percentage = Math.max(0, 100 - (excess / tolerance) * 100);
+        isOverTarget = true;
+      }
+      break;
+
+    default:
+      percentage = target > 0 ? (current / target) * 100 : 0;
   }
 
   return {
-    percentage,
+    percentage: Math.max(0, Math.min(150, percentage)),
     status: kr.status,
-    isOverTarget: kr.direction === KeyResultDirection.INCREASE
-      ? current > target
-      : current < target,
+    isOverTarget,
   };
 }
 
@@ -275,7 +360,7 @@ export interface OKRWithProgressView extends OKR {
 
 export function isOKROverdue(okr: OKR): boolean {
   const today = new Date();
-  const endDate = new Date(okr.end_date);
+  const endDate = parseLocalDate(okr.end_date);
   return endDate < today && okr.status !== OKRStatus.COMPLETED;
 }
 
@@ -322,7 +407,7 @@ export function getDepartmentLabel(department: Department): string {
 }
 
 export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseLocalDate(dateString);
   return date.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -333,4 +418,3 @@ export function formatDate(dateString: string): string {
 export function formatDateRange(startDate: string, endDate: string): string {
   return `${formatDate(startDate)} - ${formatDate(endDate)}`;
 }
-

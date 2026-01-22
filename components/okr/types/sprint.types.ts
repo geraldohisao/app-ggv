@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Department } from './okr.types';
+import { parseLocalDate } from '../utils/date';
 
 // ============================================
 // ENUMS
@@ -63,6 +64,24 @@ export const ImpedimentStatus = {
   RESOLVED: 'resolvido',
 } as const;
 
+export const AttachmentType = {
+  LINK: 'link',
+  FILE: 'file',
+} as const;
+
+export const LinkType = {
+  DRIVE: 'drive',
+  NOTION: 'notion',
+  FIGMA: 'figma',
+  MIRO: 'miro',
+  SHEETS: 'sheets',
+  DOCS: 'docs',
+  SLIDES: 'slides',
+  YOUTUBE: 'youtube',
+  LOOM: 'loom',
+  OTHER: 'other',
+} as const;
+
 // ============================================
 // ZOD SCHEMAS
 // ============================================
@@ -92,6 +111,7 @@ export const sprintItemSchema = z.object({
   project_id: z.string().uuid().optional(),
   okr_id: z.string().uuid().nullable().optional(),
   kr_id: z.string().uuid().nullable().optional(),
+  checkin_id: z.string().uuid().nullable().optional(), // ID do check-in que originou este item
   decision_type: z.enum([
     DecisionType.OKR_ADJUSTMENT,
     DecisionType.PRIORITIZATION,
@@ -121,6 +141,8 @@ export const sprintItemSchema = z.object({
 export const sprintSchema = z.object({
   id: z.string().uuid().optional(),
   okr_id: z.string().uuid().nullable().optional(),
+  responsible: z.string().optional(),
+  responsible_user_id: z.string().uuid().nullable().optional(),
   type: z.enum([
     SprintType.WEEKLY,
     SprintType.MONTHLY,
@@ -145,7 +167,7 @@ export const sprintSchema = z.object({
   }),
   end_date: z.string().refine((date) => !isNaN(Date.parse(date)), {
     message: 'Data de término inválida',
-  }),
+  }).nullable().optional(), // Permite sprints contínuas (sem data fim)
   status: z.enum([
     SprintStatus.PLANNED,
     SprintStatus.IN_PROGRESS,
@@ -161,8 +183,10 @@ export const sprintSchema = z.object({
   items: z.array(sprintItemSchema).optional(),
 }).refine(
   (data) => {
-    const start = new Date(data.start_date);
-    const end = new Date(data.end_date);
+    // Só validar se end_date existir (sprints contínuas não têm end_date)
+    if (!data.end_date) return true;
+    const start = parseLocalDate(data.start_date);
+    const end = parseLocalDate(data.end_date);
     return start <= end;
   },
   {
@@ -196,6 +220,42 @@ export const projectSchema = z.object({
 
 export type Project = z.infer<typeof projectSchema>;
 
+// Schema para anexos da sprint
+export const sprintAttachmentSchema = z.object({
+  id: z.string().uuid().optional(),
+  sprint_id: z.string().uuid(),
+  type: z.enum([AttachmentType.LINK, AttachmentType.FILE]),
+  
+  // Para links externos
+  url: z.string().url().optional(),
+  link_type: z.enum([
+    LinkType.DRIVE,
+    LinkType.NOTION,
+    LinkType.FIGMA,
+    LinkType.MIRO,
+    LinkType.SHEETS,
+    LinkType.DOCS,
+    LinkType.SLIDES,
+    LinkType.YOUTUBE,
+    LinkType.LOOM,
+    LinkType.OTHER,
+  ]).optional(),
+  
+  // Para arquivos uploadados
+  file_name: z.string().optional(),
+  file_path: z.string().optional(),
+  file_size: z.number().optional(),
+  file_type: z.string().optional(),
+  
+  // Metadados comuns
+  title: z.string().min(1, 'Título é obrigatório'),
+  description: z.string().optional(),
+  
+  // Histórico
+  created_by: z.string().optional(),
+  created_at: z.string().optional(),
+});
+
 // ============================================
 // TYPESCRIPT TYPES
 // ============================================
@@ -208,10 +268,35 @@ export type SprintItemStatus = typeof SprintItemStatus[keyof typeof SprintItemSt
 export type DecisionType = typeof DecisionType[keyof typeof DecisionType];
 export type DecisionStatus = typeof DecisionStatus[keyof typeof DecisionStatus];
 export type ImpedimentStatus = typeof ImpedimentStatus[keyof typeof ImpedimentStatus];
+export type AttachmentType = typeof AttachmentType[keyof typeof AttachmentType];
+export type LinkType = typeof LinkType[keyof typeof LinkType];
 
 export type SprintItem = z.infer<typeof sprintItemSchema>;
 export type Sprint = z.infer<typeof sprintSchema>;
 export type KRCheckin = z.infer<typeof krCheckinSchema>;
+export type SprintAttachment = z.infer<typeof sprintAttachmentSchema>;
+
+export interface SprintItemSuggestion {
+  id: string;
+  sprint_id: string;
+  checkin_id: string;
+  type: SprintItemType;
+  title: string;
+  status?: SprintItemStatus | string | null;
+  source_field?: string | null;
+  suggested_action: 'create' | 'update';
+  existing_item_id?: string | null;
+  applied_item_id?: string | null;
+  match_confidence?: number | null;
+  suggestion_reason?: string | null;
+  suggested_description?: string | null;
+  suggestion_status: 'pending' | 'accepted' | 'rejected';
+  decided_at?: string | null;
+  decided_by?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
 // ============================================
 // HELPER TYPES
@@ -247,6 +332,8 @@ export interface SprintFilters {
   department?: Department;
   status?: SprintStatus;
   search?: string;
+  visibilityDepartment?: string;
+  visibilityOkrIds?: string[];
 }
 
 // ============================================
@@ -471,13 +558,17 @@ export function getSprintItemsByType(items: SprintItem[]): Record<SprintItemType
 
 export function isSprintActive(sprint: Sprint): boolean {
   const today = new Date();
-  const start = new Date(sprint.start_date);
-  const end = new Date(sprint.end_date);
+  const start = parseLocalDate(sprint.start_date);
+  // Sprints contínuas (sem end_date) são sempre ativas após o início
+  if (!sprint.end_date) {
+    return start <= today;
+  }
+  const end = parseLocalDate(sprint.end_date);
   return start <= today && today <= end;
 }
 
 export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseLocalDate(dateString);
   return date.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -485,7 +576,10 @@ export function formatDate(dateString: string): string {
   });
 }
 
-export function formatDateRange(startDate: string, endDate: string): string {
+export function formatDateRange(startDate: string, endDate: string | null | undefined): string {
+  if (!endDate) {
+    return `${formatDate(startDate)} - ∞ Contínua`;
+  }
   return `${formatDate(startDate)} - ${formatDate(endDate)}`;
 }
 

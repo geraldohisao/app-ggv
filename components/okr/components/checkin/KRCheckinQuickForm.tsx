@@ -8,7 +8,7 @@ interface KRCheckinQuickFormProps {
     current_value: number;
     target_value: number;
     unit?: string;
-    direction: 'increase' | 'decrease';
+    direction: 'increase' | 'decrease' | 'at_most' | 'at_least' | 'in_between';
   };
   sprintId?: string;
   onSubmit: (value: number, comment: string, confidence: 'baixa' | 'média' | 'alta') => Promise<void>;

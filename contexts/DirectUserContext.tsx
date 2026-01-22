@@ -3,13 +3,27 @@ import { User, UserRole } from '../types';
 import { DirectAuth } from '../components/auth/DirectAuth';
 import { supabase } from '../services/supabaseClient';
 import { useSessionKeepAlive } from '../hooks/useSessionKeepAlive';
-import { isSessionValid, clearSession, saveSession, getSessionInfo } from '../utils/sessionUtils';
+import { 
+    isSessionValid, 
+    clearSession, 
+    saveSession, 
+    getSessionInfo,
+    canImpersonate,
+    saveImpersonation,
+    getImpersonation,
+    clearImpersonation
+} from '../utils/sessionUtils';
 
 interface UserContextType {
     user: User | null;
     loading: boolean;
     logout: () => void;
     refreshUser: () => Promise<void>;
+    // Impersonation
+    isImpersonating: boolean;
+    originalUser: User | null;
+    startImpersonation: (userId: string) => Promise<boolean>;
+    stopImpersonation: () => void;
 }
 
 export const UserContext = createContext<UserContextType>({
@@ -17,6 +31,11 @@ export const UserContext = createContext<UserContextType>({
     loading: true,
     logout: () => {},
     refreshUser: async () => {},
+    // Impersonation defaults
+    isImpersonating: false,
+    originalUser: null,
+    startImpersonation: async () => false,
+    stopImpersonation: () => {},
 });
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -24,6 +43,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
     const [showAuth, setShowAuth] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
+    
+    // Impersonation state
+    const [isImpersonating, setIsImpersonating] = useState(false);
+    const [originalUser, setOriginalUser] = useState<User | null>(null);
     
     // Ativar keep-alive da sessão apenas quando usuário estiver logado
     useSessionKeepAlive();
@@ -42,7 +65,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // Salvar novamente para renovar timestamp automaticamente
                 saveSession(sessionInfo.user);
                 
-                setUser(sessionInfo.user);
+                // Verificar se há uma impersonação ativa
+                const impersonation = getImpersonation();
+                if (impersonation && impersonation.impersonatedUser) {
+                    console.log('👤 DIRECT CONTEXT - Impersonação ativa encontrada:', impersonation.impersonatedUser.email);
+                    setOriginalUser(impersonation.originalUser);
+                    setUser(impersonation.impersonatedUser);
+                    setIsImpersonating(true);
+                } else {
+                    setUser(sessionInfo.user);
+                }
+                
                 setLoading(false);
                 setShowAuth(false);
                 // Auto-refresh não bloqueante se função comercial estiver ausente/antiga
@@ -282,8 +315,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.warn('⚠️ DIRECT CONTEXT - Erro ao limpar sessão Supabase:', e);
         }
         
-        // Limpar storage local usando utilitário
+        // Limpar storage local usando utilitário (inclui impersonação)
         clearSession();
+        
+        // Limpar estados de impersonação
+        setOriginalUser(null);
+        setIsImpersonating(false);
         
         setUser(null);
         setShowAuth(true);
@@ -335,12 +372,109 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    // ========================================
+    // IMPERSONATION FUNCTIONS
+    // ========================================
+
+    const startImpersonation = async (userId: string): Promise<boolean> => {
+        // Verificar se o usuário atual tem permissão
+        const currentUser = originalUser || user;
+        if (!currentUser || !canImpersonate(currentUser.email)) {
+            console.error('❌ DIRECT CONTEXT - Usuário não tem permissão para impersonação');
+            return false;
+        }
+
+        if (!supabase) {
+            console.error('❌ DIRECT CONTEXT - Supabase não inicializado');
+            return false;
+        }
+
+        try {
+            console.log('👤 DIRECT CONTEXT - Iniciando impersonação para userId:', userId);
+            
+            // Buscar dados do perfil alvo
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('id, email, name, role, department, cargo, user_function, avatar_url')
+                .eq('id', userId)
+                .single();
+
+            if (error || !profile) {
+                console.error('❌ DIRECT CONTEXT - Erro ao buscar perfil para impersonação:', error);
+                return false;
+            }
+
+            // Montar o usuário impersonado
+            const impersonatedUser: User = {
+                id: profile.id,
+                email: profile.email || '',
+                name: profile.name || profile.email?.split('@')[0] || 'Usuário',
+                initials: (profile.name || profile.email || 'U')
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase(),
+                role: (profile.role as UserRole) || UserRole.User,
+                department: profile.department,
+                cargo: profile.cargo,
+                user_function: profile.user_function as 'SDR' | 'Closer' | 'Gestor' | 'Analista de Marketing' | undefined,
+                avatar_url: profile.avatar_url
+            };
+
+            // Salvar o estado de impersonação
+            const realOriginalUser = originalUser || user;
+            saveImpersonation(realOriginalUser, impersonatedUser);
+            
+            // Atualizar estados
+            if (!originalUser) {
+                setOriginalUser(user);
+            }
+            setUser(impersonatedUser);
+            setIsImpersonating(true);
+
+            console.log('✅ DIRECT CONTEXT - Impersonação ativada:', impersonatedUser.email);
+            return true;
+        } catch (error) {
+            console.error('❌ DIRECT CONTEXT - Erro ao iniciar impersonação:', error);
+            return false;
+        }
+    };
+
+    const stopImpersonation = () => {
+        if (!isImpersonating || !originalUser) {
+            console.warn('⚠️ DIRECT CONTEXT - Não há impersonação ativa para encerrar');
+            return;
+        }
+
+        console.log('👤 DIRECT CONTEXT - Encerrando impersonação, voltando para:', originalUser.email);
+        
+        // Limpar impersonação do storage
+        clearImpersonation();
+        
+        // Restaurar usuário original
+        setUser(originalUser);
+        setOriginalUser(null);
+        setIsImpersonating(false);
+
+        console.log('✅ DIRECT CONTEXT - Impersonação encerrada');
+    };
+
     const isPublicOrganograma = typeof window !== 'undefined' && window.location.pathname.startsWith('/organograma-publico');
 
     // Se deve mostrar autenticação
     if (showAuth && !isPublicOrganograma) {
         return (
-            <UserContext.Provider value={{ user, loading, logout, refreshUser }}>
+            <UserContext.Provider value={{ 
+                user, 
+                loading, 
+                logout, 
+                refreshUser,
+                isImpersonating,
+                originalUser,
+                startImpersonation,
+                stopImpersonation
+            }}>
                 <DirectAuth 
                     onAuthSuccess={handleAuthSuccess}
                     onAuthError={handleAuthError}
@@ -355,7 +489,16 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     return (
-        <UserContext.Provider value={{ user, loading, logout, refreshUser }}>
+        <UserContext.Provider value={{ 
+            user, 
+            loading, 
+            logout, 
+            refreshUser,
+            isImpersonating,
+            originalUser,
+            startImpersonation,
+            stopImpersonation
+        }}>
             {children}
         </UserContext.Provider>
     );

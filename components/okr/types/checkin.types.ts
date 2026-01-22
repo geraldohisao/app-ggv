@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseLocalDate } from '../utils/date';
 
 // ============================================
 // KR CHECK-IN (Histórico de Valores)
@@ -92,7 +93,7 @@ export type SprintTemplate = z.infer<typeof sprintTemplateSchema>;
 export interface KRCheckinWithDetails extends KRCheckin {
   kr_title?: string;
   kr_unit?: string;
-  kr_direction?: 'increase' | 'decrease';
+  kr_direction?: 'increase' | 'decrease' | 'at_most' | 'at_least' | 'in_between';
   sprint_title?: string;
 }
 
@@ -124,7 +125,7 @@ export interface KRWithLatestCheckin {
   current_value: number;
   target_value: number;
   unit?: string;
-  direction: 'increase' | 'decrease';
+  direction: 'increase' | 'decrease' | 'at_most' | 'at_least' | 'in_between';
   status: string;
   progress: number;
   latest_checkin?: KRCheckin;
@@ -179,7 +180,7 @@ export function getHealthEmoji(health: 'verde' | 'amarelo' | 'vermelho'): string
 }
 
 export function formatCheckinDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseLocalDate(dateString);
   return date.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'short',

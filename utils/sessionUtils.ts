@@ -81,14 +81,16 @@ export const getSessionInfo = () => {
 };
 
 /**
- * Limpa completamente a sessão do usuário
+ * Limpa completamente a sessão do usuário (incluindo impersonação)
  */
 export const clearSession = (): void => {
   localStorage.removeItem('ggv-user');
   localStorage.removeItem('ggv-user-timestamp');
+  localStorage.removeItem('ggv-impersonation');
   sessionStorage.removeItem('ggv-user');
   sessionStorage.removeItem('ggv-user-timestamp');
-  console.log('🧹 SESSION UTILS - Sessão completamente limpa');
+  sessionStorage.removeItem('ggv-impersonation');
+  console.log('🧹 SESSION UTILS - Sessão completamente limpa (incluindo impersonação)');
 };
 
 /**
@@ -118,4 +120,67 @@ export const saveSession = (user: any): void => {
   sessionStorage.setItem('ggv-user-timestamp', timestamp);
   
   console.log('💾 SESSION UTILS - Nova sessão salva (100h de duração)');
+};
+
+// ========================================
+// IMPERSONATION (Troca de visão de usuário)
+// ========================================
+
+const IMPERSONATION_KEY = 'ggv-impersonation';
+
+// Emails autorizados a usar impersonação
+export const IMPERSONATION_ALLOWED_EMAILS = [
+  'geraldo@grupoggv.com',
+  'geraldo@ggvinteligencia.com.br',
+];
+
+/**
+ * Verifica se o email tem permissão para usar impersonação
+ */
+export const canImpersonate = (email: string | undefined): boolean => {
+  if (!email) return false;
+  return IMPERSONATION_ALLOWED_EMAILS.includes(email.toLowerCase());
+};
+
+interface ImpersonationState {
+  originalUser: any;
+  impersonatedUser: any;
+}
+
+/**
+ * Salva o estado de impersonação
+ */
+export const saveImpersonation = (originalUser: any, impersonatedUser: any): void => {
+  const state: ImpersonationState = { originalUser, impersonatedUser };
+  const stateJson = JSON.stringify(state);
+  
+  localStorage.setItem(IMPERSONATION_KEY, stateJson);
+  sessionStorage.setItem(IMPERSONATION_KEY, stateJson);
+  
+  console.log('👤 SESSION UTILS - Impersonação salva:', impersonatedUser.email);
+};
+
+/**
+ * Obtém o estado de impersonação atual
+ */
+export const getImpersonation = (): ImpersonationState | null => {
+  const stateJson = localStorage.getItem(IMPERSONATION_KEY) || sessionStorage.getItem(IMPERSONATION_KEY);
+  
+  if (!stateJson) return null;
+  
+  try {
+    return JSON.parse(stateJson) as ImpersonationState;
+  } catch (error) {
+    console.error('❌ SESSION UTILS - Erro ao parsear impersonação:', error);
+    return null;
+  }
+};
+
+/**
+ * Limpa o estado de impersonação
+ */
+export const clearImpersonation = (): void => {
+  localStorage.removeItem(IMPERSONATION_KEY);
+  sessionStorage.removeItem(IMPERSONATION_KEY);
+  console.log('🧹 SESSION UTILS - Impersonação limpa');
 };

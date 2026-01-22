@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { sprintCheckinSchema, calculateMetricsFromItems, getHealthColor } from '../../types/checkin.types';
 import { useToast, ToastContainer } from '../shared/Toast';
 import * as checkinService from '../../services/checkin.service';
+import * as checkinAI from '../../services/checkinAI.service';
 
 interface SprintCheckinFormProps {
   sprintId: string;
@@ -24,6 +25,12 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingCheckin, setExistingCheckin] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+  const [transcription, setTranscription] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [createdCheckinId, setCreatedCheckinId] = useState<string | null>(null);
+  const [postSaveSuggestions, setPostSaveSuggestions] = useState<any[]>([]);
+  const [showPostSaveSuggestions, setShowPostSaveSuggestions] = useState(false);
   const { toasts, addToast, removeToast } = useToast();
 
   // Buscar check-in existente APENAS DE HOJE (mesmo dia)
@@ -139,6 +146,49 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
 
   const health = watch('health');
 
+  const handleAIAnalysis = async () => {
+    if (!transcription || transcription.trim().length < 50) {
+      addToast('❌ Cole uma transcrição com pelo menos 50 caracteres', 'error');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const result = await checkinAI.analyzeCheckinTranscription(transcription, isGovernance);
+      
+      // Preencher formulário com os resultados da IA
+      reset({
+        sprint_id: sprintId,
+        summary: result.summary || autoSummary,
+        // Campos de Execução
+        achievements: result.achievements || initialAchievements,
+        blockers: result.blockers || initialBlockers,
+        decisions_taken: result.decisions_taken || initialDecisions,
+        next_focus: result.next_focus || '',
+        // Campos de Governança
+        learnings: result.learnings || '',
+        okr_misalignments: result.okr_misalignments || '',
+        keep_doing: result.keep_doing || '',
+        stop_doing: result.stop_doing || '',
+        adjust_doing: result.adjust_doing || '',
+        strategic_recommendations: result.strategic_recommendations || '',
+        identified_risks: result.identified_risks || '',
+        // Campos comuns
+        health: result.health,
+        health_reason: result.health_reason || '',
+        notes: result.notes || ''
+      });
+
+      addToast('Transcrição analisada. Revise os campos e edite se necessário.', 'success');
+      setShowAIAnalysis(false);
+      setTranscription('');
+    } catch (error: any) {
+      addToast(`❌ Erro ao analisar: ${error.message}`, 'error');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const onSubmit = async (data: any) => {
     // Validação adicional antes de enviar
     if (!data.summary || data.summary.trim().length < 10) {
@@ -164,19 +214,44 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
           return;
         }
 
-        // Modo edição: atualizar check-in existente
-        await checkinService.updateSprintCheckin(existingCheckin.id, data);
+        // Modo edição: atualizar check-in (NÃO criar items novamente)
+        await checkinService.updateSprintCheckin(existingCheckin.id, data, {
+          regenerateSuggestions: true,
+          sprintScope
+        });
         addToast('✅ Check-in de hoje atualizado com sucesso!', 'success');
+
+        setCreatedCheckinId(existingCheckin.id);
+        const suggestions = await checkinService.listSprintItemSuggestionsByCheckin(existingCheckin.id, 'pending');
+        setPostSaveSuggestions(suggestions || []);
+        if (suggestions && suggestions.length > 0) {
+          setShowPostSaveSuggestions(true);
+          return;
+        }
       } else {
-        // Modo criação: criar novo check-in
-        await checkinService.createSprintCheckin(sprintId, data, sprintItems);
+        // Modo criação: criar novo check-in + sugestões automaticamente
+        const created = await checkinService.createSprintCheckin(sprintId, data, sprintItems, sprintScope);
         addToast('✅ Check-in registrado com sucesso!', 'success');
+        onSuccess();
+
+        if (created?.id) {
+          setCreatedCheckinId(created.id);
+          const suggestions = await checkinService.listSprintItemSuggestionsByCheckin(created.id, 'pending');
+          setPostSaveSuggestions(suggestions || []);
+          if (suggestions && suggestions.length > 0) {
+            setShowPostSaveSuggestions(true);
+            return;
+          }
+        }
+        onClose();
       }
       
-      setTimeout(() => {
-        onSuccess();
-        onClose();
-      }, 500);
+      if (isEditMode) {
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 500);
+      }
     } catch (error: any) {
       if (error.message?.includes('Já existe um check-in')) {
         addToast('⚠️ Já existe um check-in para hoje. Aguarde até amanhã para criar novo.', 'warning');
@@ -186,6 +261,17 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAcceptSuggestion = async (suggestion: any) => {
+    await checkinService.acceptSprintItemSuggestion(suggestion);
+    setPostSaveSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+    onSuccess();
+  };
+
+  const handleRejectSuggestion = async (suggestionId: string) => {
+    await checkinService.rejectSprintItemSuggestion(suggestionId);
+    setPostSaveSuggestions(prev => prev.filter(s => s.id !== suggestionId));
   };
 
   return (
@@ -221,6 +307,174 @@ export const SprintCheckinForm: React.FC<SprintCheckinFormProps> = ({
           </header>
 
           <form onSubmit={handleSubmit(onSubmit)} className="p-10 space-y-8 max-h-[calc(90vh-140px)] overflow-y-auto">
+
+            {showPostSaveSuggestions && (
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-black text-purple-900">Sugestões do Check-in</h3>
+                    <p className="text-xs text-purple-700">Aprove ou rejeite as sugestões antes de fechar.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all"
+                  >
+                    Fechar
+                  </button>
+                </div>
+
+                {postSaveSuggestions.length === 0 ? (
+                  <p className="text-sm text-purple-700 bg-purple-100 rounded-lg p-3">
+                    Nenhuma sugestão pendente.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {postSaveSuggestions.map((suggestion: any) => {
+                      const typeColor =
+                        suggestion.type === 'iniciativa' ? 'blue' :
+                        suggestion.type === 'impedimento' ? 'rose' :
+                        'purple';
+
+                      return (
+                        <div key={suggestion.id} className={`bg-white rounded-xl p-3 border-2 border-${typeColor}-200 flex items-start gap-3`}>
+                          <div className={`w-6 h-6 rounded-full bg-${typeColor}-100 flex items-center justify-center flex-shrink-0`}>
+                            <span className="text-sm">
+                              {suggestion.type === 'iniciativa' ? '🎯' : suggestion.type === 'impedimento' ? '⚠️' : '💬'}
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-${typeColor}-100 text-${typeColor}-700`}>
+                                {suggestion.type}
+                              </span>
+                              <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                                {suggestion.suggested_action === 'update' ? 'ATUALIZAR' : 'CRIAR'}
+                              </span>
+                              {typeof suggestion.match_confidence === 'number' && suggestion.match_confidence > 0 && (
+                                <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                  {suggestion.match_confidence}%
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-sm font-bold text-${typeColor}-900`}>{suggestion.title}</p>
+                            {suggestion.suggested_description && (
+                              <p className={`text-xs text-${typeColor}-600/70 mt-1 italic`}>{suggestion.suggested_description}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-3">
+                              <button
+                                type="button"
+                                onClick={() => handleAcceptSuggestion(suggestion)}
+                                className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all"
+                              >
+                                Aceitar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectSuggestion(suggestion.id)}
+                                className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all"
+                              >
+                                Rejeitar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Botão IA - Análise de Transcrição */}
+            {!showAIAnalysis && (
+              <button
+                type="button"
+                onClick={() => setShowAIAnalysis(true)}
+                className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:shadow-lg hover:scale-105 transition-all"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                ✨ Analisar Transcrição com IA
+              </button>
+            )}
+
+            {/* Modal de Análise de IA */}
+            {showAIAnalysis && (
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-black text-purple-900 flex items-center gap-2">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Análise Inteligente de Transcrição
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAIAnalysis(false);
+                      setTranscription('');
+                    }}
+                    className="text-purple-400 hover:text-purple-600 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <p className="text-sm text-purple-700 mb-4 leading-relaxed">
+                  Cole a transcrição da reunião ou check-in abaixo. A IA irá extrair automaticamente as entregas, bloqueios, decisões e próximos passos.
+                </p>
+
+                <textarea
+                  value={transcription}
+                  onChange={(e) => setTranscription(e.target.value)}
+                  placeholder="Cole aqui a transcrição da reunião ou gravação de áudio...&#10;&#10;Exemplo:&#10;'Essa semana conseguimos concluir a integração com o CRM. Tivemos um problema com o servidor que ficou fora do ar por 2 dias, mas já foi resolvido. Decidimos contratar mais um SDR. Para a próxima semana vamos focar em fechar o pipeline de março.'"
+                  rows={8}
+                  className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all resize-none"
+                />
+
+                <div className="flex items-center gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={handleAIAnalysis}
+                    disabled={isAnalyzing || transcription.trim().length < 50}
+                    className="flex-1 py-3 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                        Analisando...
+                      </>
+                    ) : (
+                      <>
+                        ✨ Analisar com IA
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAIAnalysis(false);
+                      setTranscription('');
+                    }}
+                    className="px-6 py-3 text-purple-600 hover:bg-purple-100 rounded-xl font-bold transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+
+                <p className="text-xs text-purple-600 mt-3 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Após a análise, você poderá revisar e editar todos os campos antes de salvar.
+                </p>
+              </div>
+            )}
             
             {/* Aviso de Pré-população ou Edição */}
             <div className={`border-2 rounded-2xl p-4 flex items-start gap-3 ${

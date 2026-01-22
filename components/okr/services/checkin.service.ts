@@ -1,4 +1,9 @@
 import { supabase } from '../../../services/supabaseClient';
+import { updateOKRStatusFromActivity } from './okr.service';
+import { parseCheckinToItems } from './checkinParser.service';
+import { matchItemsWithAI } from './checkinMatcher.service';
+import * as sprintService from './sprint.service';
+import type { SprintItemSuggestion, SprintItem } from '../types/sprint.types';
 
 // Cache simples para evitar chamadas repetidas à tabela opcional sprint_okrs
 const SPRINT_OKRS_STORAGE_KEY = 'okr:sprint_okrs_available';
@@ -37,10 +42,20 @@ export interface SprintCheckin {
   sprint_id: string;
   checkin_date?: string;
   summary: string;
+  // Campos de Execução
   achievements?: string;
   blockers?: string;
   decisions_taken?: string;
   next_focus?: string;
+  // Campos de Governança
+  learnings?: string;
+  okr_misalignments?: string;
+  keep_doing?: string;
+  stop_doing?: string;
+  adjust_doing?: string;
+  strategic_recommendations?: string;
+  identified_risks?: string;
+  // Campos comuns
   health: 'verde' | 'amarelo' | 'vermelho';
   health_reason?: string;
   initiatives_completed?: number;
@@ -52,6 +67,111 @@ export interface SprintCheckin {
   notes?: string;
   created_by?: string;
   created_at?: string;
+}
+
+type SprintScope = 'execucao' | 'governanca';
+
+async function resolveUserId(): Promise<string | undefined> {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData?.user?.id) return userData.user.id;
+  } catch {
+    // Ignorar e tentar fallback abaixo
+  }
+
+  try {
+    const raw = typeof window !== 'undefined' ? (
+      localStorage.getItem('ggv-user') ||
+      sessionStorage.getItem('ggv-user') ||
+      localStorage.getItem('ggv-emergency-user')
+    ) : null;
+
+    if (raw) {
+      try {
+        const u = JSON.parse(raw);
+        return u?.id || u?.user_id || u?.user?.id || u?.user_metadata?.id;
+      } catch {
+        // noop
+      }
+    }
+
+    return localStorage.getItem('ggv_user_id') ||
+      localStorage.getItem('user_id') ||
+      sessionStorage.getItem('user_id') ||
+      undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function generateSuggestionsFromCheckin(
+  checkin: SprintCheckin,
+  sprintScope: SprintScope,
+  userId: string
+): Promise<number> {
+  if (!checkin?.id || !checkin?.sprint_id) {
+    console.warn('⚠️ Check-in inválido para gerar sugestões.');
+    return 0;
+  }
+
+  console.log('🤖 Iniciando parser de check-in para gerar sugestões...');
+
+  const parsedItems = parseCheckinToItems(checkin, sprintScope);
+  if (parsedItems.length === 0) {
+    console.log('ℹ️ Nenhum bullet point encontrado para criar items');
+    return 0;
+  }
+
+  console.log(`📋 Parser extraiu ${parsedItems.length} items`);
+
+  const { data: existingItems } = await supabase
+    .from('sprint_items')
+    .select('*')
+    .eq('sprint_id', checkin.sprint_id);
+
+  console.log(`📦 ${existingItems?.length || 0} items manuais existentes na sprint`);
+
+  const matches = await matchItemsWithAI(
+    parsedItems,
+    existingItems || [],
+    checkin.id
+  );
+
+  let suggestionCount = 0;
+
+  for (const match of matches) {
+    try {
+      const suggestedAction = match.shouldUpdate && match.existingItem ? 'update' : 'create';
+      const { error: suggestionError } = await supabase
+        .from('sprint_item_suggestions')
+        .insert({
+          sprint_id: checkin.sprint_id,
+          checkin_id: checkin.id,
+          type: match.parsedItem.type,
+          title: match.parsedItem.title,
+          status: match.updateFields.status || match.parsedItem.status,
+          source_field: match.parsedItem.source_field,
+          suggested_action: suggestedAction,
+          existing_item_id: match.existingItem?.id || null,
+          match_confidence: match.matchConfidence || 0,
+          suggestion_reason: match.matchReason || null,
+          suggested_description: match.updateFields.description || null,
+          suggestion_status: 'pending',
+          created_by: userId
+        });
+
+      if (suggestionError) {
+        throw suggestionError;
+      }
+
+      suggestionCount++;
+    } catch (itemError) {
+      console.error(`❌ Erro ao criar sugestão para item "${match.parsedItem.title}":`, itemError);
+    }
+  }
+
+  console.log(`✅ Check-in processado: ${suggestionCount} sugestões pendentes`);
+  return suggestionCount;
 }
 
 // ============================================
@@ -110,6 +230,17 @@ export async function createKRCheckin(checkin: Partial<KRCheckin>): Promise<KRCh
       .single();
 
     if (error) throw error;
+
+    if (data?.kr_id) {
+      const { data: krData } = await supabase
+        .from('key_results')
+        .select('okr_id')
+        .eq('id', data.kr_id)
+        .single();
+      if (krData?.okr_id) {
+        await updateOKRStatusFromActivity(krData.okr_id);
+      }
+    }
 
     console.log('✅ Check-in de KR criado:', {
       kr_id: data.kr_id,
@@ -172,15 +303,18 @@ export async function getKREvolution(krId: string, limit = 10): Promise<KRChecki
 /**
  * Criar check-in da sprint
  * IMPORTANTE: 1 check-in por sprint (constraint UNIQUE)
+ * NOVO: Após salvar, cria sprint_items automaticamente a partir dos bullet points
  */
 export async function createSprintCheckin(
   sprintId: string,
   checkinData: Partial<SprintCheckin>,
-  sprintItems: any[]
+  sprintItems: any[],
+  sprintScope: SprintScope = 'execucao' // NOVO parâmetro
 ): Promise<SprintCheckin | null> {
   try {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('Usuário não autenticado');
+    const userId = await resolveUserId();
+    
+    if (!userId) throw new Error('Usuário não autenticado');
 
     console.log('📝 Criando check-in da sprint...');
 
@@ -203,15 +337,25 @@ export async function createSprintCheckin(
         sprint_id: sprintId,
         checkin_date: new Date().toISOString().split('T')[0],
         summary: checkinData.summary,
+        // Campos de Execução
         achievements: checkinData.achievements || null,
         blockers: checkinData.blockers || null,
         decisions_taken: checkinData.decisions_taken || null,
         next_focus: checkinData.next_focus || null,
+        // Campos de Governança
+        learnings: checkinData.learnings || null,
+        okr_misalignments: checkinData.okr_misalignments || null,
+        keep_doing: checkinData.keep_doing || null,
+        stop_doing: checkinData.stop_doing || null,
+        adjust_doing: checkinData.adjust_doing || null,
+        strategic_recommendations: checkinData.strategic_recommendations || null,
+        identified_risks: checkinData.identified_risks || null,
+        // Campos comuns
         health: checkinData.health,
         health_reason: checkinData.health_reason || null,
         notes: checkinData.notes || null,
         ...metrics,
-        created_by: userData.user.id
+        created_by: userId
       })
       .select()
       .single();
@@ -226,8 +370,16 @@ export async function createSprintCheckin(
 
     console.log('✅ Check-in da sprint criado:', data.id);
 
+    if (data && data.id) {
+      try {
+        await generateSuggestionsFromCheckin(data as SprintCheckin, sprintScope, userId);
+      } catch (parserError) {
+        console.error('❌ Erro ao processar items do check-in:', parserError);
+      }
+    }
+
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Erro ao criar check-in da sprint:', error);
     throw error;
   }
@@ -253,11 +405,127 @@ export async function listSprintCheckins(sprintId: string): Promise<SprintChecki
 }
 
 /**
+ * Listar sugestões de items da sprint (pendentes por padrão)
+ */
+export async function listSprintItemSuggestions(
+  sprintId: string,
+  status: 'pending' | 'accepted' | 'rejected' = 'pending'
+): Promise<SprintItemSuggestion[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sprint_item_suggestions')
+      .select('*')
+      .eq('sprint_id', sprintId)
+      .eq('suggestion_status', status)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Erro ao listar sugestões de items:', error);
+    return [];
+  }
+}
+
+/**
+ * Listar sugestões por check-in
+ */
+export async function listSprintItemSuggestionsByCheckin(
+  checkinId: string,
+  status: 'pending' | 'accepted' | 'rejected' = 'pending'
+): Promise<SprintItemSuggestion[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sprint_item_suggestions')
+      .select('*')
+      .eq('checkin_id', checkinId)
+      .eq('suggestion_status', status)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Erro ao listar sugestões do check-in:', error);
+    return [];
+  }
+}
+
+/**
+ * Aceitar sugestão: cria novo item ou atualiza item existente
+ */
+export async function acceptSprintItemSuggestion(
+  suggestion: SprintItemSuggestion
+): Promise<SprintItem | null> {
+  try {
+    let appliedItem: SprintItem | null = null;
+
+    if (suggestion.suggested_action === 'update' && suggestion.existing_item_id) {
+      appliedItem = await sprintService.updateSprintItem(suggestion.existing_item_id, {
+        status: suggestion.status || undefined,
+        description: suggestion.suggested_description || undefined,
+        checkin_id: suggestion.checkin_id
+      });
+    } else {
+      appliedItem = await sprintService.createSprintItem({
+        sprint_id: suggestion.sprint_id,
+        type: suggestion.type,
+        title: suggestion.title,
+        status: suggestion.status || undefined,
+        description: suggestion.suggested_description || undefined,
+        checkin_id: suggestion.checkin_id,
+        responsible_user_id: null,
+        due_date: null,
+        okr_id: null,
+        kr_id: null
+      });
+    }
+
+    const { error } = await supabase
+      .from('sprint_item_suggestions')
+      .update({
+        suggestion_status: 'accepted',
+        applied_item_id: appliedItem?.id || null,
+        decided_at: new Date().toISOString()
+      })
+      .eq('id', suggestion.id);
+
+    if (error) throw error;
+    return appliedItem;
+  } catch (error) {
+    console.error('Erro ao aceitar sugestão:', error);
+    throw error;
+  }
+}
+
+/**
+ * Rejeitar sugestão
+ */
+export async function rejectSprintItemSuggestion(
+  suggestionId: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('sprint_item_suggestions')
+      .update({
+        suggestion_status: 'rejected',
+        decided_at: new Date().toISOString()
+      })
+      .eq('id', suggestionId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Erro ao rejeitar sugestão:', error);
+    throw error;
+  }
+}
+
+/**
  * Atualizar check-in existente
  */
 export async function updateSprintCheckin(
   checkinId: string,
-  updates: Partial<SprintCheckin>
+  updates: Partial<SprintCheckin>,
+  options?: { regenerateSuggestions?: boolean; sprintScope?: SprintScope }
 ): Promise<SprintCheckin | null> {
   try {
     console.log('📝 Atualizando check-in existente...');
@@ -272,9 +540,88 @@ export async function updateSprintCheckin(
     if (error) throw error;
 
     console.log('✅ Check-in atualizado:', data.id);
+
+    if (options?.regenerateSuggestions && data?.id && data?.sprint_id) {
+      try {
+        const { error: deleteError } = await supabase
+          .from('sprint_item_suggestions')
+          .delete()
+          .eq('checkin_id', data.id)
+          .eq('suggestion_status', 'pending');
+
+        if (deleteError) {
+          console.warn('⚠️ Falha ao limpar sugestões pendentes anteriores:', deleteError);
+        }
+
+        const userId = await resolveUserId();
+        if (!userId) {
+          console.warn('⚠️ Usuário não identificado. Sugestões não serão recriadas.');
+          return data;
+        }
+
+        const scope = options?.sprintScope || 'execucao';
+        await generateSuggestionsFromCheckin(data as SprintCheckin, scope, userId);
+      } catch (suggestionError) {
+        console.error('❌ Erro ao recriar sugestões do check-in:', suggestionError);
+      }
+    }
+
     return data;
   } catch (error) {
     console.error('❌ Erro ao atualizar check-in:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deletar check-in (apenas super admin)
+ * IMPORTANTE: Ao deletar check-in, items vinculados terão checkin_id = null (ON DELETE SET NULL)
+ */
+export async function deleteSprintCheckin(checkinId: string): Promise<boolean> {
+  try {
+    console.log('🗑️ Deletando check-in...');
+
+    // Primeiro, buscar o check-in antes de deletar (para confirmar que existe)
+    const { data: existingCheckin, error: selectError } = await supabase
+      .from('sprint_checkins')
+      .select('id, sprint_id, created_by')
+      .eq('id', checkinId)
+      .single();
+
+    if (selectError) {
+      console.error('Erro ao buscar check-in:', selectError);
+      throw selectError;
+    }
+
+    if (!existingCheckin) {
+      throw new Error('Check-in não encontrado');
+    }
+
+    // Tentar deletar
+    const { data: deletedData, error: deleteError } = await supabase
+      .from('sprint_checkins')
+      .delete()
+      .eq('id', checkinId)
+      .select(); // Adicionar .select() para ver o que foi deletado
+
+    if (deleteError) {
+      console.error('❌ Erro ao deletar:', deleteError);
+      throw deleteError;
+    }
+    if (!deletedData || deletedData.length === 0) {
+      throw new Error('Delete bloqueado por RLS ou registro não encontrado.');
+    }
+
+    // Verificar se realmente deletou (count deve ser 0 agora)
+    const { count, error: countError } = await supabase
+      .from('sprint_checkins')
+      .select('*', { count: 'exact', head: true })
+      .eq('id', checkinId);
+
+    console.log('✅ Check-in deletado com sucesso');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao deletar check-in:', error);
     throw error;
   }
 }
@@ -338,7 +685,7 @@ export async function getSprintKRs(sprintId: string): Promise<any[]> {
         // Buscar KRs de múltiplos OKRs
         const { data: krs } = await supabase
           .from('key_results')
-          .select('id, title, current_value, target_value, unit, direction, okr_id, okrs(objective)')
+          .select('*, okrs(objective, owner)')
           .in('okr_id', okrIds);
 
         return krs || [];
@@ -351,7 +698,7 @@ export async function getSprintKRs(sprintId: string): Promise<any[]> {
     // 2. Buscar KRs do OKR único
     const { data: krs } = await supabase
       .from('key_results')
-      .select('id, title, current_value, target_value, unit, direction, okr_id, okrs(objective)')
+      .select('*, okrs(objective, owner)')
       .eq('okr_id', sprint.okr_id);
 
     return krs || [];

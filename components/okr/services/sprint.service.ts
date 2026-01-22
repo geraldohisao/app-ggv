@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { parseLocalDate } from '../utils/date';
 import {
   SprintItemStatus,
   type Sprint,
@@ -10,25 +11,48 @@ import {
 } from '../types/sprint.types';
 
 // ============================================
+// HELPER: Resolução de user_id (mesmo método usado em okr.service.ts)
+// ============================================
+
+function resolveUserId(): { id?: string; source: string } {
+  if (typeof window === 'undefined') return { id: undefined, source: 'no-window' };
+  
+  const raw =
+    localStorage.getItem('ggv-user') ||
+    sessionStorage.getItem('ggv-user') ||
+    localStorage.getItem('ggv-emergency-user');
+  
+  if (raw) {
+    try {
+      const u = JSON.parse(raw);
+      const id = u?.id || u?.user_id || u?.user?.id || u?.user_metadata?.id;
+      if (id) return { id, source: 'ggv-user' };
+    } catch {}
+  }
+  
+  const fallback =
+    localStorage.getItem('ggv_user_id') ||
+    localStorage.getItem('user_id') ||
+    sessionStorage.getItem('user_id');
+  
+  if (fallback) return { id: fallback, source: 'storage-id' };
+  
+  return { id: undefined, source: 'missing' };
+}
+
+// ============================================
 // SPRINT CRUD
 // ============================================
 
 export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint | null> {
   try {
-    console.log('🔐 Verificando autenticação para criar sprint...');
-    const { data: userData, error: authError } = await supabase.auth.getUser();
+    const resolved = resolveUserId();
     
-    if (authError) {
-      console.error('❌ Erro de autenticação:', authError);
-      throw new Error(`Erro de autenticação: ${authError.message}`);
+    if (!resolved.id) {
+      throw new Error('Usuário não identificado para criar sprint');
     }
     
-    if (!userData.user) {
-      console.error('❌ Usuário não autenticado');
-      throw new Error('Usuário não autenticado');
-    }
-
-    console.log('✅ Usuário autenticado:', userData.user.id);
+    console.log(`✅ Usuário identificado (${resolved.source}):`, resolved.id);
 
     // Preparar dados com tratamento de campos opcionais
     const sprintData: any = {
@@ -40,6 +64,8 @@ export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint | nu
       status: sprint.status || 'planejada',
       description: sprint.description || null,
       okr_id: sprint.okr_id || null,
+      responsible: sprint.responsible || null,
+      responsible_user_id: sprint.responsible_user_id || null,
       parent_id: sprint.parent_id || null,
     };
 
@@ -48,18 +74,43 @@ export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint | nu
 
     let { data, error } = await supabase
       .from('sprints')
-      .insert({ ...sprintData, created_by: userData.user.id })
+      .insert({ ...sprintData, created_by: resolved.id })
       .select()
       .single();
+
+    // Fallback: se erro de coluna de responsável, tentar sem responsável
+    if (error && (error.message?.includes('responsible') || error.code === '42703')) {
+      console.warn('⚠️ Colunas de responsável não existem em sprints. Tentando sem elas...');
+      const sanitizedData = { ...sprintData };
+      delete sanitizedData.responsible;
+      delete sanitizedData.responsible_user_id;
+      const result = await supabase
+        .from('sprints')
+        .insert({ ...sanitizedData, created_by: resolved.id })
+        .select()
+        .single();
+      data = result.data;
+      error = result.error;
+    }
 
     // Fallback: se erro de coluna, tentar sem created_by
     if (error && (error.message?.includes('created_by') || error.code === '42703')) {
       console.warn('⚠️ Coluna created_by não existe em sprints. Tentando sem ela...');
-      const result = await supabase
+      let result = await supabase
         .from('sprints')
         .insert(sprintData)
         .select()
         .single();
+      if (result.error && result.error.message?.includes('responsible')) {
+        const sanitizedData = { ...sprintData };
+        delete sanitizedData.responsible;
+        delete sanitizedData.responsible_user_id;
+        result = await supabase
+          .from('sprints')
+          .insert(sanitizedData)
+          .select()
+          .single();
+      }
       data = result.data;
       error = result.error;
     }
@@ -88,12 +139,27 @@ export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint | nu
 
 export async function updateSprint(id: string, updates: Partial<Sprint>): Promise<Sprint | null> {
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('sprints')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
+
+    if (error && (error.message?.includes('responsible') || error.code === '42703')) {
+      console.warn('⚠️ Colunas de responsável não existem em sprints. Tentando sem elas...');
+      const sanitizedUpdates = { ...updates } as any;
+      delete sanitizedUpdates.responsible;
+      delete sanitizedUpdates.responsible_user_id;
+      const result = await supabase
+        .from('sprints')
+        .update(sanitizedUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) throw error;
     invalidateSprintCache(id);
@@ -108,14 +174,16 @@ export async function deleteSprint(id: string): Promise<boolean> {
   try {
     console.log('🗑️ Enviando sprint para lixeira:', id);
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('Usuário não autenticado');
+    const fallbackUser = resolveUserId();
+    const resolvedUserId = userData?.user?.id || fallbackUser.id || null;
+    if (!resolvedUserId) throw new Error('Usuário não autenticado');
 
     // Tentar com todos os campos
     let { error } = await supabase
       .from('sprints')
       .update({
         deleted_at: new Date().toISOString(),
-        deleted_by: userData.user.id,
+        deleted_by: resolvedUserId,
         status: 'cancelada',
       })
       .eq('id', id);
@@ -168,7 +236,7 @@ export async function getSprintById(id: string, skipCache = false): Promise<Spri
     // 🚀 OTIMIZAÇÃO: Executar apenas queries essenciais em PARALELO
     let sprintQuery = supabase
       .from('sprints')
-      .select('id, title, type, scope, department, start_date, end_date, status, description, okr_id, okrs(objective)')
+      .select('id, title, type, scope, department, start_date, end_date, status, description, okr_id, responsible, responsible_user_id, okrs(objective)')
       .eq('id', id)
       .is('deleted_at', null)
       .single();
@@ -182,17 +250,18 @@ export async function getSprintById(id: string, skipCache = false): Promise<Spri
       // Query 2: Items (apenas campos necessários)
       supabase
         .from('sprint_items')
-        .select('id, sprint_id, type, title, description, responsible, responsible_user_id, status, due_date, is_carry_over, project_id, created_at')
+        .select('id, sprint_id, type, title, description, responsible, responsible_user_id, status, due_date, is_carry_over, project_id, created_at, impediment_status, decision_type, decision_status, decision_impact, decision_deadline')
         .eq('sprint_id', id)
         .order('created_at', { ascending: true })
     ]);
 
-    // Fallback: se erro de coluna scope, tentar sem ela
+    // Fallback: se erro de coluna scope/responsável, tentar sem elas
     if (sprintResult.status === 'rejected' && 
         (sprintResult.reason?.code === '406' || 
          sprintResult.reason?.message?.includes('scope') ||
+         sprintResult.reason?.message?.includes('responsible') ||
          sprintResult.reason?.message?.includes('schema cache'))) {
-      console.warn('⚠️ Coluna scope não reconhecida. Tentando sem ela...');
+      console.warn('⚠️ Colunas opcionais não reconhecidas. Tentando sem elas...');
       const fallbackResult = await supabase
         .from('sprints')
         .select('id, title, type, department, start_date, end_date, status, description, okr_id, okrs(objective)')
@@ -267,8 +336,20 @@ export async function listSprints(filters?: SprintFilters): Promise<SprintWithIt
   try {
     let query = supabase
       .from('sprints')
-      .select('*, sprint_items(*), okrs(objective)')
+      .select('id, title, type, scope, department, start_date, end_date, status, description, okr_id, responsible, responsible_user_id, created_at, sprint_items(*), okrs(objective)')
       .is('deleted_at', null);
+
+    // Aplicar filtros de visibilidade (não-admin)
+    if (filters?.visibilityDepartment || (filters?.visibilityOkrIds && filters.visibilityOkrIds.length > 0)) {
+      const okrIds = filters.visibilityOkrIds || [];
+      if (filters.visibilityDepartment && okrIds.length > 0) {
+        query = query.or(`department.eq.${filters.visibilityDepartment},okr_id.in.(${okrIds.join(',')})`);
+      } else if (filters.visibilityDepartment) {
+        query = query.eq('department', filters.visibilityDepartment);
+      } else if (okrIds.length > 0) {
+        query = query.in('okr_id', okrIds);
+      }
+    }
 
     // Aplicar filtros
     if (filters?.type) {
@@ -287,7 +368,27 @@ export async function listSprints(filters?: SprintFilters): Promise<SprintWithIt
     // Ordenar por data de início (mais recente primeiro)
     query = query.order('start_date', { ascending: false });
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    // Fallback: se erro nas colunas responsible, tentar sem elas
+    if (error && (error.message?.includes('responsible') || error.code === '42703' || error.code === '406')) {
+      console.warn('⚠️ Colunas responsible não existem. Tentando sem elas...');
+      query = supabase
+        .from('sprints')
+        .select('id, title, type, scope, department, start_date, end_date, status, description, okr_id, created_at, sprint_items(*), okrs(objective)')
+        .is('deleted_at', null);
+      
+      // Reaplicar filtros
+      if (filters?.type) query = query.eq('type', filters.type);
+      if (filters?.department) query = query.eq('department', filters.department);
+      if (filters?.status) query = query.eq('status', filters.status);
+      if (filters?.search) query = query.ilike('title', `%${filters.search}%`);
+      query = query.order('start_date', { ascending: false });
+      
+      const fallbackResult = await query;
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
 
     if (error) throw error;
 
@@ -353,18 +454,20 @@ export async function createSprintItem(item: Partial<SprintItem>): Promise<Sprin
   try {
     console.log('🔐 Verificando autenticação...');
     const { data: userData, error: authError } = await supabase.auth.getUser();
+    const resolved = resolveUserId();
     
-    if (authError) {
+    if (authError && !resolved.id) {
       console.error('❌ Erro de autenticação:', authError);
       throw new Error(`Erro de autenticação: ${authError.message}`);
     }
     
-    if (!userData.user) {
+    if (!userData.user && !resolved.id) {
       console.error('❌ Usuário não autenticado');
       throw new Error('Usuário não autenticado. Faça login novamente.');
     }
 
-    console.log('✅ Usuário autenticado:', userData.user.id);
+    const userId = userData.user?.id || resolved.id!;
+    console.log('✅ Usuário identificado:', userId);
 
     // Validação de campos obrigatórios antes de enviar ao Supabase
     if (!item.sprint_id) {
@@ -402,7 +505,7 @@ export async function createSprintItem(item: Partial<SprintItem>): Promise<Sprin
       project_id: item.project_id || null,
       okr_id: item.okr_id || null,
       kr_id: item.kr_id || null,
-      created_by: userData.user.id,
+      created_by: userId,
       is_carry_over: item.is_carry_over || false,
       carried_from_id: item.carried_from_id || null,
       impediment_status: item.impediment_status || null,
@@ -484,6 +587,9 @@ export async function createSprintItem(item: Partial<SprintItem>): Promise<Sprin
 
 export async function updateSprintItem(id: string, updates: Partial<SprintItem>): Promise<SprintItem | null> {
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sprint.service.ts:updateSprintItem-entry',message:'updateSprintItem called',data:{id,updates},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     const normalizedUpdates: any = {
       ...updates,
       due_date: updates.due_date ? updates.due_date : null,
@@ -505,6 +611,10 @@ export async function updateSprintItem(id: string, updates: Partial<SprintItem>)
       .eq('id', id)
       .select()
       .single();
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sprint.service.ts:updateSprintItem-result',message:'updateSprintItem result',data:{hasError:!!error,status:data?.status||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
 
     if (error) throw error;
     
@@ -565,6 +675,61 @@ export async function getSprintItemsBySprintId(sprintId: string): Promise<Sprint
 }
 
 // ============================================
+// ATIVIDADES - Itens do usuário
+// ============================================
+
+export interface SprintItemWithContext extends SprintItem {
+  sprint_title?: string;
+  sprint_start_date?: string;
+  sprint_end_date?: string;
+  sprint_status?: string;
+}
+
+/**
+ * Busca todos os itens de sprint onde o usuário é responsável
+ * Usado na visão "Atividades" para todos os usuários
+ */
+export async function getMySprintItems(userId: string): Promise<SprintItemWithContext[]> {
+  try {
+    if (!userId) {
+      console.warn('⚠️ [getMySprintItems] userId não fornecido');
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('sprint_items')
+      .select(`
+        *,
+        sprints!inner(id, title, start_date, end_date, status, department)
+      `)
+      .eq('responsible_user_id', userId)
+      .order('due_date', { ascending: true, nullsFirst: false });
+
+    if (error) {
+      console.error('❌ [getMySprintItems] Erro na query:', error);
+      throw error;
+    }
+
+    // Mapear para adicionar contexto da sprint
+    const itemsWithContext: SprintItemWithContext[] = (data || []).map((item: any) => ({
+      ...item,
+      sprint_title: item.sprints?.title,
+      sprint_start_date: item.sprints?.start_date,
+      sprint_end_date: item.sprints?.end_date,
+      sprint_status: item.sprints?.status,
+      // Remover o objeto aninhado sprints
+      sprints: undefined,
+    }));
+
+    console.log(`✅ [getMySprintItems] ${itemsWithContext.length} itens encontrados para usuário ${userId}`);
+    return itemsWithContext;
+  } catch (error) {
+    console.error('❌ [getMySprintItems] Erro ao buscar itens do usuário:', error);
+    return [];
+  }
+}
+
+// ============================================
 // BATCH OPERATIONS
 // ============================================
 
@@ -574,6 +739,10 @@ export async function createSprintWithItems(
   okrIds: string[] = []
 ): Promise<SprintWithItems | null> {
   try {
+    if (okrIds.length === 0 && !sprint.okr_id) {
+      throw new Error('OKR obrigatório para criar sprint');
+    }
+
     // 1. Criar Sprint
     const createdSprint = await createSprint(sprint);
     if (!createdSprint) throw new Error('Falha ao criar Sprint');
@@ -672,16 +841,31 @@ export async function getSprintsByOKRId(okrId: string): Promise<Sprint[]> {
 export async function getActiveSprints(): Promise<SprintWithItems[]> {
   try {
     const today = new Date().toISOString().split('T')[0];
+    console.log('🔍 [getActiveSprints] Buscando sprints com data:', today);
 
+    // Debug: primeiro buscar TODAS as sprints para ver se existem
+    const { data: allSprints, error: allError } = await supabase
+      .from('sprints')
+      .select('id, title, status, start_date, end_date, deleted_at')
+      .limit(10);
+    
+    console.log('📊 [getActiveSprints] TODAS as sprints (limit 10):', allSprints);
+    if (allError) console.error('❌ [getActiveSprints] Erro ao buscar todas:', allError);
+
+    // Incluir sprints com end_date >= hoje OU sprints contínuas (end_date null)
     const { data, error } = await supabase
       .from('sprints')
       .select('*, sprint_items(*), okrs(objective)')
       .lte('start_date', today)
-      .gte('end_date', today)
+      .or(`end_date.gte.${today},end_date.is.null`)
       .eq('status', 'em andamento')
       .is('deleted_at', null);
 
-    if (error) throw error;
+    console.log('📊 [getActiveSprints] Sprints ATIVAS encontradas:', data?.length || 0);
+    if (error) {
+      console.error('❌ [getActiveSprints] Erro na query de ativas:', error);
+      throw error;
+    }
 
     return (data || []).map((sprint: any) => ({
       ...sprint,
@@ -689,7 +873,7 @@ export async function getActiveSprints(): Promise<SprintWithItems[]> {
       items: sprint.sprint_items || [],
     }));
   } catch (error) {
-    console.error('Erro ao buscar Sprints ativas:', error);
+    console.error('❌ [getActiveSprints] Erro geral:', error);
     return [];
   }
 }
@@ -893,7 +1077,7 @@ export async function finalizeAndCreateNext(currentSprintId: string): Promise<Sp
 }
 
 export function calculateNextSprintDates(currentEndDate: string, type: string): { start_date: string; end_date: string } {
-  const end = new Date(currentEndDate);
+  const end = parseLocalDate(currentEndDate);
   const nextStart = new Date(end);
   nextStart.setDate(nextStart.getDate() + 1);
 

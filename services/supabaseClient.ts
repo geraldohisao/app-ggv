@@ -59,6 +59,21 @@ try {
 
 export const supabase = supabaseInstance;
 
+// Listener para monitorar mudanças de estado de autenticação
+if (supabaseInstance && typeof window !== 'undefined') {
+    supabaseInstance.auth.onAuthStateChange((event: string, session: any) => {
+        console.log('🔐 Auth state changed:', event);
+        
+        if (event === 'TOKEN_REFRESHED') {
+            console.log('✅ Token renovado automaticamente');
+        }
+        
+        if (event === 'SIGNED_OUT') {
+            console.log('⚠️ Usuário deslogado');
+        }
+    });
+}
+
 // Verificação leve de conectividade (Auth health)
 export async function checkSupabaseConnectivity(timeoutMs: number = 6000): Promise<{ ok: boolean; status?: number; error?: string }> {
     try {

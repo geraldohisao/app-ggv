@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { UserRole, Module } from '../types';
+import { canAccessCalculadora } from '../utils/access';
 import { useUser } from '../contexts/DirectUserContext';
 import { CpuChipIcon, ChartBarIcon, BookOpenIcon, ExclamationTriangleIcon, KeyIcon, CheckCircleIcon, PhotoIcon, SignalIcon, UsersIcon, UserGroupIcon, CloudArrowDownIcon, BuildingOfficeIcon, IdentificationIcon, ServerIcon, ArrowsRightLeftIcon, ClipboardDocumentListIcon, ArrowPathIcon, ChatBubbleLeftRightIcon, Cog6ToothIcon, BuildingOffice2Icon, ClipboardDocumentIcon, TrashIcon } from './ui/icons';
 import { EnvelopeIcon } from './ui/icons';
@@ -31,6 +32,7 @@ const SettingsPage: React.FC = () => {
 
     const isSuperAdmin = user.role === UserRole.SuperAdmin;
     const isAdmin = user.role === UserRole.Admin;
+    const canSeeCalculadora = canAccessCalculadora(user);
 
     const canManageDiagnostic = isSuperAdmin || isAdmin;
     const canManageAssistant = isSuperAdmin;
@@ -246,13 +248,15 @@ const SettingsPage: React.FC = () => {
                                     <CpuChipIcon className="w-4 h-4" />
                                     Assistente IA
                                 </InternalLink>
-                                <InternalLink 
-                                    module={Module.Calculadora} 
-                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
-                                >
-                                    <KeyIcon className="w-4 h-4" />
-                                    Calculadora OTE
-                                </InternalLink>
+                                {canSeeCalculadora && (
+                                    <InternalLink 
+                                        module={Module.Calculadora} 
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+                                    >
+                                        <KeyIcon className="w-4 h-4" />
+                                        Calculadora OTE
+                                    </InternalLink>
+                                )}
                                 {(isSuperAdmin || isAdmin) && (
                                     <InternalLink 
                                         module={Module.ReativacaoLeads} 

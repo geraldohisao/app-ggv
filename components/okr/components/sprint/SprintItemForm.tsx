@@ -120,6 +120,9 @@ export const SprintItemForm: React.FC<SprintItemFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SprintItemForm.tsx:handleSubmit',message:'SprintItemForm submit',data:{itemId:item?.id||null,type,status:formData.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     
     // Validação de campos obrigatórios
     if (!formData.title.trim()) {
@@ -184,7 +187,7 @@ export const SprintItemForm: React.FC<SprintItemFormProps> = ({
       console.log('✅ Item salvo com sucesso:', result);
       addToast(`✅ ${typeLabels[type].title.replace('Nov', 'Item salv')}o com sucesso!`, 'success');
       setTimeout(() => {
-        onSuccess();
+      onSuccess();
       }, 500);
     } catch (error: any) {
       console.error('❌ Erro detalhado ao salvar item:', error);
@@ -259,9 +262,9 @@ export const SprintItemForm: React.FC<SprintItemFormProps> = ({
   return (
     <>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-6"
-      >
+    <div
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-6"
+    >
       <div
         className="bg-white rounded-[2.5rem] shadow-2xl max-w-3xl w-full border border-slate-100 overflow-hidden"
       >
@@ -271,9 +274,9 @@ export const SprintItemForm: React.FC<SprintItemFormProps> = ({
               {config.emoji}
             </div>
             <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                {config.title}
-              </h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+              {config.title}
+            </h2>
               {item?.is_carry_over && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 text-[9px] font-black uppercase rounded-full border border-amber-200 mt-1">
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -484,10 +487,10 @@ export const SprintItemForm: React.FC<SprintItemFormProps> = ({
                 Data Limite (Opcional)
               </label>
               <div className="relative">
-                <input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              <input
+                type="date"
+                value={formData.due_date}
+                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                   className="w-full bg-slate-50 rounded-2xl px-6 py-3 border-none focus:ring-2 focus:ring-[#5B5FF5] text-sm font-bold text-slate-700 cursor-pointer"
                   style={{ colorScheme: 'light' }}
                 />

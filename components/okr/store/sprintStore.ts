@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SprintWithItems, SprintFilters, SprintMetrics } from '../types/sprint.types';
 import * as sprintService from '../services/sprint.service';
+import * as okrService from '../services/okr.service';
 
 interface SprintStore {
   // Estado
@@ -12,7 +13,10 @@ interface SprintStore {
   error: string | null;
 
   // Ações
-  fetchSprints: (filters?: SprintFilters) => Promise<void>;
+  fetchSprints: (
+    filters?: SprintFilters,
+    visibility?: { userId?: string | null; userDepartment?: string | null; isAdmin?: boolean }
+  ) => Promise<void>;
   fetchSprintById: (id: string, skipCache?: boolean) => Promise<void>;
   fetchMetrics: () => Promise<void>;
   fetchActiveSprints: () => Promise<void>;
@@ -40,10 +44,23 @@ export const useSprintStore = create<SprintStore>((set, get) => ({
   error: null,
 
   // Ações
-  fetchSprints: async (filters) => {
+  fetchSprints: async (filters, visibility) => {
     set({ loading: true, error: null });
     try {
-      const sprints = await sprintService.listSprints(filters);
+      if (!visibility || visibility.isAdmin) {
+        const sprints = await sprintService.listSprints(filters);
+        set({ sprints, loading: false });
+        return;
+      }
+
+      const okrIds = visibility.userId
+        ? await okrService.getOKRIdsByKRResponsible(visibility.userId)
+        : [];
+      const sprints = await sprintService.listSprints({
+        ...filters,
+        visibilityDepartment: visibility.userDepartment || undefined,
+        visibilityOkrIds: okrIds,
+      });
       set({ sprints, loading: false });
     } catch (error) {
       set({ error: 'Erro ao carregar Sprints', loading: false });

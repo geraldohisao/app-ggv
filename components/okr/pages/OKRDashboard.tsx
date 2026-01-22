@@ -5,11 +5,29 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { LoadingState } from '../components/shared/LoadingState';
 import { usePermissions } from '../hooks/usePermissions';
 import { useOKRUsers } from '../hooks/useOKRUsers';
+import { useUser } from '../../../contexts/DirectUserContext';
 import { OKRLevel, Department, OKRStatus, OKRWithKeyResults } from '../types/okr.types';
-import { DonutChart } from '../components/shared/DonutChart';
 import { getActiveSprints } from '../services/sprint.service';
 import type { SprintWithItems } from '../types/sprint.types';
 import { calculateOKRProgress } from '../types/okr.types';
+import { parseLocalDate } from '../utils/date';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface OKRDashboardProps {
   onCreateNew?: () => void;
@@ -18,14 +36,54 @@ interface OKRDashboardProps {
   hideList?: boolean; // quando true, esconde a lista inferior (usado na Home)
 }
 
+// Componente sortable para cada OKR
+const SortableOKRItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style as React.CSSProperties} className="relative group">
+      {/* Handle de drag */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="absolute -left-2 top-1/2 -translate-y-1/2 -translate-x-full opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all z-10"
+        title="Arraste para reordenar"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8h16M4 16h16" />
+        </svg>
+      </button>
+      {children}
+    </div>
+  );
+};
+
 export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit, onViewSprint, hideList }) => {
   const {
     okrs,
     loading,
     fetchOKRs,
+    reorderOKRs,
+    syncOKRStatuses,
   } = useOKRStore();
 
   const permissions = usePermissions();
+  const { user } = useUser();
   const { users: okrUsers } = useOKRUsers();
   const [levelFilter, setLevelFilter] = useState<OKRLevel | 'all'>('all');
   const [deptFilter, setDeptFilter] = useState<Department | 'all'>('all');
@@ -35,6 +93,42 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
   const [activeSprints, setActiveSprints] = useState<SprintWithItems[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [, forceUpdate] = useState({});
+  
+  // Admin toggle: 'mine' = só OKRs que sou responsável, 'all' = todos os OKRs
+  // Para OP (usuário normal), sempre será 'mine' sem opção de alterar
+  const [adminViewScope, setAdminViewScope] = useState<'mine' | 'all'>('mine');
+  
+  // Determinar se é admin (CEO ou HEAD)
+  const isAdmin = permissions.isCEO || permissions.isHEAD;
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handler para reordenar OKRs via drag and drop
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = okrs.findIndex((o) => o.id === active.id);
+      const newIndex = okrs.findIndex((o) => o.id === over.id);
+      
+      // Criar nova ordem
+      const newOrder = arrayMove(okrs, oldIndex, newIndex);
+      const orderedIds = newOrder.map(o => o.id!);
+      
+      // Atualizar no store e banco
+      await reorderOKRs(orderedIds);
+    }
+  };
 
   const activeSprint = useMemo(
     () => activeSprints.find((s) => s.id === selectedSprintId) || activeSprints[0],
@@ -146,7 +240,7 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
         score += pendingDecisions * 100;
         
         // 4. Data (desempate - mais recente)
-        const date = sprint.start_date ? new Date(sprint.start_date).getTime() : 0;
+        const date = sprint.start_date ? parseLocalDate(sprint.start_date).getTime() : 0;
         score += date / 1000000; // Normalizar para não interferir muito
         
         return score;
@@ -157,7 +251,23 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
   };
 
   useEffect(() => {
-    fetchOKRs();
+    // Filtro inicial baseado no escopo de visualização
+    const initialFilters: any = {};
+    
+    // Para OP ou admin com escopo 'mine', filtrar pelo nome do usuário
+    if (permissions.isOP || adminViewScope === 'mine') {
+      if (user?.name) {
+        initialFilters.search = user.name;
+      }
+    }
+    
+    fetchOKRs(
+      initialFilters,
+      permissions.isOP
+        ? { userId: user?.id || null, userDepartment: permissions.userDepartment, isAdmin: false, userRole: user?.role }
+        : { isAdmin: true }
+    );
+    syncOKRStatuses();
     const loadSprint = async () => {
       try {
         const sprints = await getActiveSprints();
@@ -165,7 +275,7 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
         setActiveSprints(prioritized);
         setSelectedSprintId(prioritized[0]?.id ?? null);
       } catch (e) {
-        console.error('Failed to load active sprint', e);
+        console.error('Erro ao carregar sprints:', e);
       }
     };
     loadSprint();
@@ -176,13 +286,43 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     if (levelFilter !== 'all') filters.level = levelFilter;
     if (deptFilter !== 'all') filters.department = deptFilter;
     if (statusFilter !== 'all') filters.status = statusFilter;
-    if (responsibleFilter !== 'all') {
-      filters.search = responsibleFilter; // backend ainda usa busca livre; usamos owner como busca
-    } else if (searchTerm) {
-      filters.search = searchTerm;
+    
+    // Lógica de filtro por responsável:
+    // 1. Se usuário é OP, sempre filtra pelo próprio nome
+    // 2. Se é admin e adminViewScope === 'mine', filtra pelo próprio nome
+    // 3. Se é admin e adminViewScope === 'all', usa o responsibleFilter do dropdown (ou mostra todos)
+    if (permissions.isOP) {
+      // OP sempre vê apenas seus OKRs
+      if (user?.name) {
+        filters.search = user.name;
+      }
+    } else if (adminViewScope === 'mine') {
+      // Admin vendo "Meus OKRs"
+      if (user?.name) {
+        filters.search = user.name;
+      }
+    } else {
+      // Admin vendo "Todos" - usa filtro normal do dropdown
+      if (responsibleFilter !== 'all') {
+        filters.search = responsibleFilter;
+      } else if (searchTerm) {
+        filters.search = searchTerm;
+      }
     }
-    fetchOKRs(filters);
-  }, [levelFilter, deptFilter, statusFilter, responsibleFilter, searchTerm]);
+    
+    console.log('🔍 [OKRDashboard] Aplicando filtros:', filters, '| viewScope:', adminViewScope);
+    fetchOKRs(
+      filters,
+      permissions.isOP
+        ? { userId: user?.id || null, userDepartment: permissions.userDepartment, isAdmin: false, userRole: user?.role }
+        : { isAdmin: true }
+    );
+  }, [levelFilter, deptFilter, statusFilter, responsibleFilter, searchTerm, permissions.isOP, permissions.userDepartment, user?.id, user?.role, user?.name, adminViewScope]);
+
+  // Debug: Log quando OKRs mudam
+  useEffect(() => {
+    console.log('📊 [OKRDashboard] OKRs carregados:', okrs?.length || 0, okrs);
+  }, [okrs]);
 
   // Atualizar trimestre automaticamente a cada hora
   useEffect(() => {
@@ -194,10 +334,27 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
 
   // Métricas calculadas localmente para refletir filtros
   const metricsData = useMemo(() => {
+    const hasKrUpdate = (okr: OKRWithKeyResults) => {
+      if (!okr.key_results) return false;
+      return okr.key_results.some((kr) => {
+        if (kr.last_checkin_at) return true;
+        if (kr.type === 'activity') {
+          const activityProgress = kr.activity_progress ?? (kr.activity_done ? 100 : 0);
+          return activityProgress > 0;
+        }
+        if (kr.current_value === null || kr.current_value === undefined) return false;
+        if (kr.start_value === null || kr.start_value === undefined) {
+          return kr.current_value > 0;
+        }
+        return kr.current_value !== kr.start_value;
+      });
+    };
+
     const data = okrs.map(o => {
         const progress = calculateOKRProgress(o);
-        const overdue = new Date(o.end_date) < new Date() && o.status !== 'concluído';
-        return { ...o, calculatedProgress: progress, isOverdue: overdue };
+        const displayProgress = hasKrUpdate(o) ? progress : 0;
+        const overdue = parseLocalDate(o.end_date) < new Date() && o.status !== 'concluído';
+        return { ...o, calculatedProgress: displayProgress, isOverdue: overdue };
     });
 
     const totals = data.reduce((acc, o) => {
@@ -214,12 +371,29 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     ];
   }, [okrs]);
 
-  const barChartData = useMemo(() => 
-    okrs.slice(0, 3).map(o => ({
+  const barChartData = useMemo(() => {
+    const hasKrUpdate = (okr: OKRWithKeyResults) => {
+      if (!okr.key_results) return false;
+      return okr.key_results.some((kr) => {
+        if (kr.last_checkin_at) return true;
+        if (kr.type === 'activity') {
+          const activityProgress = kr.activity_progress ?? (kr.activity_done ? 100 : 0);
+          return activityProgress > 0;
+        }
+        if (kr.current_value === null || kr.current_value === undefined) return false;
+        if (kr.start_value === null || kr.start_value === undefined) {
+          return kr.current_value > 0;
+        }
+        return kr.current_value !== kr.start_value;
+      });
+    };
+
+    return okrs.slice(0, 3).map(o => ({
       ...o, // pass full okr object for click handler
       label: o.objective,
-      value: calculateOKRProgress(o)
-    })), [okrs]);
+      value: hasKrUpdate(o) ? calculateOKRProgress(o) : 0
+    }));
+  }, [okrs]);
 
   if (loading && okrs.length === 0) return <LoadingState message="Carregando Dashboard..." />;
 
@@ -237,6 +411,32 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
              </div>
           </div>
         </div>
+        
+        {/* Toggle de escopo para Admins (CEO/HEAD) */}
+        {isAdmin && (
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setAdminViewScope('mine')}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                adminViewScope === 'mine'
+                  ? 'bg-white text-[#5B5FF5] shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Meus OKRs
+            </button>
+            <button
+              onClick={() => setAdminViewScope('all')}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                adminViewScope === 'all'
+                  ? 'bg-white text-[#5B5FF5] shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Seção Superior: Gráficos e Sprint */}
@@ -265,8 +465,8 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
               {barChartData.map((d, i) => (
                 <div
                   key={i}
-                  className="flex flex-col items-center gap-3 cursor-pointer"
-                  onClick={() => onEdit?.(d)}
+                  className={`flex flex-col items-center gap-3 ${permissions.isOP ? 'cursor-default' : 'cursor-pointer'}`}
+                  onClick={() => { if (!permissions.isOP) onEdit?.(d); }}
                 >
                   <div className="w-full max-w-md">
                     <div className="relative w-full h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner">
@@ -324,12 +524,12 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
                 return (
                   <div
                     key={sprint.id}
-                    onClick={() => onViewSprint?.(sprint.id!)}
-                    className={`rounded-2xl p-5 cursor-pointer transition-all hover:shadow-md ${
+                    onClick={() => { if (!permissions.isOP) onViewSprint?.(sprint.id!); }}
+                    className={`rounded-2xl p-5 transition-all hover:shadow-md ${
                       hasRisk 
                         ? 'bg-gradient-to-r from-rose-50 to-white border-2 border-rose-100' 
                         : 'bg-slate-50 border border-slate-100 hover:border-slate-200'
-                    }`}
+                    } ${permissions.isOP ? 'cursor-default' : 'cursor-pointer'}`}
                   >
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4 mb-4">
@@ -382,9 +582,11 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
                           <span className="text-xs font-medium text-slate-400">Sem pendências críticas</span>
                         )}
                       </div>
-                      <span className="text-xs font-bold text-[#5B5FF5] uppercase tracking-wider hover:underline">
-                        Detalhes →
-                      </span>
+                      {!permissions.isOP && (
+                        <span className="text-xs font-bold text-[#5B5FF5] uppercase tracking-wider hover:underline">
+                          Detalhes →
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -400,25 +602,84 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
         </div>
 
         {/* Painel Lateral: Saúde Estratégica (Direita - 4 cols) */}
-        <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex flex-col items-center">
-            <h3 className="text-xl font-bold text-slate-800 self-start mb-8">Saúde Estratégica</h3>
-                <div className="relative w-48 h-48 mb-8 flex items-center justify-center">
-                    <DonutChart data={metricsData} />
-                    <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none z-10">
-                        <span className="text-4xl font-black text-slate-800 leading-none tracking-tighter mb-2">{okrs.length}</span>
-                        <span className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] text-center leading-tight">OKRs<br/>TOTAIS</span>
-                    </div>
+        <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 flex flex-col">
+            <h3 className="text-lg font-bold text-slate-800 mb-6">Saúde Estratégica</h3>
+            
+            {/* Score central */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="relative">
+                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shadow-inner">
+                  <div className="text-center">
+                    <span className="text-3xl font-black text-slate-800 block">{okrs.length}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">OKRs</span>
+                  </div>
                 </div>
-            <div className="w-full space-y-3">
-                {metricsData.map((h, i) => (
-                <div key={i} className="bg-slate-50 rounded-2xl px-5 py-4 flex items-center justify-between group hover:bg-slate-100 transition-colors cursor-default">
-                    <div className="flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: h.color }} />
-                    <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">{h.label}</span>
+                {/* Ring indicator */}
+                <svg className="absolute inset-0 w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#f1f5f9" strokeWidth="6" />
+                  {okrs.length > 0 && (
+                    <>
+                      {/* Verde */}
+                      <circle 
+                        cx="50" cy="50" r="46" fill="none" 
+                        stroke="#10b981" strokeWidth="6"
+                        strokeDasharray={`${(metricsData[2]?.value || 0) / okrs.length * 289} 289`}
+                        strokeDashoffset="0"
+                        strokeLinecap="round"
+                      />
+                      {/* Amarelo */}
+                      <circle 
+                        cx="50" cy="50" r="46" fill="none" 
+                        stroke="#f59e0b" strokeWidth="6"
+                        strokeDasharray={`${(metricsData[1]?.value || 0) / okrs.length * 289} 289`}
+                        strokeDashoffset={`${-((metricsData[2]?.value || 0) / okrs.length * 289)}`}
+                        strokeLinecap="round"
+                      />
+                      {/* Vermelho */}
+                      <circle 
+                        cx="50" cy="50" r="46" fill="none" 
+                        stroke="#ef4444" strokeWidth="6"
+                        strokeDasharray={`${(metricsData[0]?.value || 0) / okrs.length * 289} 289`}
+                        strokeDashoffset={`${-(((metricsData[2]?.value || 0) + (metricsData[1]?.value || 0)) / okrs.length * 289)}`}
+                        strokeLinecap="round"
+                      />
+                    </>
+                  )}
+                </svg>
+              </div>
+            </div>
+            
+            {/* Status bars */}
+            <div className="flex-1 space-y-3">
+              {metricsData.map((h, i) => {
+                const percentage = okrs.length > 0 ? (h.value / okrs.length) * 100 : 0;
+                const bgColors = ['#fef2f2', '#fef9c3', '#ecfdf5']; // rose-50, yellow-100, emerald-50
+                return (
+                  <div key={i} className="group">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: h.color }} />
+                        <span className="text-xs font-semibold text-slate-600">{h.label}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-base font-black text-slate-800">{h.value}</span>
+                        {okrs.length > 0 && (
+                          <span className="text-[10px] text-slate-400">({Math.round(percentage)}%)</span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-lg font-black text-slate-900">{h.value}</span>
-                </div>
-                ))}
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: bgColors[i] }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${percentage}%`,
+                          backgroundColor: h.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
         </div>
       </div>
@@ -468,16 +729,26 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
                     <option value={OKRStatus.COMPLETED}>Concluído</option>
                   </select>
 
-                  <select
-                    value={responsibleFilter}
-                    onChange={(e) => setResponsibleFilter(e.target.value as any)}
-                    className="px-4 py-2 bg-white rounded-xl border border-slate-200 text-sm font-bold text-slate-600 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer hover:border-indigo-300 transition-colors min-w-[160px]"
-                  >
-                    <option value="all">Responsável (todos)</option>
-                    {okrUsers.map((u) => (
-                      <option key={u.id ?? u.name} value={u.name}>{u.name}</option>
-                    ))}
-                  </select>
+                  {/* Filtro de responsável: só visível quando admin está vendo "Todos" */}
+                  {isAdmin && adminViewScope === 'all' ? (
+                    <select
+                      value={responsibleFilter}
+                      onChange={(e) => setResponsibleFilter(e.target.value as any)}
+                      className="px-4 py-2 bg-white rounded-xl border border-slate-200 text-sm font-bold text-slate-600 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer hover:border-indigo-300 transition-colors min-w-[160px]"
+                    >
+                      <option value="all">Responsável (todos)</option>
+                      {okrUsers.map((u) => (
+                        <option key={u.id ?? u.name} value={u.name}>{u.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 text-sm font-bold text-slate-400 min-w-[160px] flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      {user?.name || 'Meus OKRs'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -489,19 +760,52 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
                 action={permissions.okr.canCreate ? { label: 'Criar OKR', onClick: onCreateNew! } : undefined}
                 />
             ) : (
+              permissions.isOP ? (
                 <div className="space-y-6">
-                {okrs.map((okr) => {
+                  {okrs.map((okr) => {
                     const ownerUser = okrUsers.find(u => u.name === okr.owner);
                     return (
-                    <OKRCard 
-                        key={okr.id} 
-                        okr={okr} 
-                        onClick={() => onEdit?.(okr)} 
+                      <OKRCard 
+                        key={okr.id}
+                        okr={okr}
                         ownerAvatarUrl={ownerUser?.avatar_url}
-                    />
+                        readOnly
+                      />
                     );
-                })}
+                  })}
                 </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={okrs.map(o => o.id!)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-6 pl-8">
+                      <p className="text-xs text-slate-400 -ml-8 mb-2">
+                        💡 Arraste os OKRs pelo ícone à esquerda para reordenar. Os 3 primeiros aparecem no dashboard.
+                      </p>
+                      {okrs.map((okr) => {
+                        const ownerUser = okrUsers.find(u => u.name === okr.owner);
+                        const canEdit = permissions.okr.canEdit(okr);
+                        return (
+                          <SortableOKRItem key={okr.id} id={okr.id!}>
+                            <OKRCard 
+                              okr={okr} 
+                              onClick={canEdit ? () => onEdit?.(okr) : undefined}
+                              ownerAvatarUrl={ownerUser?.avatar_url}
+                              readOnly={!canEdit}
+                            />
+                          </SortableOKRItem>
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )
             )}
           </div>
         </>

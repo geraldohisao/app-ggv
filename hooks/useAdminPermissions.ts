@@ -23,9 +23,9 @@ export function useAdminPermissions() {
           console.log('🔍 ADMIN PERMISSIONS - Dados do ggv-user encontrados:', userData);
           
           if (userData.email && userData.name && userData.id) {
-            // Detectar role baseado no email (mesma lógica do contexto)
-            const isSuperAdminEmail = userData.email === 'geraldo@grupoggv.com' || userData.email === 'geraldo@ggvinteligencia.com.br';
-            const role = isSuperAdminEmail ? UserRole.SuperAdmin : UserRole.User;
+            // 🔐 USAR O ROLE REAL DO BANCO (salvo pelo UserContext)
+            // Não detectar baseado no email, usar o role que veio do banco
+            const role = userData.role || UserRole.User;
             
             currentUser = {
               id: userData.id,
@@ -53,18 +53,21 @@ export function useAdminPermissions() {
         const userId = localStorage.getItem('ggv_user_id') || 
                       localStorage.getItem('user_id') || 
                       localStorage.getItem('id');
+        const userRole = localStorage.getItem('ggv_user_role') || 
+                        localStorage.getItem('user_role') || 
+                        localStorage.getItem('role');
         
         console.log('🔍 ADMIN PERMISSIONS - Tentando chaves individuais:', {
           userEmail,
           userName,
           userId,
+          userRole,
           localStorageKeys: Object.keys(localStorage).filter(k => k.includes('user') || k.includes('email') || k.includes('name'))
         });
         
         if (userEmail && userName && userId) {
-          // Detectar role baseado no email (mesma lógica do contexto)
-          const isSuperAdminEmail = userEmail === 'geraldo@grupoggv.com' || userEmail === 'geraldo@ggvinteligencia.com.br';
-          const role = isSuperAdminEmail ? UserRole.SuperAdmin : UserRole.User;
+          // 🔐 USAR O ROLE REAL se disponível, senão USER como fallback
+          const role = (userRole as UserRole) || UserRole.User;
           
           currentUser = {
             id: userId,
