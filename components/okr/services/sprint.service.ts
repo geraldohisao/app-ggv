@@ -838,28 +838,39 @@ export async function getSprintsByOKRId(okrId: string): Promise<Sprint[]> {
   }
 }
 
-export async function getActiveSprints(): Promise<SprintWithItems[]> {
+export async function getActiveSprints(options?: {
+  userDepartment?: string | null;
+  isAdmin?: boolean; // CEO ou HEAD
+  isCEO?: boolean;   // SuperAdmin vê tudo
+}): Promise<SprintWithItems[]> {
   try {
     const today = new Date().toISOString().split('T')[0];
-    console.log('🔍 [getActiveSprints] Buscando sprints com data:', today);
-
-    // Debug: primeiro buscar TODAS as sprints para ver se existem
-    const { data: allSprints, error: allError } = await supabase
-      .from('sprints')
-      .select('id, title, status, start_date, end_date, deleted_at')
-      .limit(10);
-    
-    console.log('📊 [getActiveSprints] TODAS as sprints (limit 10):', allSprints);
-    if (allError) console.error('❌ [getActiveSprints] Erro ao buscar todas:', allError);
+    console.log('🔍 [getActiveSprints] Buscando sprints com data:', today, '| options:', options);
 
     // Incluir sprints com end_date >= hoje OU sprints contínuas (end_date null)
-    const { data, error } = await supabase
+    let query = supabase
       .from('sprints')
       .select('*, sprint_items(*), okrs(objective)')
       .lte('start_date', today)
       .or(`end_date.gte.${today},end_date.is.null`)
       .eq('status', 'em andamento')
       .is('deleted_at', null);
+
+    // Filtrar por departamento baseado no cargo
+    // CEO (SuperAdmin): vê todas as sprints
+    // HEAD (Admin): vê sprints do próprio departamento + Geral
+    // OP (User): vê apenas sprints do próprio departamento
+    if (!options?.isCEO && options?.userDepartment) {
+      if (options?.isAdmin) {
+        // HEAD: próprio departamento + geral
+        query = query.or(`department.eq.${options.userDepartment},department.eq.geral`);
+      } else {
+        // OP: apenas próprio departamento
+        query = query.eq('department', options.userDepartment);
+      }
+    }
+
+    const { data, error } = await query;
 
     console.log('📊 [getActiveSprints] Sprints ATIVAS encontradas:', data?.length || 0);
     if (error) {

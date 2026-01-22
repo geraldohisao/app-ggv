@@ -270,7 +270,12 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     syncOKRStatuses();
     const loadSprint = async () => {
       try {
-        const sprints = await getActiveSprints();
+        // Filtrar sprints baseado no cargo do usuário
+        const sprints = await getActiveSprints({
+          userDepartment: permissions.userDepartment,
+          isAdmin: permissions.isHEAD,
+          isCEO: permissions.isCEO,
+        });
         const prioritized = prioritizeSprints(sprints || []);
         setActiveSprints(prioritized);
         setSelectedSprintId(prioritized[0]?.id ?? null);
@@ -279,7 +284,7 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
       }
     };
     loadSprint();
-  }, []);
+  }, [permissions.userDepartment, permissions.isHEAD, permissions.isCEO]);
 
   useEffect(() => {
     const filters: any = {};

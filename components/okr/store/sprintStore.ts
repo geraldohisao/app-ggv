@@ -19,7 +19,7 @@ interface SprintStore {
   ) => Promise<void>;
   fetchSprintById: (id: string, skipCache?: boolean) => Promise<void>;
   fetchMetrics: () => Promise<void>;
-  fetchActiveSprints: () => Promise<void>;
+  fetchActiveSprints: (options?: { userDepartment?: string | null; isAdmin?: boolean; isCEO?: boolean }) => Promise<void>;
   createSprint: (sprint: Parameters<typeof sprintService.createSprintWithItems>[0], items: Parameters<typeof sprintService.createSprintWithItems>[1], okrIds: string[]) => Promise<SprintWithItems | null>;
   updateSprint: (id: string, sprint: Parameters<typeof sprintService.updateSprintWithItems>[1], items: Parameters<typeof sprintService.updateSprintWithItems>[2], okrIds: string[]) => Promise<SprintWithItems | null>;
   finalizeAndCreateNext: (id: string) => Promise<SprintWithItems | null>;
@@ -95,10 +95,10 @@ export const useSprintStore = create<SprintStore>((set, get) => ({
     }
   },
 
-  fetchActiveSprints: async () => {
+  fetchActiveSprints: async (options) => {
     set({ loading: true, error: null });
     try {
-      const sprints = await sprintService.getActiveSprints();
+      const sprints = await sprintService.getActiveSprints(options);
       set({ sprints, loading: false });
     } catch (error) {
       set({ error: 'Erro ao carregar Sprints ativas', loading: false });
