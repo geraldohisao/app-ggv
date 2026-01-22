@@ -41,7 +41,7 @@ const okrFormSchema = z.object({
       z.object({
         id: z.string().uuid().optional(),
         title: z.string().min(3, 'Título é obrigatório'),
-        current_value: z.number().default(0),
+        current_value: z.number().optional().default(0),
         target_value: z.number().positive('Meta deve ser positiva'),
         unit: z.string().optional(),
         status: z.enum([

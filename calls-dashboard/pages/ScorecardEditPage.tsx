@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { useAdminFeatures } from '../../hooks/useAdminPermissions';
-
-interface ScorecardEditPageProps {
-  scorecardId: string;
-}
 
 interface EditScorecardData {
   name: string;
@@ -23,8 +20,14 @@ interface ScorecardCriterion {
   order_index: number;
 }
 
-export default function ScorecardEditPage({ scorecardId }: ScorecardEditPageProps) {
+export default function ScorecardEditPage({ scorecardId: propScorecardId }: { scorecardId?: string } = {}) {
+  const params = useParams<{ scorecardId: string }>();
+  const scorecardId = propScorecardId || params.scorecardId;
   const { canAccessManualAnalysis } = useAdminFeatures();
+  
+  if (!scorecardId) {
+    return <div className="p-8 text-center">Scorecard ID não encontrado na URL</div>;
+  }
   const [editData, setEditData] = useState<EditScorecardData>({
     name: '',
     description: '',

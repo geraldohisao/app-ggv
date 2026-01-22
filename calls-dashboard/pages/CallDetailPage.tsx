@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { DATE_FORMATTER, TIME_FORMATTER, secondsToHuman } from '../constants';
 import { fetchCallDetail, convertToCallItem } from '../services/callsService';
 import { CallItem } from '../types';
 import AiAssistant from '../components/AiAssistant';
-import { v4 as uuidv4 } from 'uuid';
 import ScorecardAnalysis from '../components/ScorecardAnalysis';
 import AudioStatusIndicator from '../components/AudioStatusIndicator';
 import ParsedTranscription from '../components/ParsedTranscription';
@@ -87,11 +87,13 @@ function hasValidAudio(recording_url?: string): boolean {
          recording_url.includes('.wav');
 }
 
-interface CallDetailPageProps {
-  callId: string;
-}
-
-export default function CallDetailPage({ callId }: CallDetailPageProps) {
+export default function CallDetailPage({ callId: propCallId }: { callId?: string } = {}) {
+  const params = useParams<{ callId: string }>();
+  const callId = propCallId || params.callId;
+  
+  if (!callId) {
+    return <div className="p-8 text-center">Call ID não encontrado na URL</div>;
+  }
   const [call, setCall] = useState<CallItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

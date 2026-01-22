@@ -117,8 +117,9 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
             ? users.find(u => u.id === kr.responsible_user_id) 
             : null;
           
-          // Se não tem responsável próprio, buscar o owner do OKR
-          const okrOwner = kr.okrs?.owner ? users.find(u => u.name === kr.okrs.owner) : null;
+          // Se não tem responsável próprio, buscar o owner do OKR (via any para evitar erro de tipo)
+          const okrData = (kr as any).okrs;
+          const okrOwner = okrData?.owner ? users.find(u => u.name === okrData.owner) : null;
           const displayUser = krResponsible || okrOwner;
           const isInherited = !krResponsible && !!okrOwner;
           
@@ -132,7 +133,7 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
               {/* Avatar + Status indicator + Título */}
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 {/* Avatar do responsável - sempre existe (KR ou OKR) */}
-                <MiniAvatar user={displayUser!} size="sm" isInherited={isInherited} />
+                {displayUser && <MiniAvatar user={displayUser} size="sm" isInherited={isInherited} />}
                 
                 {/* Status indicator */}
                 <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
@@ -142,9 +143,9 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
                 }`} />
                 
                 <div className="flex flex-col min-w-0">
-                  {kr.okrs?.objective && (
+                  {okrData?.objective && (
                     <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400 truncate">
-                      {kr.okrs.objective}
+                      {okrData.objective}
                     </p>
                   )}
                   <p className="text-sm font-bold text-slate-700 leading-snug truncate">{kr.title}</p>

@@ -24,13 +24,13 @@ export default function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/calls" element={<CallsPage />} />
-              <Route path="/calls/:id" element={<CallDetailPage />} />
+              <Route path="/calls/:callId" element={<CallDetailPage />} />
               <Route
                 path="/scorecards"
                 element={canAccessManualAnalysis ? <ScorecardPage /> : <Navigate to="/dashboard" replace />}
               />
               <Route
-                path="/scorecards/:id"
+                path="/scorecards/:scorecardId"
                 element={canAccessManualAnalysis ? <ScorecardEditPage /> : <Navigate to="/dashboard" replace />}
               />
               <Route path="/sdr/:id" element={<SdrDetailPage />} />

@@ -1,3 +1,10 @@
+interface ProgressBarProps {
+  percentage: number;
+  color?: 'green' | 'yellow' | 'red' | 'blue' | 'gray';
+  showLabel?: boolean;
+  className?: string;
+}
+
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   percentage,
   color = 'blue',
