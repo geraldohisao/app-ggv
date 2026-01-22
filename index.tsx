@@ -10,6 +10,10 @@ import MySignaturesArea from './components/OSManager/MySignaturesArea';
 import { LogoTest } from './components/OSManager/LogoTest';
 import { OSReprocessing } from './components/OSManager/OSReprocessing';
 
+// Initialize Sentry before app renders
+import { initSentry } from './src/sentry';
+initSentry();
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");

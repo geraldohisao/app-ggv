@@ -13,6 +13,7 @@ import {
     getImpersonation,
     clearImpersonation
 } from '../utils/sessionUtils';
+import { setSentryUser, clearSentryUser } from '../src/sentry';
 
 interface UserContextType {
     user: User | null;
@@ -290,6 +291,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         // Salvar usuário usando utilitário de sessão
         saveSession(finalUser);
+        
+        // Set Sentry user context for error tracking
+        setSentryUser({
+            id: finalUser.id,
+            email: finalUser.email,
+            name: finalUser.name,
+            role: finalUser.role
+        });
         
         setUser(finalUser);
         setShowAuth(false);

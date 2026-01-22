@@ -126,3 +126,4 @@ components/okr/sql/emergency_restore*.sql
 !tsconfig.json
 !.vscode/*.json
 
+.npm-cache/
