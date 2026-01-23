@@ -19,6 +19,13 @@ import { checkSprintOkrsAvailability } from '../../services/sprint.service';
 import { DateInput } from '../shared/DateInput';
 import { SelectInput } from '../shared/SelectInput';
 import { UserSelectCombobox } from '../shared/UserSelectCombobox';
+import { 
+  syncSprintWithCalendar, 
+  getSprintCalendarEvent,
+  cancelSprintCalendarEvent,
+  sprintTypeToRRule,
+  type SprintCalendarEvent 
+} from '../../../../services/googleCalendarService';
 
 const sprintFormSchema = z.object({
   type: z.enum([
@@ -71,10 +78,42 @@ export const SprintForm: React.FC<SprintFormProps> = ({
   );
   const { toasts, addToast, removeToast } = useToast();
   const permissions = usePermissions();
+  
+  // Calendar sync state
+  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
+  const [meetingTime, setMeetingTime] = useState('09:00');
+  const [meetingDuration, setMeetingDuration] = useState(60);
+  const [existingCalendarEvent, setExistingCalendarEvent] = useState<SprintCalendarEvent | null>(null);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 
   useEffect(() => {
     fetchOKRs();
   }, []);
+
+  // Load existing calendar event if editing
+  useEffect(() => {
+    if (isEditMode && sprint?.id) {
+      const loadCalendarEvent = async () => {
+        try {
+          const event = await getSprintCalendarEvent(sprint.id!);
+          if (event) {
+            setExistingCalendarEvent(event);
+            setCalendarSyncEnabled(event.status === 'synced');
+            if (event.start_at) {
+              const startDate = new Date(event.start_at);
+              setMeetingTime(startDate.toTimeString().slice(0, 5));
+            }
+            if (event.duration_minutes) {
+              setMeetingDuration(event.duration_minutes);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao carregar evento de calendar:', error);
+        }
+      };
+      loadCalendarEvent();
+    }
+  }, [isEditMode, sprint?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -246,6 +285,74 @@ export const SprintForm: React.FC<SprintFormProps> = ({
       if (result) {
         console.log('✅ Sprint salva com sucesso!');
         addToast(`Sprint ${isEditMode ? 'atualizada' : 'criada'} com sucesso!`, 'success');
+
+        const savedSprintId = (result as any).id || sprint?.id!;
+
+        // Gerenciar sincronização com Google Calendar (mesmo em modo statusOnly)
+        const shouldManageCalendarSync = !statusOnly || calendarSyncEnabled || !!existingCalendarEvent?.event_id;
+        if (shouldManageCalendarSync) {
+          // Verificar se o toggle foi DESATIVADO (tinha evento antes e agora está desabilitado)
+          if (!calendarSyncEnabled && existingCalendarEvent?.event_id) {
+            try {
+              console.log('🗑️ CALENDAR - Toggle desativado, cancelando evento...');
+              const cancelled = await cancelSprintCalendarEvent(savedSprintId);
+              if (cancelled) {
+                addToast('📅 Evento removido do Google Calendar', 'info');
+              }
+            } catch (error) {
+              console.error('❌ Erro ao cancelar evento:', error);
+            }
+          }
+          // Sincronizar com Google Calendar se HABILITADO
+          else if (calendarSyncEnabled) {
+            try {
+              if (!data.start_date) {
+                addToast('⚠️ Não foi possível sincronizar: data de início inválida.', 'warning');
+              } else {
+                setIsSyncingCalendar(true);
+                console.log('📅 Sincronizando com Google Calendar...');
+                
+                // Montar data/hora do evento
+                const startDate = parseLocalDate(data.start_date);
+                const [hours, minutes] = meetingTime.split(':').map(Number);
+                startDate.setHours(hours, minutes, 0, 0);
+                
+                // Obter email do responsável
+                const responsibleEmail = selectedResponsibleUser?.email || okrOwnerUser?.email;
+                const attendeeEmails = responsibleEmail ? [responsibleEmail] : [];
+                
+                // Converter tipo de sprint para RRULE
+                const recurrenceRule = sprintTypeToRRule(data.type, startDate);
+                
+                const calendarResult = await syncSprintWithCalendar({
+                  sprintId: savedSprintId,
+                  title: /^sprint\s*[:\-]?/i.test(data.title) ? data.title : `Sprint: ${data.title}`,
+                  description: data.description || undefined,
+                  startAt: startDate,
+                  durationMinutes: meetingDuration,
+                  timezone: 'America/Sao_Paulo',
+                  attendeeEmails,
+                  recurrenceRule: recurrenceRule || undefined
+                });
+                
+                if (calendarResult?.status === 'synced') {
+                  addToast('📅 Evento sincronizado no Google Calendar!', 'success');
+                } else if (calendarResult?.status === 'error') {
+                  addToast(`⚠️ Erro ao sincronizar: ${calendarResult.last_sync_error || 'Erro desconhecido'}`, 'warning');
+                } else {
+                  // calendarResult null/undefined - erro silencioso antes
+                  addToast('⚠️ Sprint salva, mas a sincronização com o Google Calendar falhou.', 'warning');
+                }
+              }
+            } catch (calendarError) {
+              console.error('❌ Erro ao sincronizar Calendar:', calendarError);
+              addToast('⚠️ Sprint salva, mas não foi possível sincronizar com Calendar.', 'warning');
+            } finally {
+              setIsSyncingCalendar(false);
+            }
+          }
+        }
+
         setTimeout(() => {
         onSuccess?.();
         onClose();
@@ -286,6 +393,17 @@ export const SprintForm: React.FC<SprintFormProps> = ({
     setIsDeleting(true);
     onDeleteStart?.();
     try {
+      // Cancelar evento do Google Calendar se existir
+      if (existingCalendarEvent?.event_id) {
+        try {
+          console.log('🗑️ CALENDAR - Cancelando evento antes de deletar sprint...');
+          await cancelSprintCalendarEvent(sprint.id);
+        } catch (error) {
+          console.error('❌ Erro ao cancelar evento do Calendar:', error);
+          // Continuar com a exclusão mesmo se falhar
+        }
+      }
+
       const success = await deleteSprint(sprint.id);
       if (success) {
         addToast('Sprint enviada para a lixeira.', 'success');
@@ -330,7 +448,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
           </button>
         </header>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-8" autoComplete="off">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-8" autoComplete="off" data-testid="sprint-form">
           {statusOnly && (
             <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-800">
               Esta sprint está concluída/cancelada. Para reabrir, altere apenas o status e salve.
@@ -383,6 +501,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                   {...register('title')}
                   disabled={statusOnly}
                   placeholder="Ex: Sprint Comercial W2 - Jan 2026"
+                  data-testid="sprint-title"
                   className={`w-full rounded-2xl px-6 py-4 border-none text-lg font-bold shadow-sm ${
                     statusOnly
                       ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -421,7 +540,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                   </span>
                 </div>
 
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar" data-testid="sprint-okr-list">
                   {filteredOKRs.length === 0 ? (
                     <p className="text-xs text-slate-400 italic py-4 text-center">Nenhum OKR disponível para este departamento.</p>
                   ) : (
@@ -437,11 +556,12 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                               : 'bg-white/50 border-transparent hover:bg-white hover:border-indigo-100'}
                           `}
                         >
-                          <input
+                      <input
                             type="checkbox"
                             className="sr-only"
                             checked={isSelected}
                             disabled={statusOnly || (!isSelected && selectedOKRs.length >= maxOkrs)}
+                        data-testid="sprint-okr-option"
                             onChange={() => {
                               if (statusOnly) return;
                               if (isSelected) {
@@ -584,6 +704,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                           }
                         }}
                         disabled={statusOnly}
+                        data-testid="sprint-continuous-toggle"
                         className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
@@ -639,6 +760,95 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* SEÇÃO: Integração Google Agenda */}
+              {(
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-6 border-2 border-blue-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">📅</span>
+                      <div>
+                        <h4 className="text-sm font-black text-blue-900 uppercase tracking-wider">Google Agenda</h4>
+                        <p className="text-[10px] text-blue-600 font-medium">Criar evento com Google Meet</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={calendarSyncEnabled}
+                        onChange={(e) => setCalendarSyncEnabled(e.target.checked)}
+                        data-testid="sprint-calendar-toggle"
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                  {statusOnly && (
+                    <p className="text-[10px] text-blue-700 font-semibold mb-3">
+                      Sprint concluída/cancelada: você pode ajustar o status e a agenda.
+                    </p>
+                  )}
+
+                  {calendarSyncEnabled && (
+                    <div className="space-y-4 mt-4 pt-4 border-t border-blue-200">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 block mb-2">
+                            Horário da Reunião
+                          </label>
+                          <input
+                            type="time"
+                            value={meetingTime}
+                            onChange={(e) => setMeetingTime(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl bg-white border-2 border-blue-200 text-slate-800 font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 block mb-2">
+                            Duração (minutos)
+                          </label>
+                          <select
+                            value={meetingDuration}
+                            onChange={(e) => setMeetingDuration(Number(e.target.value))}
+                            className="w-full px-4 py-3 rounded-xl bg-white border-2 border-blue-200 text-slate-800 font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                          >
+                            <option value={30}>30 min</option>
+                            <option value={45}>45 min</option>
+                            <option value={60}>1 hora</option>
+                            <option value={90}>1h 30min</option>
+                            <option value={120}>2 horas</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/60 rounded-xl p-3 flex items-center gap-3">
+                        <span className="text-lg">🔗</span>
+                        <div>
+                          <p className="text-xs font-bold text-blue-800">
+                            {existingCalendarEvent?.meet_link ? (
+                              <a href={existingCalendarEvent.meet_link} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">
+                                Link do Meet já criado
+                              </a>
+                            ) : (
+                              'Link do Google Meet será criado automaticamente'
+                            )}
+                          </p>
+                          <p className="text-[10px] text-blue-600">
+                            Recorrência: {watch('type') === 'semanal' ? 'Semanal' : watch('type') === 'mensal' ? 'Mensal' : watch('type') === 'trimestral' ? 'Trimestral' : watch('type')}
+                            {' • '}Convidados: responsável da sprint
+                          </p>
+                        </div>
+                      </div>
+
+                      {existingCalendarEvent?.status === 'error' && (
+                        <div className="bg-rose-100 text-rose-700 rounded-xl p-3 text-xs font-bold">
+                          ⚠️ Erro na última sincronização: {existingCalendarEvent.last_sync_error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -656,6 +866,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
                   type="button"
                   onClick={handleDelete}
                   disabled={isDeleting}
+                  data-testid="sprint-delete"
                   className="px-5 py-3 rounded-2xl font-black uppercase tracking-wider text-rose-600 border border-rose-200 hover:bg-rose-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isDeleting ? 'Excluindo...' : 'Excluir Sprint'}
@@ -664,6 +875,7 @@ export const SprintForm: React.FC<SprintFormProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
+              data-testid="sprint-submit"
               className="bg-[#5B5FF5] text-white px-12 py-4 rounded-2xl font-black uppercase tracking-[0.15em] shadow-xl shadow-indigo-100 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Salvando...' : isEditMode ? 'Atualizar Sprint' : 'Criar Sprint'}
