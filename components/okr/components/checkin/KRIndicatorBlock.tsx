@@ -57,6 +57,15 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
     await loadKRs();
   };
 
+  const handleDeleteKR = async (deletedKrId: string) => {
+    if (!deletedKrId) return;
+    setKrs((prev) => (prev || []).filter((kr: any) => kr?.id !== deletedKrId));
+    addToast('🗑️ KR excluído com sucesso!', 'success');
+    setEditingKR(null);
+    onKRUpdated?.();
+    await loadKRs();
+  };
+
   // Helper para cor do status
   const getKRStatusColor = (status: string) => {
     switch (status) {
@@ -223,6 +232,7 @@ export const KRIndicatorBlock: React.FC<KRIndicatorBlockProps> = ({ sprintId, on
           }
           onClose={() => setEditingKR(null)}
           onSave={handleSaveKR}
+          onDelete={handleDeleteKR}
         />
       )}
     </div>
