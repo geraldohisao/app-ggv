@@ -12,7 +12,7 @@
   NODE_OPTIONS = "--max-old-space-size=4096"
   # Force TypeScript to skip checks in production
   SKIP_PREFLIGHT_CHECK = "true"
-  GENERATE_SOURCEMAP = "false"
+  # Sourcemaps são gerados pelo Vite e enviados ao Sentry automaticamente se SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT estiverem configurados
   # Cache para acelerar builds
   NPM_CONFIG_CACHE = ".npm-cache"
   NPM_CONFIG_PREFER_OFFLINE = "true"
@@ -74,6 +74,13 @@
   status = 200
   force = true
 
+# Impersonation magic link
+[[redirects]]
+  from = "/api/impersonate-link"
+  to = "/.netlify/functions/impersonate-link"
+  status = 200
+  force = true
+
 # Removido proxy de áudio assinado (não utilizado na versão atual)
 
 [[redirects]]
@@ -86,6 +93,20 @@
 [[redirects]]
   from = "/api/send-email"
   to = "/.netlify/functions/send-email"
+  status = 200
+  force = true
+
+# OKR Chat notifications (Google Chat DM)
+[[redirects]]
+  from = "/api/okr/chat-send"
+  to = "/.netlify/functions/okr-chat-send"
+  status = 200
+  force = true
+
+# Audit events (for admin audit trail)
+[[redirects]]
+  from = "/api/audit-event"
+  to = "/.netlify/functions/audit-event"
   status = 200
   force = true
 
@@ -102,7 +123,7 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; worker-src 'self' blob:; connect-src 'self' https://*.supabase.co https://*.supabase.io https://*.digitaloceanspaces.com https://accounts.google.com https://oauth2.googleapis.com https://gmail.googleapis.com https://generativelanguage.googleapis.com https://api.openai.com https://api-test.ggvinteligencia.com.br https://automation-test.ggvinteligencia.com.br https://api.ipify.org https://ggvinteligencia.com.br wss://*.supabase.co wss://*.supabase.io; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https: blob:; font-src 'self' data:; frame-src 'self' https://accounts.google.com https://docs.google.com https://*.supabase.co https://*.google.com; object-src 'self' https://*.supabase.co data:; base-uri 'self'; media-src 'self' https://*.digitaloceanspaces.com https://*.supabase.co;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; worker-src 'self' blob:; connect-src 'self' https://*.supabase.co https://*.supabase.io https://*.digitaloceanspaces.com https://accounts.google.com https://oauth2.googleapis.com https://gmail.googleapis.com https://generativelanguage.googleapis.com https://api.openai.com https://api-test.ggvinteligencia.com.br https://automation-test.ggvinteligencia.com.br https://api.ipify.org https://ggvinteligencia.com.br https://*.ingest.sentry.io wss://*.supabase.co wss://*.supabase.io; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https: blob:; font-src 'self' data:; frame-src 'self' https://accounts.google.com https://docs.google.com https://*.supabase.co https://*.google.com; object-src 'self' https://*.supabase.co data:; base-uri 'self'; media-src 'self' https://*.digitaloceanspaces.com https://*.supabase.co;"
 
 # Cache para assets estáticos
 [[headers]]
