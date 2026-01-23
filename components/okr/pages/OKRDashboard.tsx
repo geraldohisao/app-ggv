@@ -285,7 +285,7 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     fetchOKRs(
       initialFilters,
       permissions.isOP
-        ? { userId: user?.id || null, userDepartment: permissions.userDepartment, isAdmin: false, userRole: user?.role }
+        ? { userId: user?.id || null, userName: user?.name || null, userDepartment: permissions.userDepartment, isAdmin: false, userRole: user?.role }
         : { isAdmin: true }
     );
     syncOKRStatuses();
@@ -335,7 +335,7 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
     fetchOKRs(
       filters,
       permissions.isOP
-        ? { userId: user?.id || null, userDepartment: permissions.userDepartment, isAdmin: false, userRole: user?.role }
+        ? { userId: user?.id || null, userName: user?.name || null, userDepartment: permissions.userDepartment, isAdmin: false, userRole: user?.role }
         : { isAdmin: true }
     );
   }, [levelFilter, deptFilter, statusFilter, responsibleFilter, searchTerm, permissions.isOP, permissions.userDepartment, user?.id, user?.role, user?.name, adminViewScope]);

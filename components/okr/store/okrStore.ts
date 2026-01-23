@@ -17,7 +17,13 @@ interface OKRStore {
   // Ações
   fetchOKRs: (
     filters?: OKRFilters,
-    visibility?: { userId?: string | null; userDepartment?: string | null; isAdmin?: boolean; userRole?: string }
+    visibility?: {
+      userId?: string | null;
+      userName?: string | null;
+      userDepartment?: string | null;
+      isAdmin?: boolean;
+      userRole?: string;
+    }
   ) => Promise<void>;
   fetchOKRById: (id: string) => Promise<void>;
   fetchMetrics: () => Promise<void>;
@@ -68,7 +74,8 @@ export const useOKRStore = create<OKRStore>()(
                 visibility.userDepartment,
                 filters,
                 controller.signal,
-                visibility.userRole
+                visibility.userRole,
+                visibility.userName || undefined
               );
           // Se chegou aqui com sucesso, verifica se não foi abortado (redundância)
           if (!controller.signal.aborted) {

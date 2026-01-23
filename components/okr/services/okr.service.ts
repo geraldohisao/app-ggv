@@ -231,7 +231,8 @@ export async function listVisibleOKRsForUser(
   userDepartment?: string | null,
   filters?: OKRFilters,
   signal?: AbortSignal,
-  userRole?: string
+  userRole?: string,
+  userName?: string
 ): Promise<OKRWithKeyResults[]> {
   try {
     const okrIdsFromKrs = userId ? await getOKRIdsByKRResponsible(userId) : [];
@@ -282,24 +283,10 @@ export async function listVisibleOKRsForUser(
       throw error;
     }
     
-    // Filtrar key_results apenas para usuários OP (USER)
-    // CEO (SUPER_ADMIN) e HEAD (ADMIN) veem todos os KRs
-    const normalizedRole = (userRole || '').toString().toUpperCase();
-    const isOP = normalizedRole === 'USER';
-    
-    if (isOP) {
-      // OP só vê KRs onde é responsável
-      const filteredOkrs = (data || []).map(okr => ({
-        ...okr,
-        key_results: (okr.key_results || []).filter(
-          (kr: any) => kr.responsible_user_id === userId
-        )
-      }));
-      
-      return filteredOkrs;
-    }
-
-    // CEO e HEAD veem todos os KRs
+    // Importante:
+    // Mesmo para USER/OP, não filtramos KRs no frontend-service.
+    // A visibilidade deve ser controlada por RLS/policies no banco,
+    // e o UX deve refletir o que existe no OKR (não "sumir" KRs).
     return data || [];
   } catch (error) {
     if ((error as any).name === 'AbortError' || (error as any)?.code === '20') {
@@ -562,6 +549,21 @@ export async function updateOKRWithKeyResults(
       return match?.id ? { ...kr, id: match.id } : kr;
     });
     const incomingIds = new Set(normalizedKeyResults.filter(kr => kr.id).map(kr => kr.id!));
+
+    // Blindagem:
+    // Se por qualquer motivo os KRs NÃO vieram no payload (ex: relationship/RLS/cache),
+    // não podemos retornar `key_results: []`, porque isso "apaga" no estado do frontend
+    // e dá a impressão de que os KRs foram excluídos ao clicar/editar.
+    if ((normalizedKeyResults?.length || 0) === 0) {
+      console.warn('⚠️ [updateOKRWithKeyResults] Payload sem KRs; preservando KRs existentes no retorno.', {
+        okrId: id,
+        existing: existingKRs.length,
+      });
+      return {
+        ...updatedOKR,
+        key_results: existingKRs || [],
+      };
+    }
 
     // 3. Atualizar/Criar Key Results
     // IMPORTANTE (SEGURANÇA):

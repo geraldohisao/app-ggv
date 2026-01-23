@@ -241,8 +241,25 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
   const isReadOnly = typeof readOnly === 'boolean' ? readOnly : !canEditOKR;
 
   // Sincronizar estado local quando OKR externo mudar (ex: novo KR)
+  // Blindagem: se o OKR vier "parcial" (sem key_results) por algum refresh/race,
+  // preservamos os KRs já carregados para não parecer que "sumiu" após salvar um KR.
   useEffect(() => {
-    setLocalOKR(okr);
+    setLocalOKR((prev) => {
+      const incomingKrs = (okr as any)?.key_results;
+      const prevKrs = (prev as any)?.key_results;
+
+      const incomingEmpty =
+        incomingKrs === null ||
+        incomingKrs === undefined ||
+        (Array.isArray(incomingKrs) && incomingKrs.length === 0);
+
+      const prevHas = Array.isArray(prevKrs) && prevKrs.length > 0;
+
+      if (okr?.id && prev?.id && okr.id === prev.id && incomingEmpty && prevHas) {
+        return { ...(okr as any), key_results: prevKrs };
+      }
+      return okr;
+    });
   }, [okr]);
 
   // Drag and drop sensors
