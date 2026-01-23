@@ -236,6 +236,7 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
   const krScrollRef = useRef<number>(0);
   const { users } = useOKRUsers();
   const [isReordering, setIsReordering] = useState(false);
+  const [isRefreshingKRs, setIsRefreshingKRs] = useState(false);
   const permissions = usePermissions();
   const canEditOKR = permissions.okr.canEdit(okr);
   const isReadOnly = typeof readOnly === 'boolean' ? readOnly : !canEditOKR;
@@ -464,6 +465,20 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
     );
   };
 
+  const refreshKRsFromServer = async () => {
+    if (!localOKR?.id) return;
+    setIsRefreshingKRs(true);
+    try {
+      const fetched = await okrService.getKeyResultsByOKRId(localOKR.id);
+      const sorted = (fetched || []).sort((a: any, b: any) => (a.position ?? 999) - (b.position ?? 999));
+      setLocalOKR((prev) => ({ ...(prev as any), key_results: sorted }));
+    } catch (e) {
+      console.warn('⚠️ Falha ao recarregar KRs do servidor:', e);
+    } finally {
+      setIsRefreshingKRs(false);
+    }
+  };
+
   return (
     <div
       onClick={isReadOnly ? undefined : onClick}
@@ -538,7 +553,7 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
 
         {/* Lista de Key Results (Layout em Linha) com Drag and Drop */}
         <div 
-          className={`space-y-1 bg-slate-50/50 rounded-3xl p-5 border border-slate-100 overflow-x-auto ${isReordering ? 'opacity-70' : ''}`}
+          className={`space-y-1 bg-slate-50/50 rounded-3xl p-5 border border-slate-100 overflow-x-auto ${isReordering || isRefreshingKRs ? 'opacity-70' : ''}`}
           onClick={(e) => e.stopPropagation()}
         >
           {sortedKeyResults.length > 0 ? (
@@ -620,6 +635,18 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
               setKrLocal(updatedKR.id!, () => updatedKR);
               setEditingKRModal(null);
               setTimeout(() => window.scrollTo({ top: krScrollRef.current || 0, behavior: 'auto' }), 0);
+              // Recarregar lista do servidor para garantir consistência visual
+              // (evita ficar com dados "stale" após salvar).
+              void refreshKRsFromServer();
+            }}
+            onDelete={(deletedKrId) => {
+              setLocalOKR((prev) => ({
+                ...(prev as any),
+                key_results: (prev.key_results || []).filter((k) => k.id !== deletedKrId),
+              }));
+              setEditingKRModal(null);
+              setTimeout(() => window.scrollTo({ top: krScrollRef.current || 0, behavior: 'auto' }), 0);
+              void refreshKRsFromServer();
             }}
           />
         )}

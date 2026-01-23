@@ -10,11 +10,12 @@ interface KREditModalProps {
   kr: KeyResult;
   onClose: () => void;
   onSave: (updatedKR: KeyResult) => void;
+  onDelete?: (deletedKrId: string) => void;
   /** ID do responsável padrão (herdado do OKR) quando o KR não tem responsável próprio */
   defaultResponsibleUserId?: string | null;
 }
 
-export const KREditModal: React.FC<KREditModalProps> = ({ kr, onClose, onSave, defaultResponsibleUserId }) => {
+export const KREditModal: React.FC<KREditModalProps> = ({ kr, onClose, onSave, onDelete, defaultResponsibleUserId }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { users, loading: loadingUsers } = useOKRUsers();
@@ -102,6 +103,29 @@ export const KREditModal: React.FC<KREditModalProps> = ({ kr, onClose, onSave, d
     } catch (err) {
       console.error('Erro ao salvar KR:', err);
       setError('Erro ao salvar. Tente novamente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!kr?.id) return;
+    const ok = confirm('Tem certeza que deseja excluir este Key Result? Esta ação não pode ser desfeita.');
+    if (!ok) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const success = await okrService.deleteKeyResult(kr.id);
+      if (!success) {
+        setError('Não foi possível excluir o KR. Tente novamente.');
+        return;
+      }
+      onDelete?.(kr.id);
+      onClose();
+    } catch (err) {
+      console.error('Erro ao excluir KR:', err);
+      setError('Erro ao excluir. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -405,22 +429,35 @@ export const KREditModal: React.FC<KREditModalProps> = ({ kr, onClose, onSave, d
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
+            onClick={handleDelete}
             disabled={saving}
-            className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
+            className="px-5 py-2.5 text-sm font-bold text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Excluir Key Result"
           >
-            {saving ? 'Salvando...' : 'Salvar Alterações'}
+            Excluir KR
           </button>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="px-5 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
+            >
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

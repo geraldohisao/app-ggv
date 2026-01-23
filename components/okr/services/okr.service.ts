@@ -112,7 +112,7 @@ export async function getOKRById(id: string): Promise<OKRWithKeyResults | null> 
 
     if (okrError) throw okrError;
 
-    // Tentar ordenar por position, fallback para created_at se coluna não existir
+    // Tentar ordenar por position, fallback para updated_at/id se coluna não existir
     let krsData;
     let krsError;
     
@@ -122,17 +122,18 @@ export async function getOKRById(id: string): Promise<OKRWithKeyResults | null> 
         .select('*')
         .eq('okr_id', id)
         .order('position', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: true });
+        // Alguns ambientes não têm created_at em key_results
+        .order('updated_at', { ascending: false });
       
       krsData = result.data;
       krsError = result.error;
     } catch {
-      // Fallback sem ordenação por position
+      // Fallback sem ordenação por position/updated_at
       const result = await supabase
         .from('key_results')
         .select('*')
         .eq('okr_id', id)
-        .order('created_at', { ascending: true });
+        .order('id', { ascending: true });
       
       krsData = result.data;
       krsError = result.error;
@@ -377,9 +378,12 @@ export async function getOKRMetrics(): Promise<OKRMetrics> {
 
 export async function createKeyResult(keyResult: Partial<KeyResult>): Promise<KeyResult | null> {
   try {
+    // Blindagem: nunca confiar em `id` vindo do frontend (ex.: react-hook-form usa `id` interno no fieldArray)
+    // Deixa o banco gerar o UUID para evitar conflitos de PK.
+    const { id, ...payload } = keyResult as any;
     const { data, error } = await supabase
       .from('key_results')
-      .insert(keyResult)
+      .insert(payload)
       .select()
       .single();
 
@@ -395,6 +399,7 @@ export async function updateKeyResult(id: string, updates: Partial<KeyResult>): 
   try {
     // Sanitizar updates (evita enviar campos de relação como `okrs` / `okr`, etc.)
     const safeUpdates: any = { ...(updates as any) };
+    delete safeUpdates.id; // nunca atualizar PK
     delete safeUpdates.okrs;
     delete safeUpdates.okr;
     delete safeUpdates.okr_id; // não atualiza vínculo aqui
@@ -465,12 +470,27 @@ export async function deleteKeyResult(id: string): Promise<boolean> {
 
 export async function getKeyResultsByOKRId(okrId: string): Promise<KeyResult[]> {
   try {
-    // Tentar ordenar por position, fallback para created_at
-    const { data, error } = await supabase
-      .from('key_results')
-      .select('*')
-      .eq('okr_id', okrId)
-      .order('created_at', { ascending: true });
+    // Ordenação robusta (alguns ambientes não têm created_at em key_results)
+    let data: any[] | null = null;
+    let error: any = null;
+    try {
+      const result = await supabase
+        .from('key_results')
+        .select('*')
+        .eq('okr_id', okrId)
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('updated_at', { ascending: false });
+      data = result.data as any;
+      error = result.error;
+    } catch {
+      const result = await supabase
+        .from('key_results')
+        .select('*')
+        .eq('okr_id', okrId)
+        .order('id', { ascending: true });
+      data = result.data as any;
+      error = result.error;
+    }
 
     if (error) throw error;
     
