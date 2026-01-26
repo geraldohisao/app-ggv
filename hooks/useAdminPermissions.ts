@@ -1,6 +1,3 @@
-import { useContext } from 'react';
-import { UserContext as DirectUserContext } from '../contexts/DirectUserContext';
-import { UserContext as LegacyUserContext } from '../contexts/UserContext';
 import { UserRole, User } from '../types';
 
 /**
@@ -10,72 +7,62 @@ import { UserRole, User } from '../types';
  * Versão robusta para produção e desenvolvimento
  */
 export function useAdminPermissions() {
-  // Importante: durante impersonação, o user do contexto "Direto" já é o usuário impersonado.
-  // O contexto legado e o localStorage podem conter o usuário original (Admin) e causar vazamento de permissões.
-  const direct = useContext(DirectUserContext);
-  const legacy = useContext(LegacyUserContext);
+  // IMPORTANTE:
+  // Este hook precisa ser estável mesmo durante impersonação e em módulos diferentes.
+  // A fonte mais confiável aqui é o storage:
+  // - se existir `ggv-impersonation`, usar SEMPRE o `impersonatedUser` (para não vazar role do usuário original).
+  // - caso contrário, usar `ggv-user`.
+  // Evitamos depender de Context aqui para não criar ciclos/erros em runtime.
 
-  let currentUser: User | null = (direct as any)?.user || (legacy as any)?.user || null;
-
-  const tryReadImpersonatedUser = (): User | null => {
+  const safeGet = (key: string): string | null => {
     try {
-      const raw =
-        localStorage.getItem('ggv-impersonation') || sessionStorage.getItem('ggv-impersonation');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as any;
-      const imp = parsed?.impersonatedUser;
-      if (!imp?.id || !imp?.email || !imp?.name) return null;
-      return {
-        id: imp.id,
-        email: imp.email,
-        name: imp.name,
-        initials:
-          imp.initials ||
-          String(imp.name)
-            .split(' ')
-            .map((n: string) => n[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase(),
-        role: (imp.role as UserRole) || UserRole.User,
-      } as User;
+      if (typeof window === 'undefined') return null;
+      return localStorage.getItem(key) || sessionStorage.getItem(key);
     } catch {
       return null;
     }
   };
 
-  const tryReadStoredUser = (): User | null => {
-    try {
-      // Priorizar impersonação (se existir) para não vazar o role do usuário original.
-      const imp = tryReadImpersonatedUser();
-      if (imp) return imp;
-
-      const raw = localStorage.getItem('ggv-user') || sessionStorage.getItem('ggv-user');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as any;
-      if (!parsed?.id || !parsed?.email || !parsed?.name) return null;
-      return {
-        id: parsed.id,
-        email: parsed.email,
-        name: parsed.name,
-        initials:
-          parsed.initials ||
-          String(parsed.name)
-            .split(' ')
-            .map((n: string) => n[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase(),
-        role: (parsed.role as UserRole) || UserRole.User,
-      } as User;
-    } catch {
-      return null;
-    }
+  const toUser = (raw: any): User | null => {
+    if (!raw?.id || !raw?.email || !raw?.name) return null;
+    return {
+      id: raw.id,
+      email: raw.email,
+      name: raw.name,
+      initials:
+        raw.initials ||
+        String(raw.name)
+          .split(' ')
+          .map((n: string) => n[0])
+          .slice(0, 2)
+          .join('')
+          .toUpperCase(),
+      role: (raw.role as UserRole) || UserRole.User,
+    } as User;
   };
 
-  if (!currentUser) {
-    currentUser = tryReadStoredUser();
-  }
+  const readCurrentUser = (): User | null => {
+    try {
+      const impRaw = safeGet('ggv-impersonation');
+      if (impRaw) {
+        const parsed = JSON.parse(impRaw) as any;
+        const impUser = toUser(parsed?.impersonatedUser);
+        if (impUser) return impUser;
+      }
+
+      const userRaw = safeGet('ggv-user');
+      if (userRaw) {
+        const parsed = JSON.parse(userRaw) as any;
+        const u = toUser(parsed);
+        if (u) return u;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
+  const currentUser: User | null = readCurrentUser();
   
   const isAdmin = currentUser?.role === UserRole.Admin;
   const isSuperAdmin = currentUser?.role === UserRole.SuperAdmin;
