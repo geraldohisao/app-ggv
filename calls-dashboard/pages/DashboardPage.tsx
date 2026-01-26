@@ -87,6 +87,7 @@ const DashboardPage = () => {
 
   const startDateParam = startDate ? startDate.toISOString().split('T')[0] : '';
   const endDateParam = endDate ? endDate.toISOString().split('T')[0] : '';
+  const isCustomRangeReady = !!(useCustomDates && startDate && endDate);
   
   // Calcular período em dias a partir das datas customizadas
   const getEffectivePeriod = (): number => {
@@ -113,8 +114,9 @@ const DashboardPage = () => {
     return periodLabels[selectedPeriod] || `${selectedPeriod} dias`;
   };
 
-  const getDateRangeForMetrics = () => {
-    if (useCustomDates && startDate && endDate) {
+  const getDateRangeForMetrics = (): { startIso: string; endIso: string } | null => {
+    if (useCustomDates) {
+      if (!startDate || !endDate) return null;
       const startIso = new Date(startDate.toISOString().split('T')[0] + 'T00:00:00.000Z').toISOString();
       const endIso = new Date(endDate.toISOString().split('T')[0] + 'T23:59:59.999Z').toISOString();
       return { startIso, endIso };
@@ -142,7 +144,12 @@ const DashboardPage = () => {
   };
 
   const fetchDashboardMetricsFromCalls = useCallback(async () => {
-    const { startIso, endIso } = getDateRangeForMetrics();
+    const range = getDateRangeForMetrics();
+    if (!range) {
+      // Incomplete custom range: don't fetch yet
+      return null;
+    }
+    const { startIso, endIso } = range;
     const pageSize = 1000;
     const maxRecords = 50000;
     let offset = 0;
@@ -206,6 +213,7 @@ const DashboardPage = () => {
   // Função para atualização manual (sem reload da página)
   const handleManualRefresh = useCallback(async () => {
     if (isRefreshing) return;
+    if (useCustomDates && (!startDate || !endDate)) return;
     
     setIsRefreshing(true);
     console.log('🔄 Atualização manual iniciada...');
@@ -216,6 +224,7 @@ const DashboardPage = () => {
       }
 
       const metrics = await fetchDashboardMetricsFromCalls();
+      if (!metrics) return;
 
       setDashboardData(prev => ({
         ...prev,
@@ -352,6 +361,11 @@ const DashboardPage = () => {
     
     const fetchAllData = async () => {
       console.log('🚀 BUSCANDO TODOS OS DADOS - UMA CONSULTA ÚNICA!');
+
+      // If user is choosing custom dates but hasn't finished the range, don't fetch yet.
+      if (useCustomDates && (!startDate || !endDate)) {
+        return;
+      }
       
       if (!supabase) {
         console.log('❌ Supabase não inicializado');
@@ -363,6 +377,7 @@ const DashboardPage = () => {
         setDashboardData(prev => ({ ...prev, loading: true, error: null }));
 
         const metrics = await fetchDashboardMetricsFromCalls();
+        if (!metrics) return;
 
         // Atualizar estado (deixar gráficos para componentes próprios)
         setDashboardData(prev => ({
@@ -401,6 +416,7 @@ const DashboardPage = () => {
   // Sistema de atualização automática
   useEffect(() => {
     if (!autoRefresh) return;
+    if (useCustomDates && (!startDate || !endDate)) return;
     
     const interval = setInterval(async () => {
       console.log('🔄 Atualização automática disparada');
@@ -409,7 +425,9 @@ const DashboardPage = () => {
         if (!supabase) return;
 
         // Buscar volume agregado para detectar mudanças sem refazer cálculo pesado
-        const { startIso, endIso } = getDateRangeForMetrics();
+        const range = getDateRangeForMetrics();
+        if (!range) return;
+        const { startIso, endIso } = range;
         const { data: volumeData, error: volumeErr } = await supabase
           .rpc('get_calls_volume_by_day', { p_start_date: startIso, p_end_date: endIso, p_sdr: selectedSdr || null });
         if (volumeErr) throw volumeErr;
@@ -426,6 +444,7 @@ const DashboardPage = () => {
           const fetchAllData = async () => {
             try {
               const metrics = await fetchDashboardMetricsFromCalls();
+              if (!metrics) return;
 
               setDashboardData(prev => ({
                 ...prev,
@@ -727,8 +746,8 @@ const DashboardPage = () => {
         <CallVolumeChart 
           selectedPeriod={getEffectivePeriod()} 
           selectedSdrEmail={selectedSdr}
-          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
-          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
+          startDate={isCustomRangeReady ? (startDateParam || undefined) : undefined}
+          endDate={isCustomRangeReady ? (endDateParam || undefined) : undefined}
         />
       </div>
 
@@ -736,18 +755,18 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <SdrScoreChart 
           selectedPeriod={getEffectivePeriod()} 
-          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
-          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
+          startDate={isCustomRangeReady ? (startDateParam || undefined) : undefined}
+          endDate={isCustomRangeReady ? (endDateParam || undefined) : undefined}
         />
         <SdrAverageScoreChart 
           selectedPeriod={getEffectivePeriod()}
-          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
-          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
+          startDate={isCustomRangeReady ? (startDateParam || undefined) : undefined}
+          endDate={isCustomRangeReady ? (endDateParam || undefined) : undefined}
         />
         <SdrUniqueLeadsChart 
           selectedPeriod={getEffectivePeriod()}
-          startDate={useCustomDates ? (startDateParam || undefined) : undefined}
-          endDate={useCustomDates ? (endDateParam || undefined) : undefined}
+          startDate={isCustomRangeReady ? (startDateParam || undefined) : undefined}
+          endDate={isCustomRangeReady ? (endDateParam || undefined) : undefined}
         />
       </div>
 

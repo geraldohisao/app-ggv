@@ -228,7 +228,7 @@ export default function CallsDashboardAuditPanel({
     };
   }, [selectedSdr, getDateRange]);
 
-  // Fetch data directly from database with pagination
+  // Fetch data directly from database with stable pagination (order is required)
   const fetchDirectData = useCallback(async () => {
     if (!supabase) return null;
     
@@ -247,6 +247,8 @@ export default function CallsDashboardAuditPanel({
         .select('id, status_voip, duration, duration_formated', { count: 'exact' })
         .gte('created_at', startIso)
         .lte('created_at', endIso)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
       
       if (selectedSdr) {
@@ -270,7 +272,8 @@ export default function CallsDashboardAuditPanel({
       if (page > 100) break;
     }
 
-    const totalCalls = allCalls.length;
+    // Prefer DB exact count (avoid duplicates from unstable paging)
+    const totalCalls = totalFromDb || allCalls.length;
     const answeredCalls = allCalls.filter(c => c.status_voip === 'normal_clearing').length;
     const answeredRate = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0;
 
@@ -308,9 +311,122 @@ export default function CallsDashboardAuditPanel({
     };
   }, [selectedSdr, getDateRange]);
 
-  // Fetch ranking data from RPCs
+  // Fetch ranking data from RPCs (rolling window). If custom date range is active,
+  // compute the \"RPC\" side from get_calls_with_filters (same filter source as list)
+  // because get_sdr_* functions do not accept start/end params.
   const fetchRankingRpcData = useCallback(async () => {
     if (!supabase) return null;
+
+    if (useCustomDates && startDate && endDate) {
+      // Use get_calls_with_filters for the selected custom range
+      const { startIso, endIso } = getDateRange();
+      const pageSize = 1000;
+      const maxRecords = 50000;
+      let offset = 0;
+      let allCalls: any[] = [];
+      let totalCount = 0;
+
+      while (offset < maxRecords) {
+        const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+          p_sdr: null,
+          p_status: null,
+          p_type: null,
+          p_start_date: startIso,
+          p_end_date: endIso,
+          p_limit: pageSize,
+          p_offset: offset,
+          p_sort_by: 'created_at',
+          p_min_duration: null,
+          p_max_duration: null,
+          p_min_score: null
+        });
+
+        if (callsError) throw callsError;
+
+        const chunk = Array.isArray(callsData) ? callsData : [];
+        if (chunk.length === 0) break;
+
+        totalCount = Number(chunk[0]?.total_count || totalCount);
+        allCalls = allCalls.concat(chunk);
+        if (allCalls.length >= totalCount) break;
+        offset += pageSize;
+      }
+
+      // Volume ranking: group by normalized group name (match dashboard normalization)
+      const volumeMap = new Map<string, number>();
+      allCalls.forEach((c: any) => {
+        const name = normalizeSdrGroupName(String(c.sdr_name || c.agent_id || 'SDR'));
+        const key = name.toLowerCase();
+        volumeMap.set(key, (volumeMap.get(key) || 0) + 1);
+      });
+      const volumeRanking = Array.from(volumeMap.entries())
+        .map(([key, count]) => ({ sdr_name: normalizeSdrGroupName(key), total_calls: count }))
+        .sort((a, b) => b.total_calls - a.total_calls)
+        .slice(0, 10);
+
+      // Leads ranking
+      const leadsMap = new Map<string, Set<string>>();
+      const callsBySdrCalls = new Map<string, number>();
+      allCalls.forEach((c: any) => {
+        const dealId = String(c.deal_id || '').trim();
+        if (!dealId) return;
+        const name = normalizeSdrGroupName(String(c.sdr_name || c.agent_id || 'SDR'));
+        const key = name.toLowerCase();
+        if (!leadsMap.has(key)) leadsMap.set(key, new Set());
+        leadsMap.get(key)!.add(dealId);
+        callsBySdrCalls.set(key, (callsBySdrCalls.get(key) || 0) + 1);
+      });
+      const leadsRanking = Array.from(leadsMap.entries())
+        .map(([key, leads]) => ({ sdr_name: normalizeSdrGroupName(key), unique_leads: leads.size }))
+        .sort((a, b) => b.unique_leads - a.unique_leads)
+        .slice(0, 10);
+
+      // Score ranking: use call_analysis scores (final_grade) joined by call id
+      const callIds = allCalls.map((c: any) => c.id).filter(Boolean);
+      const scoreByCallId = new Map<string, number>();
+      if (callIds.length > 0) {
+        const batchSize = 500;
+        for (let i = 0; i < callIds.length; i += batchSize) {
+          const batch = callIds.slice(i, i + batchSize);
+          const { data, error } = await supabase
+            .from('call_analysis')
+            .select('call_id, final_grade')
+            .in('call_id', batch);
+          if (!error && data) {
+            data.forEach((row: any) => {
+              if (row.final_grade !== null && typeof row.final_grade === 'number') {
+                scoreByCallId.set(row.call_id, row.final_grade);
+              }
+            });
+          }
+        }
+      }
+
+      const scoreAgg = new Map<string, { sum: number; count: number }>();
+      allCalls.forEach((c: any) => {
+        const score = scoreByCallId.get(c.id);
+        if (score === undefined) return;
+        const name = normalizeSdrGroupName(String(c.sdr_name || c.agent_id || 'SDR'));
+        const key = name.toLowerCase();
+        const cur = scoreAgg.get(key) || { sum: 0, count: 0 };
+        scoreAgg.set(key, { sum: cur.sum + score, count: cur.count + 1 });
+      });
+      const scoreRanking = Array.from(scoreAgg.entries())
+        .map(([key, v]) => ({
+          sdr_name: normalizeSdrGroupName(key),
+          avg_score: v.count > 0 ? Number((v.sum / v.count).toFixed(1)) : 0,
+          noted_calls: v.count
+        }))
+        .sort((a, b) => b.avg_score - a.avg_score)
+        .slice(0, 10);
+
+      return {
+        source: 'rpc' as const,
+        volumeRanking,
+        scoreRanking,
+        leadsRanking
+      };
+    }
 
     const [volumeRes, scoreRes, leadsRes] = await Promise.all([
       supabase.rpc('get_sdr_metrics', { p_days: selectedPeriod }),
@@ -338,7 +454,7 @@ export default function CallsDashboardAuditPanel({
         unique_leads: Number(r.unique_leads) || 0
       }))
     };
-  }, [selectedPeriod]);
+  }, [selectedPeriod, useCustomDates, startDate, endDate, getDateRange]);
 
   // Normalize SDR identifier (match RPC logic)
   const normalizeSdrEmail = (email?: string | null): string | null => {
@@ -410,6 +526,8 @@ export default function CallsDashboardAuditPanel({
         .gte('created_at', startIso)
         .lte('created_at', endIso)
         .not('agent_id', 'is', null)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (error) throw error;
