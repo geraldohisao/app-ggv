@@ -133,6 +133,13 @@ exports.handler = async (event, context) => {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+
+  // Google Chat disabled: return no-op response
+  return {
+    statusCode: 204,
+    headers,
+    body: ''
+  };
   
   // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
