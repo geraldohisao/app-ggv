@@ -38,22 +38,7 @@ export default function ScorecardPage() {
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadScorecards();
-    fetchAvailableCallTypes();
-  }, []);
-
-  if (!canAccessManualAnalysis) {
-    return (
-      <div className="p-6">
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-600">
-          A visualização de scorecards é restrita a Admin e Super Admin.
-        </div>
-      </div>
-    );
-  }
-
-  const loadScorecards = async () => {
+  async function loadScorecards() {
     try {
       setLoading(true);
       setError(null);
@@ -73,7 +58,22 @@ export default function ScorecardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadScorecards();
+    fetchAvailableCallTypes();
+  }, []);
+
+  if (!canAccessManualAnalysis) {
+    return (
+      <div className="p-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-600">
+          A visualização de scorecards é restrita a Admin e Super Admin.
+        </div>
+      </div>
+    );
+  }
 
   const fetchAvailableCallTypes = async () => {
     try {
