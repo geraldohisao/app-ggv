@@ -777,21 +777,27 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
                 />
             ) : (
               permissions.isOP ? (
+                // Usuários OP: sem drag-and-drop, mas podem editar OKRs onde são owners
                 <div className="space-y-6">
                   {okrs.map((okr) => {
                     const ownerUser = okrUsers.find(u => u.name === okr.owner);
+                    const canEdit = permissions.okr.canEdit(okr);
                     return (
                       <OKRCard 
                         key={okr.id}
                         okr={okr}
+                        onClick={canEdit ? () => onEdit?.(okr) : undefined}
                         ownerAvatarUrl={ownerUser?.avatar_url}
-                        readOnly
+                        readOnly={!canEdit}
                       />
                     );
                   })}
                 </div>
               ) : (
                 <DndContext
+                  // Key baseada no número de OKRs força recriação do contexto após exclusão
+                  // Isso evita que o DndKit mantenha estado residual que bloqueia cliques
+                  key={`dnd-okrs-${okrs.length}`}
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={handleDragEnd}
@@ -802,7 +808,7 @@ export const OKRDashboard: React.FC<OKRDashboardProps> = ({ onCreateNew, onEdit,
                   >
                     <div className="space-y-6 pl-8">
                       <p className="text-xs text-slate-400 -ml-8 mb-2">
-                        💡 Arraste os OKRs pelo ícone à esquerda para reordenar. Os 3 primeiros aparecem no dashboard.
+                        Arraste os OKRs pelo ícone à esquerda para reordenar. Os 3 primeiros aparecem no dashboard.
                       </p>
                       {okrs.map((okr) => {
                         const ownerUser = okrUsers.find(u => u.name === okr.owner);

@@ -96,15 +96,30 @@ export function usePermissions(): Permissions {
   // PERMISSÕES DE OKR
   // ============================================
   
+  // Helper para verificar se o usuário é o owner do OKR
+  const isOKROwner = (okr: OKR) => {
+    if (!user.name || !okr.owner) return false;
+    // Comparação case-insensitive e parcial para flexibilidade
+    const userName = user.name.toLowerCase().trim();
+    const okrOwner = okr.owner.toLowerCase().trim();
+    return userName === okrOwner || 
+           userName.includes(okrOwner) || 
+           okrOwner.includes(userName);
+  };
+  
   const okrPermissions: OKRPermissions = {
     // CEO pode criar qualquer OKR
     // HEAD pode criar OKRs setoriais do próprio departamento
     canCreate: isCEO || isHEAD,
 
     // CEO pode editar qualquer OKR
-    // HEAD pode editar apenas OKRs do próprio departamento
+    // HEAD pode editar OKRs do próprio departamento OU OKRs onde é owner
+    // Owner do OKR também pode editar (mesmo que seja OP)
     canEdit: (okr: OKR) => {
       if (isCEO) return true;
+      // Owner sempre pode editar seu próprio OKR
+      if (isOKROwner(okr)) return true;
+      // HEAD pode editar OKRs do seu departamento
       if (isHEAD && userDepartment) {
         return okr.department === userDepartment;
       }
@@ -112,9 +127,13 @@ export function usePermissions(): Permissions {
     },
 
     // CEO pode deletar qualquer OKR
-    // HEAD pode deletar apenas OKRs do próprio departamento
+    // HEAD pode deletar OKRs do próprio departamento OU OKRs onde é owner
+    // Owner do OKR também pode deletar
     canDelete: (okr: OKR) => {
       if (isCEO) return true;
+      // Owner sempre pode deletar seu próprio OKR
+      if (isOKROwner(okr)) return true;
+      // HEAD pode deletar OKRs do seu departamento
       if (isHEAD && userDepartment) {
         return okr.department === userDepartment;
       }
