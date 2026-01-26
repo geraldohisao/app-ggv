@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { CALLS, DATE_FORMATTER, TIME_FORMATTER, secondsToHuman } from '../../../calls-dashboard/constants';
 import AiAssistant from '../../../calls-dashboard/components/AiAssistant';
 import { fetchCallDetails, listCallComments, addCallComment } from '../../../services/callsService';
+import { useAdminFeatures } from '../../../hooks/useAdminPermissions';
 
 export default function CallDetailPage({ callId }: { callId: string }) {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const local = CALLS.find((c) => c.id === callId);
   const [call, setCall] = useState<any>(local);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -166,10 +168,17 @@ export default function CallDetailPage({ callId }: { callId: string }) {
               <div className="text-slate-500">Status</div>
               <div className="font-semibold capitalize">{call.status}</div>
             </div>
-            <div>
-              <div className="text-slate-500">Nota</div>
-              <div className="font-semibold">{typeof call.score === 'number' ? call.score : 'N/A'}</div>
-            </div>
+            {canAccessManualAnalysis ? (
+              <div>
+                <div className="text-slate-500">Nota</div>
+                <div className="font-semibold">{typeof call.score === 'number' ? call.score : 'N/A'}</div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-slate-500">Nota</div>
+                <div className="font-semibold">—</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -209,11 +218,13 @@ export default function CallDetailPage({ callId }: { callId: string }) {
           {renderTranscription()}
         </div>
 
-        {/* Análise IA */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <div className="mb-4 font-medium text-slate-800">🤖 Feedback de IA</div>
-          {renderAIAnalysis()}
-        </div>
+        {/* Análise IA (somente Admin/SuperAdmin) */}
+        {canAccessManualAnalysis && (
+          <div className="bg-white rounded-lg border border-slate-200 p-4">
+            <div className="mb-4 font-medium text-slate-800">🤖 Feedback de IA</div>
+            {renderAIAnalysis()}
+          </div>
+        )}
       </div>
 
       {/* Sidebar com comentários */}

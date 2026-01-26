@@ -12,7 +12,11 @@
     "test:watch": "vitest --watch",
     "test:debug": "vitest --run --reporter=verbose",
     "test:coverage": "vitest --run --coverage",
-    "seed:calls": "node --env-file=.env.local ./scripts/seed-calls.js"
+    "seed:calls": "node --env-file=.env.local ./scripts/seed-calls.js",
+    "test:e2e:local": "PLAYWRIGHT_TARGET=local npx playwright test",
+    "test:e2e:web": "PLAYWRIGHT_TARGET=web PLAYWRIGHT_BASE_URL=https://app.grupoggv.com npx playwright test",
+    "test:e2e:sprint:local": "PLAYWRIGHT_TARGET=local npx playwright test e2e/sprint-calendar.spec.ts",
+    "test:e2e:sprint:web": "PLAYWRIGHT_TARGET=web PLAYWRIGHT_BASE_URL=https://app.grupoggv.com npx playwright test e2e/sprint-calendar.spec.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -40,6 +44,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^2.22.0",
     "@playwright/test": "^1.57.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

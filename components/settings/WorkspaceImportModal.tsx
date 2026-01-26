@@ -20,6 +20,19 @@ export const WorkspaceImportModal: React.FC<{ onClose: () => void }> = ({ onClos
   const [users, setUsers] = useState<WorkspaceUser[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState({ imported: 0, updated: 0, skipped: 0, errors: 0 });
+  const isImportSuccess = stats.errors === 0;
+  const isImportFailed = stats.errors > 0 && (stats.imported + stats.updated) === 0;
+  const doneIcon = isImportFailed ? '❌' : isImportSuccess ? '🎉' : '⚠️';
+  const doneTitle = isImportFailed
+    ? 'Importação não foi concluída com sucesso'
+    : isImportSuccess
+      ? 'Importação concluída!'
+      : 'Importação concluída com erros';
+  const doneSubtitle = isImportFailed
+    ? 'Não foi possível importar/atualizar nenhum usuário. Verifique os erros abaixo.'
+    : isImportSuccess
+      ? 'Tudo certo! Os usuários selecionados foram processados.'
+      : 'Alguns usuários não puderam ser importados/atualizados. Verifique os erros abaixo.';
 
   // MOCK - Dados de exemplo (depois substituir por chamada real ao Google)
   const mockGoogleUsers = [
@@ -131,6 +144,9 @@ export const WorkspaceImportModal: React.FC<{ onClose: () => void }> = ({ onClos
 
           if (error) {
             console.error(`❌ Erro ao importar ${user.email}:`, error);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WorkspaceImportModal.tsx:132',message:'workspace_sync_user RPC error',data:{email:user.email,code:(error as any)?.code,message:(error as any)?.message,details:(error as any)?.details,hint:(error as any)?.hint},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
             errors++;
             continue; // Pula para próximo
           }
@@ -369,10 +385,13 @@ export const WorkspaceImportModal: React.FC<{ onClose: () => void }> = ({ onClos
           {/* STEP: Done */}
           {step === 'done' && (
             <div className="text-center py-12">
-              <div className="text-6xl mb-6">🎉</div>
+              <div className="text-6xl mb-6">{doneIcon}</div>
               <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                Importação concluída!
+                {doneTitle}
               </h3>
+              <p className="text-slate-600 mb-8 max-w-2xl mx-auto">
+                {doneSubtitle}
+              </p>
               <div className="grid grid-cols-4 gap-4 max-w-2xl mx-auto mb-8">
                 <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                   <div className="text-3xl font-bold text-green-800">{stats.imported}</div>
@@ -395,7 +414,7 @@ export const WorkspaceImportModal: React.FC<{ onClose: () => void }> = ({ onClos
                 onClick={onClose}
                 className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"
               >
-                ✅ Fechar
+                Fechar
               </button>
             </div>
           )}

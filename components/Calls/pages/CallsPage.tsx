@@ -5,8 +5,10 @@ import RelativeDateRange from '../RelativeDateRange';
 import FilterChips from '../FilterChips';
 import SavedFilters from '../SavedFilters';
 import { listFavoriteSdrs, toggleFavoriteSdr } from '../../../services/preferences';
+import { useAdminFeatures } from '../../../hooks/useAdminPermissions';
 
 export default function CallsPage() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const [query, setQuery] = useState('');
   const [sdr, setSdr] = useState('');
   const [status, setStatus] = useState('');
@@ -454,7 +456,7 @@ export default function CallsPage() {
                     )}
                     
                     {/* Análise IA */}
-                    {(call.scorecard && Object.keys(call.scorecard).length > 0) && (
+                    {canAccessManualAnalysis && (call.scorecard && Object.keys(call.scorecard).length > 0) && (
                       <span 
                         className="inline-flex items-center justify-center w-6 h-6 text-purple-600 hover:text-purple-700 transition-colors cursor-help" 
                         title="🤖 Análise IA realizada"
@@ -482,7 +484,9 @@ export default function CallsPage() {
                 <td className="p-4 text-right">
                   <div className="flex items-center gap-3 justify-end">
                     <a href={`#/calls/${call.id}`} className="text-slate-600 hover:text-slate-900 text-sm">Detalhes</a>
-                    <a href={`#/calls/${call.id}/analyze`} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Analisar</a>
+                    {canAccessManualAnalysis && (
+                      <a href={`#/calls/${call.id}/analyze`} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Analisar</a>
+                    )}
                   </div>
                 </td>
               </tr>

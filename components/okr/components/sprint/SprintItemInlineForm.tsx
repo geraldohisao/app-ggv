@@ -169,21 +169,21 @@ export const SprintItemInlineForm: React.FC<SprintItemInlineFormProps> = ({
   };
 
   const selectUser = (user: { id: string; name: string; cargo?: string }) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       responsible: formatUserLabel(user as any),
       responsible_user_id: user.id,
-    });
+    }));
     setShowResponsibleDropdown(false);
     setResponsibleSearch('');
   };
 
   const clearResponsible = () => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       responsible: '',
       responsible_user_id: '',
-    });
+    }));
   };
 
   const filteredUsers = users.filter(user => {

@@ -312,10 +312,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 provider: 'google',
                 options: {
                     redirectTo: cleanUrl,
-                    scopes: 'openid email profile https://www.googleapis.com/auth/gmail.send',
+                    scopes: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/documents.readonly',
                     queryParams: {
-                        include_granted_scopes: 'true',
-                        prompt: isProduction ? 'select_account' : 'none' // Usar 'select_account' em produção
+                        access_type: 'offline',
+                        prompt: 'consent',
+                        include_granted_scopes: 'true'
                     }
                 }
             });

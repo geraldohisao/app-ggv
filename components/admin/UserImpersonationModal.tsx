@@ -65,6 +65,7 @@ const UserImpersonationModal: React.FC<UserImpersonationModalProps> = ({ isOpen,
 
     setSwitching(true);
     try {
+      setError(null);
       const success = await startImpersonation(profile.id);
       if (success) {
         onClose();

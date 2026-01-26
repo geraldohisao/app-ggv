@@ -8,6 +8,7 @@ import ScorecardPage from '../../calls-dashboard/pages/ScorecardPage';
 import ScorecardEditPage from '../../calls-dashboard/pages/ScorecardEditPage';
 import SdrDetailPage from '../../calls-dashboard/pages/SdrDetailPage';
 import { ChartBarIcon, PhoneIcon, ClipboardDocumentListIcon } from '../ui/icons';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 type Route =
   | { name: 'dashboard' }
@@ -57,6 +58,7 @@ const tabs = [
 ];
 
 export default function CallsApp() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const [route, setRoute] = useState<Route>(() => parseHash());
 
   useEffect(() => {
@@ -74,6 +76,11 @@ export default function CallsApp() {
         <div className="max-w-screen-2xl mx-auto px-6">
           <div className="flex gap-1">
             {tabs.map((tab) => {
+              // Ocultar aba Scorecard para usuários não-admin
+              if (tab.id === 'scorecards' && !canAccessManualAnalysis) {
+                return null;
+              }
+              
               const isActive = tab.activeOn.includes(active);
               const Icon = tab.icon;
               return (

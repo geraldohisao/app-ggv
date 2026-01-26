@@ -63,6 +63,9 @@ Certifique-se que estes escopos estão configurados:
 ✅ https://www.googleapis.com/auth/gmail.send
 ✅ https://www.googleapis.com/auth/gmail.compose
 ✅ https://www.googleapis.com/auth/gmail.readonly
+✅ https://www.googleapis.com/auth/calendar.events     (para criar/gerenciar eventos no Google Calendar)
+✅ https://www.googleapis.com/auth/drive.readonly      (para ler transcrições do Google Drive)
+✅ https://www.googleapis.com/auth/documents.readonly  (para ler conteúdo do Google Docs)
 ```
 
 #### **3.2 - Verificar URLs Autorizadas**

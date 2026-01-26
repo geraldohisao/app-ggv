@@ -4,6 +4,7 @@ import { parseCheckinToItems } from './checkinParser.service';
 import { matchItemsWithAI } from './checkinMatcher.service';
 import * as sprintService from './sprint.service';
 import type { SprintItemSuggestion, SprintItem } from '../types/sprint.types';
+import { logCheckinEvent } from '../../../services/auditService';
 
 // Cache simples para evitar chamadas repetidas à tabela opcional sprint_okrs
 const SPRINT_OKRS_STORAGE_KEY = 'okr:sprint_okrs_available';
@@ -377,6 +378,14 @@ export async function createSprintCheckin(
     }
 
     console.log('✅ Check-in da sprint criado:', data.id);
+    
+    // Log audit event (best-effort)
+    if (data?.id) {
+      logCheckinEvent('created', data.id, sprintId, {
+        health: data.health,
+        scope: sprintScope,
+      }).catch(() => {});
+    }
 
     if (data && data.id) {
       const mode = options?.suggestionsMode || 'async';
@@ -541,7 +550,7 @@ export async function rejectSprintItemSuggestion(
 export async function updateSprintCheckin(
   checkinId: string,
   updates: Partial<SprintCheckin>,
-  options?: { regenerateSuggestions?: boolean; sprintScope?: SprintScope }
+  options?: { regenerateSuggestions?: boolean; sprintScope?: SprintScope; regenerateSuggestionsMode?: 'sync' | 'async' }
 ): Promise<SprintCheckin | null> {
   try {
     console.log('📝 Atualizando check-in existente...');
@@ -576,10 +585,19 @@ export async function updateSprintCheckin(
         }
 
         const scope = options?.sprintScope || 'execucao';
-        // Não bloquear UX: gerar sugestões em background
-        void generateSuggestionsFromCheckin(data as SprintCheckin, scope, userId).catch((suggestionError) => {
-          console.error('❌ Erro ao recriar sugestões do check-in (async):', suggestionError);
-        });
+        const mode = options?.regenerateSuggestionsMode || 'async';
+        if (mode === 'sync') {
+          try {
+            await generateSuggestionsFromCheckin(data as SprintCheckin, scope, userId);
+          } catch (suggestionError) {
+            console.error('❌ Erro ao recriar sugestões do check-in (sync):', suggestionError);
+          }
+        } else {
+          // Não bloquear UX: gerar sugestões em background
+          void generateSuggestionsFromCheckin(data as SprintCheckin, scope, userId).catch((suggestionError) => {
+            console.error('❌ Erro ao recriar sugestões do check-in (async):', suggestionError);
+          });
+        }
       } catch (suggestionError) {
         console.error('❌ Erro ao recriar sugestões do check-in:', suggestionError);
       }

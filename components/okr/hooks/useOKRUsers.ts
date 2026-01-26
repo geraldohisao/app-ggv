@@ -24,6 +24,10 @@ export function useOKRUsers() {
           console.error('Erro ao buscar usuários:', error);
           setUsers([]);
         } else {
+          // #region agent log
+          const geraldo = data?.find(u => u.name?.toLowerCase().includes('geraldo'));
+          fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useOKRUsers.ts:26',message:'RPC list_users_for_okr returned',data:{totalUsers:data?.length,geraldoFound:!!geraldo,geraldoName:geraldo?.name,geraldoAvatarUrl:geraldo?.avatar_url,geraldoEmail:geraldo?.email},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
           setUsers(data || []);
         }
       } catch (err) {

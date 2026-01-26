@@ -164,7 +164,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger para personal_tasks
 DROP TRIGGER IF EXISTS trg_personal_task_notification ON personal_tasks;
@@ -249,7 +249,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger para sprint_items
 DROP TRIGGER IF EXISTS trg_sprint_item_notification ON sprint_items;
@@ -350,7 +350,7 @@ BEGIN
     
     RETURN QUERY SELECT v_created, v_processed;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- =========================================
 -- 6. FUNÇÃO: Gerar alertas de tarefas atrasadas
@@ -489,7 +489,7 @@ BEGIN
     
     RETURN QUERY SELECT v_created, v_processed;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- =========================================
 -- 7. RLS POLICIES

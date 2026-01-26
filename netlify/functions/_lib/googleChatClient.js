@@ -5,6 +5,11 @@
  * 
  * Required environment variables:
  * - GOOGLE_CHAT_SERVICE_ACCOUNT_JSON: Base64-encoded JSON of the service account key
+ *   OR (preferred to avoid Netlify env size limits):
+ * - GOOGLE_CHAT_SERVICE_ACCOUNT_BUCKET: Supabase Storage bucket (default: "secrets")
+ * - GOOGLE_CHAT_SERVICE_ACCOUNT_OBJECT: Object path in bucket (e.g. "google-chat-service-account.json")
+ * - SUPABASE_URL: Supabase project URL (for Storage download)
+ * - SUPABASE_SERVICE_ROLE_KEY: Service role key (for Storage download)
  * - APP_DOMAIN: (optional) Domain for deep links in messages (defaults to app.grupoggv.com)
  * 
  * Setup Guide:
@@ -133,14 +138,14 @@ class GoogleServiceAccountAuth {
 class GoogleChatClient {
   constructor() {
     this.auth = null;
-    this._initAuth();
+    this._initPromise = null;
+    this._initAuthFromEnv();
   }
 
-  _initAuth() {
+  _initAuthFromEnv() {
     const credentialsB64 = process.env.GOOGLE_CHAT_SERVICE_ACCOUNT_JSON;
     
     if (!credentialsB64) {
-      console.warn('⚠️ GOOGLE_CHAT_SERVICE_ACCOUNT_JSON not configured');
       return;
     }
 
@@ -158,7 +163,73 @@ class GoogleChatClient {
    * Check if the client is properly configured
    */
   isConfigured() {
-    return this.auth !== null;
+    return Boolean(
+      this.auth ||
+      process.env.GOOGLE_CHAT_SERVICE_ACCOUNT_JSON ||
+      process.env.GOOGLE_CHAT_SERVICE_ACCOUNT_OBJECT
+    );
+  }
+
+  async _ensureAuth() {
+    if (this.auth) return;
+    if (this._initPromise) {
+      await this._initPromise;
+      return;
+    }
+    this._initPromise = this._initAuthFromStorage();
+    await this._initPromise;
+  }
+
+  async _initAuthFromStorage() {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const bucket = process.env.GOOGLE_CHAT_SERVICE_ACCOUNT_BUCKET || 'secrets';
+    const objectPath = process.env.GOOGLE_CHAT_SERVICE_ACCOUNT_OBJECT;
+
+    if (!supabaseUrl || !serviceRoleKey || !objectPath) {
+      console.warn('⚠️ Google Chat storage credentials not configured');
+      return;
+    }
+
+    try {
+      const encodedPath = encodeURIComponent(objectPath).replace(/%2F/g, '/');
+      const url = `${supabaseUrl}/storage/v1/object/${bucket}/${encodedPath}`;
+      const response = await fetch(url, {
+        headers: {
+          authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Storage fetch failed: ${response.status} ${errorText}`);
+      }
+
+      const raw = await response.text();
+      const credentials = this._parseCredentials(raw);
+      if (!credentials) {
+        throw new Error('Failed to parse credentials from Storage');
+      }
+
+      this.auth = new GoogleServiceAccountAuth(credentials);
+      console.log('✅ Google Chat client initialized (Supabase Storage)');
+    } catch (error) {
+      console.error('❌ Failed to initialize Google Chat auth from Storage:', error.message);
+    }
+  }
+
+  _parseCredentials(raw) {
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      try {
+        const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+        return JSON.parse(decoded);
+      } catch (err) {
+        return null;
+      }
+    }
   }
 
   /**
@@ -169,7 +240,8 @@ class GoogleChatClient {
    * @returns {Promise<{spaceName: string, displayName: string}>}
    */
   async findOrCreateDmSpace(userEmail) {
-    if (!this.isConfigured()) {
+    await this._ensureAuth();
+    if (!this.auth) {
       throw new Error('Google Chat client not configured');
     }
 

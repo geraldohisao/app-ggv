@@ -57,7 +57,30 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- EmailJS CDN -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<style></style>
+<style>
+      /* Custom animations for wizard steps */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+      .animate-slideInRight {
+        animation: slideInRight 0.3s ease-out forwards;
+      }
+      .animate-slideInLeft {
+        animation: slideInLeft 0.3s ease-out forwards;
+      }
+    </style>
 <!-- Removido index.css (não existe no projeto) para evitar 404 em dev -->
 </head>
   <body class="h-full bg-slate-100 text-slate-800 antialiased">

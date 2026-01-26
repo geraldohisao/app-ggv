@@ -261,3 +261,4 @@ kr_checkins (
 **Testado por:** Antigravity AI  
 **Ambiente:** Desenvolvimento Local (porta 5173)  
 **Status Final:** ✅ Sistema funcional, aguardando implementação de exportação de documentos
+n

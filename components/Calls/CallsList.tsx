@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import CallAnalysisPanel from './CallAnalysisPanel';
+import { useAdminFeatures } from '../../hooks/useAdminPermissions';
 
 interface Call {
   id: string;
@@ -26,6 +27,7 @@ interface Call {
 }
 
 export default function CallsList() {
+  const { canAccessManualAnalysis } = useAdminFeatures();
   const [data, setData] = useState<{ items: Call[]; total: number }>({ items: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,7 +190,7 @@ export default function CallsList() {
           <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
             Total: {data.total}
           </span>
-          {selectedDealId && (
+          {canAccessManualAnalysis && selectedDealId && (
             <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
               📊 Análise IA Ativa
             </span>
@@ -207,7 +209,7 @@ export default function CallsList() {
       )}
 
       {/* Painel de Análise IA - Só aparece quando há deal_id na URL */}
-      {selectedDealId && !IS_UNDER_DEVELOPMENT && (
+      {canAccessManualAnalysis && selectedDealId && !IS_UNDER_DEVELOPMENT && (
         <div className="mb-6">
           <CallAnalysisPanel 
             dealId={selectedDealId} 
@@ -247,7 +249,7 @@ export default function CallsList() {
                     <th className="p-4 font-medium">Data</th>
                     <th className="p-4 font-medium">Duração</th>
                     <th className="p-4 font-medium">Status</th>
-                    <th className="p-4 font-medium">Nota</th>
+                    {canAccessManualAnalysis && <th className="p-4 font-medium">Nota</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -312,9 +314,11 @@ export default function CallsList() {
                           {call.status_voip_friendly || call.status}
                         </span>
                       </td>
-                      <td className="p-4">
-                        <span className="text-xs text-slate-500">N/A</span>
-                      </td>
+                      {canAccessManualAnalysis && (
+                        <td className="p-4">
+                          <span className="text-xs text-slate-500">N/A</span>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

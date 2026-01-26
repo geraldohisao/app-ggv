@@ -14,6 +14,7 @@ import {
     clearImpersonation
 } from '../utils/sessionUtils';
 import { setSentryUser, clearSentryUser } from '../src/sentry';
+import { logAuthEvent, logImpersonationEvent, flushAuditEvents } from '../services/auditService';
 
 interface UserContextType {
     user: User | null;
@@ -62,6 +63,23 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (sessionInfo.isLoggedIn && sessionInfo.isValid) {
                 console.log('✅ DIRECT CONTEXT - Usuário válido encontrado no localStorage:', sessionInfo.user.email);
                 console.log(`🕐 DIRECT CONTEXT - Sessão válida por mais ${sessionInfo.remainingHours} horas`);
+                // #region agent log
+                if (sessionInfo.user?.email === 'geraldo@grupoggv.com' || sessionInfo.user?.email === 'geraldo@ggvinteligencia.com.br') {
+                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:65',message:'Local session user avatar',data:{email:sessionInfo.user?.email,localAvatarUrl:sessionInfo.user?.avatar_url,localInitials:sessionInfo.user?.initials},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                }
+                // #endregion
+                // #region agent log
+                if (supabase && (sessionInfo.user?.email === 'geraldo@grupoggv.com' || sessionInfo.user?.email === 'geraldo@ggvinteligencia.com.br')) {
+                    (async () => {
+                        try {
+                            const { data: { session } } = await supabase.auth.getSession();
+                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:73',message:'Supabase session metadata snapshot',data:{email:session?.user?.email,metaAvatarUrl:session?.user?.user_metadata?.avatar_url,metaPicture:session?.user?.user_metadata?.picture},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                        } catch (e) {
+                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:79',message:'Supabase session metadata error',data:{error:true},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                        }
+                    })();
+                }
+                // #endregion
                 
                 // Salvar novamente para renovar timestamp automaticamente
                 saveSession(sessionInfo.user);
@@ -73,8 +91,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setOriginalUser(impersonation.originalUser);
                     setUser(impersonation.impersonatedUser);
                     setIsImpersonating(true);
+                    setSentryUser({
+                        id: impersonation.impersonatedUser.id,
+                        email: impersonation.impersonatedUser.email,
+                        name: impersonation.impersonatedUser.name,
+                        role: impersonation.impersonatedUser.role
+                    });
                 } else {
                     setUser(sessionInfo.user);
+                    setSentryUser({
+                        id: sessionInfo.user.id,
+                        email: sessionInfo.user.email,
+                        name: sessionInfo.user.name,
+                        role: sessionInfo.user.role
+                    });
                 }
                 
                 setLoading(false);
@@ -146,6 +176,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         const googleAvatarUrl = session.user.user_metadata?.avatar_url || 
                                                session.user.user_metadata?.picture || 
                                                undefined;
+                        // #region agent log
+                        if (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br') {
+                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:164',message:'Auth session avatar metadata',data:{email:email,metaAvatarUrl:session.user.user_metadata?.avatar_url,metaPicture:session.user.user_metadata?.picture,googleAvatarUrl:googleAvatarUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                        }
+                        // #endregion
                         
                         // Consultar role, department, cargo e avatar_url da tabela profiles
                         let userRole = UserRole.User;
@@ -169,6 +204,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 // Prioriza avatar do banco, senão usa do Google OAuth
                                 userAvatarUrl = profile.avatar_url || googleAvatarUrl || undefined;
                                 console.log('✅ DIRECT CONTEXT - Role, department e cargo carregados do banco:', { role: userRole, department: userDepartment, cargo: userCargo, function: userFunction, avatar_url: !!userAvatarUrl, source: profile.avatar_url ? 'db' : 'google' });
+                                // #region agent log
+                                if (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br') {
+                                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:189',message:'Profile avatar selection',data:{email:email,profileAvatarUrl:profile.avatar_url,googleAvatarUrl:googleAvatarUrl,finalUserAvatarUrl:userAvatarUrl,source:profile.avatar_url ? 'db' : (googleAvatarUrl ? 'google' : 'none')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                                }
+                                // #endregion
                             } else {
                                 // Fallback para emails específicos
                                 const isAdmin = email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br';
@@ -199,6 +239,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         saveSession(user);
                         
                         setUser(user);
+                        setSentryUser({
+                            id: user.id,
+                            email: user.email,
+                            name: user.name,
+                            role: user.role
+                        });
                         setLoading(false);
                         setShowAuth(false);
                         return;
@@ -303,6 +349,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(finalUser);
         setShowAuth(false);
         setAuthError(null);
+        
+        // Log auth event (best-effort, non-blocking)
+        logAuthEvent('login', {
+            user_id: finalUser.id,
+            role: finalUser.role,
+            department: finalUser.department,
+        }).catch(() => {});
     };
 
     const handleAuthError = (error: string) => {
@@ -313,6 +366,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const logout = async () => {
         console.log('🚪 DIRECT CONTEXT - Logout');
+        
+        // Log logout event before clearing session (best-effort, non-blocking)
+        try {
+            await logAuthEvent('logout', {
+                user_id: user?.id,
+            });
+            await flushAuditEvents(); // Ensure event is sent before session clears
+        } catch {}
         
         // Limpar sessão Supabase se existir
         try {
@@ -332,6 +393,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsImpersonating(false);
         
         setUser(null);
+        clearSentryUser();
         setShowAuth(true);
         setAuthError(null);
     };
@@ -370,6 +432,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 
                 // Atualizar estado
                 setUser(updatedUser);
+                setSentryUser({
+                    id: updatedUser.id,
+                    email: updatedUser.email,
+                    name: updatedUser.name,
+                    role: updatedUser.role
+                });
                 
                 // Atualizar storage usando utilitário
                 saveSession(updatedUser);
@@ -440,9 +508,24 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setOriginalUser(user);
             }
             setUser(impersonatedUser);
+            setSentryUser({
+                id: impersonatedUser.id,
+                email: impersonatedUser.email,
+                name: impersonatedUser.name,
+                role: impersonatedUser.role
+            });
             setIsImpersonating(true);
 
             console.log('✅ DIRECT CONTEXT - Impersonação ativada:', impersonatedUser.email);
+            
+            // Log impersonation event (best-effort)
+            logImpersonationEvent(
+                'start',
+                impersonatedUser.id,
+                impersonatedUser.email,
+                realOriginalUser?.id
+            ).catch(() => {});
+            
             return true;
         } catch (error) {
             console.error('❌ DIRECT CONTEXT - Erro ao iniciar impersonação:', error);
@@ -463,10 +546,24 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         // Restaurar usuário original
         setUser(originalUser);
+        setSentryUser({
+            id: originalUser.id,
+            email: originalUser.email,
+            name: originalUser.name,
+            role: originalUser.role
+        });
         setOriginalUser(null);
         setIsImpersonating(false);
 
         console.log('✅ DIRECT CONTEXT - Impersonação encerrada');
+        
+        // Log impersonation stop event (best-effort)
+        logImpersonationEvent(
+            'stop',
+            user?.id || '',
+            user?.email || '',
+            originalUser?.id
+        ).catch(() => {});
     };
 
     const isPublicOrganograma = typeof window !== 'undefined' && window.location.pathname.startsWith('/organograma-publico');

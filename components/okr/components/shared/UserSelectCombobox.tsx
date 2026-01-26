@@ -147,17 +147,33 @@ export const UserSelectCombobox: React.FC<UserSelectComboboxProps> = ({
         ) : selectedUser ? (
           <>
             {/* Avatar do usuário selecionado */}
-            {selectedUser.avatar_url ? (
-              <img
-                src={selectedUser.avatar_url}
-                alt={selectedUser.name}
-                className="w-8 h-8 rounded-full object-cover"
-              />
-            ) : (
-              <div className={`w-8 h-8 rounded-full ${getAvatarColor(selectedUser.name)} flex items-center justify-center`}>
-                <span className="text-white text-xs font-bold">{getInitials(selectedUser.name)}</span>
-              </div>
-            )}
+            {(() => {
+              // #region agent log
+              const isGeraldo = selectedUser.name?.toLowerCase().includes('geraldo');
+              fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:150',message:'Rendering selected user avatar',data:{userName:selectedUser.name,hasAvatarUrl:!!selectedUser.avatar_url,avatarUrl:selectedUser.avatar_url,isGeraldo:isGeraldo},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+              // #endregion
+              return selectedUser.avatar_url ? (
+                <img
+                  src={selectedUser.avatar_url}
+                  alt={selectedUser.name}
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:158',message:'Image load ERROR',data:{userName:selectedUser.name,avatarUrl:selectedUser.avatar_url,errorType:e.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                    // #endregion
+                  }}
+                  onLoad={() => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:162',message:'Image loaded successfully',data:{userName:selectedUser.name,avatarUrl:selectedUser.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                    // #endregion
+                  }}
+                />
+              ) : (
+                <div className={`w-8 h-8 rounded-full ${getAvatarColor(selectedUser.name)} flex items-center justify-center`}>
+                  <span className="text-white text-xs font-bold">{getInitials(selectedUser.name)}</span>
+                </div>
+              );
+            })()}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-800 truncate">{selectedUser.name}</p>
               {(selectedUser.cargo || selectedUser.department) && (
@@ -265,17 +281,39 @@ export const UserSelectCombobox: React.FC<UserSelectComboboxProps> = ({
                   `}
                 >
                   {/* Avatar */}
-                  {user.avatar_url ? (
-                    <img
-                      src={user.avatar_url}
-                      alt={user.name}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className={`w-8 h-8 rounded-full ${getAvatarColor(user.name)} flex items-center justify-center`}>
-                      <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    // #region agent log
+                    const isGeraldo = user.name?.toLowerCase().includes('geraldo');
+                    if (isGeraldo) {
+                      fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:270',message:'Rendering Geraldo in list',data:{userName:user.name,hasAvatarUrl:!!user.avatar_url,avatarUrl:user.avatar_url,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
+                    }
+                    // #endregion
+                    return user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.name}
+                        className="w-8 h-8 rounded-full object-cover"
+                        onError={(e) => {
+                          // #region agent log
+                          if (isGeraldo) {
+                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:280',message:'Geraldo image ERROR in list',data:{userName:user.name,avatarUrl:user.avatar_url,errorType:e.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                          }
+                          // #endregion
+                        }}
+                        onLoad={() => {
+                          // #region agent log
+                          if (isGeraldo) {
+                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:286',message:'Geraldo image loaded in list',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                          }
+                          // #endregion
+                        }}
+                      />
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full ${getAvatarColor(user.name)} flex items-center justify-center`}>
+                        <span className="text-white text-xs font-bold">{getInitials(user.name)}</span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">

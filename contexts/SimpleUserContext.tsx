@@ -198,7 +198,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
-                    scopes: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose',
+                    scopes: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/documents.readonly',
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent'

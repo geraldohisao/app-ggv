@@ -34,6 +34,8 @@ import { enableCriticalFetchAlerts } from './src/utils/net';
 import { canAccessCalculadora, canAccessCalls } from './utils/access';
 // Debug Panel sempre visível e robusto
 import AlwaysVisibleDebugPanel from './components/debug/AlwaysVisibleDebugPanel';
+import ErrorEventsAdmin from './components/debug/ErrorEventsAdmin';
+import AuditEventsAdmin from './components/admin/AuditEventsAdmin';
 // Utilitários de debug globais
 import './utils/debugHelpers';
 // Widget de feedback movido para o UserMenu
@@ -86,8 +88,10 @@ const AppContent: React.FC = () => {
   // Verificar se é a página de diagnóstico standalone
   const isDiagnosticPage = window.location.pathname === '/diagnostico' || window.location.pathname.startsWith('/diagnostico/');
   
-  // Verificar se é a página de admin de incidentes (temporariamente desabilitada)
-  const isErrorEventsAdminPage = false;
+  // Verificar se é a página de admin de incidentes
+  const isErrorEventsAdminPage = window.location.pathname === '/admin/incidents';
+  // Verificar se é a página de admin de auditoria
+  const isAuditEventsAdminPage = window.location.pathname === '/admin/audit';
   // Verificar se é a página de admin de logs (temporariamente desabilitada)
   const isDebugLogsAdminPage = false;
   
@@ -171,9 +175,13 @@ const AppContent: React.FC = () => {
     return <PublicOrganogramaPage />;
   }
   
-  // Se for página de admin de incidentes (temporariamente desabilitada)
+  // Se for página de admin de incidentes
   if (isErrorEventsAdminPage) {
-    return <div>Página temporariamente indisponível</div>;
+    return <ErrorEventsAdmin />;
+  }
+  // Se for página de admin de auditoria
+  if (isAuditEventsAdminPage) {
+    return <AuditEventsAdmin />;
   }
   // Se for página de admin de logs persistidos
   if (isDebugLogsAdminPage) {

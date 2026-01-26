@@ -1,7 +1,15 @@
 // Netlify Function: Error Events Admin API
 // Endpoint: /.netlify/functions/error-events-admin
 
-exports.handler = async (event, _context) => {
+const Sentry = require('@sentry/serverless');
+
+Sentry.AWSLambda.init({
+  dsn: process.env.SENTRY_DSN || process.env.SENTRY_SERVER_DSN || '',
+  environment: process.env.CONTEXT || process.env.NODE_ENV || 'development',
+  tracesSampleRate: 0.1,
+});
+
+exports.handler = Sentry.AWSLambda.wrapHandler(async (event, _context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -127,4 +135,4 @@ exports.handler = async (event, _context) => {
       body: JSON.stringify({ error: 'Internal server error', details: error.message }) 
     };
   }
-};
+});

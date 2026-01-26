@@ -29,6 +29,7 @@ import { SprintCheckinList } from '../components/checkin/SprintCheckinList';
 import { SprintAttachments } from '../components/sprint/SprintAttachments';
 import { parseLocalDate } from '../utils/date';
 import { usePermissions } from '../hooks/usePermissions';
+import { getSprintCalendarEvent, type SprintCalendarEvent } from '../../../services/googleCalendarService';
 
 export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => void }> = ({ sprintId, onBack }) => {
   const { selectedSprint, loading, fetchSprintById } = useSprintStore();
@@ -69,9 +70,18 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
     okrs.find((okr) => okr.id === selectedSprint?.okr_id)?.owner ||
     null;
 
+  // Calendar event state
+  const [calendarEvent, setCalendarEvent] = useState<SprintCalendarEvent | null>(null);
 
   useEffect(() => { 
     fetchSprintById(sprintId); 
+  }, [sprintId]);
+
+  // Load calendar event
+  useEffect(() => {
+    if (sprintId) {
+      getSprintCalendarEvent(sprintId).then(setCalendarEvent).catch(console.error);
+    }
   }, [sprintId]);
 
   useEffect(() => {
@@ -345,6 +355,26 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
                   Responsável: <span className="text-emerald-400">{sprintResponsible}</span>
                 </p>
               )}
+              {/* Google Calendar Event Info */}
+              {calendarEvent && calendarEvent.status === 'synced' && (
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                    <span>📅</span>
+                    Evento Agenda
+                  </span>
+                  {calendarEvent.meet_link && (
+                    <a
+                      href={calendarEvent.meet_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+                    >
+                      <span>🎥</span>
+                      Google Meet
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -380,6 +410,7 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
               {/* Botão Editar */}
               <button 
                 onClick={() => setShowEditForm(true)}
+                data-testid="sprint-edit"
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 transition-all text-xs font-bold text-white/80 hover:text-white"
                 title="Editar sprint"
               >

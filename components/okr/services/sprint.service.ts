@@ -1,5 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { parseLocalDate } from '../utils/date';
+import { logSprintEvent } from '../../../services/auditService';
 import {
   SprintItemStatus,
   type Sprint,
@@ -130,6 +131,16 @@ export async function createSprint(sprint: Partial<Sprint>): Promise<Sprint | nu
     // Invalidar cache
     invalidateSprintCache();
     
+    // Log audit event (best-effort)
+    if (data?.id) {
+      logSprintEvent('created', data.id, {
+        title: data.title,
+        type: data.type,
+        department: data.department,
+        okr_id: data.okr_id,
+      }).catch(() => {});
+    }
+    
     return data;
   } catch (error) {
     console.error('❌ Erro ao criar Sprint:', error);
@@ -163,6 +174,16 @@ export async function updateSprint(id: string, updates: Partial<Sprint>): Promis
 
     if (error) throw error;
     invalidateSprintCache(id);
+    
+    // Log audit event (best-effort)
+    if (data) {
+      const hasStatusChange = updates.status !== undefined;
+      logSprintEvent(hasStatusChange ? 'status_changed' : 'updated', id, {
+        updated_fields: Object.keys(updates),
+        new_status: updates.status,
+      }).catch(() => {});
+    }
+    
     return data;
   } catch (error) {
     console.error('Erro ao atualizar Sprint:', error);
@@ -208,6 +229,12 @@ export async function deleteSprint(id: string): Promise<boolean> {
 
     console.log('✅ Sprint enviada para lixeira com sucesso');
     invalidateSprintCache(id);
+    
+    // Log audit event (best-effort)
+    logSprintEvent('deleted', id, {
+      deleted_by: resolvedUserId,
+    }).catch(() => {});
+    
     return true;
   } catch (error) {
     console.error('❌ Erro ao enviar Sprint para lixeira:', error);

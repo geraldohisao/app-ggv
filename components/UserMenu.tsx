@@ -31,6 +31,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
     // Reset image error when avatar_url changes
     useEffect(() => {
         setImgError(false);
+        // #region agent log
+        if (user?.name?.toLowerCase().includes('geraldo')) {
+            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:34',message:'UserMenu avatar_url changed',data:{userName:user?.name,avatarUrl:user?.avatar_url,imgError:imgError},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
+        }
+        // #endregion
     }, [user?.avatar_url]);
 
     // Close on click outside
@@ -108,12 +113,38 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                 <div className={`w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden ${
                     isImpersonating ? 'ring-2 ring-amber-500 ring-offset-2' : ''
                 }`}>
+                    {/* #region agent log */}
+                    {(() => {
+                        const isGeraldo = user.name?.toLowerCase().includes('geraldo');
+                        if (isGeraldo) {
+                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:111',message:'UserMenu top avatar render',data:{userName:user.name,hasAvatarUrl:!!user.avatar_url,avatarUrl:user.avatar_url,imgError:imgError,isImpersonating:isImpersonating},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C,E'})}).catch(()=>{});
+                        }
+                        return null;
+                    })()}
+                    {/* #endregion */}
                     {user.avatar_url && !imgError ? (
                         <img 
                             src={user.avatar_url} 
                             alt={user.name}
                             className="w-full h-full object-cover"
-                            onError={() => setImgError(true)}
+                            onError={() => {
+                                // #region agent log
+                                if (user.name?.toLowerCase().includes('geraldo')) {
+                                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:118',message:'UserMenu top avatar ERROR',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                                }
+                                // #endregion
+                                setImgError(true);
+                            }}
+                            onLoad={(e) => {
+                                // #region agent log
+                                if (user.name?.toLowerCase().includes('geraldo')) {
+                                    const img = e.currentTarget;
+                                    const styles = getComputedStyle(img);
+                                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:124',message:'UserMenu top avatar LOADED',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:125',message:'UserMenu top avatar metrics',data:{naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,clientWidth:img.clientWidth,clientHeight:img.clientHeight,display:styles.display,visibility:styles.visibility,opacity:styles.opacity},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+                                }
+                                // #endregion
+                            }}
                             referrerPolicy="no-referrer"
                         />
                     ) : (
@@ -148,12 +179,38 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
                         <div className={`w-10 h-10 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden flex-shrink-0 ${
                             isImpersonating ? 'ring-2 ring-amber-400' : ''
                         }`}>
+                            {/* #region agent log */}
+                            {(() => {
+                                const isGeraldo = user.name?.toLowerCase().includes('geraldo');
+                                if (isGeraldo) {
+                                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:151',message:'UserMenu dropdown avatar render',data:{userName:user.name,hasAvatarUrl:!!user.avatar_url,avatarUrl:user.avatar_url,imgError:imgError,isImpersonating:isImpersonating},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C,E'})}).catch(()=>{});
+                                }
+                                return null;
+                            })()}
+                            {/* #endregion */}
                             {user.avatar_url && !imgError ? (
                                 <img 
                                     src={user.avatar_url} 
                                     alt={user.name}
                                     className="w-full h-full object-cover"
-                                    onError={() => setImgError(true)}
+                                    onError={() => {
+                                        // #region agent log
+                                        if (user.name?.toLowerCase().includes('geraldo')) {
+                                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:158',message:'UserMenu dropdown avatar ERROR',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                                        }
+                                        // #endregion
+                                        setImgError(true);
+                                    }}
+                                    onLoad={(e) => {
+                                        // #region agent log
+                                        if (user.name?.toLowerCase().includes('geraldo')) {
+                                            const img = e.currentTarget;
+                                            const styles = getComputedStyle(img);
+                                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:165',message:'UserMenu dropdown avatar LOADED',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:166',message:'UserMenu dropdown avatar metrics',data:{naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,clientWidth:img.clientWidth,clientHeight:img.clientHeight,display:styles.display,visibility:styles.visibility,opacity:styles.opacity},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+                                        }
+                                        // #endregion
+                                    }}
                                     referrerPolicy="no-referrer"
                                 />
                             ) : (

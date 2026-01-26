@@ -1,7 +1,15 @@
 // Netlify Function: Critical error alerts to Google Chat
 // Endpoint: /.netlify/functions/alert
 
-exports.handler = async (event, _context) => {
+const Sentry = require('@sentry/serverless');
+
+Sentry.AWSLambda.init({
+  dsn: process.env.SENTRY_DSN || process.env.SENTRY_SERVER_DSN || '',
+  environment: process.env.CONTEXT || process.env.NODE_ENV || 'development',
+  tracesSampleRate: 0.1,
+});
+
+exports.handler = Sentry.AWSLambda.wrapHandler(async (event, _context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -19,11 +27,80 @@ exports.handler = async (event, _context) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
+
+    const normalizePayload = (payload) => {
+      // Sentry Issue Alert webhook shape
+      if (payload?.data?.issue) {
+        const issue = payload.data.issue || {};
+        const eventData = payload.data.event || {};
+        const user = eventData.user || {};
+        const exception = eventData.exception?.values?.[0] || {};
+        const requestUrl = eventData.request?.url || issue.permalink || issue.web_url || '';
+
+        return {
+          title: issue.title || issue.type || 'Sentry Issue',
+          message: exception.value || issue.culprit || issue.shortId || 'Sentry issue triggered',
+          incidentHash: issue.id || issue.shortId,
+          context: {
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.username || user.name
+            },
+            url: requestUrl,
+            stack: exception.stacktrace ? JSON.stringify(exception.stacktrace).slice(0, 2000) : '',
+            userAgent: eventData.userAgent || '',
+            appVersion: issue.release || eventData.release || '',
+            tags: issue.tags || [],
+            sentry: {
+              issueId: issue.id,
+              shortId: issue.shortId,
+              permalink: issue.permalink || issue.web_url || '',
+              level: issue.level || eventData.level,
+              environment: issue.environment || payload?.environment,
+              firstSeen: issue.firstSeen,
+              lastSeen: issue.lastSeen
+            }
+          }
+        };
+      }
+
+      // Batched debug events (from gateway)
+      if (Array.isArray(payload?.events) && payload.events.length) {
+        const primary = payload.events[0];
+        return {
+          title: primary.title || 'Evento de debug',
+          message: `${primary.message || ''}${payload.events.length > 1 ? ` (batch: ${payload.events.length})` : ''}`,
+          incidentHash: primary.incidentHash,
+          context: {
+            user: primary.context?.user,
+            url: primary.url,
+            stack: primary.context?.stack,
+            componentStack: primary.context?.componentStack,
+            userAgent: primary.userAgent || '',
+            appVersion: primary.context?.appVersion || '',
+            tags: [primary.level, primary.category].filter(Boolean),
+            batchSize: payload.events.length
+          }
+        };
+      }
+
+      // Default (existing client payload)
+      return {
+        title: payload.title || 'Erro crítico no app',
+        message: payload.message || '',
+        incidentHash: payload.incidentHash,
+        context: payload.context || {}
+      };
+    };
+
+    const normalized = normalizePayload(body);
     const {
       title = 'Erro crítico no app',
       message = '',
       context = {},
-    } = body;
+      incidentHash: incomingIncidentHash
+    } = normalized;
 
     const {
       user = {},
@@ -36,7 +113,7 @@ exports.handler = async (event, _context) => {
     } = context || {};
 
     // Use incident hash from client or generate one
-    const incidentHash = body.incidentHash || (() => {
+    const incidentHash = incomingIncidentHash || (() => {
       const crypto = require('crypto');
       const incidentKey = JSON.stringify({ title, message, url, stack: String(stack).slice(0, 600), componentStack: String(componentStack).slice(0, 600) });
       return crypto.createHash('sha1').update(incidentKey).digest('hex').slice(0, 12);
@@ -58,7 +135,8 @@ exports.handler = async (event, _context) => {
     if (url) lines.push(`• *Página*: ${url}`);
     if (appVersion) lines.push(`• *Versão*: ${appVersion}`);
     if (userAgent) lines.push(`• *Navegador*: ${userAgent}`);
-    if (tags && Array.isArray(tags) && tags.length) lines.push(`• *Tags*: ${tags.join(', ')}`);
+    if (tags && Array.isArray(tags) && tags.length) lines.push(`• *Tags*: ${tags.map(tag => tag?.key && tag?.value ? `${tag.key}:${tag.value}` : String(tag)).join(', ')}`);
+    if (context?.sentry?.permalink) lines.push(`• *Sentry*: ${context.sentry.permalink}`);
     const timestamp = new Date().toISOString();
     lines.push(`• *Enviado*: ${timestamp}`);
     lines.push('');
@@ -187,6 +265,6 @@ exports.handler = async (event, _context) => {
   } catch (error) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal error', details: error.message }) };
   }
-};
+});
 
 
