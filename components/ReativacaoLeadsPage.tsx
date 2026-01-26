@@ -56,18 +56,6 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Verificar se o usuário tem permissão
   const isAdmin = user && (user.role === UserRole.Admin || user.role === UserRole.SuperAdmin);
-  
-  if (!isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6">
-        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl max-w-md text-center">
-          <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Acesso Negado</h2>
-          <p className="text-sm">Esta funcionalidade está disponível apenas para administradores.</p>
-        </div>
-      </div>
-    );
-  }
 
   // Função para obter nome completo do usuário baseado no email
   const getUserFullName = (email: string): string => {
@@ -277,18 +265,21 @@ const ReativacaoLeadsPage: React.FC = () => {
 
   // Carregar SDRs quando o componente for montado
   useEffect(() => {
+    if (!isAdmin) return;
     loadSdrs();
-  }, []);
+  }, [isAdmin]);
 
   // Carregar histórico quando mostrar
   useEffect(() => {
+    if (!isAdmin) return;
     if (showHistory) {
       loadHistory();
     }
-  }, [showHistory]);
+  }, [showHistory, isAdmin]);
 
   // Auto-refresh do histórico + polling do N8N
   useEffect(() => {
+    if (!isAdmin) return;
     if (!showHistory || !history) return;
 
     const hasActive = history.some(h => (
@@ -326,7 +317,22 @@ const ReativacaoLeadsPage: React.FC = () => {
 
       return () => clearInterval(interval);
     }
-  }, [showHistory, history, currentPage]);
+  }, [showHistory, history, currentPage, isAdmin]);
+
+  // Importante: não fazer early-return antes dos hooks acima.
+  // Na impersonação, o usuário pode mudar de Admin -> não-Admin entre renders.
+  // Se retornarmos cedo, o React detecta "fewer hooks than expected".
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl max-w-md text-center">
+          <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Acesso Negado</h2>
+          <p className="text-sm">Esta funcionalidade está disponível apenas para administradores.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Função para formatar data (mantém horário UTC como no banco)
   const formatDate = (dateString: string) => {

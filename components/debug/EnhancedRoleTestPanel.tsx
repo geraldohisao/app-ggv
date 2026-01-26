@@ -39,8 +39,9 @@ export const EnhancedRoleTestPanel: React.FC = () => {
 
   // Verificações de permissão
   const permissions = {
-    canSeeFeedback: user?.role === UserRole.SuperAdmin || 
-                   user?.user_function === 'Closer' || 
+    canSeeFeedback: user?.role === UserRole.SuperAdmin ||
+                   user?.role === UserRole.Admin ||
+                   user?.user_function === 'Closer' ||
                    user?.user_function === 'Gestor',
     canSeeSettings: user?.role === UserRole.SuperAdmin || user?.role === UserRole.Admin,
     canSeeDebug: user?.role === UserRole.SuperAdmin,
@@ -195,7 +196,7 @@ export const EnhancedRoleTestPanel: React.FC = () => {
             {/* Action Buttons */}
             <div className="space-y-2">
               <button
-                onClick={() => window.location.href = '/opportunity-feedback'}
+                onClick={() => window.location.href = '/feedback'}
                 disabled={!permissions.canSeeFeedback}
                 className={`w-full text-sm px-3 py-2 rounded-lg font-medium ${
                   permissions.canSeeFeedback 

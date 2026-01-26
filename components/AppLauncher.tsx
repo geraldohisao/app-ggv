@@ -70,8 +70,9 @@ const AppLauncher: React.FC<AppLauncherProps> = ({ activeModule, setActiveModule
     const allowOKRLocal = import.meta.env.DEV || import.meta.env.VITE_ALLOW_OKR_LOCAL === 'true';
     const canSeeSettings = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor;
     const canSeeOSManager = user.role === UserRole.SuperAdmin || user.role === UserRole.Admin || isGestor || user.user_function === 'Gestor';
-    const canSeeFeedback = user.role === UserRole.SuperAdmin || 
-                          user.user_function === 'Closer' || 
+    const canSeeFeedback = user.role === UserRole.SuperAdmin ||
+                          user.role === UserRole.Admin ||
+                          user.user_function === 'Closer' ||
                           user.user_function === 'Gestor';
     const canSeeOKRManager = allowOKRLocal || user.role === UserRole.SuperAdmin || user.role === UserRole.Admin;
     const canSeeGGVTalent = user.role !== UserRole.User;

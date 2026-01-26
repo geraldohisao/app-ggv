@@ -20,8 +20,9 @@ export const RoleTestPanel: React.FC = () => {
     );
   }
 
-  const canSeeFeedback = user?.role === 'SUPER_ADMIN' || 
-                        user?.user_function === 'Closer' || 
+  const canSeeFeedback = user?.role === 'SUPER_ADMIN' ||
+                        user?.role === 'ADMIN' ||
+                        user?.user_function === 'Closer' ||
                         user?.user_function === 'Gestor';
 
   return (
@@ -98,7 +99,7 @@ export const RoleTestPanel: React.FC = () => {
           <div className="text-xs text-gray-600">
             <strong>Regras de Acesso:</strong>
             <ul className="mt-1 space-y-1 text-xs">
-              <li>• <strong>Feedback:</strong> Closer, Gestor, SuperAdmin</li>
+              <li>• <strong>Feedback:</strong> Admin, SuperAdmin, Closer, Gestor</li>
               <li>• <strong>Configurações:</strong> Admin, SuperAdmin</li>
               <li>• <strong>SDR:</strong> Acesso limitado (sem feedback)</li>
             </ul>
@@ -107,7 +108,7 @@ export const RoleTestPanel: React.FC = () => {
 
         <div className="mt-3 pt-3 border-t border-gray-200">
           <button
-            onClick={() => window.location.href = '/opportunity-feedback'}
+            onClick={() => window.location.href = '/feedback'}
             className={`w-full text-xs px-3 py-2 rounded ${
               canSeeFeedback 
                 ? 'bg-blue-500 text-white hover:bg-blue-600' 

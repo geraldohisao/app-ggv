@@ -22,12 +22,12 @@ const OpportunityFeedbackPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
-  // Verificar se o usuário tem acesso (apenas Closer e Gestor)
+  // Verificar se o usuário tem acesso (Closer/Gestor e Admins)
   const hasAccess = useMemo(() => {
     if (!user) return false;
     
-    // SuperAdmin sempre tem acesso
-    if (user.role === 'SUPER_ADMIN') return true;
+    // Admin/SuperAdmin sempre têm acesso
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') return true;
     
     // Verificar função comercial - apenas Closer e Gestor
     return user.user_function === 'Closer' || user.user_function === 'Gestor';
@@ -336,8 +336,8 @@ const OpportunityFeedbackPage: React.FC = () => {
     return (
       <AccessDenied
         title="Feedback de Oportunidade"
-        message="Esta funcionalidade está disponível apenas para usuários com função Closer ou Gestor."
-        requiredRoles={['Closer', 'Gestor']}
+        message="Esta funcionalidade está disponível para Admin/SuperAdmin, ou para usuários com função Closer ou Gestor."
+        requiredRoles={['Admin', 'SuperAdmin', 'Closer', 'Gestor']}
         userRole={userFunctionDisplay}
       />
     );
