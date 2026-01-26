@@ -14,6 +14,75 @@ interface SdrUniqueLeadsChartProps {
   endDate?: string;
 }
 
+function normalizeSdrGroupName(nameRaw: string): string {
+  const raw = (nameRaw || '').trim();
+  if (!raw) return 'Sistema/Automático';
+  const low = raw.toLowerCase();
+
+  // Mirror backend-style normalization (plus a rule for Djiovane)
+  if (low.includes('djiovane')) return 'Djiovane Santos';
+  if (low.includes('andressa')) return 'Andressa Habinoski';
+  if ((low.includes('camila') && low.includes('ataliba')) || low.includes('ataliba')) return 'Camila Ataliba';
+  if (low.includes('ruama') || low.includes('lô') || low.includes('lo-ruama') || low.includes('lo ruama')) return 'Lô-Ruama Oliveira';
+  if (low.includes('mariana')) return 'Mariana Costa';
+  if (low.includes('isabel')) return 'Isabel Pestilho';
+  if (low.includes('barbara') || low.includes('bárbara')) return 'Barbara Rabech';
+  if (low.includes('rafael')) return 'Rafael Garcia';
+  if (low.includes('geraldo')) return 'Geraldo Hisao';
+  if (low.includes('cesar') || low.includes('césar')) return 'César Intrieri';
+  if (low.includes('danilo')) return 'Tarcis Danilo';
+  if (low.includes('samuel')) return 'Samuel Bueno';
+  if (low.includes('victor') || low.includes('vitor')) return 'Victor Hernandes';
+
+  return raw;
+}
+
+function getRollingRangeIso(days: number) {
+  const end = new Date();
+  const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+async function fetchCallsForLeadsRolling(days: number): Promise<any[]> {
+  const { startIso, endIso } = getRollingRangeIso(days);
+  const pageSize = 1000;
+  const maxRecords = 50000;
+  let offset = 0;
+  let allCalls: any[] = [];
+  let totalCount = 0;
+
+  while (offset < maxRecords) {
+    const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+      p_sdr: null,
+      p_status: null,
+      p_type: null,
+      p_start_date: startIso,
+      p_end_date: endIso,
+      p_limit: pageSize,
+      p_offset: offset,
+      p_sort_by: 'created_at',
+      p_min_duration: null,
+      p_max_duration: null,
+      p_min_score: null
+    });
+
+    if (callsError) {
+      throw callsError;
+    }
+
+    const chunk = Array.isArray(callsData) ? callsData : [];
+    if (chunk.length === 0) break;
+
+    totalCount = Number(chunk[0]?.total_count || totalCount);
+    allCalls = allCalls.concat(chunk);
+
+    if (allCalls.length >= totalCount) break;
+    offset += pageSize;
+  }
+
+  return allCalls;
+}
+
 async function fetchSdrUniqueLeads(
   days: number = 30,
   startDate?: string,
@@ -26,7 +95,6 @@ async function fetchSdrUniqueLeads(
 
   try {
     const useCustomRange = !!(startDate && endDate);
-    console.log('🔍 Buscando ranking de leads únicos:', { days, startDate, endDate, useCustomRange });
 
     let result: SdrUniqueLeadsData[] = [];
     let rawResult: SdrUniqueLeadsData[] = [];
@@ -34,7 +102,7 @@ async function fetchSdrUniqueLeads(
     if (useCustomRange) {
       const startIso = new Date(startDate + 'T00:00:00.000Z').toISOString();
       const endIso = new Date(endDate + 'T23:59:59.999Z').toISOString();
-      const limit = 5000;
+      const pageSize = 1000;
       const maxRecords = 50000;
       let offset = 0;
       let allCalls: any[] = [];
@@ -47,13 +115,12 @@ async function fetchSdrUniqueLeads(
           p_type: null,
           p_start_date: startIso,
           p_end_date: endIso,
-          p_limit: limit,
+          p_limit: pageSize,
           p_offset: offset,
           p_sort_by: 'created_at',
           p_min_duration: null,
           p_max_duration: null,
-          p_min_score: null,
-          p_search_query: null
+          p_min_score: null
         });
 
         if (callsError) {
@@ -68,7 +135,7 @@ async function fetchSdrUniqueLeads(
         allCalls = allCalls.concat(chunk);
 
         if (allCalls.length >= totalCount) break;
-        offset += limit;
+        offset += pageSize;
       }
 
       if (allCalls.length === 0) {
@@ -83,18 +150,19 @@ async function fetchSdrUniqueLeads(
       const sdrLeadMap = new Map<string, { sdr_id: string; sdr_name: string; leads: Set<string>; total_calls: number }>();
       allCalls.forEach((call: any) => {
         const dealId = call.deal_id;
-        if (!dealId) return;
+        const dealIdClean = String(dealId || '').trim();
+        if (!dealIdClean) return;
 
-        const sdrId = call.sdr_id || call.agent_id || 'desconhecido';
-        const sdrName = call.sdr_name || call.agent_id || 'SDR';
-        const key = String(sdrId).toLowerCase();
+        const sdrNameRaw = String(call.sdr_name || call.agent_id || 'SDR');
+        const groupName = normalizeSdrGroupName(sdrNameRaw);
+        const key = groupName.toLowerCase();
 
         if (!sdrLeadMap.has(key)) {
-          sdrLeadMap.set(key, { sdr_id: String(sdrId), sdr_name: String(sdrName), leads: new Set(), total_calls: 0 });
+          sdrLeadMap.set(key, { sdr_id: key, sdr_name: groupName, leads: new Set(), total_calls: 0 });
         }
 
         const item = sdrLeadMap.get(key)!;
-        item.leads.add(String(dealId));
+        item.leads.add(dealIdClean);
         item.total_calls += 1;
       });
 
@@ -111,13 +179,47 @@ async function fetchSdrUniqueLeads(
         console.error('❌ Erro ao buscar leads únicos:', error);
         return [];
       }
-      result = (data || []).map((row: any) => ({
-        sdr_id: row.sdr_id,
-        sdr_name: row.sdr_name,
-        unique_leads: Number(row.unique_leads) || 0,
-        total_calls: Number(row.total_calls) || 0
-      }));
+      result = (data || []).map((row: any) => {
+        const groupName = normalizeSdrGroupName(String(row.sdr_name || ''));
+        return {
+          sdr_id: String(row.sdr_id || groupName).toLowerCase(),
+          sdr_name: groupName,
+          unique_leads: Number(row.unique_leads) || 0,
+          total_calls: Number(row.total_calls) || 0
+        };
+      });
       rawResult = result.slice();
+
+      // If RPC returns duplicates that normalize to same SDR, recompute precisely from calls (deal_id union)
+      const countsByName = new Map<string, number>();
+      for (const r of result) {
+        const key = r.sdr_name.toLowerCase();
+        countsByName.set(key, (countsByName.get(key) || 0) + 1);
+      }
+      const hasDuplicates = Array.from(countsByName.values()).some(v => v > 1);
+      if (hasDuplicates) {
+        const calls = await fetchCallsForLeadsRolling(days);
+        const sdrLeadMap = new Map<string, { sdr_name: string; leads: Set<string>; total_calls: number }>();
+        calls.forEach((call: any) => {
+          const dealIdClean = String(call.deal_id || '').trim();
+          if (!dealIdClean) return;
+          const sdrNameRaw = String(call.sdr_name || call.agent_id || 'SDR');
+          const groupName = normalizeSdrGroupName(sdrNameRaw);
+          const key = groupName.toLowerCase();
+          if (!sdrLeadMap.has(key)) sdrLeadMap.set(key, { sdr_name: groupName, leads: new Set(), total_calls: 0 });
+          const item = sdrLeadMap.get(key)!;
+          item.leads.add(dealIdClean);
+          item.total_calls += 1;
+        });
+
+        result = Array.from(sdrLeadMap.entries()).map(([key, item]) => ({
+          sdr_id: key,
+          sdr_name: item.sdr_name,
+          unique_leads: item.leads.size,
+          total_calls: item.total_calls
+        }));
+        rawResult = result.slice();
+      }
     }
 
     // Filtrar por usuários ativos (se conseguimos a lista)

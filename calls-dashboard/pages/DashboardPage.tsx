@@ -7,7 +7,9 @@ import CallVolumeChart from '../components/CallVolumeChart';
 import SdrScoreChart from '../components/SdrScoreChart';
 import SdrAverageScoreChart from '../components/SdrAverageScoreChart';
 import SdrUniqueLeadsChart from '../components/SdrUniqueLeadsChart';
+import CallsDashboardAuditPanel from '../components/CallsDashboardAuditPanel';
 import { fetchUniqueSdrs } from '../services/callsService';
+import { useAdminPermissions } from '../../hooks/useAdminPermissions';
 
 // Componente Toggle Switch
 const ToggleSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
@@ -53,6 +55,7 @@ const periodLabels: Record<number, string> = {
 };
 
 const DashboardPage = () => {
+  const { isAdminOrSuperAdmin } = useAdminPermissions();
   const [dashboardData, setDashboardData] = useState({
     // Métricas principais
     totalCalls: -1, // Valor diferente para detectar se atualizou
@@ -75,6 +78,7 @@ const DashboardPage = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showAuditPanel, setShowAuditPanel] = useState(false);
   
   // Filtros de data personalizada
   const [useCustomDates, setUseCustomDates] = useState(false);
@@ -109,6 +113,96 @@ const DashboardPage = () => {
     return periodLabels[selectedPeriod] || `${selectedPeriod} dias`;
   };
 
+  const getDateRangeForMetrics = () => {
+    if (useCustomDates && startDate && endDate) {
+      const startIso = new Date(startDate.toISOString().split('T')[0] + 'T00:00:00.000Z').toISOString();
+      const endIso = new Date(endDate.toISOString().split('T')[0] + 'T23:59:59.999Z').toISOString();
+      return { startIso, endIso };
+    }
+
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - getEffectivePeriod() + 1);
+    return {
+      startIso: new Date(start.toISOString().split('T')[0] + 'T00:00:00.000Z').toISOString(),
+      endIso: new Date(end.toISOString().split('T')[0] + 'T23:59:59.999Z').toISOString()
+    };
+  };
+
+  const parseDurationSeconds = (call: any): number => {
+    const formatted = call.duration_formated || call.duration_formatted;
+    if (formatted && typeof formatted === 'string' && formatted !== '00:00:00') {
+      const parts = formatted.split(':').map((p: string) => parseInt(p, 10));
+      if (parts.length === 3) {
+        const [hours, minutes, seconds] = parts;
+        return (hours || 0) * 3600 + (minutes || 0) * 60 + (seconds || 0);
+      }
+    }
+    return Number(call.duration_seconds || call.duration || 0);
+  };
+
+  const fetchDashboardMetricsFromCalls = useCallback(async () => {
+    const { startIso, endIso } = getDateRangeForMetrics();
+    const pageSize = 1000;
+    const maxRecords = 50000;
+    let offset = 0;
+    let allCalls: any[] = [];
+    let totalCount = 0;
+
+    while (offset < maxRecords) {
+      const { data: callsData, error: callsError } = await supabase.rpc('get_calls_with_filters', {
+        p_sdr: selectedSdr || null,
+        p_status: null,
+        p_type: null,
+        p_start_date: startIso,
+        p_end_date: endIso,
+        p_limit: pageSize,
+        p_offset: offset,
+        p_sort_by: 'created_at',
+        p_min_duration: null,
+        p_max_duration: null,
+        p_min_score: null
+      });
+
+      if (callsError) {
+        throw callsError;
+      }
+
+      const chunk = Array.isArray(callsData) ? callsData : [];
+      if (chunk.length === 0) break;
+
+      totalCount = Number(chunk[0]?.total_count || totalCount);
+      allCalls = allCalls.concat(chunk);
+
+      if (allCalls.length >= totalCount) break;
+      offset += pageSize;
+    }
+
+    if (totalCount > maxRecords) {
+      console.warn('⚠️ Dashboard - Limite máximo atingido, métricas podem estar parciais.');
+    }
+
+    const totalCalls = totalCount || allCalls.length;
+    const answeredCalls = allCalls.filter((call) => call.status_voip === 'normal_clearing').length;
+    const answeredRate = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0;
+
+    const answeredDurations = allCalls
+      .filter((call) => call.status_voip === 'normal_clearing')
+      .map(parseDurationSeconds)
+      .filter((duration) => duration > 0);
+
+    const avgDuration = answeredDurations.length > 0
+      ? Math.round(answeredDurations.reduce((sum, duration) => sum + duration, 0) / answeredDurations.length)
+      : 0;
+
+    return {
+      totalCalls,
+      answeredCalls,
+      answeredRate,
+      avgDuration
+    };
+  }, [selectedSdr, useCustomDates, startDate, endDate, selectedPeriod]);
+
   // Função para atualização manual (sem reload da página)
   const handleManualRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -121,21 +215,14 @@ const DashboardPage = () => {
         throw new Error('Supabase não inicializado');
       }
 
-      const { data: totalsData, error: totalsErr } = await supabase.rpc('get_dashboard_totals');
-      if (totalsErr) throw totalsErr;
-      
-      const metrics = Array.isArray(totalsData) ? totalsData[0] : totalsData;
-      const totalCount = Number(metrics?.total_calls || 0);
-      const answeredCount = Number(metrics?.answered_calls || 0);
-      const avgDurationFromRpc = Math.round(Number(metrics?.avg_duration_answered || 0));
-      const answeredRate = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
+      const metrics = await fetchDashboardMetricsFromCalls();
 
       setDashboardData(prev => ({
         ...prev,
-        totalCalls: totalCount,
-        answeredCalls: answeredCount,
-        answeredRate,
-        avgDuration: avgDurationFromRpc,
+        totalCalls: metrics.totalCalls,
+        answeredCalls: metrics.answeredCalls,
+        answeredRate: metrics.answeredRate,
+        avgDuration: metrics.avgDuration,
         loading: false,
         error: null
       }));
@@ -147,7 +234,7 @@ const DashboardPage = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing]);
+  }, [isRefreshing, fetchDashboardMetricsFromCalls]);
 
   // Obter nome do SDR selecionado
   const selectedSdrName = selectedSdr 
@@ -275,50 +362,15 @@ const DashboardPage = () => {
       try {
         setDashboardData(prev => ({ ...prev, loading: true, error: null }));
 
-        console.log('📊 Buscando contagens via RPC (com filtro de período)...');
-
-        // Usar RPC com intervalo amplo (timestamptz) para garantir retorno
-        const startISO = '2023-01-01T00:00:00.000Z';
-        const endISO = '2030-01-01T00:00:00.000Z';
-        
-        console.log('📅 Período filtrado:', { startISO, endISO, selectedPeriod });
-
-        // USAR A NOVA RPC QUE CRIAMOS (get_dashboard_totals)
-        console.log('📊 Buscando métricas via get_dashboard_totals (função existente)');
-        const { data: totalsData, error: totalsErr } = await supabase.rpc('get_dashboard_totals');
-        
-        if (totalsErr) throw totalsErr;
-        
-        const metrics = Array.isArray(totalsData) ? totalsData[0] : totalsData;
-        const totalCount = Number(metrics?.total_calls || 0);
-        const answeredCount = Number(metrics?.answered_calls || 0);
-        const avgDurationFromRpc = Math.round(Number(metrics?.avg_duration_answered || 0));
-
-        console.log('✅ Contagens (via get_dashboard_totals):', { 
-          totalCount, 
-          answeredCount, 
-          avgDurationFromRpc,
-          dadosBrutos: metrics
-        });
-
-        // Duração média vinda da própria função quando disponível
-        const avgDurationFromRpcLocal = Number(avgDurationFromRpc || 0);
-
-        // Calcular taxa
-        const answeredRate = totalCount && totalCount > 0
-          ? Math.round(((answeredCount || 0) / totalCount) * 100)
-          : 0;
-
-        // Calcular média de duração
-        let avgDuration = Math.round(avgDurationFromRpcLocal || 0);
+        const metrics = await fetchDashboardMetricsFromCalls();
 
         // Atualizar estado (deixar gráficos para componentes próprios)
         setDashboardData(prev => ({
           ...prev,
-          totalCalls: totalCount || 0,
-          answeredCalls: answeredCount || 0,
-          answeredRate,
-          avgDuration,
+          totalCalls: metrics.totalCalls,
+          answeredCalls: metrics.answeredCalls,
+          answeredRate: metrics.answeredRate,
+          avgDuration: metrics.avgDuration,
           loading: false,
           error: null
         }));
@@ -327,10 +379,10 @@ const DashboardPage = () => {
         setLastUpdate(new Date());
 
         console.log('✅ Métricas finais:', {
-          totalCalls: totalCount,
-          answeredCalls: answeredCount,
-          answeredRate,
-          avgDuration: formatDuration(avgDuration)
+          totalCalls: metrics.totalCalls,
+          answeredCalls: metrics.answeredCalls,
+          answeredRate: metrics.answeredRate,
+          avgDuration: formatDuration(metrics.avgDuration)
         });
 
       } catch (error) {
@@ -344,7 +396,7 @@ const DashboardPage = () => {
     };
 
     fetchAllData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, useCustomDates, startDate, endDate, selectedSdr, fetchDashboardMetricsFromCalls]);
 
   // Sistema de atualização automática
   useEffect(() => {
@@ -356,35 +408,31 @@ const DashboardPage = () => {
       try {
         if (!supabase) return;
 
-        // Buscar total via RPC para comparar
-        const { data: metricsData, error: metricsErr } = await supabase
-          .rpc('get_dashboard_metrics_v2', { p_days: selectedPeriod });
-        if (metricsErr) throw metricsErr;
-        const metrics = Array.isArray(metricsData) ? metricsData[0] : metricsData;
-        const newTotalCount = Number(metrics?.total_calls || 0);
+        // Buscar volume agregado para detectar mudanças sem refazer cálculo pesado
+        const { startIso, endIso } = getDateRangeForMetrics();
+        const { data: volumeData, error: volumeErr } = await supabase
+          .rpc('get_calls_volume_by_day', { p_start_date: startIso, p_end_date: endIso, p_sdr: selectedSdr || null });
+        if (volumeErr) throw volumeErr;
+
+        const totalFromVolume = Array.isArray(volumeData)
+          ? volumeData.reduce((sum: number, row: any) => sum + Number(row.total || 0), 0)
+          : 0;
         
         // Se houver mudança na contagem, recarregar dados SEM RESETAR FILTROS
-        if (newTotalCount !== dashboardData.totalCalls) {
-          console.log('📊 Novos dados detectados! Atualizando sem resetar filtros...', newTotalCount, 'vs', dashboardData.totalCalls);
+        if (totalFromVolume !== dashboardData.totalCalls) {
+          console.log('📊 Novos dados detectados! Atualizando sem resetar filtros...', totalFromVolume, 'vs', dashboardData.totalCalls);
           
           // Recarregar dados preservando filtros (selectedSdr, selectedPeriod)
           const fetchAllData = async () => {
             try {
-              const { data: totalsData, error: totalsErr } = await supabase.rpc('get_dashboard_totals');
-              if (totalsErr) throw totalsErr;
-              
-              const metrics = Array.isArray(totalsData) ? totalsData[0] : totalsData;
-              const totalCount = Number(metrics?.total_calls || 0);
-              const answeredCount = Number(metrics?.answered_calls || 0);
-              const avgDurationFromRpc = Math.round(Number(metrics?.avg_duration_answered || 0));
-              const answeredRate = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
+              const metrics = await fetchDashboardMetricsFromCalls();
 
               setDashboardData(prev => ({
                 ...prev,
-                totalCalls: totalCount,
-                answeredCalls: answeredCount,
-                answeredRate,
-                avgDuration: avgDurationFromRpc,
+                totalCalls: metrics.totalCalls,
+                answeredCalls: metrics.answeredCalls,
+                answeredRate: metrics.answeredRate,
+                avgDuration: metrics.avgDuration,
                 loading: false,
                 error: null
               }));
@@ -409,7 +457,7 @@ const DashboardPage = () => {
     }, 15000); // Verificar a cada 15 segundos
     
     return () => clearInterval(interval);
-  }, [autoRefresh, selectedPeriod, dashboardData.totalCalls]);
+  }, [autoRefresh, selectedPeriod, useCustomDates, startDate, endDate, selectedSdr, dashboardData.totalCalls, fetchDashboardMetricsFromCalls]);
 
   if (dashboardData.loading) {
     return (
@@ -459,29 +507,50 @@ const DashboardPage = () => {
           </div>
         </div>
         
-        {/* Botão de Atualizar */}
-        <button 
-          onClick={handleManualRefresh}
-          disabled={isRefreshing}
-          className={`
-            inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-            transition-all duration-200 shadow-sm
-            ${isRefreshing 
-              ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-              : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
-            }
-          `}
-        >
-          <svg 
-            className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+        {/* Botões de Ação */}
+        <div className="flex items-center gap-2">
+          {/* Botão de Auditoria (apenas SuperAdmin) */}
+          {isAdminOrSuperAdmin && (
+            <button 
+              onClick={() => setShowAuditPanel(!showAuditPanel)}
+              className={`
+                inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+                transition-all duration-200 shadow-sm
+                ${showAuditPanel 
+                  ? 'bg-amber-600 text-white hover:bg-amber-700' 
+                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300'
+                }
+              `}
+            >
+              <span>🔍</span>
+              {showAuditPanel ? 'Ocultar Auditoria' : 'Auditoria'}
+            </button>
+          )}
+          
+          {/* Botão de Atualizar */}
+          <button 
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className={`
+              inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+              transition-all duration-200 shadow-sm
+              ${isRefreshing 
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
+              }
+            `}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {isRefreshing ? 'Atualizando...' : 'Atualizar'}
-        </button>
+            <svg 
+              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isRefreshing ? 'Atualizando...' : 'Atualizar'}
+          </button>
+        </div>
       </div>
 
       {/* === BARRA DE FILTROS === */}
@@ -681,6 +750,23 @@ const DashboardPage = () => {
           endDate={useCustomDates ? (endDateParam || undefined) : undefined}
         />
       </div>
+
+      {/* === PAINEL DE AUDITORIA (SuperAdmin) === */}
+      {showAuditPanel && isAdminOrSuperAdmin && (
+        <CallsDashboardAuditPanel
+          dashboardData={{
+            totalCalls: dashboardData.totalCalls,
+            answeredCalls: dashboardData.answeredCalls,
+            answeredRate: dashboardData.answeredRate,
+            avgDuration: dashboardData.avgDuration
+          }}
+          selectedPeriod={selectedPeriod}
+          selectedSdr={selectedSdr}
+          useCustomDates={useCustomDates}
+          startDate={startDate}
+          endDate={endDate}
+        />
+      )}
     </div>
   );
 };

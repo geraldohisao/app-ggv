@@ -17,6 +17,59 @@ interface SdrAverageScoreChartProps {
   endDate?: string;
 }
 
+function normalizeSdrGroupName(nameRaw: string): string {
+  const raw = (nameRaw || '').trim();
+  if (!raw) return 'Sistema/Automático';
+  const low = raw.toLowerCase();
+
+  if (low.includes('djiovane')) return 'Djiovane Santos';
+  if (low.includes('andressa')) return 'Andressa Habinoski';
+  if ((low.includes('camila') && low.includes('ataliba')) || low.includes('ataliba')) return 'Camila Ataliba';
+  if (low.includes('ruama') || low.includes('lô') || low.includes('lo-ruama') || low.includes('lo ruama')) return 'Lô-Ruama Oliveira';
+  if (low.includes('mariana')) return 'Mariana Costa';
+  if (low.includes('isabel')) return 'Isabel Pestilho';
+  if (low.includes('barbara') || low.includes('bárbara')) return 'Barbara Rabech';
+  if (low.includes('rafael')) return 'Rafael Garcia';
+  if (low.includes('geraldo')) return 'Geraldo Hisao';
+  if (low.includes('cesar') || low.includes('césar')) return 'César Intrieri';
+  if (low.includes('danilo')) return 'Tarcis Danilo';
+  if (low.includes('samuel')) return 'Samuel Bueno';
+  if (low.includes('victor') || low.includes('vitor')) return 'Victor Hernandes';
+
+  return raw;
+}
+
+function mergeScoreRankingByName(rows: SdrScoreRankingData[]): SdrScoreRankingData[] {
+  const map = new Map<string, { name: string; total_calls: number; noted_calls: number; answered_calls: number; scoreSumWeighted: number }>();
+
+  for (const r of rows) {
+    const normName = normalizeSdrGroupName(r.sdr_name);
+    const key = normName.toLowerCase();
+    const noted = Number(r.noted_calls) || 0;
+    const score = Number(r.avg_score) || 0;
+    const cur = map.get(key) || { name: normName, total_calls: 0, noted_calls: 0, answered_calls: 0, scoreSumWeighted: 0 };
+    cur.total_calls += Number(r.total_calls) || 0;
+    cur.answered_calls += Number(r.answered_calls) || 0;
+    cur.noted_calls += noted;
+    cur.scoreSumWeighted += score * noted;
+    map.set(key, cur);
+  }
+
+  return Array.from(map.values()).map(v => {
+    const avgScore = v.noted_calls > 0 ? Number((v.scoreSumWeighted / v.noted_calls).toFixed(1)) : 0;
+    const answeredRate = v.total_calls > 0 ? Math.round((v.answered_calls / v.total_calls) * 100) : 0;
+    return {
+      sdr_id: v.name.toLowerCase(),
+      sdr_name: v.name,
+      total_calls: v.total_calls,
+      noted_calls: v.noted_calls,
+      answered_calls: v.answered_calls,
+      avg_score: avgScore,
+      answered_rate: answeredRate
+    };
+  });
+}
+
 // Função para buscar dados de ranking por nota média (apenas usuários ativos)
 async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, endDate?: string): Promise<SdrScoreRankingData[]> {
   if (!supabase) {
@@ -31,7 +84,7 @@ async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, e
     if (useCustomRange) {
       const startIso = new Date(startDate + 'T00:00:00.000Z').toISOString();
       const endIso = new Date(endDate + 'T23:59:59.999Z').toISOString();
-      const limit = 5000;
+      const pageSize = 1000;
       const maxRecords = 50000;
       let offset = 0;
       let allCalls: any[] = [];
@@ -44,13 +97,12 @@ async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, e
           p_type: null,
           p_start_date: startIso,
           p_end_date: endIso,
-          p_limit: limit,
+          p_limit: pageSize,
           p_offset: offset,
           p_sort_by: 'created_at',
           p_min_duration: null,
           p_max_duration: null,
-          p_min_score: null,
-          p_search_query: null
+          p_min_score: null
         });
 
         if (callsError) {
@@ -65,7 +117,7 @@ async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, e
         allCalls = allCalls.concat(chunk);
 
         if (allCalls.length >= totalCount) break;
-        offset += limit;
+        offset += pageSize;
       }
 
       if (allCalls.length === 0) {
@@ -79,14 +131,14 @@ async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, e
 
       const sdrMap = new Map<string, SdrScoreRankingData & { scoreSum: number }>();
       allCalls.forEach((call: any) => {
-        const sdrId = call.sdr_id || call.agent_id || 'desconhecido';
-        const sdrName = call.sdr_name || call.agent_id || 'SDR';
-        const key = String(sdrId).toLowerCase();
+        const sdrNameRaw = String(call.sdr_name || call.agent_id || 'SDR');
+        const sdrName = normalizeSdrGroupName(sdrNameRaw);
+        const key = sdrName.toLowerCase();
         const score = typeof call.score === 'number' ? call.score : null;
 
         if (!sdrMap.has(key)) {
           sdrMap.set(key, {
-            sdr_id: String(sdrId),
+            sdr_id: key,
             sdr_name: String(sdrName),
             total_calls: 0,
             noted_calls: 0,
@@ -155,6 +207,7 @@ async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, e
         }
       }
 
+      result = mergeScoreRankingByName(result);
       return result.sort((a, b) => b.avg_score - a.avg_score).slice(0, 10);
     }
 
@@ -274,8 +327,8 @@ async function fetchSdrScoreRankingData(days: number = 30, startDate?: string, e
       }
     }
 
-    // Ordenar por nota e limitar a top 10
-    result = result
+    // Unificar duplicados por nome normalizado e limitar a top 10
+    result = mergeScoreRankingByName(result)
       .sort((a, b) => b.avg_score - a.avg_score)
       .slice(0, 10);
 
