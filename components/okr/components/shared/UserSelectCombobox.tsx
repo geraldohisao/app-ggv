@@ -150,7 +150,11 @@ export const UserSelectCombobox: React.FC<UserSelectComboboxProps> = ({
             {(() => {
               // #region agent log
               const isGeraldo = selectedUser.name?.toLowerCase().includes('geraldo');
-              fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:150',message:'Rendering selected user avatar',data:{userName:selectedUser.name,hasAvatarUrl:!!selectedUser.avatar_url,avatarUrl:selectedUser.avatar_url,isGeraldo:isGeraldo},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+              const host = typeof window !== 'undefined' ? window.location.hostname : '';
+              const isLocal = host === 'localhost' || host === '127.0.0.1';
+              if (isLocal) {
+                fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:150',message:'Rendering selected user avatar',data:{userName:selectedUser.name,hasAvatarUrl:!!selectedUser.avatar_url,avatarUrl:selectedUser.avatar_url,isGeraldo:isGeraldo},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+              }
               // #endregion
               return selectedUser.avatar_url ? (
                 <img
@@ -159,12 +163,20 @@ export const UserSelectCombobox: React.FC<UserSelectComboboxProps> = ({
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => {
                     // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:158',message:'Image load ERROR',data:{userName:selectedUser.name,avatarUrl:selectedUser.avatar_url,errorType:e.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                    const isLocal = host === 'localhost' || host === '127.0.0.1';
+                    if (isLocal) {
+                      fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:158',message:'Image load ERROR',data:{userName:selectedUser.name,avatarUrl:selectedUser.avatar_url,errorType:e.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                    }
                     // #endregion
                   }}
                   onLoad={() => {
                     // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:162',message:'Image loaded successfully',data:{userName:selectedUser.name,avatarUrl:selectedUser.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                    const isLocal = host === 'localhost' || host === '127.0.0.1';
+                    if (isLocal) {
+                      fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:162',message:'Image loaded successfully',data:{userName:selectedUser.name,avatarUrl:selectedUser.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+                    }
                     // #endregion
                   }}
                 />
@@ -284,7 +296,9 @@ export const UserSelectCombobox: React.FC<UserSelectComboboxProps> = ({
                   {(() => {
                     // #region agent log
                     const isGeraldo = user.name?.toLowerCase().includes('geraldo');
-                    if (isGeraldo) {
+                    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                    const isLocal = host === 'localhost' || host === '127.0.0.1';
+                    if (isLocal && isGeraldo) {
                       fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:270',message:'Rendering Geraldo in list',data:{userName:user.name,hasAvatarUrl:!!user.avatar_url,avatarUrl:user.avatar_url,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
                     }
                     // #endregion
@@ -295,14 +309,18 @@ export const UserSelectCombobox: React.FC<UserSelectComboboxProps> = ({
                         className="w-8 h-8 rounded-full object-cover"
                         onError={(e) => {
                           // #region agent log
-                          if (isGeraldo) {
+                          const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                          const isLocal = host === 'localhost' || host === '127.0.0.1';
+                          if (isLocal && isGeraldo) {
                             fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:280',message:'Geraldo image ERROR in list',data:{userName:user.name,avatarUrl:user.avatar_url,errorType:e.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
                           }
                           // #endregion
                         }}
                         onLoad={() => {
                           // #region agent log
-                          if (isGeraldo) {
+                          const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                          const isLocal = host === 'localhost' || host === '127.0.0.1';
+                          if (isLocal && isGeraldo) {
                             fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserSelectCombobox.tsx:286',message:'Geraldo image loaded in list',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
                           }
                           // #endregion

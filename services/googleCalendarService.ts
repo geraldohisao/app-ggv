@@ -655,7 +655,11 @@ export async function syncSprintWithCalendar(params: CreateCalendarEventParams):
       result = await createCalendarEvent(params);
     }
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'googleCalendarService.ts:syncSprintWithCalendar',message:'calendar_result',data:{sprintId:params.sprintId,usedExisting:!!existing?.event_id,resultStatus:result.status,hasEventId:!!result.eventId},timestamp:Date.now()})}).catch(()=>{});
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    if (isLocal) {
+      fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'googleCalendarService.ts:syncSprintWithCalendar',message:'calendar_result',data:{sprintId:params.sprintId,usedExisting:!!existing?.event_id,resultStatus:result.status,hasEventId:!!result.eventId},timestamp:Date.now()})}).catch(()=>{});
+    }
     // #endregion
 
     // Salvar no Supabase

@@ -32,7 +32,9 @@ const UserMenu: React.FC<UserMenuProps> = ({ activeModule, setActiveModule, onLo
     useEffect(() => {
         setImgError(false);
         // #region agent log
-        if (user?.name?.toLowerCase().includes('geraldo')) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        const isLocal = host === 'localhost' || host === '127.0.0.1';
+        if (isLocal && user?.name?.toLowerCase().includes('geraldo')) {
             fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:34',message:'UserMenu avatar_url changed',data:{userName:user?.name,avatarUrl:user?.avatar_url,imgError:imgError},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
         }
         // #endregion

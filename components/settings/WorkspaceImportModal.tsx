@@ -145,7 +145,11 @@ export const WorkspaceImportModal: React.FC<{ onClose: () => void }> = ({ onClos
           if (error) {
             console.error(`❌ Erro ao importar ${user.email}:`, error);
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WorkspaceImportModal.tsx:132',message:'workspace_sync_user RPC error',data:{email:user.email,code:(error as any)?.code,message:(error as any)?.message,details:(error as any)?.details,hint:(error as any)?.hint},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+            const host = typeof window !== 'undefined' ? window.location.hostname : '';
+            const isLocal = host === 'localhost' || host === '127.0.0.1';
+            if (isLocal) {
+              fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WorkspaceImportModal.tsx:132',message:'workspace_sync_user RPC error',data:{email:user.email,code:(error as any)?.code,message:(error as any)?.message,details:(error as any)?.details,hint:(error as any)?.hint},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+            }
             // #endregion
             errors++;
             continue; // Pula para próximo

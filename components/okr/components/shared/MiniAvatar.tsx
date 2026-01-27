@@ -54,7 +54,9 @@ export const MiniAvatar: React.FC<MiniAvatarProps> = ({
 
   // #region agent log
   const isGeraldo = user.name?.toLowerCase().includes('geraldo');
-  if (isGeraldo) {
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  if (isLocal && isGeraldo) {
     fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MiniAvatar.tsx:55',message:'MiniAvatar rendering Geraldo',data:{userName:user.name,hasAvatarUrl:!!user.avatar_url,avatarUrl:user.avatar_url,imgError:imgError,size:size,isInherited:isInherited},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
   }
   // #endregion
@@ -77,7 +79,7 @@ export const MiniAvatar: React.FC<MiniAvatarProps> = ({
           className={`rounded-full object-cover ${sizeClasses[size]} ${isInherited ? 'opacity-70' : ''}`}
           onError={() => {
             // #region agent log
-            if (isGeraldo) {
+            if (isLocal && isGeraldo) {
               fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MiniAvatar.tsx:72',message:'MiniAvatar Geraldo image ERROR',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
             }
             // #endregion
@@ -86,7 +88,7 @@ export const MiniAvatar: React.FC<MiniAvatarProps> = ({
           referrerPolicy="no-referrer"
           onLoad={(e) => {
             // #region agent log
-            if (isGeraldo) {
+            if (isLocal && isGeraldo) {
               const img = e.currentTarget;
               const styles = getComputedStyle(img);
               fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MiniAvatar.tsx:81',message:'MiniAvatar Geraldo image loaded',data:{userName:user.name,avatarUrl:user.avatar_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});

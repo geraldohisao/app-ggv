@@ -119,23 +119,84 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (session?.user) return true;
         } catch {}
 
-        try {
-            const raw = localStorage.getItem(SUPABASE_SESSION_BACKUP_KEY);
-            if (!raw) return false;
-            const parsed = JSON.parse(raw);
-            const access_token = parsed?.access_token;
-            const refresh_token = parsed?.refresh_token;
-            if (!access_token || !refresh_token) return false;
+        const trySetSession = async (access_token: string, refresh_token: string): Promise<boolean> => {
+            try {
+                const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+                const ok = !!data?.session?.user && !error;
+                console.log('🔐 DIRECT CONTEXT - Rehidratação Supabase (setSession):', { ok });
+                return ok;
+            } catch (e) {
+                console.warn('⚠️ DIRECT CONTEXT - setSession falhou:', e);
+                return false;
+            }
+        };
 
-            // Rehidratar sessão (não exige logout/login manual; usa refresh_token salvo)
-            const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
-            const ok = !!data?.session?.user && !error;
-            console.log('🔐 DIRECT CONTEXT - Rehidratação Supabase:', { ok });
+        const extractTokens = (raw: string | null): { access_token?: string; refresh_token?: string } => {
+            if (!raw) return {};
+            try {
+                const parsed = JSON.parse(raw);
+                // Variações comuns de shape (evitar acoplamento a uma versão específica)
+                const candidates = [
+                    parsed,
+                    parsed?.currentSession,
+                    parsed?.data?.session,
+                    parsed?.session,
+                ];
+                for (const c of candidates) {
+                    const access_token = c?.access_token;
+                    const refresh_token = c?.refresh_token;
+                    if (access_token || refresh_token) return { access_token, refresh_token };
+                }
+                return {};
+            } catch {
+                return {};
+            }
+        };
+
+        // 1) Tentar backup explícito que criamos
+        const backupRaw = localStorage.getItem(SUPABASE_SESSION_BACKUP_KEY);
+        const backupTokens = extractTokens(backupRaw);
+
+        // 2) Tentar storage nativo do Supabase (custom storageKey no client)
+        const nativeRaw = localStorage.getItem('ggv-supabase-auth-token');
+        const nativeTokens = extractTokens(nativeRaw);
+
+        console.log('🔐 DIRECT CONTEXT - Tokens disponíveis p/ rehidratar (sem expor segredos):', {
+            hasBackup: !!backupRaw,
+            hasNative: !!nativeRaw,
+            backupHasAccess: !!backupTokens.access_token,
+            backupHasRefresh: !!backupTokens.refresh_token,
+            nativeHasAccess: !!nativeTokens.access_token,
+            nativeHasRefresh: !!nativeTokens.refresh_token,
+        });
+
+        // Priorizar refresh token (mais importante). Preferir native -> backup.
+        const access_token = nativeTokens.access_token || backupTokens.access_token;
+        const refresh_token = nativeTokens.refresh_token || backupTokens.refresh_token;
+
+        if (access_token && refresh_token) {
+            const ok = await trySetSession(access_token, refresh_token);
+            if (ok) {
+                // Se veio do native storage, também garantir backup para futuras restaurações
+                saveSupabaseSessionBackup().catch(() => {});
+            }
             return ok;
-        } catch (e) {
-            console.warn('⚠️ DIRECT CONTEXT - Falha ao rehidratar sessão Supabase:', e);
-            return false;
         }
+
+        // Se só tivermos refresh_token, tentar refreshSession (se existir na versão do client)
+        if (refresh_token && (supabase.auth as any).refreshSession) {
+            try {
+                const { data, error } = await (supabase.auth as any).refreshSession({ refresh_token });
+                const ok = !!data?.session?.user && !error;
+                console.log('🔐 DIRECT CONTEXT - Rehidratação Supabase (refreshSession):', { ok });
+                if (ok) saveSupabaseSessionBackup().catch(() => {});
+                return ok;
+            } catch (e) {
+                console.warn('⚠️ DIRECT CONTEXT - refreshSession falhou:', e);
+            }
+        }
+
+        return false;
     };
 
     useEffect(() => {
