@@ -318,12 +318,15 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
 
       // 1) Preferir RPC (bypass RLS de forma controlada, via SECURITY DEFINER)
       try {
-        const { data: snapshot, error: rpcError } = await supabase.rpc('get_org_chart_snapshot');
+        // Obs: em alguns ambientes, RPC sem args falha se o body não vier como JSON objeto.
+        // Passamos `{}` explicitamente para garantir compatibilidade.
+        const { data: snapshot, error: rpcError } = await supabase.rpc('get_org_chart_snapshot', {});
         if (!rpcError && snapshot && typeof snapshot === 'object') {
           const snapUsuarios = Array.isArray((snapshot as any).usuarios) ? (snapshot as any).usuarios : [];
           const snapCargos = Array.isArray((snapshot as any).cargos) ? (snapshot as any).cargos : [];
           setUsuarios(snapUsuarios);
           setCargos(snapCargos);
+          console.log('✅ [Organograma] Snapshot via RPC:', { usuarios: snapUsuarios.length, cargos: snapCargos.length });
           return;
         }
         // Se o RPC existir mas falhar, vamos cair no fallback (e exibir erro se ficar vazio)
@@ -332,6 +335,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
         }
       } catch (e) {
         // RPC pode não existir ainda em alguns ambientes
+        console.warn('⚠️ RPC get_org_chart_snapshot indisponível, usando fallback:', e);
       }
 
       // 2) Fallback: SELECT direto (pode retornar vazio por RLS)
