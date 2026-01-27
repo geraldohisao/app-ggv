@@ -239,6 +239,8 @@ export async function listVisibleOKRsForUser(
     const okrIdsFromKrs = userId ? await getOKRIdsByKRResponsible(userId) : [];
     
     const hasDept = Boolean(userDepartment);
+    const normalizedRole = (userRole || '').toString().toUpperCase();
+    const isOP = normalizedRole === 'USER';
 
     let query = supabase
       .from('okrs')
@@ -248,14 +250,31 @@ export async function listVisibleOKRsForUser(
       query = query.abortSignal(signal);
     }
 
-    if (hasDept && okrIdsFromKrs.length > 0) {
-      query = query.or(`department.eq.${userDepartment},id.in.(${okrIdsFromKrs.join(',')})`);
-    } else if (hasDept) {
-      query = query.eq('department', userDepartment as string);
-    } else if (okrIdsFromKrs.length > 0) {
-      query = query.in('id', okrIdsFromKrs);
+    // Visibilidade:
+    // - USER/OP: ver apenas OKRs em que é owner (responsável) OU em que tem algum KR atribuído.
+    // - Outros perfis (Admin/Head/Ceo): podem filtrar por departamento quando usado como fallback.
+    if (isOP) {
+      const hasOwner = Boolean(userName && userName.trim());
+      if (okrIdsFromKrs.length > 0 && hasOwner) {
+        // PostgREST OR: id ∈ {okrIdsFromKrs} OR owner = userName
+        query = query.or(`id.in.(${okrIdsFromKrs.join(',')}),owner.eq.${userName}`);
+      } else if (okrIdsFromKrs.length > 0) {
+        query = query.in('id', okrIdsFromKrs);
+      } else if (hasOwner) {
+        query = query.eq('owner', userName as string);
+      } else {
+        return [];
+      }
     } else {
-      return [];
+      if (hasDept && okrIdsFromKrs.length > 0) {
+        query = query.or(`department.eq.${userDepartment},id.in.(${okrIdsFromKrs.join(',')})`);
+      } else if (hasDept) {
+        query = query.eq('department', userDepartment as string);
+      } else if (okrIdsFromKrs.length > 0) {
+        query = query.in('id', okrIdsFromKrs);
+      } else {
+        return [];
+      }
     }
 
     if (filters?.level) {
