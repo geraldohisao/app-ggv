@@ -4,6 +4,10 @@
   functions = "netlify/functions"
   # Force rebuild - diagnostic improvements v5 (formatting fix)
 
+# Instalar dependências das Netlify Functions automaticamente
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
+
 [build.environment]
   NODE_VERSION = "20.18.0"
   NPM_CONFIG_PRODUCTION = "false"
