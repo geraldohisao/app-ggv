@@ -252,6 +252,34 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
+  const hasFetchedAfterAuthRef = useRef(false);
+
+  const debugLog = (hypothesisId: string, location: string, message: string, data: Record<string, any>) => {
+    try {
+      // Evitar ruído/CSP em produção: enviar para collector apenas em dev/local.
+      if (typeof window === 'undefined') return;
+      const host = window.location.hostname;
+      const isLocal = host === 'localhost' || host === '127.0.0.1';
+      if (!isLocal) return;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'organograma-auth',
+          hypothesisId,
+          location,
+          message,
+          data,
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    } catch {
+      // ignore
+    }
+  };
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.4));
@@ -316,6 +344,20 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
         return;
       }
 
+      // Evidência: em produção vimos RPC falhar com not_authenticated.
+      // Vamos capturar se há sessão do Supabase no momento do fetch (sem PII).
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const hasSession = !!session?.user;
+        debugLog('A', 'OrganogramaUnificado.tsx:fetchData:getSession', 'Supabase session present?', {
+          hasSession,
+          expiresAt: session?.expires_at || null,
+        });
+        console.log('🔐 [Organograma] Supabase session:', { hasSession, expiresAt: session?.expires_at || null });
+      } catch (e) {
+        debugLog('A', 'OrganogramaUnificado.tsx:fetchData:getSession', 'Supabase getSession failed', { ok: false });
+      }
+
       // 1) Preferir RPC (bypass RLS de forma controlada, via SECURITY DEFINER)
       try {
         // Obs: em alguns ambientes, RPC sem args falha se o body não vier como JSON objeto.
@@ -327,15 +369,21 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
           setUsuarios(snapUsuarios);
           setCargos(snapCargos);
           console.log('✅ [Organograma] Snapshot via RPC:', { usuarios: snapUsuarios.length, cargos: snapCargos.length });
+          debugLog('B', 'OrganogramaUnificado.tsx:fetchData:rpc', 'RPC success', { usuarios: snapUsuarios.length, cargos: snapCargos.length });
           return;
         }
         // Se o RPC existir mas falhar, vamos cair no fallback (e exibir erro se ficar vazio)
         if (rpcError) {
           console.warn('⚠️ RPC get_org_chart_snapshot falhou, usando fallback:', rpcError);
+          debugLog('B', 'OrganogramaUnificado.tsx:fetchData:rpc', 'RPC error', { code: (rpcError as any).code || null, message: (rpcError as any).message || null });
+          if ((rpcError as any)?.message === 'not_authenticated') {
+            setLoadError('Sessão do Supabase não autenticada. Faça logout e login novamente para carregar o organograma.');
+          }
         }
       } catch (e) {
         // RPC pode não existir ainda em alguns ambientes
         console.warn('⚠️ RPC get_org_chart_snapshot indisponível, usando fallback:', e);
+        debugLog('B', 'OrganogramaUnificado.tsx:fetchData:rpc', 'RPC unavailable/exception', { ok: false });
       }
 
       // 2) Fallback: SELECT direto (pode retornar vazio por RLS)
@@ -411,6 +459,24 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [staticData, disableRealtime]);
+
+  // 🔐 Auth listener: se o organograma buscou antes do Supabase estar pronto,
+  // re-tentar quando a sessão aparecer (sem timeout).
+  useEffect(() => {
+    if (staticData || !supabase) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      const hasSession = !!session?.user;
+      debugLog('A', 'OrganogramaUnificado.tsx:auth', 'Auth state changed', { event, hasSession, expiresAt: session?.expires_at || null });
+      console.log('🔐 [Organograma] Auth event:', { event, hasSession });
+      if (hasSession && !hasFetchedAfterAuthRef.current) {
+        hasFetchedAfterAuthRef.current = true;
+        fetchData();
+      }
+    });
+    return () => {
+      try { sub?.subscription?.unsubscribe(); } catch {}
+    };
+  }, [staticData]);
 
   // 🧠 Processamento dos dados
   const { cLevel, deptGroups } = useMemo(() => {
