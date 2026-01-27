@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "🚀 Build Netlify iniciado"
 echo "Node version: $(node --version)"
@@ -17,11 +17,15 @@ else
 fi
 
 # Install dependencies
-npm ci --silent
+echo "📦 Instalando dependências (npm ci)..."
+echo "🔧 npm config: production=$(npm config get production) omit=$(npm config get omit)"
+# Garantir devDependencies no build (Vite/TypeScript/Sentry plugin vivem em devDependencies)
+npm ci --include=dev --no-audit --no-fund
 
 # Run build (usando build:fast que pula TypeScript check para deploy rápido)
 # IMPORTANTE: Erros TypeScript no módulo Calls serão corrigidos posteriormente
 # Sentry plugin will automatically upload sourcemaps during build if configured
+echo "🏗️  Rodando build:fast..."
 npm run build:fast
 
 echo "✅ Build concluído"
