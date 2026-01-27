@@ -27,6 +27,14 @@ interface SprintStore {
   setFilters: (filters: SprintFilters) => void;
   setSelectedSprint: (sprint: SprintWithItems | null) => void;
   clearError: () => void;
+  
+  // Ações silenciosas (sem loading - para refresh em background)
+  refreshSprintById: (id: string) => Promise<void>;
+  refreshSprints: (
+    filters?: SprintFilters,
+    visibility?: { userId?: string | null; userDepartment?: string | null; isAdmin?: boolean }
+  ) => Promise<void>;
+  updateSelectedSprintLocally: (updater: (sprint: SprintWithItems) => SprintWithItems) => void;
 }
 
 export const useSprintStore = create<SprintStore>((set, get) => ({
@@ -208,6 +216,63 @@ export const useSprintStore = create<SprintStore>((set, get) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  // ===========================================
+  // Ações silenciosas (sem loading)
+  // Usadas para refresh em background sem "piscar" a UI
+  // ===========================================
+
+  refreshSprintById: async (id) => {
+    // Refresh silencioso: NÃO seta loading=true
+    // Mantém a UI atual e atualiza apenas quando o dado chegar
+    try {
+      const sprint = await sprintService.getSprintById(id, true); // skipCache=true
+      if (sprint) {
+        set((state) => ({
+          selectedSprint: state.selectedSprint?.id === id ? sprint : state.selectedSprint,
+          sprints: state.sprints.map((s) => (s.id === id ? sprint : s)),
+        }));
+      }
+    } catch (error) {
+      // Erro silencioso - não interrompe a UX
+      console.warn('⚠️ Erro no refresh silencioso da sprint:', error);
+    }
+  },
+
+  refreshSprints: async (filters, visibility) => {
+    // Refresh silencioso: NÃO seta loading=true
+    try {
+      let sprints: SprintWithItems[];
+      if (!visibility || visibility.isAdmin) {
+        sprints = await sprintService.listSprints(filters);
+      } else {
+        const okrIds = visibility.userId
+          ? await okrService.getOKRIdsByKRResponsible(visibility.userId)
+          : [];
+        sprints = await sprintService.listSprints({
+          ...filters,
+          visibilityDepartment: visibility.userDepartment || undefined,
+          visibilityOkrIds: okrIds,
+        });
+      }
+      set({ sprints });
+    } catch (error) {
+      // Erro silencioso
+      console.warn('⚠️ Erro no refresh silencioso das sprints:', error);
+    }
+  },
+
+  updateSelectedSprintLocally: (updater) => {
+    // Atualização otimista local (síncrona)
+    set((state) => {
+      if (!state.selectedSprint) return state;
+      const updated = updater(state.selectedSprint);
+      return {
+        selectedSprint: updated,
+        sprints: state.sprints.map((s) => (s.id === updated.id ? updated : s)),
+      };
+    });
   },
 }));
 

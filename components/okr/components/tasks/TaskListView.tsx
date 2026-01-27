@@ -13,6 +13,7 @@ interface TaskListViewProps {
   tasks: UnifiedTask[];
   filters?: TaskFilters;
   userId?: string;
+  userName?: string;
   onToggleComplete: (task: UnifiedTask) => void;
   onEdit?: (task: UnifiedTask) => void;
   onDelete?: (task: UnifiedTask) => void;
@@ -24,17 +25,21 @@ interface TaskListViewProps {
     due_date?: string | null;
   }) => Promise<void>;
   emptyMessage?: string;
+  /** Função para verificar se o usuário pode editar uma task específica */
+  canEditTask?: (task: UnifiedTask) => boolean;
 }
 
 export const TaskListView: React.FC<TaskListViewProps> = ({
   tasks,
   filters,
   userId,
+  userName,
   onToggleComplete,
   onEdit,
   onDelete,
   onSaveEdit,
   emptyMessage = 'Nenhuma tarefa encontrada',
+  canEditTask,
 }) => {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   // Aplicar filtros
@@ -69,6 +74,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const completedTasks = filteredTasks.filter(t => t.status === TaskStatus.COMPLETED);
 
   const handleEditClick = (task: UnifiedTask) => {
+    // Usar edição inline para todas as tasks
+    // O TaskInlineForm vai mostrar read-only se não for responsável
     setEditingTaskId(task.id);
     onEdit?.(task);
   };
@@ -117,6 +124,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 key={`${task.source}-${task.id}-edit`}
                 task={task}
                 userId={userId || ''}
+                userName={userName}
                 onSave={(data) => handleSaveInlineEdit(task, data)}
                 onCancel={handleCancelEdit}
                 onDelete={() => handleDeleteInline(task)}
@@ -129,6 +137,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 onEdit={handleEditClick}
                 onDelete={onDelete}
                 variant="list"
+                canEdit={canEditTask ? canEditTask(task) : true}
               />
             )
           ))}
@@ -155,6 +164,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 key={`${task.source}-${task.id}-edit`}
                 task={task}
                 userId={userId || ''}
+                userName={userName}
                 onSave={(data) => handleSaveInlineEdit(task, data)}
                 onCancel={handleCancelEdit}
                 onDelete={() => handleDeleteInline(task)}
@@ -167,6 +177,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 onEdit={handleEditClick}
                 onDelete={onDelete}
                 variant="list"
+                canEdit={canEditTask ? canEditTask(task) : true}
               />
             )
           ))}

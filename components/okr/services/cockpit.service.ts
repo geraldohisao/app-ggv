@@ -37,6 +37,183 @@ export interface KRTrend {
   currentValue: number;
 }
 
+export interface KRMonthlyContext {
+  monthStart: string; // YYYY-MM-01
+  kind: 'delta' | 'point' | 'range';
+  actual: number | null; // delta do mês OU valor fim do mês (conforme kind)
+  target: number | null;
+  targetMax?: number | null;
+  gap: number | null;
+  isOk: boolean | null;
+}
+
+function monthStartKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function addMonths(d: Date, deltaMonths: number): Date {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + deltaMonths);
+  return x;
+}
+
+function getDefaultMonthlyKind(kr: KRWithOKRContext): 'delta' | 'point' {
+  if (kr.type === 'percentage') return 'point';
+  const dir = (kr.direction || 'increase') as any;
+  if ((kr.type === 'currency' || kr.type === 'numeric') && (dir === 'increase' || dir === 'at_least')) {
+    return 'delta';
+  }
+  return 'point';
+}
+
+function isBetterWhenLower(kr: KRWithOKRContext): boolean {
+  const dir = (kr.direction || 'increase') as any;
+  return dir === 'decrease' || dir === 'at_most';
+}
+
+/**
+ * Calcula contexto do mês atual (Realizado vs Meta) para uma lista de KRs.
+ * - 1 query para metas (kr_period_targets)
+ * - 1 query para check-ins (kr_checkins) desde o início do mês anterior
+ */
+export async function getCurrentMonthContextForKRs(
+  krs: KRWithOKRContext[]
+): Promise<Record<string, KRMonthlyContext>> {
+  const map: Record<string, KRMonthlyContext> = {};
+  const ids = (krs || []).map((k) => k.id).filter(Boolean) as string[];
+  if (ids.length === 0) return map;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(addMonths(monthStart, -1).getFullYear(), addMonths(monthStart, -1).getMonth(), 1);
+  const monthStartStr = monthStartKey(monthStart);
+
+  // Defaults
+  for (const kr of krs) {
+    if (!kr?.id) continue;
+    const defKind = getDefaultMonthlyKind(kr);
+    map[kr.id] = {
+      monthStart: monthStartStr,
+      kind: defKind,
+      actual: null,
+      target: null,
+      targetMax: null,
+      gap: null,
+      isOk: null,
+    };
+  }
+
+  // 1) Metas do mês atual
+  try {
+    const { data: targets, error: targetsError } = await supabase
+      .from('kr_period_targets')
+      .select('kr_id, target_kind, target_value, target_max, period_start')
+      .in('kr_id', ids)
+      .eq('period_type', 'month')
+      .eq('period_start', monthStartStr);
+
+    if (targetsError) {
+      const isMissing =
+        targetsError?.code === '42P01' ||
+        targetsError?.status === 404 ||
+        String(targetsError?.message || '').includes('does not exist') ||
+        String(targetsError?.message || '').includes('schema cache') ||
+        String(targetsError?.message || '').includes('relationship');
+      if (!isMissing) {
+        console.warn('⚠️ [getCurrentMonthContextForKRs] Falha ao buscar metas:', targetsError);
+      }
+    } else {
+      (targets || []).forEach((t: any) => {
+        const krId = t.kr_id;
+        if (!krId || !map[krId]) return;
+        map[krId].kind = (t.target_kind || map[krId].kind) as any;
+        map[krId].target = typeof t.target_value === 'number' ? t.target_value : Number(t.target_value);
+        map[krId].targetMax = t.target_max === null || t.target_max === undefined ? null : Number(t.target_max);
+      });
+    }
+  } catch (e) {
+    // best-effort
+    console.warn('⚠️ [getCurrentMonthContextForKRs] Erro metas:', e);
+  }
+
+  // 2) Check-ins desde mês anterior (para achar fim do mês anterior e fim do mês atual)
+  const prevMonthStartIso = prevMonthStart.toISOString();
+  try {
+    const { data: checkins, error: checkinsError } = await supabase
+      .from('kr_checkins')
+      .select('kr_id, value, created_at')
+      .in('kr_id', ids)
+      .gte('created_at', prevMonthStartIso)
+      .order('created_at', { ascending: true });
+
+    if (checkinsError) {
+      console.warn('⚠️ [getCurrentMonthContextForKRs] Falha ao buscar check-ins:', checkinsError);
+      return map;
+    }
+
+    const byKr = new Map<string, { created_at: string; value: number }[]>();
+    (checkins || []).forEach((c: any) => {
+      const krId = c.kr_id;
+      if (!krId) return;
+      const arr = byKr.get(krId) || [];
+      arr.push({ created_at: c.created_at, value: Number(c.value ?? 0) });
+      byKr.set(krId, arr);
+    });
+
+    for (const kr of krs) {
+      if (!kr?.id) continue;
+      const arr = byKr.get(kr.id) || [];
+
+      let endPrev: number | null = null;
+      let endThis: number | null = null;
+
+      for (const c of arr) {
+        const t = new Date(c.created_at).getTime();
+        if (t < monthStart.getTime()) {
+          endPrev = c.value;
+        } else {
+          endThis = c.value;
+        }
+      }
+
+      const baseline = endPrev ?? (kr.start_value ?? kr.current_value ?? 0);
+      const endValue = endThis ?? endPrev ?? (kr.current_value ?? kr.start_value ?? 0);
+
+      const ctx = map[kr.id];
+      const kind = ctx.kind;
+
+      if (kind === 'delta') {
+        ctx.actual = endValue - baseline;
+        ctx.gap = typeof ctx.target === 'number' ? ctx.actual - ctx.target : null;
+        // Para delta, a regra de OK é "atingiu a meta do mês": atual >= meta (mesmo em decrease/at_most isso seria semântico estranho),
+        // então mantemos apenas para increase/at_least; se direção for melhor quando menor, não marcamos como ok/ko aqui.
+        ctx.isOk = typeof ctx.target === 'number' ? ctx.actual >= ctx.target : null;
+      } else if (kind === 'range') {
+        ctx.actual = endValue;
+        if (typeof ctx.target === 'number' && typeof ctx.targetMax === 'number') {
+          ctx.gap = endValue >= ctx.target && endValue <= ctx.targetMax ? 0 : endValue < ctx.target ? endValue - ctx.target : endValue - ctx.targetMax;
+          ctx.isOk = ctx.gap === 0;
+        } else {
+          ctx.gap = null;
+          ctx.isOk = null;
+        }
+      } else {
+        ctx.actual = endValue;
+        ctx.gap = typeof ctx.target === 'number' ? ctx.actual - ctx.target : null;
+        if (typeof ctx.target === 'number') {
+          ctx.isOk = isBetterWhenLower(kr) ? ctx.actual <= ctx.target : ctx.actual >= ctx.target;
+        } else {
+          ctx.isOk = null;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ [getCurrentMonthContextForKRs] Erro check-ins:', e);
+  }
+
+  return map;
+}
+
 // ============================================
 // COCKPIT SERVICE FUNCTIONS
 // ============================================

@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUser } from '../../../contexts/DirectUserContext';
+import { UserRole } from '../../../types';
 import * as taskService from '../services/task.service';
+import * as sprintService from '../services/sprint.service';
 import {
   TaskStatus,
   TaskSource,
@@ -18,6 +20,8 @@ import { LoadingState } from '../components/shared/LoadingState';
 type ViewMode = 'list' | 'kanban';
 type FilterStatus = 'all' | 'pending' | 'completed';
 type FilterOwner = 'mine' | 'all';
+type FilterDatePeriod = 'all' | 'overdue' | 'today' | 'week' | 'month';
+type FilterPriority = 'all' | TaskPriority;
 
 interface ActivitiesViewProps {
   onSprintClick?: (sprintId: string) => void;
@@ -35,10 +39,62 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
   const [filterOwner, setFilterOwner] = useState<FilterOwner>('mine');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Filtros avançados
+  const [filterDatePeriod, setFilterDatePeriod] = useState<FilterDatePeriod>('all');
+  const [filterPriority, setFilterPriority] = useState<FilterPriority>('all');
+  const [filterSprint, setFilterSprint] = useState<string>('all'); // 'all' ou sprint_id
+  const [filterResponsible, setFilterResponsible] = useState<string>('all'); // 'all' ou nome do responsável
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  
   // Modal state
   const [editingTask, setEditingTask] = useState<UnifiedTask | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Verificar se usuário é admin (pode ver tarefas de outros e atribuir)
+  // Apenas CEO, HEAD, SUPER_ADMIN e ADMIN podem
+  const isAdminUser = useMemo(() => {
+    if (!user) return false;
+    const role = user.role;
+    const cargo = user.cargo?.toUpperCase() || '';
+    
+    return (
+      role === UserRole.SuperAdmin ||
+      role === UserRole.Admin ||
+      cargo.includes('CEO') ||
+      cargo.includes('HEAD') ||
+      cargo.includes('DIRETOR') ||
+      cargo.includes('GERENTE')
+    );
+  }, [user]);
+  
+  const canAssignResponsible = isAdminUser;
+
+  // Função para verificar se usuário pode editar uma task específica
+  const canEditTask = useCallback((task: UnifiedTask): boolean => {
+    if (!user) return false;
+    
+    // Task pessoal: só pode editar se for o dono ou admin
+    if (task.source === TaskSource.PERSONAL) {
+      return task.user_id === user.id || isAdminUser;
+    }
+    
+    // Task de Sprint: pode editar se for responsável ou admin
+    // Verificar por ID
+    if (task.responsible_user_id && task.responsible_user_id === user.id) return true;
+    // Fallback: verificar por nome
+    if (task.responsible && user.name) {
+      const taskResponsible = task.responsible.toLowerCase().trim();
+      const userName = user.name.toLowerCase().trim();
+      if (taskResponsible === userName || 
+          taskResponsible.includes(userName) || 
+          userName.includes(taskResponsible)) {
+        return true;
+      }
+    }
+    // Admin pode editar qualquer task
+    return isAdminUser;
+  }, [user, isAdminUser]);
 
   // Carregar tasks
   const loadTasks = useCallback(async () => {
@@ -48,18 +104,51 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
     setError(null);
     
     try {
-      const data = await taskService.getMyTasks(user.id);
+      // Se é admin e quer ver "Todas", buscar todas as tasks
+      // Senão, buscar apenas as do usuário
+      let data: UnifiedTask[];
+      if (isAdminUser && filterOwner === 'all') {
+        data = await taskService.getAllTasks();
+      } else {
+        data = await taskService.getMyTasks(user.id);
+      }
       setTasks(data);
     } catch (err: any) {
       setError(err?.message || 'Erro ao carregar atividades');
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, filterOwner, isAdminUser]);
 
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  // Lista de sprints disponíveis (derivada das tasks)
+  const availableSprints = useMemo(() => {
+    const sprints = new Map<string, { id: string; title: string }>();
+    tasks.forEach(t => {
+      if (t.source === TaskSource.SPRINT && t.sprint_id && t.sprint_title) {
+        sprints.set(t.sprint_id, { id: t.sprint_id, title: t.sprint_title });
+      }
+    });
+    return Array.from(sprints.values()).sort((a, b) => a.title.localeCompare(b.title));
+  }, [tasks]);
+
+  // Lista de responsáveis disponíveis (derivada das tasks)
+  const availableResponsibles = useMemo(() => {
+    const responsibles = new Map<string, string>();
+    tasks.forEach(t => {
+      if (t.responsible) {
+        // Usar o nome como chave para evitar duplicatas
+        responsibles.set(t.responsible.toLowerCase().trim(), t.responsible);
+      }
+    });
+    return Array.from(responsibles.values()).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  // Verificar se algum filtro avançado está ativo
+  const hasActiveAdvancedFilter = filterDatePeriod !== 'all' || filterPriority !== 'all' || filterSprint !== 'all' || filterResponsible !== 'all';
 
   // Filtros
   const filters: TaskFilters = useMemo(() => ({
@@ -82,10 +171,65 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
     }
 
     // Filtro de status
-    if (filterStatus === 'pending') {
-      result = result.filter(t => t.status !== TaskStatus.COMPLETED);
-    } else if (filterStatus === 'completed') {
-      result = result.filter(t => t.status === TaskStatus.COMPLETED);
+    // OBS: No Kanban não filtramos por status, senão itens "somem" ao arrastar entre colunas
+    if (viewMode === 'list') {
+      if (filterStatus === 'pending') {
+        result = result.filter(t => t.status !== TaskStatus.COMPLETED);
+      } else if (filterStatus === 'completed') {
+        result = result.filter(t => t.status === TaskStatus.COMPLETED);
+      }
+    }
+
+    // Filtro por período de data (aplicado em ambos os modos)
+    if (filterDatePeriod !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfWeek = new Date(today);
+      endOfWeek.setDate(today.getDate() + (7 - today.getDay())); // Próximo domingo
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+      result = result.filter(t => {
+        if (!t.due_date) return filterDatePeriod === 'all'; // Sem data só aparece em "todas"
+        
+        const dueDate = new Date(t.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+
+        switch (filterDatePeriod) {
+          case 'overdue':
+            return dueDate < today && t.status !== TaskStatus.COMPLETED;
+          case 'today':
+            return dueDate.getTime() === today.getTime();
+          case 'week':
+            return dueDate >= today && dueDate <= endOfWeek;
+          case 'month':
+            return dueDate >= today && dueDate <= endOfMonth;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Filtro por prioridade (apenas para tasks pessoais)
+    if (filterPriority !== 'all') {
+      result = result.filter(t => 
+        t.source === TaskSource.SPRINT || // Sprint tasks não têm prioridade, passam
+        t.priority === filterPriority
+      );
+    }
+
+    // Filtro por sprint
+    if (filterSprint !== 'all') {
+      result = result.filter(t => 
+        t.source === TaskSource.SPRINT && t.sprint_id === filterSprint
+      );
+    }
+
+    // Filtro por responsável
+    if (filterResponsible !== 'all') {
+      result = result.filter(t => {
+        if (!t.responsible) return false;
+        return t.responsible.toLowerCase().trim() === filterResponsible.toLowerCase().trim();
+      });
     }
 
     // Busca
@@ -94,12 +238,13 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
       result = result.filter(t => 
         t.title.toLowerCase().includes(search) ||
         t.description?.toLowerCase().includes(search) ||
-        t.sprint_title?.toLowerCase().includes(search)
+        t.sprint_title?.toLowerCase().includes(search) ||
+        t.responsible?.toLowerCase().includes(search)
       );
     }
 
     return result;
-  }, [tasks, filterStatus, filterOwner, searchTerm, user?.id]);
+  }, [tasks, filterStatus, filterOwner, searchTerm, user?.id, viewMode, filterDatePeriod, filterPriority, filterSprint, filterResponsible]);
 
   // Métricas (baseado no filtro de ownership atual)
   const metrics = useMemo(() => {
@@ -167,12 +312,29 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
     }
   };
 
+  // Helper para verificar se usuário é responsável pela task de Sprint
+  const isUserResponsibleForTask = (task: UnifiedTask) => {
+    if (!user || task.source !== TaskSource.SPRINT) return false;
+    // Verificar por ID
+    if (task.responsible_user_id && task.responsible_user_id === user.id) return true;
+    // Fallback: verificar por nome
+    if (task.responsible && user.name) {
+      const taskResponsible = task.responsible.toLowerCase().trim();
+      const userName = user.name.toLowerCase().trim();
+      return taskResponsible === userName || 
+             taskResponsible.includes(userName) || 
+             userName.includes(taskResponsible);
+    }
+    return false;
+  };
+
   const handleSaveTask = async (data: {
     title: string;
     description?: string;
     status: TaskStatus;
     priority?: TaskPriority;
     due_date?: string | null;
+    responsible_user_id?: string | null;
   }) => {
     try {
       if (isCreating) {
@@ -186,6 +348,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
           status: data.status,
           priority: data.priority,
           due_date: data.due_date || undefined,
+          responsible_user_id: canAssignResponsible ? data.responsible_user_id ?? undefined : undefined,
         });
       } else if (editingTask) {
         if (editingTask.source === TaskSource.PERSONAL) {
@@ -195,9 +358,25 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
             status: data.status,
             priority: data.priority,
             due_date: data.due_date,
+            responsible_user_id: canAssignResponsible ? data.responsible_user_id : editingTask.responsible_user_id,
+          });
+        } else if (isUserResponsibleForTask(editingTask)) {
+          // Para tasks de sprint onde o usuário é responsável, atualiza todos os campos
+          let sprintStatus = 'pendente';
+          if (data.status === TaskStatus.COMPLETED) {
+            sprintStatus = 'concluído';
+          } else if (data.status === TaskStatus.IN_PROGRESS) {
+            sprintStatus = 'em andamento';
+          }
+          
+          await sprintService.updateSprintItem(editingTask.id, {
+            title: data.title,
+            description: data.description,
+            status: sprintStatus,
+            due_date: data.due_date || undefined,
           });
         } else {
-          // Para tasks de sprint, só atualiza status
+          // Para tasks de sprint onde NÃO é responsável, só atualiza status
           await taskService.updateTaskStatus(editingTask.id, data.status, editingTask.source);
         }
       }
@@ -224,8 +403,24 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
           priority: data.priority,
           due_date: data.due_date,
         });
+      } else if (isUserResponsibleForTask(task)) {
+        // Para tasks de sprint onde o usuário é responsável, atualiza todos os campos
+        // Mapear status para formato do sprint
+        let sprintStatus = 'pendente';
+        if (data.status === TaskStatus.COMPLETED) {
+          sprintStatus = 'concluído';
+        } else if (data.status === TaskStatus.IN_PROGRESS) {
+          sprintStatus = 'em andamento';
+        }
+        
+        await sprintService.updateSprintItem(task.id, {
+          title: data.title,
+          description: data.description,
+          status: sprintStatus,
+          due_date: data.due_date || undefined,
+        });
       } else {
-        // Para tasks de sprint, só atualiza status
+        // Para tasks de sprint onde NÃO é responsável, só atualiza status
         await taskService.updateTaskStatus(task.id, data.status, task.source);
       }
       await loadTasks();
@@ -247,7 +442,9 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
     setShowEditModal(true);
   };
 
-  if (loading) {
+  // Mostrar loading apenas no carregamento inicial (sem tasks carregadas)
+  // NÃO mostrar loading durante refreshes (evita "piscar" a UI)
+  if (loading && tasks.length === 0) {
     return <LoadingState message="Carregando atividades..." />;
   }
 
@@ -323,38 +520,40 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
           </div>
 
           {/* Filtros de Status */}
-          <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-slate-100">
-            <button
-              onClick={() => setFilterStatus('pending')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                filterStatus === 'pending'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              Pendentes
-            </button>
-            <button
-              onClick={() => setFilterStatus('completed')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                filterStatus === 'completed'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              Concluídas
-            </button>
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                filterStatus === 'all'
-                  ? 'bg-slate-800 text-white shadow'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              Todas
-            </button>
-          </div>
+          {viewMode === 'list' && (
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-slate-100">
+              <button
+                onClick={() => setFilterStatus('pending')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  filterStatus === 'pending'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Pendentes
+              </button>
+              <button
+                onClick={() => setFilterStatus('completed')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  filterStatus === 'completed'
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Concluídas
+              </button>
+              <button
+                onClick={() => setFilterStatus('all')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  filterStatus === 'all'
+                    ? 'bg-slate-800 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Todas
+              </button>
+            </div>
+          )}
 
           {/* Toggle de Visualização */}
           <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-slate-100">
@@ -372,7 +571,9 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
               </svg>
             </button>
             <button
-              onClick={() => setViewMode('kanban')}
+              onClick={() => {
+                setViewMode('kanban');
+              }}
               className={`p-2 rounded-lg transition-all ${
                 viewMode === 'kanban'
                   ? 'bg-indigo-600 text-white shadow'
@@ -386,6 +587,24 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
             </button>
           </div>
 
+          {/* Botão Filtros Avançados */}
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`p-2 rounded-xl transition-all relative ${
+              showAdvancedFilters || hasActiveAdvancedFilter
+                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                : 'bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-50 border-slate-100'
+            } border shadow-sm`}
+            title="Filtros Avançados"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            {hasActiveAdvancedFilter && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full" />
+            )}
+          </button>
+
           {/* Botao Nova Tarefa */}
           <button
             onClick={handleCreateNew}
@@ -398,6 +617,156 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
           </button>
         </div>
       </header>
+
+      {/* Painel de Filtros Avançados */}
+      {showAdvancedFilters && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4 animate-in slide-in-from-top-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+              <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filtros Avançados
+            </h3>
+            {hasActiveAdvancedFilter && (
+              <button
+                onClick={() => {
+                  setFilterDatePeriod('all');
+                  setFilterPriority('all');
+                  setFilterSprint('all');
+                  setFilterResponsible('all');
+                }}
+                className="text-sm text-slate-500 hover:text-rose-600 font-medium flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Limpar filtros
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Filtro por Período */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                Período
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { value: 'all' as FilterDatePeriod, label: 'Todas', icon: '📅' },
+                  { value: 'overdue' as FilterDatePeriod, label: 'Atrasadas', icon: '🔴' },
+                  { value: 'today' as FilterDatePeriod, label: 'Hoje', icon: '📍' },
+                  { value: 'week' as FilterDatePeriod, label: 'Esta semana', icon: '📆' },
+                  { value: 'month' as FilterDatePeriod, label: 'Este mês', icon: '🗓️' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFilterDatePeriod(opt.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      filterDatePeriod === opt.value
+                        ? opt.value === 'overdue' 
+                          ? 'bg-rose-100 text-rose-700 border-rose-200'
+                          : 'bg-amber-100 text-amber-700 border-amber-200'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    } border`}
+                  >
+                    <span className="mr-1">{opt.icon}</span>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filtro por Prioridade */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                Prioridade
+              </label>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setFilterPriority('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    filterPriority === 'all'
+                      ? 'bg-amber-100 text-amber-700 border-amber-200'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  } border`}
+                >
+                  Todas
+                </button>
+                {[
+                  { value: TaskPriority.URGENT, label: 'Urgente', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+                  { value: TaskPriority.HIGH, label: 'Alta', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+                  { value: TaskPriority.MEDIUM, label: 'Média', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+                  { value: TaskPriority.LOW, label: 'Baixa', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFilterPriority(opt.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      filterPriority === opt.value
+                        ? opt.color
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    } border`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filtro por Sprint */}
+            {availableSprints.length > 0 && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                  Sprint
+                </label>
+                <select
+                  value={filterSprint}
+                  onChange={(e) => setFilterSprint(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                    filterSprint !== 'all'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  } focus:outline-none focus:ring-2 focus:ring-amber-200`}
+                >
+                  <option value="all">Todas as sprints</option>
+                  {availableSprints.map(sprint => (
+                    <option key={sprint.id} value={sprint.id}>
+                      {sprint.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Filtro por Responsável - só mostra se tem responsáveis */}
+            {availableResponsibles.length > 0 && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                  Responsável
+                </label>
+                <select
+                  value={filterResponsible}
+                  onChange={(e) => setFilterResponsible(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                    filterResponsible !== 'all'
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  } focus:outline-none focus:ring-2 focus:ring-indigo-200`}
+                >
+                  <option value="all">Todos os responsáveis</option>
+                  {availableResponsibles.map(responsible => (
+                    <option key={responsible} value={responsible}>
+                      {responsible}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Quick Add */}
       <div className="max-w-2xl">
@@ -413,9 +782,11 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
           <TaskListView
             tasks={filteredTasks}
             userId={user?.id}
+            userName={user?.name}
             onToggleComplete={handleToggleComplete}
             onDelete={handleDelete}
             onSaveEdit={handleSaveInlineEdit}
+            canEditTask={canEditTask}
             emptyMessage={
               filterStatus === 'completed' 
                 ? 'Nenhuma atividade concluida' 
@@ -430,6 +801,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
             onStatusChange={handleStatusChange}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            canEditTask={canEditTask}
           />
         )}
       </div>
@@ -446,6 +818,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ onSprintClick })
         onSave={handleSaveTask}
         onDelete={editingTask?.source === TaskSource.PERSONAL ? handleDeleteFromModal : undefined}
         isCreating={isCreating}
+        canAssignResponsible={canAssignResponsible}
       />
     </div>
   );

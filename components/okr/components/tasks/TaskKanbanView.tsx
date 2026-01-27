@@ -12,6 +12,8 @@ interface TaskKanbanViewProps {
   onStatusChange: (task: UnifiedTask, newStatus: TaskStatus) => void;
   onEdit?: (task: UnifiedTask) => void;
   onDelete?: (task: UnifiedTask) => void;
+  /** Função para verificar se o usuário pode editar uma task específica */
+  canEditTask?: (task: UnifiedTask) => boolean;
 }
 
 interface DragState {
@@ -45,6 +47,7 @@ export const TaskKanbanView: React.FC<TaskKanbanViewProps> = ({
   onStatusChange,
   onEdit,
   onDelete,
+  canEditTask,
 }) => {
   const [dragState, setDragState] = useState<DragState>({ taskId: null, sourceStatus: null });
   const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null);
@@ -164,8 +167,8 @@ export const TaskKanbanView: React.FC<TaskKanbanViewProps> = ({
                     onDragStart={(e) => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
                     className={`
-                      cursor-grab active:cursor-grabbing transition-transform
-                      ${dragState.taskId === task.id ? 'scale-105' : ''}
+                      transition-transform
+                      ${dragState.taskId === task.id ? 'scale-105 opacity-50' : ''}
                     `}
                   >
                     <TaskCard
@@ -180,6 +183,7 @@ export const TaskKanbanView: React.FC<TaskKanbanViewProps> = ({
                       onDelete={onDelete}
                       variant="kanban"
                       isDragging={dragState.taskId === task.id}
+                      canEdit={canEditTask ? canEditTask(task) : true}
                     />
                   </div>
                 ))

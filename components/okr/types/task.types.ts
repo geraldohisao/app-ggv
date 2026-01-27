@@ -26,6 +26,60 @@ export const TaskSource = {
 // ZOD SCHEMAS
 // ============================================
 
+export const subtaskSchema = z.object({
+  id: z.string().uuid().optional(),
+  task_id: z.string().uuid(),
+  title: z.string().min(1, 'Título é obrigatório'),
+  is_completed: z.boolean().default(false),
+  position: z.number().default(0),
+  created_at: z.string().optional(),
+  completed_at: z.string().optional().nullable(),
+});
+
+export type Subtask = z.infer<typeof subtaskSchema>;
+export type CreateSubtaskInput = Omit<Subtask, 'id' | 'created_at' | 'completed_at'>;
+
+// Comentários
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at?: string;
+  // Dados do usuário (join)
+  user_name?: string;
+  user_avatar?: string;
+}
+
+export type CreateTaskCommentInput = Pick<TaskComment, 'task_id' | 'user_id' | 'content'>;
+
+// Activity Log / Histórico
+export type ActivityActionType = 
+  | 'created'
+  | 'status_changed'
+  | 'priority_changed'
+  | 'due_date_changed'
+  | 'title_changed'
+  | 'responsible_changed'
+  | 'subtask_added'
+  | 'subtask_completed'
+  | 'comment_added';
+
+export interface TaskActivityLog {
+  id: string;
+  task_id: string;
+  user_id: string;
+  action_type: ActivityActionType;
+  old_value?: string | null;
+  new_value?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  // Dados do usuário (join)
+  user_name?: string;
+  user_avatar?: string;
+}
+
 export const personalTaskSchema = z.object({
   id: z.string().uuid().optional(),
   user_id: z.string().uuid(),
@@ -34,6 +88,7 @@ export const personalTaskSchema = z.object({
   status: z.enum([TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED]),
   priority: z.enum([TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH, TaskPriority.URGENT]).optional(),
   due_date: z.string().optional().nullable(),
+  responsible_user_id: z.string().uuid().optional().nullable(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
   completed_at: z.string().optional().nullable(),
@@ -78,13 +133,21 @@ export interface UnifiedTask {
   user_id?: string;
   completed_at?: string | null;
   
+  // Responsável (usado tanto em pessoais quanto em sprints)
+  responsible?: string; // Nome do responsável (para exibição)
+  responsible_user_id?: string; // ID do responsável
+  responsible_avatar?: string; // Avatar do responsável
+  
+  // Subtarefas (apenas para tasks pessoais)
+  subtasks?: Subtask[];
+  subtasks_total?: number;
+  subtasks_completed?: number;
+  
   // Contexto de sprint (quando source === 'sprint')
   sprint_id?: string;
   sprint_title?: string;
   sprint_status?: string;
   item_type?: string; // 'iniciativa', 'impedimento', 'decisão', 'atividade', 'marco'
-  responsible?: string;
-  responsible_user_id?: string;
 }
 
 // ============================================
@@ -191,6 +254,87 @@ export function getDaysUntilDue(dueDate: string | null | undefined): number | nu
   const diffTime = due.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
+}
+
+/**
+ * Níveis de urgência para due date
+ */
+export type DueDateUrgency = 'overdue' | 'today' | 'tomorrow' | 'soon' | 'normal' | null;
+
+/**
+ * Calcula o nível de urgência de uma task baseado na due_date
+ */
+export function getDueDateUrgency(task: UnifiedTask): DueDateUrgency {
+  if (!task.due_date || task.status === TaskStatus.COMPLETED) return null;
+  const daysUntil = getDaysUntilDue(task.due_date);
+  if (daysUntil === null) return null;
+  
+  if (daysUntil < 0) return 'overdue';
+  if (daysUntil === 0) return 'today';
+  if (daysUntil === 1) return 'tomorrow';
+  if (daysUntil <= 3) return 'soon';
+  return 'normal';
+}
+
+/**
+ * Retorna classes CSS para o badge de due date baseado na urgência
+ */
+export function getDueDateUrgencyClasses(urgency: DueDateUrgency): { badge: string; text: string; icon: string } {
+  switch (urgency) {
+    case 'overdue':
+      return {
+        badge: 'bg-rose-100 border-rose-200',
+        text: 'text-rose-600 font-bold',
+        icon: 'text-rose-500',
+      };
+    case 'today':
+      return {
+        badge: 'bg-amber-100 border-amber-200',
+        text: 'text-amber-700 font-bold',
+        icon: 'text-amber-500',
+      };
+    case 'tomorrow':
+      return {
+        badge: 'bg-amber-50 border-amber-100',
+        text: 'text-amber-600 font-medium',
+        icon: 'text-amber-400',
+      };
+    case 'soon':
+      return {
+        badge: 'bg-blue-50 border-blue-100',
+        text: 'text-blue-600',
+        icon: 'text-blue-400',
+      };
+    case 'normal':
+    default:
+      return {
+        badge: 'bg-slate-50 border-slate-100',
+        text: 'text-slate-500',
+        icon: 'text-slate-400',
+      };
+  }
+}
+
+/**
+ * Retorna label para o badge de urgência
+ */
+export function getDueDateUrgencyLabel(urgency: DueDateUrgency, daysUntil: number | null): string {
+  if (urgency === null || daysUntil === null) return '';
+  
+  switch (urgency) {
+    case 'overdue':
+      return daysUntil === -1 ? 'Ontem' : `${Math.abs(daysUntil)}d atrasado`;
+    case 'today':
+      return 'Hoje';
+    case 'tomorrow':
+      return 'Amanhã';
+    case 'soon':
+      return `${daysUntil}d`;
+    case 'normal':
+      return `${daysUntil}d`;
+    default:
+      return '';
+  }
 }
 
 /**

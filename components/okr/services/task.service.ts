@@ -7,6 +7,11 @@ import {
   type UnifiedTask,
   type PersonalTask,
   type CreatePersonalTaskInput,
+  type Subtask,
+  type CreateSubtaskInput,
+  type TaskComment,
+  type CreateTaskCommentInput,
+  type TaskActivityLog,
 } from '../types/task.types';
 import { SprintItemStatus } from '../types/sprint.types';
 
@@ -56,7 +61,7 @@ export async function createPersonalTask(input: CreatePersonalTaskInput): Promis
       throw new Error('Usuário não identificado');
     }
 
-    const taskData = {
+    const taskData: Record<string, unknown> = {
       user_id: effectiveUserId,
       title: input.title.trim(),
       description: input.description?.trim() || null,
@@ -64,6 +69,11 @@ export async function createPersonalTask(input: CreatePersonalTaskInput): Promis
       priority: input.priority || TaskPriority.MEDIUM,
       due_date: input.due_date || null,
     };
+    
+    // Incluir responsible_user_id se fornecido
+    if (input.responsible_user_id) {
+      taskData.responsible_user_id = input.responsible_user_id;
+    }
     
     const { data, error } = await supabase
       .from('personal_tasks')
@@ -135,10 +145,23 @@ export async function deletePersonalTask(id: string): Promise<boolean> {
   }
 }
 
+/** 
+ * Tipo para task pessoal com dados do responsável e subtasks
+ */
+interface PersonalTaskWithRelations extends PersonalTask {
+  responsible_profile?: {
+    id: string;
+    full_name?: string;
+    name?: string;
+    avatar_url?: string;
+  } | null;
+  subtasks?: Subtask[];
+}
+
 /**
  * Busca tasks pessoais do usuário
  */
-export async function getPersonalTasks(userId?: string): Promise<PersonalTask[]> {
+export async function getPersonalTasks(userId?: string): Promise<PersonalTaskWithRelations[]> {
   try {
     const resolved = userId ? { id: userId } : resolveUserId();
     if (!resolved.id) {
@@ -148,7 +171,24 @@ export async function getPersonalTasks(userId?: string): Promise<PersonalTask[]>
 
     const { data, error } = await supabase
       .from('personal_tasks')
-      .select('*')
+      .select(`
+        *,
+        responsible_profile:profiles!personal_tasks_responsible_user_id_fkey(
+          id,
+          full_name,
+          name,
+          avatar_url
+        ),
+        subtasks:personal_task_subtasks(
+          id,
+          task_id,
+          title,
+          is_completed,
+          position,
+          created_at,
+          completed_at
+        )
+      `)
       .eq('user_id', resolved.id)
       .order('created_at', { ascending: true });
 
@@ -402,7 +442,10 @@ export async function updateSprintItemStatus(id: string, status: string): Promis
 /**
  * Converte uma task pessoal para UnifiedTask
  */
-function personalTaskToUnified(task: PersonalTask): UnifiedTask {
+function personalTaskToUnified(task: PersonalTaskWithRelations): UnifiedTask {
+  const responsibleProfile = task.responsible_profile;
+  const subtasks = task.subtasks || [];
+  
   return {
     id: task.id!,
     title: task.title,
@@ -415,6 +458,14 @@ function personalTaskToUnified(task: PersonalTask): UnifiedTask {
     source: TaskSource.PERSONAL,
     user_id: task.user_id,
     completed_at: task.completed_at,
+    // Informações do responsável
+    responsible_user_id: task.responsible_user_id ?? undefined,
+    responsible: responsibleProfile?.full_name || responsibleProfile?.name || undefined,
+    responsible_avatar: responsibleProfile?.avatar_url ?? undefined,
+    // Subtarefas
+    subtasks: subtasks.sort((a, b) => (a.position || 0) - (b.position || 0)),
+    subtasks_total: subtasks.length,
+    subtasks_completed: subtasks.filter(s => s.is_completed).length,
   };
 }
 
@@ -479,6 +530,100 @@ export async function getMyTasks(userId?: string): Promise<UnifiedTask[]> {
 }
 
 /**
+ * Busca TODAS as tasks pessoais (de todos os usuários)
+ * Para uso de admins que precisam ver tasks de todos
+ */
+export async function getAllPersonalTasks(): Promise<PersonalTaskWithRelations[]> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_tasks')
+      .select(`
+        *,
+        responsible_profile:profiles!personal_tasks_responsible_user_id_fkey(
+          id,
+          full_name,
+          name,
+          avatar_url
+        ),
+        subtasks(*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro ao buscar todas as tasks pessoais:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Erro ao buscar todas as tasks pessoais:', error);
+    return [];
+  }
+}
+
+/**
+ * Busca TODOS os itens de sprint (de todas as sprints)
+ * Para uso de admins que precisam ver tasks de todos
+ */
+export async function getAllSprintItems(): Promise<SprintItemWithContext[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sprint_items')
+      .select(`
+        *,
+        sprints(id, title, start_date, end_date, status, deleted_at)
+      `)
+      .order('due_date', { ascending: true, nullsFirst: false });
+
+    if (error) {
+      console.error('❌ Erro ao buscar todos os itens de sprint:', error);
+      return [];
+    }
+
+    // Filtrar items de sprints deletadas
+    const validItems = (data || []).filter((item: any) => !item.sprints?.deleted_at);
+    
+    // Transformar para o formato esperado
+    return validItems.map((item: any) => ({
+      ...item,
+      sprint_title: item.sprints?.title || 'Sprint não encontrada',
+      sprint_status: item.sprints?.status,
+      sprint_start_date: item.sprints?.start_date,
+      sprint_end_date: item.sprints?.end_date,
+      sprints: undefined,
+    }));
+  } catch (error) {
+    console.error('❌ Erro ao buscar todos os itens de sprint:', error);
+    return [];
+  }
+}
+
+/**
+ * Busca TODAS as tasks (pessoais + sprint items de todos os usuários)
+ * Para uso de admins que precisam ver tasks de todos
+ */
+export async function getAllTasks(): Promise<UnifiedTask[]> {
+  try {
+    // Buscar de ambas as fontes em paralelo
+    const [personalTasks, sprintItems] = await Promise.all([
+      getAllPersonalTasks(),
+      getAllSprintItems(),
+    ]);
+
+    // Converter para formato unificado
+    const unifiedPersonal = personalTasks.map(personalTaskToUnified);
+    const unifiedSprint = sprintItems.map(sprintItemToUnified);
+
+    // Combinar e ordenar
+    const allTasks = [...unifiedPersonal, ...unifiedSprint];
+    return sortTasks(allTasks);
+  } catch (error) {
+    console.error('❌ Erro ao buscar todas as tasks:', error);
+    return [];
+  }
+}
+
+/**
  * Atualiza o status de uma task (pessoal ou sprint)
  */
 export async function updateTaskStatus(
@@ -535,4 +680,330 @@ export async function quickAddTask(title: string, userId?: string): Promise<Pers
   };
 
   return createPersonalTask(input);
+}
+
+// ============================================
+// SUBTASKS (checklist)
+// ============================================
+
+/**
+ * Busca subtasks de uma task
+ */
+export async function getSubtasks(taskId: string): Promise<Subtask[]> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_task_subtasks')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('position', { ascending: true });
+
+    if (error) {
+      console.error('❌ Erro ao buscar subtasks:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Erro ao buscar subtasks:', error);
+    return [];
+  }
+}
+
+/**
+ * Cria uma nova subtask
+ */
+export async function createSubtask(input: CreateSubtaskInput): Promise<Subtask | null> {
+  try {
+    // Buscar a maior posição atual para colocar a nova subtask no final
+    const { data: existingSubtasks } = await supabase
+      .from('personal_task_subtasks')
+      .select('position')
+      .eq('task_id', input.task_id)
+      .order('position', { ascending: false })
+      .limit(1);
+
+    const nextPosition = existingSubtasks?.[0]?.position ?? -1;
+
+    const { data, error } = await supabase
+      .from('personal_task_subtasks')
+      .insert({
+        task_id: input.task_id,
+        title: input.title.trim(),
+        is_completed: input.is_completed ?? false,
+        position: nextPosition + 1,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao criar subtask:', error);
+      throw error;
+    }
+
+    console.log('✅ Subtask criada:', data?.id);
+    return data;
+  } catch (error) {
+    console.error('❌ Erro ao criar subtask:', error);
+    throw error;
+  }
+}
+
+/**
+ * Atualiza uma subtask
+ */
+export async function updateSubtask(
+  id: string,
+  updates: Partial<Pick<Subtask, 'title' | 'is_completed' | 'position'>>
+): Promise<Subtask | null> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_task_subtasks')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao atualizar subtask:', error);
+      throw error;
+    }
+
+    console.log('✅ Subtask atualizada:', id);
+    return data;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar subtask:', error);
+    throw error;
+  }
+}
+
+/**
+ * Toggle de is_completed de uma subtask
+ */
+export async function toggleSubtaskComplete(subtask: Subtask): Promise<boolean> {
+  try {
+    await updateSubtask(subtask.id!, { is_completed: !subtask.is_completed });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao toggle subtask:', error);
+    return false;
+  }
+}
+
+/**
+ * Deleta uma subtask
+ */
+export async function deleteSubtask(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('personal_task_subtasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Erro ao deletar subtask:', error);
+      throw error;
+    }
+
+    console.log('✅ Subtask deletada:', id);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao deletar subtask:', error);
+    return false;
+  }
+}
+
+/**
+ * Reordena subtasks
+ */
+export async function reorderSubtasks(taskId: string, subtaskIds: string[]): Promise<boolean> {
+  try {
+    // Atualizar posições em batch
+    const updates = subtaskIds.map((id, index) => 
+      supabase
+        .from('personal_task_subtasks')
+        .update({ position: index })
+        .eq('id', id)
+        .eq('task_id', taskId)
+    );
+
+    await Promise.all(updates);
+    console.log('✅ Subtasks reordenadas');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao reordenar subtasks:', error);
+    return false;
+  }
+}
+
+// ============================================
+// COMMENTS
+// ============================================
+
+/**
+ * Busca comentários de uma task
+ */
+export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_task_comments')
+      .select(`
+        *,
+        user:profiles!personal_task_comments_user_id_fkey(
+          id,
+          full_name,
+          name,
+          avatar_url
+        )
+      `)
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('❌ Erro ao buscar comentários:', error);
+      throw error;
+    }
+
+    // Mapear para incluir user_name e user_avatar
+    return (data || []).map(comment => ({
+      ...comment,
+      user_name: comment.user?.full_name || comment.user?.name || 'Usuário',
+      user_avatar: comment.user?.avatar_url,
+      user: undefined,
+    }));
+  } catch (error) {
+    console.error('❌ Erro ao buscar comentários:', error);
+    return [];
+  }
+}
+
+/**
+ * Cria um comentário
+ */
+export async function createTaskComment(input: CreateTaskCommentInput): Promise<TaskComment | null> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_task_comments')
+      .insert({
+        task_id: input.task_id,
+        user_id: input.user_id,
+        content: input.content.trim(),
+      })
+      .select(`
+        *,
+        user:profiles!personal_task_comments_user_id_fkey(
+          id,
+          full_name,
+          name,
+          avatar_url
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao criar comentário:', error);
+      throw error;
+    }
+
+    console.log('✅ Comentário criado:', data?.id);
+    return {
+      ...data,
+      user_name: data.user?.full_name || data.user?.name || 'Usuário',
+      user_avatar: data.user?.avatar_url,
+      user: undefined,
+    };
+  } catch (error) {
+    console.error('❌ Erro ao criar comentário:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deleta um comentário
+ */
+export async function deleteTaskComment(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('personal_task_comments')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Erro ao deletar comentário:', error);
+      throw error;
+    }
+
+    console.log('✅ Comentário deletado:', id);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao deletar comentário:', error);
+    return false;
+  }
+}
+
+// ============================================
+// ACTIVITY LOG / HISTÓRICO
+// ============================================
+
+/**
+ * Busca histórico de atividades de uma task
+ */
+export async function getTaskActivityLog(taskId: string): Promise<TaskActivityLog[]> {
+  try {
+    const { data, error } = await supabase
+      .from('personal_task_activity_log')
+      .select(`
+        *,
+        user:profiles!personal_task_activity_log_user_id_fkey(
+          id,
+          full_name,
+          name,
+          avatar_url
+        )
+      `)
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro ao buscar histórico:', error);
+      throw error;
+    }
+
+    // Mapear para incluir user_name e user_avatar
+    return (data || []).map(entry => ({
+      ...entry,
+      user_name: entry.user?.full_name || entry.user?.name || 'Sistema',
+      user_avatar: entry.user?.avatar_url,
+      user: undefined,
+    }));
+  } catch (error) {
+    console.error('❌ Erro ao buscar histórico:', error);
+    return [];
+  }
+}
+
+/**
+ * Formata uma entrada do activity log para exibição
+ */
+export function formatActivityLogEntry(entry: TaskActivityLog): string {
+  const actionLabels: Record<string, string> = {
+    created: 'criou a tarefa',
+    status_changed: 'alterou o status',
+    priority_changed: 'alterou a prioridade',
+    due_date_changed: 'alterou a data de vencimento',
+    title_changed: 'alterou o título',
+    responsible_changed: 'alterou o responsável',
+    subtask_added: 'adicionou uma subtarefa',
+    subtask_completed: 'concluiu uma subtarefa',
+    comment_added: 'adicionou um comentário',
+  };
+
+  const actionLabel = actionLabels[entry.action_type] || entry.action_type;
+
+  if (entry.old_value && entry.new_value) {
+    return `${actionLabel}: "${entry.old_value}" → "${entry.new_value}"`;
+  } else if (entry.new_value) {
+    return `${actionLabel}: "${entry.new_value}"`;
+  }
+  
+  return actionLabel;
 }

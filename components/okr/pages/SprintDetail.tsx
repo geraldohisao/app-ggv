@@ -29,7 +29,7 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
   sprintId,
   onBack,
 }) => {
-  const { selectedSprint, loading, fetchSprintById, finalizeAndCreateNext } = useSprintStore();
+  const { selectedSprint, loading, fetchSprintById, refreshSprintById, finalizeAndCreateNext } = useSprintStore();
   const [updating, setUpdating] = useState(false);
   const [newItemType, setNewItemType] = useState<SprintItemType | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -59,8 +59,8 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
     setUpdating(true);
     try {
       await sprintService.updateSprintItem(itemId, updates);
-      // Recarregar sprint
-      await fetchSprintById(sprintId);
+      // Refresh silencioso (sem "piscar" a UI)
+      await refreshSprintById(sprintId);
     } catch (error) {
       console.error('Erro ao atualizar item:', error);
     } finally {
@@ -74,8 +74,8 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
     setUpdating(true);
     try {
       await sprintService.deleteSprintItem(itemId);
-      // Recarregar sprint
-      await fetchSprintById(sprintId);
+      // Refresh silencioso (sem "piscar" a UI)
+      await refreshSprintById(sprintId);
     } catch (error) {
       console.error('Erro ao deletar item:', error);
     } finally {
@@ -89,7 +89,8 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
     setUpdating(true);
     try {
       await sprintService.updateSprint(selectedSprint.id!, { status: newStatus });
-      await fetchSprintById(sprintId);
+      // Refresh silencioso (sem "piscar" a UI)
+      await refreshSprintById(sprintId);
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
     } finally {
@@ -119,7 +120,13 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
     }
   };
 
-  if (loading || !selectedSprint) {
+  // Mostrar loading apenas no carregamento inicial (sem sprint carregada)
+  // NÃO mostrar loading durante refreshes (evita "piscar" a UI)
+  if (loading && !selectedSprint) {
+    return <LoadingState message="Carregando Sprint..." />;
+  }
+  
+  if (!selectedSprint) {
     return <LoadingState message="Carregando Sprint..." />;
   }
 
@@ -139,8 +146,8 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
         kr_id: krId,
         value: newValue,
       });
-      // Recarregar para atualizar os checkins locais se necessário
-      await fetchSprintById(sprintId);
+      // Refresh silencioso (sem "piscar" a UI)
+      await refreshSprintById(sprintId);
     } catch (error) {
       console.error('Erro no checkin do KR:', error);
     } finally {
@@ -403,19 +410,23 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
                   {[...itemsByType[SprintItemType.INITIATIVE], ...itemsByType[SprintItemType.ACTIVITY]].length === 0 ? (
                     <EmptyState title="Tudo limpo por aqui" description="Adicione as iniciativas e atividades principais para este período." />
                   ) : (
-                    [...itemsByType[SprintItemType.INITIATIVE], ...itemsByType[SprintItemType.ACTIVITY]].map((item) => (
-                      <SprintItemRow
-                        key={item.id}
-                        item={item}
-                        onUpdate={canEditThisSprint ? handleItemUpdate : undefined}
-                        onDelete={canEditThisSprint ? handleItemDelete : undefined}
-                        onEdit={(it) => {
-                          setEditingItemId(it.id || null);
-                          setEditingItemData(it);
-                          setNewItemType(null);
-                        }}
-                      />
-                    ))
+                    [...itemsByType[SprintItemType.INITIATIVE], ...itemsByType[SprintItemType.ACTIVITY]].map((item) => {
+                      const canEditItem = permissions.sprintItem.canEdit(item);
+                      const canDeleteItem = permissions.sprintItem.canDelete(item);
+                      return (
+                        <SprintItemRow
+                          key={item.id}
+                          item={item}
+                          onUpdate={(canEditThisSprint || canEditItem) ? handleItemUpdate : undefined}
+                          onDelete={(canEditThisSprint || canDeleteItem) ? handleItemDelete : undefined}
+                          onEdit={(canEditThisSprint || canEditItem) ? (it) => {
+                            setEditingItemId(it.id || null);
+                            setEditingItemData(it);
+                            setNewItemType(null);
+                          } : undefined}
+                        />
+                      );
+                    }))
                   )}
                 </div>
               </section>
@@ -428,19 +439,23 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
                     Marcos (Milestones)
                   </h3>
                   <div className="space-y-4">
-                    {itemsByType[SprintItemType.MILESTONE].map((item) => (
-                      <SprintItemRow
-                        key={item.id}
-                        item={item}
-                        onUpdate={canEditThisSprint ? handleItemUpdate : undefined}
-                        onDelete={canEditThisSprint ? handleItemDelete : undefined}
-                        onEdit={(it) => {
-                          setEditingItemId(it.id || null);
-                          setEditingItemData(it);
-                          setNewItemType(null);
-                        }}
-                      />
-                    ))}
+                    {itemsByType[SprintItemType.MILESTONE].map((item) => {
+                      const canEditItem = permissions.sprintItem.canEdit(item);
+                      const canDeleteItem = permissions.sprintItem.canDelete(item);
+                      return (
+                        <SprintItemRow
+                          key={item.id}
+                          item={item}
+                          onUpdate={(canEditThisSprint || canEditItem) ? handleItemUpdate : undefined}
+                          onDelete={(canEditThisSprint || canDeleteItem) ? handleItemDelete : undefined}
+                          onEdit={(canEditThisSprint || canEditItem) ? (it) => {
+                            setEditingItemId(it.id || null);
+                            setEditingItemData(it);
+                            setNewItemType(null);
+                          } : undefined}
+                        />
+                      );
+                    })}
                   </div>
                 </section>
               )}
@@ -483,19 +498,23 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
               {itemsByType[SprintItemType.IMPEDIMENT].length === 0 ? (
                 <EmptyState title="Caminho livre" description="Nenhum impedimento registrado. Se algo travar, anote aqui." />
               ) : (
-                itemsByType[SprintItemType.IMPEDIMENT].map((item) => (
-                  <SprintItemRow
-                    key={item.id}
-                    item={item}
-                    onUpdate={canEditThisSprint ? handleItemUpdate : undefined}
-                    onDelete={canEditThisSprint ? handleItemDelete : undefined}
-                    onEdit={(it) => {
-                      setEditingItemId(it.id || null);
-                      setEditingItemData(it);
-                      setNewItemType(null);
-                    }}
-                  />
-                ))
+                itemsByType[SprintItemType.IMPEDIMENT].map((item) => {
+                  const canEditItem = permissions.sprintItem.canEdit(item);
+                  const canDeleteItem = permissions.sprintItem.canDelete(item);
+                  return (
+                    <SprintItemRow
+                      key={item.id}
+                      item={item}
+                      onUpdate={(canEditThisSprint || canEditItem) ? handleItemUpdate : undefined}
+                      onDelete={(canEditThisSprint || canDeleteItem) ? handleItemDelete : undefined}
+                      onEdit={(canEditThisSprint || canEditItem) ? (it) => {
+                        setEditingItemId(it.id || null);
+                        setEditingItemData(it);
+                        setNewItemType(null);
+                      } : undefined}
+                    />
+                  );
+                })
               )}
             </div>
 
@@ -536,19 +555,23 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
               {itemsByType[SprintItemType.DECISION].length === 0 ? (
                 <EmptyState title="Sem atas" description="Nenhuma decisão registrada ainda." />
               ) : (
-                itemsByType[SprintItemType.DECISION].map((item) => (
-                  <SprintItemRow
-                    key={item.id}
-                    item={item}
-                    onUpdate={canEditThisSprint ? handleItemUpdate : undefined}
-                    onDelete={canEditThisSprint ? handleItemDelete : undefined}
-                    onEdit={(it) => {
-                      setEditingItemId(it.id || null);
-                      setEditingItemData(it);
-                      setNewItemType(null);
-                    }}
-                  />
-                ))
+                itemsByType[SprintItemType.DECISION].map((item) => {
+                  const canEditItem = permissions.sprintItem.canEdit(item);
+                  const canDeleteItem = permissions.sprintItem.canDelete(item);
+                  return (
+                    <SprintItemRow
+                      key={item.id}
+                      item={item}
+                      onUpdate={(canEditThisSprint || canEditItem) ? handleItemUpdate : undefined}
+                      onDelete={(canEditThisSprint || canDeleteItem) ? handleItemDelete : undefined}
+                      onEdit={(canEditThisSprint || canEditItem) ? (it) => {
+                        setEditingItemId(it.id || null);
+                        setEditingItemData(it);
+                        setNewItemType(null);
+                      } : undefined}
+                    />
+                  );
+                })
               )}
             </div>
 
@@ -579,13 +602,14 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
           type={newItemType}
           onSuccess={async () => {
             setNewItemType(null);
-            await fetchSprintById(sprintId);
+            // Refresh silencioso (sem "piscar" a UI)
+            await refreshSprintById(sprintId);
           }}
           onClose={() => setNewItemType(null)}
         />
       )}
 
-      {editingItemId && editingItemData && canEditThisSprint && (
+      {editingItemId && editingItemData && (canEditThisSprint || permissions.sprintItem.canEdit(editingItemData)) && (
         <SprintItemForm
           sprintId={selectedSprint.id!}
           type={editingItemData.type}
@@ -593,7 +617,8 @@ export const SprintDetail: React.FC<SprintDetailProps> = ({
           onSuccess={async () => {
             setEditingItemId(null);
             setEditingItemData(null);
-            await fetchSprintById(sprintId);
+            // Refresh silencioso (sem "piscar" a UI)
+            await refreshSprintById(sprintId);
           }}
           onClose={() => {
             setEditingItemId(null);

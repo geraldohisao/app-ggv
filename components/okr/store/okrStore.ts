@@ -35,6 +35,20 @@ interface OKRStore {
   setFilters: (filters: OKRFilters) => void;
   setSelectedOKR: (okr: OKRWithKeyResults | null) => void;
   clearError: () => void;
+  
+  // Ações silenciosas (sem loading - para refresh em background)
+  refreshOKRs: (
+    filters?: OKRFilters,
+    visibility?: {
+      userId?: string | null;
+      userName?: string | null;
+      userDepartment?: string | null;
+      isAdmin?: boolean;
+      userRole?: string;
+    }
+  ) => Promise<void>;
+  refreshOKRById: (id: string) => Promise<void>;
+  updateOKRLocally: (id: string, updater: (okr: OKRWithKeyResults) => OKRWithKeyResults) => void;
 }
 
 export const useOKRStore = create<OKRStore>()(
@@ -245,6 +259,65 @@ export const useOKRStore = create<OKRStore>()(
 
       clearError: () => {
         set({ error: null });
+      },
+
+      // ===========================================
+      // Ações silenciosas (sem loading)
+      // Usadas para refresh em background sem "piscar" a UI
+      // ===========================================
+
+      refreshOKRs: async (filters, visibility) => {
+        // Refresh silencioso: NÃO seta loading=true
+        try {
+          const useDefault = !visibility || visibility.isAdmin;
+          const okrs = useDefault
+            ? await okrService.listOKRs(filters)
+            : await okrService.listVisibleOKRsForUser(
+                visibility.userId || '',
+                visibility.userDepartment,
+                filters,
+                undefined, // sem AbortSignal
+                visibility.userRole,
+                visibility.userName || undefined
+              );
+          set({ okrs });
+        } catch (error) {
+          // Erro silencioso - não interrompe a UX
+          console.warn('⚠️ Erro no refresh silencioso dos OKRs:', error);
+        }
+      },
+
+      refreshOKRById: async (id) => {
+        // Refresh silencioso: NÃO seta loading=true
+        try {
+          const okr = await okrService.getOKRById(id);
+          if (okr) {
+            set((state) => ({
+              selectedOKR: state.selectedOKR?.id === id ? okr : state.selectedOKR,
+              okrs: state.okrs.map((o) => (o.id === id ? okr : o)),
+            }));
+          }
+        } catch (error) {
+          // Erro silencioso
+          console.warn('⚠️ Erro no refresh silencioso do OKR:', error);
+        }
+      },
+
+      updateOKRLocally: (id, updater) => {
+        // Atualização otimista local (síncrona)
+        set((state) => {
+          const updatedOkrs = state.okrs.map((okr) =>
+            okr.id === id ? updater(okr) : okr
+          );
+          const updatedSelected =
+            state.selectedOKR?.id === id
+              ? updater(state.selectedOKR)
+              : state.selectedOKR;
+          return {
+            okrs: updatedOkrs,
+            selectedOKR: updatedSelected,
+          };
+        });
       },
     }),
     {

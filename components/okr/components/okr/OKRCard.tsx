@@ -627,6 +627,8 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
           <KREditModal
             kr={editingKRModal}
             defaultResponsibleUserId={okrOwnerUser?.id}
+            okrStartDate={localOKR.start_date}
+            okrEndDate={localOKR.end_date}
             onClose={() => {
               setEditingKRModal(null);
               setTimeout(() => window.scrollTo({ top: krScrollRef.current || 0, behavior: 'auto' }), 0);

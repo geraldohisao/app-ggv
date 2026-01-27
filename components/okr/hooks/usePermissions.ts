@@ -181,6 +181,24 @@ export function usePermissions(): Permissions {
   // PERMISSÕES DE SPRINT ITEMS
   // ============================================
   
+  // Helper para verificar se o usuário é responsável pelo item
+  const isItemResponsible = (item: SprintItem) => {
+    if (!user) return false;
+    // Primeira verificação: por ID (mais preciso)
+    if (item.responsible_user_id && item.responsible_user_id === user.id) {
+      return true;
+    }
+    // Fallback: comparar por nome (para itens antigos sem responsible_user_id)
+    if (item.responsible && user.name) {
+      const itemResponsible = item.responsible.toLowerCase().trim();
+      const userName = user.name.toLowerCase().trim();
+      return itemResponsible === userName || 
+             itemResponsible.includes(userName) || 
+             userName.includes(itemResponsible);
+    }
+    return false;
+  };
+
   const sprintItemPermissions: SprintItemPermissions = {
     // CEO e HEAD podem criar itens em qualquer sprint
     // OP pode criar itens (serão atribuídos a ele)
@@ -190,8 +208,8 @@ export function usePermissions(): Permissions {
     // OP pode editar apenas itens onde é responsável
     canEdit: (item: SprintItem) => {
       if (isCEO || isHEAD) return true;
-      // OP só pode editar itens onde é responsável
-      if (isOP && item.responsible_user_id === user.id) {
+      // OP só pode editar itens onde é responsável (por ID ou nome)
+      if (isOP && isItemResponsible(item)) {
         return true;
       }
       return false;
@@ -201,8 +219,8 @@ export function usePermissions(): Permissions {
     // OP pode deletar apenas itens onde é responsável
     canDelete: (item: SprintItem) => {
       if (isCEO || isHEAD) return true;
-      // OP só pode deletar itens onde é responsável
-      if (isOP && item.responsible_user_id === user.id) {
+      // OP só pode deletar itens onde é responsável (por ID ou nome)
+      if (isOP && isItemResponsible(item)) {
         return true;
       }
       return false;

@@ -4,6 +4,7 @@ import { TaskStatus, TaskPriority, TaskSource, type UnifiedTask } from '../../ty
 interface TaskInlineFormProps {
   task?: UnifiedTask; // Para edição
   userId: string;
+  userName?: string; // Nome do usuário para comparação com responsible
   onSave: (data: {
     title: string;
     description?: string;
@@ -18,13 +19,32 @@ interface TaskInlineFormProps {
 export const TaskInlineForm: React.FC<TaskInlineFormProps> = ({
   task,
   userId,
+  userName,
   onSave,
   onCancel,
   onDelete,
 }) => {
   const isEdit = !!task?.id;
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  const canEdit = task?.source === TaskSource.PERSONAL || !task; // Só edita tasks pessoais
+  
+  // Verificar se usuário é responsável pela task de Sprint
+  const isResponsibleForSprintTask = () => {
+    if (!task || task.source !== TaskSource.SPRINT) return false;
+    // Verificar por ID
+    if (task.responsible_user_id && task.responsible_user_id === userId) return true;
+    // Fallback: verificar por nome
+    if (task.responsible && userName) {
+      const taskResponsible = task.responsible.toLowerCase().trim();
+      const userNameLower = userName.toLowerCase().trim();
+      return taskResponsible === userNameLower || 
+             taskResponsible.includes(userNameLower) || 
+             userNameLower.includes(taskResponsible);
+    }
+    return false;
+  };
+  
+  // Pode editar: task pessoal OU task de sprint onde é responsável
+  const canEdit = task?.source === TaskSource.PERSONAL || !task || isResponsibleForSprintTask();
   
   const [formData, setFormData] = useState({
     title: task?.title || '',
@@ -92,8 +112,8 @@ export const TaskInlineForm: React.FC<TaskInlineFormProps> = ({
     }
   };
 
-  // Se for task de sprint, mostrar só leitura
-  if (task && task.source === TaskSource.SPRINT) {
+  // Se for task de sprint E usuário NÃO é responsável, mostrar só leitura
+  if (task && task.source === TaskSource.SPRINT && !isResponsibleForSprintTask()) {
     return (
       <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
         <div className="flex items-center justify-between mb-2">

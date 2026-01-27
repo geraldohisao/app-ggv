@@ -32,7 +32,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { getSprintCalendarEvent, type SprintCalendarEvent } from '../../../services/googleCalendarService';
 
 export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => void }> = ({ sprintId, onBack }) => {
-  const { selectedSprint, loading, fetchSprintById } = useSprintStore();
+  const { selectedSprint, loading, fetchSprintById, refreshSprintById, updateSelectedSprintLocally } = useSprintStore();
   const { okrs, fetchOKRs } = useOKRStore();
   const permissions = usePermissions();
   const [exporting, setExporting] = useState(false);
@@ -115,9 +115,9 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
     loadSuggestions();
   }, [sprintId]);
 
-  // Função otimizada para recarregar sprint (usa cache)
+  // Função otimizada para recarregar sprint (refresh silencioso - sem "piscar" a UI)
   const refreshSprint = async () => {
-    await fetchSprintById(sprintId, true); // skipCache = true
+    await refreshSprintById(sprintId); // Não seta loading=true
   };
 
   const refreshSuggestions = async () => {
@@ -144,8 +144,13 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
     }
   };
 
-  if (loading || isDeletingSprint) {
-    return <LoadingState message={isDeletingSprint ? 'Enviando sprint para a lixeira...' : 'Carregando Sprint...'} />;
+  // Mostrar loading apenas no carregamento inicial (sem sprint carregada) ou ao deletar
+  // NÃO mostrar loading durante refreshes (evita "piscar" a UI)
+  if (isDeletingSprint) {
+    return <LoadingState message="Enviando sprint para a lixeira..." />;
+  }
+  if (loading && !selectedSprint) {
+    return <LoadingState message="Carregando Sprint..." />;
   }
   if (deletedSuccess) {
     return (
@@ -660,9 +665,30 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
                             <div className="flex items-center gap-2 mt-3">
                               <button
                                 onClick={async () => {
-                                  await checkinService.acceptSprintItemSuggestion(suggestion);
-                                  await refreshSuggestions();
-                                  await refreshSprint();
+                                  // 1. Update otimista: remove sugestão da lista imediatamente
+                                  setPendingSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+                                  
+                                  try {
+                                    // 2. Chama API para aceitar (retorna o item criado/atualizado)
+                                    const appliedItem = await checkinService.acceptSprintItemSuggestion(suggestion);
+                                    
+                                    // 3. Update otimista: adiciona item à sprint localmente
+                                    if (appliedItem) {
+                                      updateSelectedSprintLocally((sprint) => ({
+                                        ...sprint,
+                                        items: suggestion.suggested_action === 'update' && suggestion.existing_item_id
+                                          ? (sprint.items || []).map(i => i.id === suggestion.existing_item_id ? { ...i, ...appliedItem } : i)
+                                          : [...(sprint.items || []), appliedItem],
+                                      }));
+                                    }
+                                    
+                                    // 4. Refresh silencioso em background para garantir consistência
+                                    void refreshSprint();
+                                  } catch (error) {
+                                    // Em caso de erro, recarrega sugestões para reverter
+                                    console.error('Erro ao aceitar sugestão:', error);
+                                    await refreshSuggestions();
+                                  }
                                 }}
                                 className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all"
                               >
@@ -670,8 +696,17 @@ export const SprintDetailStyled: React.FC<{ sprintId: string; onBack?: () => voi
                               </button>
                               <button
                                 onClick={async () => {
-                                  await checkinService.rejectSprintItemSuggestion(suggestion.id);
-                                  await refreshSuggestions();
+                                  // 1. Update otimista: remove sugestão da lista imediatamente
+                                  setPendingSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+                                  
+                                  try {
+                                    // 2. Chama API para rejeitar
+                                    await checkinService.rejectSprintItemSuggestion(suggestion.id);
+                                  } catch (error) {
+                                    // Em caso de erro, recarrega sugestões para reverter
+                                    console.error('Erro ao rejeitar sugestão:', error);
+                                    await refreshSuggestions();
+                                  }
                                 }}
                                 className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 transition-all"
                               >
