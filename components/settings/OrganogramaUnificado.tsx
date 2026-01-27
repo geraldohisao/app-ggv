@@ -237,6 +237,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   const [usuarios, setUsuarios] = useState<Usuario[]>(staticData?.usuarios || []);
   const [cargos, setCargos] = useState<Cargo[]>(staticData?.cargos || []);
   const [loading, setLoading] = useState(!staticData);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [missingCargos, setMissingCargos] = useState<string[]>([]);
   const [showLegend, setShowLegend] = useState(true);
@@ -306,27 +307,62 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
   // 🔄 Busca de dados
   const fetchData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       if (!supabase) {
         setUsuarios([]);
         setCargos([]);
+        setLoadError('Supabase não configurado neste ambiente.');
         return;
       }
-      const { data: usersData } = await supabase
+
+      // 1) Preferir RPC (bypass RLS de forma controlada, via SECURITY DEFINER)
+      try {
+        const { data: snapshot, error: rpcError } = await supabase.rpc('get_org_chart_snapshot');
+        if (!rpcError && snapshot && typeof snapshot === 'object') {
+          const snapUsuarios = Array.isArray((snapshot as any).usuarios) ? (snapshot as any).usuarios : [];
+          const snapCargos = Array.isArray((snapshot as any).cargos) ? (snapshot as any).cargos : [];
+          setUsuarios(snapUsuarios);
+          setCargos(snapCargos);
+          return;
+        }
+        // Se o RPC existir mas falhar, vamos cair no fallback (e exibir erro se ficar vazio)
+        if (rpcError) {
+          console.warn('⚠️ RPC get_org_chart_snapshot falhou, usando fallback:', rpcError);
+        }
+      } catch (e) {
+        // RPC pode não existir ainda em alguns ambientes
+      }
+
+      // 2) Fallback: SELECT direto (pode retornar vazio por RLS)
+      const errors: string[] = [];
+
+      const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('id, name, email, cargo, department, role, is_active, avatar_url')
         .eq('is_active', true)
         .order('name');
+      if (usersError) errors.push(`profiles: ${usersError.message}`);
 
-      const { data: cargosData } = await supabase
+      const { data: cargosData, error: cargosError } = await supabase
         .from('cargos')
         .select('name, level')
         .eq('is_active', true);
+      if (cargosError) errors.push(`cargos: ${cargosError.message}`);
 
       setUsuarios(usersData || []);
       setCargos(cargosData || []);
+
+      // Se ficou vazio e teve erro, sinalizar na UI (evita "tela em branco" silenciosa)
+      if ((usersData?.length || 0) === 0 && errors.length > 0) {
+        setLoadError(
+          `Não foi possível carregar os dados do organograma (${errors.join(' | ')}). ` +
+          `Provável permissão/RLS em produção.`
+        );
+      }
     } catch (error) {
       console.error('Erro ao carregar organograma:', error);
+      setLoadError('Erro inesperado ao carregar organograma.');
     } finally {
       setLoading(false);
     }
@@ -455,6 +491,29 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
 
   return (
     <div className="h-full flex flex-col relative">
+      {/* Erro de carregamento (evita falha silenciosa / "vazio") */}
+      {loadError && (
+        <div className="absolute top-4 left-4 right-4 z-30 bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r shadow-lg">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-amber-900">⚠️ Não foi possível carregar o organograma</h3>
+              <p className="text-xs text-amber-800 mt-1">{loadError}</p>
+              <p className="text-[11px] text-amber-700 mt-1">
+                Dica: aplique a migration <code className="bg-amber-100 px-1 rounded">110_org_chart_snapshot_rpc.sql</code> para restaurar o acesso em ambientes com RLS restrito.
+              </p>
+            </div>
+            {!isStatic && allowManualRefresh && (
+              <button
+                onClick={fetchData}
+                className="px-3 py-2 bg-amber-100 text-amber-900 rounded-lg text-xs font-semibold hover:bg-amber-200 transition-colors whitespace-nowrap"
+              >
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Alerta de Cargos Faltantes */}
       {missingCargos.length > 0 && (
         <div className="absolute top-4 left-4 right-4 z-30 bg-red-50 border-l-4 border-red-500 p-3 rounded-r shadow-lg">
