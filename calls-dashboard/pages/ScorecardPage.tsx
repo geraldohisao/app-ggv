@@ -38,6 +38,18 @@ export default function ScorecardPage() {
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  async function fetchAvailableCallTypes() {
+    try {
+      const { data, error } = await supabase.rpc('get_all_etapas_with_indefinida');
+      if (error) throw error;
+      // Mapear para formato compatível, incluindo indefinida
+      const etapas = (data || []).map((item: any) => item.etapa_codigo || 'indefinida');
+      setAvailableCallTypes(etapas);
+    } catch (err) {
+      console.error('Erro ao buscar etapas:', err);
+    }
+  }
+
   async function loadScorecards() {
     try {
       setLoading(true);
@@ -74,18 +86,6 @@ export default function ScorecardPage() {
       </div>
     );
   }
-
-  const fetchAvailableCallTypes = async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_all_etapas_with_indefinida');
-      if (error) throw error;
-      // Mapear para formato compatível, incluindo indefinida
-      const etapas = (data || []).map((item: any) => item.etapa_codigo || 'indefinida');
-      setAvailableCallTypes(etapas);
-    } catch (err) {
-      console.error('Erro ao buscar etapas:', err);
-    }
-  };
 
   const toggleScorecard = async (id: string, currentStatus: boolean) => {
     try {
