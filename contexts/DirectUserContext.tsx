@@ -53,6 +53,91 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Ativar keep-alive da sessão apenas quando usuário estiver logado
     useSessionKeepAlive();
 
+    // ============================
+    // Helpers: profile lookup
+    // ============================
+    const fetchProfileForSessionUser = async (sessionUser: any) => {
+        if (!supabase || !sessionUser) return null;
+        const userId = sessionUser.id as string | undefined;
+        const email = (sessionUser.email as string | undefined) || '';
+        try {
+            // 1) Tentativa padrão (compatível com schema "profiles.id = auth.uid()")
+            if (userId) {
+                const { data: byId } = await supabase
+                    .from('profiles')
+                    .select('id, role, department, cargo, user_function, avatar_url, email')
+                    .eq('id', userId)
+                    .maybeSingle();
+                if (byId) return byId;
+            }
+        } catch {
+            // ignore (fallback abaixo)
+        }
+
+        try {
+            // 2) Fallback por email (compatível com schema onde profiles.id não é auth.uid())
+            if (email) {
+                const { data: byEmail } = await supabase
+                    .from('profiles')
+                    .select('id, role, department, cargo, user_function, avatar_url, email')
+                    .eq('email', email)
+                    .maybeSingle();
+                if (byEmail) return byEmail;
+            }
+        } catch {
+            // ignore
+        }
+
+        return null;
+    };
+
+    // ========================================
+    // Supabase session keep-in-sync (com sessão local 100h)
+    // ========================================
+    const SUPABASE_SESSION_BACKUP_KEY = 'ggv-supabase-session-backup-v1';
+
+    const saveSupabaseSessionBackup = async () => {
+        if (!supabase) return;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token && session?.refresh_token) {
+                // NÃO logar tokens (segredo). Apenas salva para rehidratar se necessário.
+                localStorage.setItem(SUPABASE_SESSION_BACKUP_KEY, JSON.stringify({
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                    expires_at: session.expires_at || null,
+                }));
+                console.log('🔐 DIRECT CONTEXT - Backup de sessão Supabase salvo');
+            }
+        } catch {}
+    };
+
+    const restoreSupabaseSessionFromBackup = async (): Promise<boolean> => {
+        if (!supabase) return false;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) return true;
+        } catch {}
+
+        try {
+            const raw = localStorage.getItem(SUPABASE_SESSION_BACKUP_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            const access_token = parsed?.access_token;
+            const refresh_token = parsed?.refresh_token;
+            if (!access_token || !refresh_token) return false;
+
+            // Rehidratar sessão (não exige logout/login manual; usa refresh_token salvo)
+            const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+            const ok = !!data?.session?.user && !error;
+            console.log('🔐 DIRECT CONTEXT - Rehidratação Supabase:', { ok });
+            return ok;
+        } catch (e) {
+            console.warn('⚠️ DIRECT CONTEXT - Falha ao rehidratar sessão Supabase:', e);
+            return false;
+        }
+    };
+
     useEffect(() => {
         console.log('🚀 DIRECT CONTEXT - Iniciando...');
         
@@ -63,23 +148,23 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (sessionInfo.isLoggedIn && sessionInfo.isValid) {
                 console.log('✅ DIRECT CONTEXT - Usuário válido encontrado no localStorage:', sessionInfo.user.email);
                 console.log(`🕐 DIRECT CONTEXT - Sessão válida por mais ${sessionInfo.remainingHours} horas`);
+
                 // #region agent log
-                if (sessionInfo.user?.email === 'geraldo@grupoggv.com' || sessionInfo.user?.email === 'geraldo@ggvinteligencia.com.br') {
-                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:65',message:'Local session user avatar',data:{email:sessionInfo.user?.email,localAvatarUrl:sessionInfo.user?.avatar_url,localInitials:sessionInfo.user?.initials},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                // Evitar CSP noise em produção: só logar para collector em localhost
+                const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                const isLocal = host === 'localhost' || host === '127.0.0.1';
+                if (isLocal && (sessionInfo.user?.email === 'geraldo@grupoggv.com' || sessionInfo.user?.email === 'geraldo@ggvinteligencia.com.br')) {
+                    fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:local',message:'Local session user present',data:{hasUser:!!sessionInfo.user},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
                 }
                 // #endregion
-                // #region agent log
-                if (supabase && (sessionInfo.user?.email === 'geraldo@grupoggv.com' || sessionInfo.user?.email === 'geraldo@ggvinteligencia.com.br')) {
+
+                // Tentar manter Supabase Auth sincronizado com a sessão local (sem exigir logout/login)
+                if (supabase) {
                     (async () => {
-                        try {
-                            const { data: { session } } = await supabase.auth.getSession();
-                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:73',message:'Supabase session metadata snapshot',data:{email:session?.user?.email,metaAvatarUrl:session?.user?.user_metadata?.avatar_url,metaPicture:session?.user?.user_metadata?.picture},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-                        } catch (e) {
-                            fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:79',message:'Supabase session metadata error',data:{error:true},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-                        }
+                        const ok = await restoreSupabaseSessionFromBackup();
+                        console.log('🔐 DIRECT CONTEXT - Supabase session status (after restore attempt):', { ok });
                     })();
                 }
-                // #endregion
                 
                 // Salvar novamente para renovar timestamp automaticamente
                 saveSession(sessionInfo.user);
@@ -117,11 +202,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             try {
                                 const { data: { session } } = await supabase.auth.getSession();
                                 if (session?.user) {
-                                    const { data: profile } = await supabase
-                                        .from('profiles')
-                                        .select('role, department, cargo, user_function, avatar_url')
-                                        .eq('id', session.user.id)
-                                        .single();
+                                    const profile = await fetchProfileForSessionUser(session.user);
                                     if (profile && (profile.role || profile.department || profile.cargo || profile.avatar_url)) {
                                         const updatedUser = {
                                             ...sessionInfo.user,
@@ -165,6 +246,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     
                     if (session?.user && !error) {
                         console.log('✅ DIRECT CONTEXT - Sessão Supabase encontrada como backup');
+                        // Guardar backup para rehidratar na próxima vez
+                        saveSupabaseSessionBackup().catch(()=>{});
                         
                         const email = session.user.email || '';
                         const name = session.user.user_metadata?.full_name || 
@@ -177,7 +260,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                                session.user.user_metadata?.picture || 
                                                undefined;
                         // #region agent log
-                        if (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br') {
+                        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                        const isLocal = host === 'localhost' || host === '127.0.0.1';
+                        if (isLocal && (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br')) {
                             fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:164',message:'Auth session avatar metadata',data:{email:email,metaAvatarUrl:session.user.user_metadata?.avatar_url,metaPicture:session.user.user_metadata?.picture,googleAvatarUrl:googleAvatarUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
                         }
                         // #endregion
@@ -190,11 +275,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         let userAvatarUrl: string | undefined = googleAvatarUrl; // Começa com foto do Google
                         
                         try {
-                            const { data: profile } = await supabase
-                                .from('profiles')
-                                .select('role, department, cargo, user_function, avatar_url')
-                                .eq('id', session.user.id)
-                                .single();
+                            const profile = await fetchProfileForSessionUser(session.user);
                             
                             if (profile?.role) {
                                 userRole = profile.role as UserRole;
@@ -205,7 +286,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 userAvatarUrl = profile.avatar_url || googleAvatarUrl || undefined;
                                 console.log('✅ DIRECT CONTEXT - Role, department e cargo carregados do banco:', { role: userRole, department: userDepartment, cargo: userCargo, function: userFunction, avatar_url: !!userAvatarUrl, source: profile.avatar_url ? 'db' : 'google' });
                                 // #region agent log
-                                if (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br') {
+                                const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                                const isLocal = host === 'localhost' || host === '127.0.0.1';
+                                if (isLocal && (email === 'geraldo@grupoggv.com' || email === 'geraldo@ggvinteligencia.com.br')) {
                                     fetch('http://127.0.0.1:7242/ingest/d9f25aad-ab08-4cdf-bf8b-99a2626827e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectUserContext.tsx:189',message:'Profile avatar selection',data:{email:email,profileAvatarUrl:profile.avatar_url,googleAvatarUrl:googleAvatarUrl,finalUserAvatarUrl:userAvatarUrl,source:profile.avatar_url ? 'db' : (googleAvatarUrl ? 'google' : 'none')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
                                 }
                                 // #endregion
@@ -307,16 +390,15 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const handleAuthSuccess = async (authenticatedUser: User) => {
         console.log('✅ DIRECT CONTEXT - Login bem-sucedido:', authenticatedUser.email);
+        // Persistir backup Supabase logo após login (para evitar "desconectar do banco")
+        saveSupabaseSessionBackup().catch(()=>{});
         
         // Atualizar role e função do usuário consultando a tabela profiles
         let finalUser = authenticatedUser;
         try {
             if (supabase) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role, department, cargo, user_function, avatar_url')
-                    .eq('id', authenticatedUser.id)
-                    .single();
+                const { data: { session } } = await supabase.auth.getSession();
+                const profile = session?.user ? await fetchProfileForSessionUser(session.user) : null;
                 
                 if (profile) {
                     finalUser = {
@@ -408,11 +490,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         try {
             // Buscar role, department, cargo e avatar_url atualizados do banco
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role, department, cargo, user_function, avatar_url')
-                .eq('id', user.id)
-                .single();
+            const { data: { session } } = await supabase.auth.getSession();
+            const profile = session?.user ? await fetchProfileForSessionUser(session.user) : null;
             
             if (profile && (profile.role !== user.role || profile.department !== user.department || profile.cargo !== user.cargo || profile.user_function !== user.user_function || profile.avatar_url !== user.avatar_url)) {
                 const updatedUser = {

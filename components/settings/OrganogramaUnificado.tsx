@@ -377,7 +377,7 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
           console.warn('⚠️ RPC get_org_chart_snapshot falhou, usando fallback:', rpcError);
           debugLog('B', 'OrganogramaUnificado.tsx:fetchData:rpc', 'RPC error', { code: (rpcError as any).code || null, message: (rpcError as any).message || null });
           if ((rpcError as any)?.message === 'not_authenticated') {
-            setLoadError('Sessão do Supabase não autenticada. Faça logout e login novamente para carregar o organograma.');
+            setLoadError('Sem sessão ativa no Supabase (banco). Clique em “Reconectar” para revalidar sua sessão sem precisar fazer logout manual.');
           }
         }
       } catch (e) {
@@ -573,12 +573,33 @@ export const OrganogramaUnificado: React.FC<OrganogramaUnificadoProps> = ({
               </p>
             </div>
             {!isStatic && allowManualRefresh && (
-              <button
-                onClick={fetchData}
-                className="px-3 py-2 bg-amber-100 text-amber-900 rounded-lg text-xs font-semibold hover:bg-amber-200 transition-colors whitespace-nowrap"
-              >
-                Tentar novamente
-              </button>
+              <div className="flex flex-col gap-2 items-end">
+                <button
+                  onClick={fetchData}
+                  className="px-3 py-2 bg-amber-100 text-amber-900 rounded-lg text-xs font-semibold hover:bg-amber-200 transition-colors whitespace-nowrap"
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      if (!supabase) return;
+                      const isProduction = window.location.hostname === 'app.grupoggv.com';
+                      const redirectOrigin = isProduction ? 'https://app.grupoggv.com' : window.location.origin;
+                      const redirectTo = redirectOrigin + window.location.pathname + window.location.search;
+                      await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: { redirectTo }
+                      });
+                    } catch (e) {
+                      console.warn('Falha ao iniciar reconexão OAuth:', e);
+                    }
+                  }}
+                  className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                >
+                  Reconectar
+                </button>
+              </div>
             )}
           </div>
         </div>
