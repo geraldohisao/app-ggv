@@ -114,6 +114,7 @@ const okrFormSchema = z.object({
   department: z.enum([Department.GENERAL, Department.COMMERCIAL, Department.MARKETING, Department.PROJECTS]),
   owner: z.string().min(2),
   objective: z.string().min(10),
+  description: z.string().optional(),
   start_date: z.string(),
   end_date: z.string(),
   periodicity: z.enum([Periodicity.MONTHLY, Periodicity.QUARTERLY]),
@@ -422,6 +423,7 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
               department: data.department,
               owner: data.owner,
               objective: data.objective,
+              description: data.description || null,
               start_date: data.start_date,
               end_date: data.end_date,
               periodicity: data.periodicity,
@@ -478,6 +480,18 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
                 {errors.objective && (
                   <p className="text-rose-600 text-sm font-medium mt-2">{errors.objective.message}</p>
                 )}
+              </div>
+
+              <div>
+                <h3 className="text-base font-black uppercase tracking-wider text-slate-700 mb-3">
+                  Descrição do OKR (opcional)
+                </h3>
+                <textarea
+                  {...register('description')}
+                  placeholder="Contexto/escopo do OKR, definição de sucesso, observações importantes..."
+                  autoComplete="off"
+                  className="w-full bg-slate-50 rounded-2xl p-6 border-none focus:ring-2 focus:ring-[#5B5FF5] text-sm font-semibold text-slate-800 placeholder:text-slate-300 min-h-[110px] leading-relaxed"
+                />
               </div>
 
               <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100 flex items-center justify-between gap-6">

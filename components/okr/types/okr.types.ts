@@ -119,6 +119,7 @@ export const okrSchema = z.object({
   ]),
   owner: z.string().min(2, 'Nome do responsável é obrigatório'),
   objective: z.string().min(10, 'Objetivo deve ter pelo menos 10 caracteres'),
+  description: z.string().nullable().optional(),
   start_date: z.string().refine((date) => !isNaN(Date.parse(date)), {
     message: 'Data de início inválida',
   }),

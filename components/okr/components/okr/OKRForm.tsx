@@ -27,6 +27,7 @@ const okrFormSchema = z.object({
   ]),
   owner: z.string().min(2, 'Nome do responsável é obrigatório'),
   objective: z.string().min(10, 'Objetivo deve ter pelo menos 10 caracteres'),
+  description: z.string().optional(),
   start_date: z.string(),
   end_date: z.string(),
   periodicity: z.enum([Periodicity.MONTHLY, Periodicity.QUARTERLY]),
@@ -90,6 +91,7 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
           department: okr.department,
           owner: okr.owner,
           objective: okr.objective,
+          description: (okr as any).description || '',
           start_date: okr.start_date,
           end_date: okr.end_date,
           periodicity: okr.periodicity,
@@ -102,6 +104,7 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
           department: Department.GENERAL,
           owner: '',
           objective: '',
+          description: '',
           start_date: `${new Date().getFullYear()}-01-01`,
           end_date: `${new Date().getFullYear()}-12-31`,
           periodicity: Periodicity.QUARTERLY,
@@ -167,6 +170,7 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
             department: data.department,
             owner: data.owner,
             objective: data.objective,
+            description: data.description || null,
             start_date: data.start_date,
             end_date: data.end_date,
             periodicity: data.periodicity,
@@ -198,6 +202,7 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
             department: data.department,
             owner: data.owner,
             objective: data.objective,
+            description: data.description || null,
             start_date: data.start_date,
             end_date: data.end_date,
             periodicity: data.periodicity,
@@ -384,6 +389,19 @@ export const OKRForm: React.FC<OKRFormProps> = ({ okr, onClose, onSuccess }) => 
                 {errors.objective.message}
               </p>
             )}
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Descrição (opcional)
+            </label>
+            <textarea
+              {...register('description')}
+              rows={2}
+              placeholder="Contexto/escopo do OKR, definição de sucesso, observações importantes..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
           </div>
 
           {/* Observações */}

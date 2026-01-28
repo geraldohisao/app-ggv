@@ -51,7 +51,7 @@ export async function createOKR(okr: Partial<OKR>): Promise<OKR | null> {
 
     // Selecionar apenas colunas reais da tabela para evitar conflitos de cache/relationships
     const columns =
-      'id,user_id,level,department,owner,objective,start_date,end_date,periodicity,status,notes,created_at,updated_at,position';
+      'id,user_id,level,department,owner,objective,description,start_date,end_date,periodicity,status,notes,created_at,updated_at,position';
 
     const { data, error } = await supabase
       .from('okrs')

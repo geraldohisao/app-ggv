@@ -511,6 +511,11 @@ export const OKRCard: React.FC<OKRCardProps> = ({ okr, onClick, ownerAvatarUrl, 
           <h3 className="text-2xl font-bold text-slate-900 leading-tight group-hover:text-[#5B5FF5] transition-colors mb-2">
             {okr.objective}
           </h3>
+          {(okr as any).description && (
+            <p className="text-sm text-slate-600 line-clamp-3 mb-3" title={(okr as any).description}>
+              {(okr as any).description}
+            </p>
+          )}
           {okr.notes && (
             <p className="text-sm text-slate-500 line-clamp-2 mb-3" title={okr.notes}>
               {okr.notes}
