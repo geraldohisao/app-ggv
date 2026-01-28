@@ -212,6 +212,7 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
   const { fields, append, remove, move } = useFieldArray({ control, name: 'key_results' });
   const watchKeyResults = watch('key_results');
   const watchObjective = watch('objective');
+  const watchDescription = watch('description');
   const watchOwner = watch('owner');
 
   const trackRemovedKRId = (maybeId?: string) => {
@@ -350,7 +351,7 @@ export const OKRFormSimple: React.FC<{ okr?: OKR; onClose: () => void; onSuccess
 
     setIsGeneratingKRs(true);
     try {
-      const suggestions = await suggestKeyResults(watchObjective);
+      const suggestions = await suggestKeyResults(watchObjective, watchDescription);
 
       // Limpar KRs existentes e adicionar sugestões
       // Se estiver editando, registrar IDs atuais para remoção explícita (seguro).

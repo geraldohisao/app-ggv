@@ -106,16 +106,20 @@ const krSuggestionSchema = {
 // OPENAI
 // ============================================
 
-async function suggestKRsWithOpenAI(objective: string): Promise<any> {
+async function suggestKRsWithOpenAI(objective: string, description?: string | null): Promise<any> {
   const apiKey = await getApiKey('openai');
   if (!apiKey) throw new Error('OpenAI API Key não configurada');
 
+  const extraContext = (description || '').trim();
   const prompt = `Você é um especialista em OKRs (Objectives and Key Results).
 
 OBJETIVO DO USUÁRIO:
 "${objective}"
 
-TAREFA:
+${extraContext ? `DESCRIÇÃO/CONTEXTO (OPCIONAL):
+"${extraContext}"
+
+` : ''}TAREFA:
 Sugira entre 3 e 5 Key Results (KRs) SMART para este objetivo.
 
 REGRAS:
@@ -185,11 +189,13 @@ Retorne APENAS o JSON sem explicações adicionais.`;
 // GEMINI (Fallback)
 // ============================================
 
-async function suggestKRsWithGemini(objective: string): Promise<any> {
+async function suggestKRsWithGemini(objective: string, description?: string | null): Promise<any> {
   const apiKey = await getApiKey('gemini');
   if (!apiKey) throw new Error('Gemini API Key não configurada');
 
+  const extraContext = (description || '').trim();
   const prompt = `Sugira entre 3 e 5 Key Results para este objetivo: "${objective}".
+${extraContext ? `\nContexto/descrição do OKR: "${extraContext}".\n` : '\n'}
 
 Retorne JSON no formato:
 {
@@ -245,7 +251,7 @@ Retorne JSON no formato:
 // FUNÇÃO PRINCIPAL
 // ============================================
 
-export async function suggestKeyResults(objective: string): Promise<{
+export async function suggestKeyResults(objective: string, description?: string | null): Promise<{
   title: string;
   type: string;
   direction?: string;
@@ -261,7 +267,7 @@ export async function suggestKeyResults(objective: string): Promise<{
     // Tenta OpenAI
     console.log('🔵 Tentando OpenAI...');
     try {
-      const result = await suggestKRsWithOpenAI(objective);
+      const result = await suggestKRsWithOpenAI(objective, description);
       console.log('✅ OpenAI retornou sugestões!');
       return result.suggestions || [];
     } catch (openAIError) {
@@ -271,7 +277,7 @@ export async function suggestKeyResults(objective: string): Promise<{
     // Fallback Gemini
     console.log('🟣 Tentando Gemini...');
     try {
-      const result = await suggestKRsWithGemini(objective);
+      const result = await suggestKRsWithGemini(objective, description);
       console.log('✅ Gemini retornou sugestões!');
       return result.suggestions || [];
     } catch (geminiError) {
