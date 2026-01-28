@@ -722,7 +722,8 @@ export async function getSprintKRs(sprintId: string): Promise<any[]> {
         // Buscar KRs de múltiplos OKRs
         const { data: krs } = await supabase
           .from('key_results')
-          .select('*, okrs(objective, owner)')
+          // incluir período do OKR para habilitar metas mensais no editor do KR
+          .select('*, okrs(objective, owner, start_date, end_date)')
           .in('okr_id', okrIds);
 
         return krs || [];
@@ -735,7 +736,8 @@ export async function getSprintKRs(sprintId: string): Promise<any[]> {
     // 2. Buscar KRs do OKR único
     const { data: krs } = await supabase
       .from('key_results')
-      .select('*, okrs(objective, owner)')
+      // incluir período do OKR para habilitar metas mensais no editor do KR
+      .select('*, okrs(objective, owner, start_date, end_date)')
       .eq('okr_id', sprint.okr_id);
 
     return krs || [];

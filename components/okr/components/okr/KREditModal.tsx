@@ -60,11 +60,19 @@ export const KREditModal: React.FC<KREditModalProps> = ({
   // - direções especiais => point por padrão
   // ============================================
 
+  const effectiveOKRStartDate = useMemo(() => {
+    return okrStartDate || (kr as any)?.okrs?.start_date || undefined;
+  }, [kr, okrStartDate]);
+
+  const effectiveOKREndDate = useMemo(() => {
+    return okrEndDate || (kr as any)?.okrs?.end_date || undefined;
+  }, [kr, okrEndDate]);
+
   const monthsInCycle = useMemo(() => {
-    if (!okrStartDate || !okrEndDate) return [];
+    if (!effectiveOKRStartDate || !effectiveOKREndDate) return [];
     try {
-      const start = parseLocalDate(okrStartDate);
-      const end = parseLocalDate(okrEndDate);
+      const start = parseLocalDate(effectiveOKRStartDate);
+      const end = parseLocalDate(effectiveOKREndDate);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
 
       const cur = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -79,7 +87,7 @@ export const KREditModal: React.FC<KREditModalProps> = ({
     } catch {
       return [];
     }
-  }, [okrStartDate, okrEndDate]);
+  }, [effectiveOKRStartDate, effectiveOKREndDate]);
 
   const monthlyTargetKind: KRTargetKind | null = useMemo(() => {
     if (isActivity) return null;
