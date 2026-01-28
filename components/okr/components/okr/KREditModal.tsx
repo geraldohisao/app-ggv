@@ -121,6 +121,32 @@ export const KREditModal: React.FC<KREditModalProps> = ({
     return `${y}-${m}-01`;
   };
 
+  const parsePtNumber = (raw: string): number | null => {
+    const s = (raw || '').trim().replace(/\s/g, '');
+    if (!s) return null;
+
+    // Aceitar formatos:
+    // - 100000
+    // - 100000.50
+    // - 100.000
+    // - 100.000,50
+    // - 1.000.000
+    let normalized = s;
+    if (normalized.includes(',')) {
+      // vírgula como decimal => remove milhares (.) e troca , por .
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else {
+      const dots = normalized.match(/\./g)?.length || 0;
+      if (dots > 1) {
+        // vários pontos => tratar como milhares
+        normalized = normalized.replace(/\./g, '');
+      }
+    }
+
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const formatMonthLabel = (d: Date): string => {
     return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
   };
@@ -164,8 +190,8 @@ export const KREditModal: React.FC<KREditModalProps> = ({
     const parsed = monthsInCycle.map((m) => {
       const key = monthKey(m);
       const raw = (monthlyTargetMap[key] || '').trim();
-      const num = raw ? Number(raw.replace(',', '.')) : null;
-      return { key, month: m, value: Number.isFinite(num as any) ? (num as number) : null };
+      const num = parsePtNumber(raw);
+      return { key, month: m, value: typeof num === 'number' ? num : null };
     });
 
     if (monthlyTargetKind === 'delta') {
@@ -633,16 +659,15 @@ export const KREditModal: React.FC<KREditModalProps> = ({
                                 {formatMonthLabel(m)}
                               </div>
                               <input
-                                type="number"
-                                step="any"
-                                min={0}
+                                type="text"
+                                inputMode="decimal"
                                 value={raw}
                                 onChange={(e) => {
                                   setMonthlyTargetMap((prev) => ({ ...prev, [key]: e.target.value }));
                                   setMonthlyTargetsError(null);
                                   setMonthlyTargetsSavedMsg(null);
                                 }}
-                                placeholder={monthlyTargetKind === 'delta' ? 'Meta do mês' : 'Meta fim do mês'}
+                                placeholder={monthlyTargetKind === 'delta' ? 'Ex: 150000 ou 150.000' : 'Ex: 3,5'}
                                 className="flex-1 bg-slate-50 rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                               />
                               {monthlyTargetKind === 'delta' && (
@@ -710,8 +735,8 @@ export const KREditModal: React.FC<KREditModalProps> = ({
                                   const key = monthKey(m);
                                   const raw = (monthlyTargetMap[key] || '').trim();
                                   if (!raw) return null;
-                                  const n = Number(raw.replace(',', '.'));
-                                  if (!Number.isFinite(n) || n < 0) return { key, invalid: true };
+                                  const n = parsePtNumber(raw);
+                                  if (typeof n !== 'number' || n < 0) return { key, invalid: true };
                                   return {
                                     period_start: key,
                                     target_kind: monthlyTargetKind,
